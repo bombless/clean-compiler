@@ -1704,8 +1704,27 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 
 	if (array_state.state_type == ArrayState){
 		StateS elem_state = array_state.state_array_arguments [0];
-		DetermineArrayElemDescr (elem_state, & elem_desc);
-		DetermineSizeOfState	(elem_state, & asize, & bsize);
+
+		if (array_state.state_mark & STATE_PACKED_ARRAY_MASK){
+			elem_desc.lab_mod		= NULL;
+			elem_desc.lab_pref		= no_pref;
+			elem_desc.lab_issymbol	= False;
+			elem_desc.lab_post		= 0;
+
+			if (elem_state.state_object==IntObj)
+				elem_desc.lab_name = "INT32";
+			else if (elem_state.state_object==RealObj)
+				elem_desc.lab_name = "REAL32";
+			else
+				error_in_function ("CallArrayFunction");
+
+			asize = 0;
+			bsize = 1;
+		} else {
+			DetermineArrayElemDescr (elem_state, & elem_desc);
+			DetermineSizeOfState	(elem_state, & asize, & bsize);
+		}
+
 		elem_is_lazy = elem_state.state_type==SimpleState && elem_state.state_kind==OnA;
 	} else
 		error_in_function ("CallArrayFunction");
