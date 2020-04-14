@@ -1417,9 +1417,9 @@ cIsNotStrict	:== False
 				| OverloadedListPatterns !OverloadedListType !Expression ![AlgebraicPattern]
 				| NoPattern											/* auxiliary */
 
-::	OverloadedListType	= UnboxedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_u index, nil_u index
-						| UnboxedTailStrictList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons_uts index, nil_uts index
-						| OverloadedList !GlobalIndex !Index !Index !Index // list_type_symbol StdStrictLists module index, decons index, nil index
+::	OverloadedListType	= UnboxedList !Index !Index !Index // StdStrictLists module index, decons_u index, nil_u index
+						| UnboxedTailStrictList !Index !Index !Index // StdStrictLists module index, decons_uts index, nil_uts index
+						| OverloadedList !Index !Index !Index // StdStrictLists module index, decons index, nil index
 
 instance == OverloadedListType
 

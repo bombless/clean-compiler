@@ -272,16 +272,16 @@ where
 		| type1 == type2
 			= merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 		= case (type1,type2) of
-			(OverloadedList _ _ _ _,UnboxedList type_symbol stdStrictLists_index decons_index nil_index)
+			(OverloadedList _ _ _,UnboxedList _ _ _)
 				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
 				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
-			(OverloadedList _ _ _ _,UnboxedTailStrictList type_symbol stdStrictLists_index decons_index nil_index)
+			(OverloadedList _ _ _,UnboxedTailStrictList _ _ _)
 				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
 				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
-			(UnboxedList type_symbol stdStrictLists_index decons_index nil_index,OverloadedList _ _ _ _)
+			(UnboxedList _ _ _,OverloadedList _ _ _)
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
 				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
-			(UnboxedTailStrictList type_symbol stdStrictLists_index decons_index nil_index,OverloadedList _ _ _ _)
+			(UnboxedTailStrictList _ _ _,OverloadedList _ _ _)
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
 				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 			_
@@ -295,7 +295,7 @@ where
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
 	merge_guards guards=:(AlgebraicPatterns type1 patterns1) (OverloadedListPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
-		| type1.gi_module==cPredefinedModuleIndex && isOverloaded type2
+		| type1.gi_module==cPredefinedModuleIndex && type2=:OverloadedList _ _ _
 			# index=type1.gi_index+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_ConsSymbol PD_NilSymbol
@@ -311,7 +311,7 @@ where
 				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 	merge_guards guards=:(OverloadedListPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
-		| type2.gi_module==cPredefinedModuleIndex && isOverloaded type1
+		| type2.gi_module==cPredefinedModuleIndex && type1=:OverloadedList _ _ _
 			# index=type2.gi_index+FirstTypePredefinedSymbolIndex
 			| index==PD_ListType
 				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_ConsSymbol PD_NilSymbol
@@ -423,8 +423,3 @@ mergeCases (Case first_case=:{case_default, case_default_pos, case_explicit}, ca
 					var_heap, symbol_heap, error)
 mergeCases expr_and_pos=:(_,pos) _ var_heap symbol_heap error
 	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
-
-isOverloaded (OverloadedList _ _ _ _)
-	=	True
-isOverloaded _
-	=	False

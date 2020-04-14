@@ -1010,11 +1010,11 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 			= (argument_types,result_type,tst_context,tst_attr_env,ts)
 
 freshOverloadedListType :: !OverloadedListType !CoercionPosition ![AlgebraicPattern] !{#CommonDefs} !{#{#FunType }} !*TypeState -> (![[AType]],!AType,![TypeContext],![AttrCoercion],!*TypeState)
-freshOverloadedListType (UnboxedList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedListType (UnboxedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_UnboxedConsSymbol PD_UnboxedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedListType (UnboxedTailStrictList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedListType (UnboxedTailStrictList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedListType (OverloadedList _ stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedListType (OverloadedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_OverloadedConsSymbol PD_OverloadedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
 
 cWithFreshContextVars 		:== True

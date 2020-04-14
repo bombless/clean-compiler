@@ -680,7 +680,7 @@ instance consumerRequirements Case where
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
 		handle_overloaded_list_patterns
-					(OverloadedListPatterns (OverloadedList _ _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns)
+					(OverloadedListPatterns (OverloadedList _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns)
 					ai
 						// decons_expr will be optimized to a decons_u Selector in transform
 						# (cc, _, ai)	= consumerRequirements app_arg ro ai

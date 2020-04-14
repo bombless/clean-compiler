@@ -616,7 +616,7 @@ where
 				= match_and_instantiate_algebraic_type linearities cons_index app_args guards cons_types case_default ro ti
 			match_and_instantiate_algebraic_type _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
+	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
 		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  ti & ti_symbol_heap=ti_symbol_heap
 		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
