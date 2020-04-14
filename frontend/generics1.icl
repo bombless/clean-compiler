@@ -1175,6 +1175,30 @@ where
 		# name_expr = makeStringExpr name
 		= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
 
+make_unboxed_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_list expr_heap predef_symbols
+	# stdStrictLists_index = predef_symbols.[PD_StdStrictLists].pds_def
+	  nil_u_index = predef_symbols.[PD_nil_u].pds_def
+	  decons_u_index = predef_symbols.[PD_decons_u].pds_def
+	  decons_u_ident = predefined_idents.[PD_decons_u]
+	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
+	  (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+	  decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	  unboxed_list = UnboxedList stdStrictLists_index decons_u_index nil_u_index
+	= (unboxed_list,decons_expr,expr_heap)
+
+make_unboxed_tail_strict_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_tail_strict_list expr_heap predef_symbols
+	# stdStrictLists_index = predef_symbols.[PD_StdStrictLists].pds_def
+	  nil_uts_index = predef_symbols.[PD_nil_uts].pds_def
+	  decons_uts_index = predef_symbols.[PD_decons_uts].pds_def
+	  decons_uts_ident = predefined_idents.[PD_decons_uts]
+	  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
+	  (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+	  decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	  unboxed_list = UnboxedTailStrictList stdStrictLists_index decons_uts_index nil_uts_index
+	= (unboxed_list,decons_expr,expr_heap)
+
 //	conversions functions
 
 // conversion from type to generic
@@ -1230,9 +1254,21 @@ where
 	build_expr_for_conses type_def_mod type_def_index cons_def_syms arg_expr heaps error
 		# (case_alts, heaps, error)
 			= build_exprs_for_conses 0 (length cons_def_syms) type_def_mod cons_def_syms  heaps error
-		# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
-		# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
-		= (case_expr, heaps, error)
+		| type_def_mod==cPredefinedModuleIndex && type_def_index+FirstTypePredefinedSymbolIndex==PD_UnboxedListType
+			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
+			  heaps & hp_expression_heap=expression_heap
+			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+			= (case_expr, heaps, error)
+		| type_def_mod==cPredefinedModuleIndex && type_def_index+FirstTypePredefinedSymbolIndex==PD_UnboxedTailStrictListType
+			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
+			  heaps & hp_expression_heap=expression_heap
+			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+			= (case_expr, heaps, error)
+			# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
+			# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+			= (case_expr, heaps, error)
 
 	// build conversions for constructors 	
 	build_exprs_for_conses :: !Int !Int !Int ![DefinedSymbol] !*Heaps !*ErrorAdmin
@@ -1369,11 +1405,21 @@ where
 	build_sum :: !Index ![DefinedSymbol] !*Heaps !*ErrorAdmin -> (!Expression,!FreeVar/*top variable*/,!*Heaps,!*ErrorAdmin)
 	build_sum type_def_mod [] heaps error
 		= abort "algebraic type with no constructors!\n"
-	build_sum type_def_mod [def_symbol] heaps error
-		#! (cons_app_expr, cons_arg_vars, heaps) = build_cons_app type_def_mod def_symbol heaps
-		#! (prod_expr, var, heaps) = build_case_prod False cons_app_expr cons_arg_vars predefs heaps
-		#! (alt_expr, var, heaps) = build_case_cons var prod_expr predefs heaps
-		= (alt_expr, var, heaps, error)
+	build_sum type_def_mod [{ds_arity,ds_index,ds_ident}] heaps error
+		| type_def_mod==cPredefinedModuleIndex
+			# cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
+			| cons_index==PD_UnboxedConsSymbol
+				= build_sum_cons (buildUnboxedConsSymbIdent PD_cons_u predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedTailStrictConsSymbol
+				= build_sum_cons (buildUnboxedConsSymbIdent PD_cons_uts predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedNilSymbol
+				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_u predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedTailStrictNilSymbol
+				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_uts predefs.psd_predefs_a) ds_arity heaps error
+				# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
+				= build_sum_cons symb_ident ds_arity heaps error
+			# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
+			= build_sum_cons symb_ident ds_arity heaps error
 	build_sum type_def_mod def_symbols heaps error
 		#! (left_def_syms, right_def_syms) = splitAt ((length def_symbols) /2) def_symbols
 		#! (left_expr, left_var, heaps, error) = build_sum type_def_mod left_def_syms heaps error
@@ -1381,9 +1427,17 @@ where
 		#! (case_expr, var, heaps) = build_case_either left_var left_expr right_var right_expr predefs heaps
 		= (case_expr, var, heaps, error)
 
+	build_sum_cons :: !SymbIdent !Int !*Heaps !*ErrorAdmin -> (!Expression,!FreeVar/*top variable*/,!*Heaps,!*ErrorAdmin)
+	build_sum_cons symb_ident ds_arity heaps error
+		#! (cons_app_expr, cons_arg_vars, heaps) = build_cons_app symb_ident ds_arity heaps
+		#! (prod_expr, var, heaps) = build_case_prod False cons_app_expr cons_arg_vars predefs heaps
+		#! (alt_expr, var, heaps) = build_case_cons var prod_expr predefs heaps
+		= (alt_expr, var, heaps, error)
+
 	build_record :: !Index !DefinedSymbol !*Heaps !*ErrorAdmin -> (!Expression,!FreeVar/*top variable*/,!*Heaps,!*ErrorAdmin)
-	build_record type_def_mod def_symbol heaps error
-		#! (cons_app_expr, cons_arg_vars, heaps) = build_cons_app type_def_mod def_symbol heaps
+	build_record type_def_mod {ds_arity,ds_index,ds_ident} heaps error
+		# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
+		#! (cons_app_expr, cons_arg_vars, heaps) = build_cons_app symb_ident ds_arity heaps
 		#! (prod_expr, var, heaps) = build_case_prod True cons_app_expr cons_arg_vars predefs heaps
 		#! (alt_expr, var, heaps) = build_case_record var prod_expr predefs heaps
 		= (alt_expr, var, heaps, error)
@@ -1410,12 +1464,26 @@ build_case_prod add_case_field expr cons_arg_vars predefs heaps
 	#! (case_expr, var, heaps) = build_case_pair left_var right_var expr predefs heaps
 	= (case_expr, var, heaps) 
 
+buildUnboxedConsSymbIdent :: !Int !PredefinedSymbols -> SymbIdent
+buildUnboxedConsSymbIdent predef_index predef_symbols
+	# cons_u_ident = predefined_idents.[predef_index]
+	  {pds_module,pds_def} = predef_symbols.[predef_index]
+	= {symb_ident=cons_u_ident, symb_kind=SK_OverloadedFunction {glob_module=pds_module,glob_object=pds_def}}
+
+buildUnboxedNilSymbIdent :: !Int !PredefinedSymbols -> SymbIdent
+buildUnboxedNilSymbIdent predef_index predef_symbols
+	# cons_u_ident = predefined_idents.[predef_index]
+	  {pds_module,pds_def} = predef_symbols.[predef_index];
+	 = {symb_ident=cons_u_ident, symb_kind=SK_Function {glob_module=pds_module,glob_object=pds_def}};
+
 // build constructor application expression
-build_cons_app :: !Index !DefinedSymbol !*Heaps -> (!Expression, ![FreeVar], !*Heaps)
-build_cons_app cons_mod def_symbol=:{ds_arity} heaps
+build_cons_app :: !SymbIdent !Int !*Heaps -> (!Expression, ![FreeVar], !*Heaps)
+build_cons_app symb_ident ds_arity heaps
 	#! names = ["x"  +++ toString k \\ k <- [1..ds_arity]]
-	#! (var_exprs, vars, heaps) = buildVarExprs names heaps 
-	#! (expr, heaps) = buildConsApp cons_mod def_symbol var_exprs heaps
+	#! (var_exprs, vars, heaps) = buildVarExprs names heaps
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
+	  heaps & hp_expression_heap = hp_expression_heap
+	  expr = App {app_symb = symb_ident,app_args = var_exprs, app_info_ptr = expr_info_ptr}
  	= (expr, vars, heaps)
 
 build_newtype_cons_app :: !Index !DefinedSymbol !*Heaps -> (!Expression, !FreeVar, !*Heaps)
@@ -5362,21 +5430,6 @@ makeListExpr [expr:exprs] predefs heaps
 	# (list_expr, heaps) = makeListExpr exprs predefs heaps 
 	= buildPredefConsApp PD_ConsSymbol [expr, list_expr] predefs heaps
 
-buildConsApp :: !Index DefinedSymbol ![Expression] !*Heaps 
-	-> (!Expression, !*Heaps) 
-buildConsApp cons_mod {ds_ident, ds_index, ds_arity} arg_exprs heaps=:{hp_expression_heap}
-	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
-	# cons_glob = {glob_module = cons_mod, glob_object = ds_index}
-	# expr = App {
-		app_symb = {
-			symb_ident = ds_ident, 
-			symb_kind = SK_Constructor cons_glob
-			}, 
-		app_args = arg_exprs, 
-		app_info_ptr = expr_info_ptr} 	
-	# heaps = { heaps & hp_expression_heap = hp_expression_heap } 
-	= (expr, heaps)	
-
 buildNewTypeConsApp :: !Index DefinedSymbol !Expression !*Heaps -> (!Expression, !*Heaps) 
 buildNewTypeConsApp cons_mod {ds_ident, ds_index, ds_arity} arg_expr heaps=:{hp_expression_heap}
 	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
@@ -5555,6 +5608,7 @@ where
 	fold_guards f (BasicPatterns gi bps) st = foldSt (foldExpr f) [bp_expr\\{bp_expr}<-bps] st
 	fold_guards f (DynamicPatterns dps) st = foldSt (foldExpr f) [dp_rhs\\{dp_rhs}<-dps] st
 	fold_guards f (NewTypePatterns gi aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
+	fold_guards f (OverloadedListPatterns _ _ aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
 	fold_guards f NoPattern st = st
 foldExpr f expr=:(Selection _ expr1 _) st
 	# st = f expr st
@@ -5658,6 +5712,7 @@ where
 		collect (BasicPatterns _ bps) = []
 		collect (DynamicPatterns dps) = [dp_var \\ {dp_var}<-dps]
 		collect (NewTypePatterns _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
+		collect (OverloadedListPatterns _ _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
 		collect NoPattern = []
 	collect_vars expr st = st		
 
