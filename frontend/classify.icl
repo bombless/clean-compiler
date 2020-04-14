@@ -713,22 +713,8 @@ instance consumerRequirements Case where
 			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns common_defs has_default (BasicPatterns BT_Bool _) constructors_and_unsafe_bits
 			= (appearance_loop [0,1] constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
-		inspect_patterns common_defs has_default (OverloadedListPatterns overloaded_list _ _) constructors_and_unsafe_bits
-			# type_def = case overloaded_list of
-							UnboxedList {gi_index,gi_module} _ _ _
-								-> common_defs.[gi_module].com_type_defs.[gi_index]
-							UnboxedTailStrictList {gi_index,gi_module} _ _ _
-								-> common_defs.[gi_module].com_type_defs.[gi_index]
-							OverloadedList {gi_index,gi_module} _ _ _
-								-> common_defs.[gi_module].com_type_defs.[gi_index]
-			  defined_symbols = case type_def.td_rhs of
-									AlgType defined_symbols		-> defined_symbols
-									RecordType {rt_constructor}	-> [rt_constructor]
-									ExtensibleAlgType defined_symbols -> defined_symbols
-									AlgConses defined_symbols _	-> defined_symbols
-			  all_constructors = [ ds_index \\ {ds_index}<-defined_symbols ]
-			  all_sorted_constructors = if (is_sorted all_constructors) all_constructors (sortBy (<) all_constructors)
-			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
+		inspect_patterns common_defs has_default (OverloadedListPatterns _ _ _) constructors_and_unsafe_bits
+			= (check_n_safe_pattern_constructors constructors_and_unsafe_bits 2, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns _ _ _ _
 			= (False, False)
 
@@ -752,6 +738,16 @@ instance consumerRequirements Case where
 				= appearance_loop l1 constructors_in_pattern
 			// the constructor will match safely. Skip over patterns with the same constructor and test the following constructor
 			= appearance_loop constructors_in_type (dropWhile (\(ds_index,_)->ds_index==constructor_in_pattern) constructors_in_pattern)
+
+		check_n_safe_pattern_constructors [] n_remaining_constructors
+			= n_remaining_constructors==0
+		check_n_safe_pattern_constructors [(constructor_in_pattern,is_unsafe_pattern):constructors_in_pattern] n_remaining_constructors
+			| is_unsafe_pattern
+				 // maybe there is another pattern that is safe for this constructor
+				= check_n_safe_pattern_constructors constructors_in_pattern n_remaining_constructors
+			// the constructor will match safely. Skip over patterns with the same constructor and test the following constructor
+			# constructors_in_pattern = dropWhile (\(ds_index,_)->ds_index==constructor_in_pattern) constructors_in_pattern
+			= check_n_safe_pattern_constructors constructors_in_pattern (n_remaining_constructors-1)
 
 		multimatch_loop has_default []
 			= False
