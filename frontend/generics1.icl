@@ -818,6 +818,9 @@ where
 	build_type {td_rhs=NewType cons, td_ident, td_pos} (AlgebraicInfo type_info cons_desc_list_ds _ _) st
 		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module predefs st
 		= (GTSObject type_info {gi_module=gi_module,gi_index=gi_index} cons_desc_list_ds type, st)
+	build_type {td_rhs=AbstractNewType _ cons, td_ident, td_pos} (AlgebraicInfo type_info cons_desc_list_ds _ _) st
+		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module predefs st
+		= (GTSObject type_info {gi_module=gi_module,gi_index=gi_index} cons_desc_list_ds type, st)
 	build_type {td_rhs=SynType type,td_ident, td_pos} type_infos (modules, td_infos, heaps, error)
 		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of a synonym type" error
 		= (GTSE, (modules, td_infos, heaps, error))
@@ -923,6 +926,8 @@ buildTypeDefInfo td=:{td_rhs = AlgType alts} td_module main_module_index predefs
 buildTypeDefInfo td=:{td_rhs = RecordType {rt_constructor, rt_fields}} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildRecordTypeDefInfo td rt_constructor [x\\x<-:rt_fields] td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = NewType cons} td_module main_module_index predefs funs_and_groups modules heaps error
+	= buildAlgebraicTypeDefInfo td [cons] td_module main_module_index predefs funs_and_groups modules heaps error
+buildTypeDefInfo td=:{td_rhs = AbstractNewType _ cons} td_module main_module_index predefs funs_and_groups modules heaps error
 	= buildAlgebraicTypeDefInfo td [cons] td_module main_module_index predefs funs_and_groups modules heaps error
 buildTypeDefInfo td=:{td_rhs = SynType type, td_ident, td_pos} td_module main_module_index predefs funs_and_groups modules heaps error
 	# error = reportError td_ident.id_name td_pos "cannot build constructor information for a synonym type" error
@@ -1241,7 +1246,9 @@ where
 		= build_expr_for_conses type_def_mod type_def_index def_symbols arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (RecordType {rt_constructor}) arg_expr heaps error		
 		= build_expr_for_record type_def_mod type_def_index rt_constructor arg_expr heaps error
- 	build_expr_for_type_rhs type_def_mod type_def_index (NewType cons) arg_expr heaps error
+	build_expr_for_type_rhs type_def_mod type_def_index (NewType cons) arg_expr heaps error
+		= build_expr_for_newtype type_def_mod type_def_index cons arg_expr heaps error
+	build_expr_for_type_rhs type_def_mod type_def_index (AbstractNewType _ cons) arg_expr heaps error
 		= build_expr_for_newtype type_def_mod type_def_index cons arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (AbstractType _) arg_expr  heaps error
 		#! error = checkErrorWithIdentPos (newPosition td_ident td_pos) "cannot build isomorphisms for an abstract type" error
@@ -1389,6 +1396,10 @@ where
 	build_expr_for_type_rhs type_def_mod (RecordType {rt_constructor}) heaps error				
 		= build_record type_def_mod rt_constructor heaps error
 	build_expr_for_type_rhs type_def_mod (NewType cons) heaps error
+		#! (expr, var, heaps) = build_newtype_cons_app type_def_mod cons heaps
+		#! (expr, var, heaps) = build_case_object var expr predefs heaps
+		= (expr, var, heaps, error)
+	build_expr_for_type_rhs type_def_mod (AbstractNewType _ cons) heaps error
 		#! (expr, var, heaps) = build_newtype_cons_app type_def_mod cons heaps
 		#! (expr, var, heaps) = build_case_object var expr predefs heaps
 		= (expr, var, heaps, error)
