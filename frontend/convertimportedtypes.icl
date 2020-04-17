@@ -94,6 +94,13 @@ convert_member_types module_i main_dcl_module_n dcl_mods common_defs used_module
 		= convert_member_types (module_i+1) main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
 		= convert_member_types (module_i+1) main_dcl_module_n dcl_mods common_defs used_module_numbers imported_types imported_conses var_heap type_heaps
 
+cons_type_ptr_and_index_of_class :: !Int !Int !{#CommonDefs} -> (!VarInfoPtr,!Int)
+cons_type_ptr_and_index_of_class module_n class_index common_defs
+	# {com_class_defs,com_type_defs,com_cons_defs} = common_defs.[module_n]
+	  {ds_index=type_index} = com_class_defs.[class_index].class_dictionary
+	  {td_rhs=RecordType {rt_constructor={ds_index=cons_index}}} = com_type_defs.[type_index]
+	= (com_cons_defs.[cons_index].cons_type_ptr,cons_index)
+
 mark_imported_classes_in_instances :: !Int !Int !{#ClassInstance} {#CommonDefs} !ImportedConstructors !*VarHeap
 																			-> (!ImportedConstructors,!*VarHeap)
 mark_imported_classes_in_instances instance_i main_dcl_module_n instance_defs common_defs imported_conses var_heap
@@ -101,12 +108,8 @@ mark_imported_classes_in_instances instance_i main_dcl_module_n instance_defs co
 		# {gi_module,gi_index} = instance_defs.[instance_i].ins_class_index
 		| gi_module==main_dcl_module_n
 			= mark_imported_classes_in_instances (instance_i+1) main_dcl_module_n instance_defs common_defs imported_conses var_heap
-			# {com_class_defs,com_type_defs,com_cons_defs} = common_defs.[gi_module]
-			  {ds_index=type_index} = com_class_defs.[gi_index].class_dictionary
-			  {td_rhs=RecordType {rt_constructor={ds_index=cons_index}}} = com_type_defs.[type_index]
-			  {cons_type_ptr} = com_cons_defs.[cons_index]
-			  (cons_type_ptr_v,var_heap) = readPtr cons_type_ptr var_heap
-			= case cons_type_ptr_v of
+			# (cons_type_ptr,cons_index) = cons_type_ptr_and_index_of_class gi_module gi_index common_defs
+			= case sreadPtr cons_type_ptr var_heap of
 				VI_Used
 					-> mark_imported_classes_in_instances (instance_i+1) main_dcl_module_n instance_defs common_defs imported_conses var_heap
 				VI_ExpandedType _
@@ -116,6 +119,22 @@ mark_imported_classes_in_instances instance_i main_dcl_module_n instance_defs co
 					  imported_conses = [{glob_module=gi_module,glob_object=cons_index}:imported_conses]
 					-> mark_imported_classes_in_instances (instance_i+1) main_dcl_module_n instance_defs common_defs imported_conses var_heap
 		= (imported_conses,var_heap)
+
+mark_imported_class :: !Int !Int !Int {#CommonDefs} !ImportedConstructors !*VarHeap
+												-> (!ImportedConstructors,!*VarHeap)
+mark_imported_class	module_n class_index main_module_n common_defs imported_conses var_heap
+	| module_n==main_module_n
+		= (imported_conses,var_heap)
+	# (cons_type_ptr,cons_index) = cons_type_ptr_and_index_of_class module_n class_index common_defs
+	= case sreadPtr cons_type_ptr var_heap of
+		VI_Used
+			-> (imported_conses,var_heap)
+		VI_ExpandedType _
+			-> (imported_conses,var_heap)
+		_
+			# var_heap = writePtr cons_type_ptr VI_Used var_heap
+			  imported_conses = [{glob_module=module_n,glob_object=cons_index}:imported_conses]
+			-> (imported_conses,var_heap)
 
 convert_member_types_of_module :: !Int !Int !{#ClassDef} !{#CheckedTypeDef} !{#ConsDef} !{#SelectorDef} !{#MemberDef} !Int !{#CommonDefs}
 										!*{#{#CheckedTypeDef}} ![Global Int] !*VarHeap !*TypeHeaps

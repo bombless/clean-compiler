@@ -241,6 +241,13 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (not_exported_generic_classes,dcl_types,used_conses,var_heap,type_heaps,generic_heap)
 		= convertIclModule main_dcl_module_n start_index_generic_classes first_not_exported_generic_def_index common_defs dcl_types used_conses
 			var_heap type_heaps generic_heap
+	# (used_conses,var_heap,predef_symbols)
+		= mark_imported_unboxed_list_class array_instances.ali_list_first_instance_indices PD_UListClass
+											main_dcl_module_n common_defs used_conses var_heap predef_symbols
+	# (used_conses,var_heap,predef_symbols)
+		= mark_imported_unboxed_list_class array_instances.ali_tail_strict_list_first_instance_indices PD_UTSListClass
+											main_dcl_module_n common_defs used_conses var_heap predef_symbols
+
 	# (dcl_types,used_conses,var_heap,type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
@@ -329,10 +336,15 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	where
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
-		
-newSymbolTable :: !Int -> *{# SymbolTableEntry}
-newSymbolTable size
-	= createArray size {  ste_index = NoIndex, ste_def_level = -1, ste_kind = STE_Empty, ste_previous = abort "PreviousPlaceholder"}
+
+mark_imported_unboxed_list_class :: ![Int] !Int !Int !{#CommonDefs} !ImportedConstructors !*VarHeap !*PredefinedSymbols
+																-> (!ImportedConstructors,!*VarHeap,!*PredefinedSymbols)
+mark_imported_unboxed_list_class [] predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
+	= (used_conses,var_heap,predef_symbols)
+mark_imported_unboxed_list_class _ predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
+	# ({pds_module,pds_def},predef_symbols) = predef_symbols![predef_index]
+	# (used_conses,var_heap) = mark_imported_class pds_module pds_def main_dcl_module_n common_defs used_conses var_heap
+	= (used_conses,var_heap,predef_symbols)
 
 showFunctions :: !IndexRange !*{# FunDef} !*File  -> (!*{# FunDef},!*File)
 showFunctions {ir_from, ir_to} fun_defs file
