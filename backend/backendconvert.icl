@@ -297,10 +297,16 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		=	declareDynamicTemp predefs backEnd
 
+	# (old_cons_vi,cons_vi_ptr,var_heap)
+		= remove_VI_ExpandedMemberType_of_List_cons fe_dcls main_dcl_module_n icl_used_module_numbers predefs backEnd.bes_varHeap
+	  backEnd & bes_varHeap = var_heap
+
 	#! (type_var_heap,backEnd)
 		=	defineDclModule main_dcl_module_n fe_dcls.[main_dcl_module_n] type_var_heap backEnd
 	#! (type_var_heap,backEnd)
 		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers type_var_heap backEnd
+
+	# backEnd & bes_varHeap = restore_VI_ExpandedMemberType_of_List_cons old_cons_vi cons_vi_ptr backEnd.bes_varHeap
 
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) backEnd
@@ -387,6 +393,36 @@ where
 		|| not (inNumberSet moduleIndex used_module_numbers)
 			=	identity
 			=	declareDclModule moduleIndex dclModule
+
+/*
+in transformApplication calls to instances List [#(!)] | U(TS)List u_members are converted to List u_members,
+however calling an instance entry of _cons_u or _cons_uts instead of a _cons is incorrect, by temporarily removing
+the VI_ExpandedMemberType BESetMemberTypeOfField is not called and these entries are not used for List._cons calls
+*/
+remove_VI_ExpandedMemberType_of_List_cons :: !{#DclModule} !Int !NumberSet !PredefinedSymbols !*VarHeap -> (!VarInfo,!VarInfoPtr,!*VarHeap)
+remove_VI_ExpandedMemberType_of_List_cons dcls main_dcl_module_n icl_used_module_numbers predefs var_heap
+	# std_strict_list_module_index = predefs.[PD_StdStrictLists].pds_def
+	| std_strict_list_module_index==NoIndex || std_strict_list_module_index==main_dcl_module_n
+			|| not (inNumberSet std_strict_list_module_index icl_used_module_numbers)
+		= (VI_Empty,nilPtr,var_heap)
+	# {com_selector_defs,com_type_defs} = dcls.[std_strict_list_module_index].dcl_common
+	// _cons is the first selector in _SystemStrictLists
+	# {sd_type_ptr,sd_ident,sd_type_index} = com_selector_defs.[0]
+	| sd_ident.id_name<>"_cons" || com_type_defs.[sd_type_index].td_ident.id_name<>"_List"
+		= abort "error in function remove_VI_ExpandedMemberType_of_List_cons"
+	# (old_cons_vi,var_heap) = readPtr sd_type_ptr var_heap
+	= case old_cons_vi of
+		VI_ExpandedMemberType _ previous_vi
+			# var_heap = writePtr sd_type_ptr previous_vi var_heap
+			-> (old_cons_vi,sd_type_ptr,var_heap)
+		_
+			-> (VI_Empty,nilPtr,var_heap)
+
+restore_VI_ExpandedMemberType_of_List_cons :: !VarInfo !VarInfoPtr !*VarHeap -> *VarHeap
+restore_VI_ExpandedMemberType_of_List_cons old_cons_vi cons_vi_ptr var_heap
+	| isNilPtr cons_vi_ptr
+		= var_heap
+		= writePtr cons_vi_ptr old_cons_vi var_heap
 
 defineOtherDclModules :: {#DclModule} Int NumberSet !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineOtherDclModules dcls main_dcl_module_n used_module_numbers type_var_heap beState
