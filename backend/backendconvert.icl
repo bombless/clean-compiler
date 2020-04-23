@@ -408,7 +408,7 @@ remove_VI_ExpandedMemberType_of_List_cons dcls main_dcl_module_n icl_used_module
 	# {com_selector_defs,com_type_defs} = dcls.[std_strict_list_module_index].dcl_common
 	// _cons is the first selector in _SystemStrictLists
 	# {sd_type_ptr,sd_ident,sd_type_index} = com_selector_defs.[0]
-	| sd_ident.id_name<>"_cons" || com_type_defs.[sd_type_index].td_ident.id_name<>"_List"
+	| sd_ident.id_name<>"_cons" || com_type_defs.[sd_type_index].td_ident.id_name<>"List;"
 		= abort "error in function remove_VI_ExpandedMemberType_of_List_cons"
 	# (old_cons_vi,var_heap) = readPtr sd_type_ptr var_heap
 	= case old_cons_vi of
