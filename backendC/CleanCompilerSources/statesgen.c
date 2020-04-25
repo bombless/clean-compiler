@@ -295,7 +295,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 				} else
 					state_p->state_tuple_arguments[i] = arg_type_node->type_node_annotation==NoAnnot ? LazyState : StrictState;
 			}
-		} else if (obj_kind==UnboxedArrayObj || obj_kind==StrictArrayObj || obj_kind==ArrayObj){
+		} else if (obj_kind==UnboxedArrayObj || obj_kind==StrictArrayObj || obj_kind==ArrayObj || obj_kind==PackedArrayObj){
 			TypeNode element_node;
 				
 			element_node=type->type_node_arguments->type_arg_node;
@@ -312,6 +312,8 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 				case StrictArrayObj:
 					state_p->state_array_arguments [0] = StrictState;
 					break;
+				case PackedArrayObj:
+					state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
 				case UnboxedArrayObj:
 					if (element_node->type_node_is_var)
 						state_p->state_array_arguments [0] = StrictState;
@@ -4242,7 +4244,8 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 
 			if (!type_arg->type_arg_node->type_node_is_var &&
 				(type_arg->type_arg_node->type_node_symbol->symb_kind==strict_array_type ||
-				 type_arg->type_arg_node->type_node_symbol->symb_kind==unboxed_array_type)
+				 type_arg->type_arg_node->type_node_symbol->symb_kind==unboxed_array_type ||
+				 type_arg->type_arg_node->type_node_symbol->symb_kind==packed_array_type)
 			){
 				node_id->nid_node->node_annotation=StrictAnnot;
 			} else {
@@ -4566,6 +4569,7 @@ void InitStatesGen (void)
 	SetUnaryState (& BasicSymbolStates[array_type], StrictOnA, ArrayObj);
 	SetUnaryState (& BasicSymbolStates[strict_array_type], StrictOnA, StrictArrayObj);
 	SetUnaryState (& BasicSymbolStates[unboxed_array_type], StrictOnA, UnboxedArrayObj);
+	SetUnaryState (& BasicSymbolStates[packed_array_type], StrictOnA, PackedArrayObj);
 	SetUnaryState (& BasicSymbolStates[fun_type], StrictOnA, UnknownObj);
 	SetUnaryState (& BasicSymbolStates[list_type], StrictOnA, ListObj);
 	SetUnaryState (& BasicSymbolStates[tuple_type], StrictOnA, TupleObj);

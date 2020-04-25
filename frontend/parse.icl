@@ -109,6 +109,10 @@ makeUnboxedArraySymbol arity
 	#! unboxed_array_ident = predefined_idents.[PD_UnboxedArrayType]
 	= MakeNewTypeSymbIdent unboxed_array_ident arity
 
+makePackedArraySymbol arity
+	#! packed_array_ident = predefined_idents.[PD_PackedArrayType]
+	= MakeNewTypeSymbIdent packed_array_ident arity
+
 makeTupleTypeSymbol form_arity act_arity
 	#! tuple_ident = predefined_idents.[GetTupleTypeIndex form_arity]
 	= MakeNewTypeSymbIdent tuple_ident act_arity
@@ -3208,6 +3212,17 @@ trySimpleTypeT CurlyOpenToken attr pState
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+	| token == IntToken "32"
+		# pState = wantToken TypeContext "packed array type" HashToken pState
+		# (token, pState) = nextToken TypeContext pState
+		| token == CurlyCloseToken
+			# array_symbol =  makePackedArraySymbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
+		// otherwise // token <> CurlyCloseToken
+			# (atype, pState) = wantAType_strictness_ignored (tokenBack pState)
+			  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
+			  array_symbol    = makePackedArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
 		# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
 		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
@@ -4530,6 +4545,19 @@ wantRecordOrArrayExp is_pattern pState
 						| token == CurlyCloseToken
 							-> (PE_Record PE_Empty NoRecordName [ field ], pState)
 							-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
+					# (is_32_hash,pState)
+						= case token of
+							IntToken "32"
+								# pState = appScanState setNoNewOffsideForSeqLetBit pState
+								  (token, pState) = nextToken FunctionContext pState
+								  pState = appScanState clearNoNewOffsideForSeqLetBit pState
+								| token=:(SeqLetToken False)
+									-> (True, pState)
+									-> (False, tokenBack pState)
+							_
+								-> (False, pState)
+					| is_32_hash
+						-> want_array_elems PackedArray pState
 					# (expr, pState) = wantExpressionT token pState
 					  (token, pState) = nextToken FunctionContext pState
 					| token == AndToken
