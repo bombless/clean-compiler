@@ -1,12 +1,10 @@
 
 OBJECTS = \
-	backend.obj backendsupport.obj buildtree.obj checker_2.obj \
-	checksupport.obj cocl.obj codegen1.obj codegen2.obj \
-	codegen3.obj codegen.obj comparser_2.obj \
+	backend.obj backendsupport.obj buildtree.obj \
+	cocl.obj codegen1.obj codegen2.obj codegen3.obj codegen.obj \
 	comsupport.obj dbprint.obj instructions.obj optimisations.obj \
-	overloading_2.obj pattern_match_2.obj result_state_database.obj \
-	sa.obj scanner_2.obj set_scope_numbers.obj settings.obj \
-	statesgen.obj tcsupport_2.obj typeconv_2.obj version.obj windows_io.obj
+	pattern_match_2.obj result_state_database.obj sa.obj \
+	set_scope_numbers.obj settings.obj statesgen.obj windows_io.obj
 
 backend.dll: $(OBJECTS)
 	link /dll /release /out:..\backend.dll $(OBJECTS) @..\backend.link64
@@ -19,12 +17,6 @@ backendsupport.obj:
 
 buildtree.obj:
 	cl /nologo /c /D_WINDOWS_ /O buildtree.c
-
-checker_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O checker_2.c
-
-checksupport.obj:
-	cl /nologo /c /D_WINDOWS_ /O checksupport.c
 
 cocl.obj:
 	cl /nologo /c /D_WINDOWS_ /O cocl.c
@@ -41,9 +33,6 @@ codegen3.obj:
 codegen.obj:
 	cl /nologo /c /D_WINDOWS_ /O codegen.c
 
-comparser_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O comparser_2.c
-
 comsupport.obj:
 	cl /nologo /c /D_WINDOWS_ /O comsupport.c
 
@@ -56,9 +45,6 @@ instructions.obj:
 optimisations.obj:
 	cl /nologo /c /D_WINDOWS_ /O optimisations.c
 
-overloading_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O overloading_2.c
-
 pattern_match_2.obj:
 	cl /nologo /c /D_WINDOWS_ /O pattern_match_2.c
 
@@ -68,9 +54,6 @@ result_state_database.obj:
 sa.obj:
 	cl /nologo /c /D_WINDOWS_ /O sa.c
 
-scanner_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O scanner_2.c
-
 set_scope_numbers.obj:
 	cl /nologo /c /D_WINDOWS_ /O set_scope_numbers.c
 
@@ -79,15 +62,6 @@ settings.obj:
 
 statesgen.obj:
 	cl /nologo /c /D_WINDOWS_ /O statesgen.c
-
-tcsupport_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O tcsupport_2.c
-
-typeconv_2.obj:
-	cl /nologo /c /D_WINDOWS_ /O typeconv_2.c
-
-version.obj:
-	cl /nologo /c /D_WINDOWS_ /O version.c
 
 windows_io.obj:
 	cl /nologo /c /D_WINDOWS_ /O windows_io.c
