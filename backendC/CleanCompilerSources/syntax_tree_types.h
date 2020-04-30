@@ -6,7 +6,7 @@ typedef enum
 typedef unsigned AttributeKind;
 
 typedef struct poly_list
-{	void *				pl_elem;
+{	struct symbol_def *	pl_elem;
 	struct poly_list *	pl_next;
 } * PolyList;
 

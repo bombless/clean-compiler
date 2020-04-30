@@ -1557,8 +1557,7 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 	for (next_fun = UserDefinedArrayFunctions; next_fun; next_fun = next_fun -> pl_next){
 		SymbDef arr_fun_def;
 		
-		arr_fun_def = ((Symbol)next_fun->pl_elem)->symb_def;
-
+		arr_fun_def = next_fun->pl_elem;
 		if (arr_fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
 			int a_size,b_size;
 			

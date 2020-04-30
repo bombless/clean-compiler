@@ -36,7 +36,7 @@ BEGetVersion (int *current, int *oldestDefinition, int *oldestImplementation)
  PolyList unboxed_record_cons_list,unboxed_record_decons_list;
 #endif
 
-extern PolyList UserDefinedArrayFunctions;	/* typechecker.c */
+extern PolyList UserDefinedArrayFunctions;	/* statesgen.c */
 extern int StdOutReopened, StdErrorReopened; /* cocl.c */
 
 static char *
@@ -219,13 +219,13 @@ InitPredefinedSymbols (void)
 } /* InitPredefinedSymbols */
 
 static void
-AddUserDefinedArrayFunction (SymbolP functionSymbol)
+AddUserDefinedArrayFunction (SymbDef function_sdef)
 {
 	PolyList	elem;
 
 	elem	= ConvertAllocType (struct poly_list);
 
-	elem->pl_elem	= functionSymbol;
+	elem->pl_elem	= function_sdef;
 	elem->pl_next	= UserDefinedArrayFunctions;
 	UserDefinedArrayFunctions	= elem;
 } /* AddUserDefinedArrayFunction */
@@ -692,7 +692,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			previousFunctionSymbDef->sdef_special_array_function_symbol = newFunctionSymbol;
 		}
 
-		AddUserDefinedArrayFunction (newFunctionSymbol);
+		AddUserDefinedArrayFunction (newsdef);
 
 		functionSymbol	= newFunctionSymbol;
 	}
@@ -2426,15 +2426,9 @@ BEDefineRuleTypeWithCode (int functionIndex, int moduleIndex, BETypeAltP typeAlt
 void
 BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int moduleIndex)
 {
-	SymbolP		functionSymbol;
 	SymbDef		sdef;
-	BEModule	module;
 
-	module	= &gBEState.be_modules [moduleIndex];
-
-	functionSymbol	= &module->bem_functions [functionIndex];
-
-	sdef	= functionSymbol->symb_def;
+	sdef = gBEState.be_modules[moduleIndex].bem_functions[functionIndex].symb_def;
 
 	Assert (sdef->sdef_kind == DEFRULE || (moduleIndex == main_dcl_module_n && sdef->sdef_kind == IMPRULE));
 	sdef->sdef_arfun	= arrayFunKind;
@@ -2442,7 +2436,7 @@ BEAdjustArrayFunction (BEArrayFunKind arrayFunKind, int functionIndex, int modul
 
 	if (sdef->sdef_kind == DEFRULE  && moduleIndex == main_dcl_module_n)
 	{
-		AddUserDefinedArrayFunction (functionSymbol);
+		AddUserDefinedArrayFunction (sdef);
 		sdef->sdef_kind	= SYSRULE;
 	}
 } /* BEAdjustArrayFunction */

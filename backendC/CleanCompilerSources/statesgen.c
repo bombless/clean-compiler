@@ -1291,12 +1291,8 @@ void ExamineTypesAndLhsOfSymbols
 				ExamineTypesAndLhsOfSymbolDefinition (function_symbol_a[i].symb_def);
 	}
 
-	for_l (array_fun,UserDefinedArrayFunctions,pl_next){
-		SymbDef fun_def;
-		
-		fun_def = ((Symbol) array_fun->pl_elem)->symb_def;
-		ExamineTypesAndLhsOfSymbolDefinition (fun_def);
-	}
+	for_l (array_fun,UserDefinedArrayFunctions,pl_next)
+		ExamineTypesAndLhsOfSymbolDefinition (array_fun->pl_elem);
 
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;
@@ -1338,7 +1334,7 @@ void ImportSymbols (int size_dcl_mfts_a,struct module_function_and_type_symbols 
 	for_l (array_fun,UserDefinedArrayFunctions,pl_next){
 		SymbDef fun_def;
 		
-		fun_def = ((Symbol) array_fun->pl_elem)->symb_def;
+		fun_def = array_fun->pl_elem;
 		if (fun_def ->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
 			fun_def -> sdef_module = CurrentModule;
 	}
