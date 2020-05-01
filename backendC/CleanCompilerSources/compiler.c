@@ -5,7 +5,6 @@
 #include "settings.h"
 #include "syntaxtr.t"
 #include "comsupport.h"
-#include "checker.h"
 #include "compiler.h"
 #include "codegen_types.h"
 #include "codegen.h"
