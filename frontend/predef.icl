@@ -47,7 +47,7 @@ predefined_idents
 					[PD_LazyArrayType] = i "_Array",
 					[PD_StrictArrayType] = i "_!Array",
 					[PD_UnboxedArrayType] = i PD_UnboxedArray_String,
-					[PD_PackedArrayType] = i "_#32Array",
+					[PD_PackedArrayType] = i "_32#Array",
 					[PD_UnitType] = i "_Unit",
 					[PD_TypeCodeMember] = i "_type_code",
 					[PD_DummyForStrictAliasFun] = i "_dummyForStrictAlias"
