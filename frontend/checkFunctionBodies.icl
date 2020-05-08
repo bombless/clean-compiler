@@ -60,52 +60,55 @@ cCaseNotExplicit	:== False
 
 ::	RecordKind = RK_Constructor | RK_Update
 
-get_unboxed_list_indices_and_decons_u_ident :: *CheckState -> (!Index,!Index,!Index,!Ident,!*CheckState)
-get_unboxed_list_indices_and_decons_u_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_list_indices_and_decons_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
+get_unboxed_list_indices_and_decons_u_symb_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
-	# (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
-	# (decons_u_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_u].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,decons_u_index,nil_u_index,predefined_idents.[PD_decons_u],cs)
+	  (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
+	  (decons_u_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_u].pds_def
+	  decons_u_ident = predefined_idents.[PD_decons_u]
+	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	= (stdStrictLists_index,decons_u_index,nil_u_index,app_symb,cs)
 
 make_unboxed_list expr_heap cs
-	# (stdStrictLists_index,decons_u_index,nil_u_index,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
-	# unboxed_list=UnboxedList stdStrictLists_index decons_u_index nil_u_index
+	# (stdStrictLists_index,decons_u_index,nil_u_index,app_symb,cs) = get_unboxed_list_indices_and_decons_u_symb_ident cs
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
 	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	# unboxed_list=UnboxedList stdStrictLists_index decons_u_index nil_u_index
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
-get_unboxed_tail_strict_list_indices_and_decons_uts_ident :: *CheckState -> (!Index,!Index,!Index,!Ident,!*CheckState)
-get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
+get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
-	# (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
-	# (decons_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_uts].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,decons_uts_index,nil_uts_index,predefined_idents.[PD_decons_uts],cs)
+	  (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
+	  (decons_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_uts].pds_def
+	  decons_uts_ident = predefined_idents.[PD_decons_uts]
+	  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	= (stdStrictLists_index,decons_uts_index,nil_uts_index,app_symb,cs)
 
 make_unboxed_tail_strict_list expr_heap cs
-	# (stdStrictLists_index,decons_uts_index,nil_uts_index,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
-	# unboxed_list=UnboxedTailStrictList stdStrictLists_index decons_uts_index nil_uts_index
+	# (stdStrictLists_index,decons_uts_index,nil_uts_index,app_symb,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident cs
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
 	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	# unboxed_list=UnboxedTailStrictList stdStrictLists_index decons_uts_index nil_uts_index
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
-get_overloaded_list_indices_and_decons_ident :: *CheckState -> (!Index,!Index,!Index,!Ident,!*CheckState)
-get_overloaded_list_indices_and_decons_ident cs=:{cs_predef_symbols,cs_x}
+get_overloaded_list_indices_and_decons_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
+get_overloaded_list_indices_and_decons_symb_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
-	# (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
-	# (decons_index,cs_predef_symbols)=cs_predef_symbols![PD_decons].pds_def
-	# cs={cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists}
-	= (stdStrictLists_index,decons_index,nil_index,predefined_idents.[PD_decons],cs)
+	  (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
+	  (decons_index,cs_predef_symbols)=cs_predef_symbols![PD_decons].pds_def
+	  decons_ident = predefined_idents.[PD_decons]
+	  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	= (stdStrictLists_index,decons_index,nil_index,app_symb,cs)
 
 make_overloaded_list expr_heap cs
-	# (stdStrictLists_index,decons_index,nil_index,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
-	# overloaded_list=OverloadedList stdStrictLists_index decons_index nil_index
+	# (stdStrictLists_index,decons_index,nil_index,app_symb,cs) = get_overloaded_list_indices_and_decons_symb_ident cs
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-	  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
 	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	# overloaded_list=OverloadedList stdStrictLists_index decons_index nil_index
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
@@ -2277,22 +2280,19 @@ adjust_match_expression match_expr expr_heap
 add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
 	| glob_module==cPredefinedModuleIndex
 		# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
-		| pd_cons_index==PD_UnboxedConsSymbol			
-			# (stdStrictLists_index,decons_u_index,_,decons_u_ident,cs) = get_unboxed_list_indices_and_decons_u_ident cs
+		| pd_cons_index==PD_UnboxedConsSymbol
+			# (_,_,_,app_symb,cs) = get_unboxed_list_indices_and_decons_u_symb_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
 			# decons_u_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}			
 			= (decons_u_expr,expr_heap,cs)
 		| pd_cons_index==PD_UnboxedTailStrictConsSymbol
-			# (stdStrictLists_index,decons_uts_index,_,decons_uts_ident,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_ident cs
+			# (_,_,_,app_symb,cs) = get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
 			# decons_uts_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_uts_expr,expr_heap,cs)
 		| pd_cons_index==PD_OverloadedConsSymbol
-			# (stdStrictLists_index,decons_index,_,decons_ident,cs) = get_overloaded_list_indices_and_decons_ident cs
+			# (_,_,_,app_symb,cs) = get_overloaded_list_indices_and_decons_symb_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
-			  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
 			# decons_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_expr,expr_heap,cs)
 			= (src_expr,expr_heap,cs)
