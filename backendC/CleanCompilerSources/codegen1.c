@@ -1343,10 +1343,9 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	return 0;
 }
 
-static void GenUnboxedRecordConsApplyAndNodeEntries
-	(SymbDef fun_def,struct label *unboxed_record_cons_lab_p,int *a_size_p,int *b_size_p)
+static void GenUnboxedRecordCons (SymbDef fun_def,struct label *unboxed_record_cons_lab_p)
 {
-	int asize,bsize,maxasize,arity,n_result_nodes_on_a_stack;
+	int a_size,b_size,maxasize,arity,n_result_nodes_on_a_stack;
 	struct state *rule_type_state_p;
 	LabDef ealab;
 
@@ -1360,7 +1359,7 @@ static void GenUnboxedRecordConsApplyAndNodeEntries
 	ealab			= CurrentAltLabel;
 	ealab.lab_pref	= ea_pref;
 	
-	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&asize,&bsize);
+	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&a_size,&b_size);
 
 	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
@@ -1372,7 +1371,7 @@ static void GenUnboxedRecordConsApplyAndNodeEntries
 		struct label i_label;
 
 		if (fun_def->sdef_mark & (SDEF_INSTANCE_RULE_WITH_FIELD_P | SDEF_RULE_INSTANCE_RULE_P) &&
-			generate_unboxed_record_cons_instance_entry (fun_def,unboxed_record_cons_lab_p,rule_type_state_p,asize,bsize,&i_label))
+			generate_unboxed_record_cons_instance_entry (fun_def,unboxed_record_cons_lab_p,rule_type_state_p,a_size,b_size,&i_label))
 		{
 			ApplyInstanceEntry (rule_type_state_p,arity,&ealab,&i_label,!(fun_def->sdef_mark & SDEF_USED_LAZILY_MASK));
 		} else
@@ -1383,15 +1382,19 @@ static void GenUnboxedRecordConsApplyAndNodeEntries
 		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
 
 	EvalArgsEntry (rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
-	
-	*a_size_p=asize;
-	*b_size_p=bsize;
+
+	GenFillR (unboxed_record_cons_lab_p,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
+
+	GenRtn (1,0,OnAState);
+
+	if (DoTimeProfiling)
+		GenPE();
 }
 
-static void GenUnboxedRecordDeconsApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,int *b_size_p)
+static void GenUnboxedRecordDecons (SymbDef fun_def)
 {
 	LabDef ealab;
-	int asize,bsize,maxasize,arity,n_result_nodes_on_a_stack;
+	int a_size,b_size,maxasize,arity,n_result_nodes_on_a_stack;
 	struct state *rule_type_state_p;
 	
 	n_result_nodes_on_a_stack=0;
@@ -1404,7 +1407,7 @@ static void GenUnboxedRecordDeconsApplyAndNodeEntries (SymbDef fun_def,int *a_si
 	ealab			= CurrentAltLabel;
 	ealab.lab_pref	= ea_pref;
 	
-	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&asize,&bsize);
+	DetermineStateSizesAndMaxFrameSizes (arity,rule_type_state_p,&maxasize,&a_size,&b_size);
 
 	if ((fun_def->sdef_mark & SDEF_USED_CURRIED_MASK) || DoDescriptors || DoParallel)
 		GenArrayFunctionDescriptor (fun_def,&CurrentAltLabel,arity);
@@ -1427,9 +1430,18 @@ static void GenUnboxedRecordDeconsApplyAndNodeEntries (SymbDef fun_def,int *a_si
 		NodeEntry (rule_type_state_p,arity,&ealab,fun_def);
 
 	EvalArgsEntry (rule_type_state_p,fun_def,maxasize,&ealab,n_result_nodes_on_a_stack);
-	
-	*a_size_p=asize;
-	*b_size_p=bsize;
+
+	DetermineSizeOfState (rule_type_state_p[-1],&a_size,&b_size);
+
+	if (b_size==0)
+		GenReplArgs (a_size,a_size);
+	else
+		GenReplRArgs (a_size,b_size);
+
+	GenRtn (a_size,b_size,rule_type_state_p[-1]);
+
+	if (DoTimeProfiling)
+		GenPE();
 }
 
 static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,int *b_size_p)
@@ -1489,7 +1501,6 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 		
 		fun_def=unboxed_record_cons_elem->pl_elem;
 		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
-			int a_size,b_size;
 			TypeArgs type_node_arguments_p;
 			LabDef unboxed_record_cons_lab;
 			int tail_strict;
@@ -1508,14 +1519,7 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
 			unboxed_record_cons_lab.lab_post='\0';
 			
-			GenUnboxedRecordConsApplyAndNodeEntries (fun_def,&unboxed_record_cons_lab,&a_size,&b_size);
-
-			GenFillR (&unboxed_record_cons_lab,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
-
-			GenRtn (1,0,OnAState);
-			
-			if (DoTimeProfiling)
-				GenPE();
+			GenUnboxedRecordCons (fun_def,&unboxed_record_cons_lab);
 		}
 	}
 
@@ -1523,26 +1527,8 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 		SymbDef fun_def;
 		
 		fun_def=unboxed_record_decons_elem->pl_elem;
-		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
-			int a_size,b_size;
-			StateP result_state_p;
-
-			GenUnboxedRecordDeconsApplyAndNodeEntries (fun_def,&a_size,&b_size);
-			
-			result_state_p=&fun_def->sdef_rule_type->rule_type_state_p[-1];
-
-			DetermineSizeOfState (*result_state_p,&a_size,&b_size);
-			
-			if (b_size==0)
-				GenReplArgs (a_size,a_size);
-			else
-				GenReplRArgs (a_size,b_size);
-					
-			GenRtn (a_size,b_size,*result_state_p);
-			
-			if (DoTimeProfiling)
-				GenPE();
-		}
+		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
+			GenUnboxedRecordDecons (fun_def);
 	}
 }
 #endif
