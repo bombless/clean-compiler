@@ -3278,7 +3278,7 @@ static void fill_strict_if_node (Node node,int *asp_p,int *bsp_p,CodeGenNodeIdsP
 #include "backendsupport.h"
 
 LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
-{ 
+{
 	static LabDef unboxed_record_cons_lab;
 	
 	if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==SimpleState && BETWEEN (IntObj,FileObj,cons_symbol_p->symb_unboxed_cons_state_p->state_object))
@@ -3334,6 +3334,65 @@ void push_rational (SymbolP symb)
 	GenPopA (2);
 }
 
+static int lazy_fill_for_cons_in_lazy_context (Node node)
+{
+	Symbol symb;
+
+	symb = node->node_symbol;
+
+	if (symb->symb_head_strictness>1){
+		NodeP arg_node_p;
+
+		arg_node_p=node->node_arguments->arg_node;
+		if (arg_node_p->node_kind!=NodeIdNode){
+			if (arg_node_p->node_kind==NormalNode &&
+				(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+				;
+			else
+				if (IsLazyState (arg_node_p->node_state))
+					return 1;
+		} else
+			if (IsLazyState (arg_node_p->node_node_id->nid_state))
+				return 1;
+	}
+
+	if (symb->symb_tail_strictness){
+		NodeP arg_node_p;
+
+		arg_node_p=node->node_arguments->arg_next->arg_node;
+		if (arg_node_p->node_kind!=NodeIdNode){
+			if (IsLazyState (arg_node_p->node_state))
+				return 1;
+		} else
+			if (IsLazyState (arg_node_p->node_node_id->nid_state))
+				return 1;
+	}
+
+	if (symb->symb_head_strictness>1){
+		NodeP arg_node_p;
+		StateP element_state_p;
+
+		if (symb->symb_head_strictness==4)
+			element_state_p=symb->symb_unboxed_cons_state_p;
+		else
+			element_state_p=&StrictState;
+
+		arg_node_p=node->node_arguments->arg_node;
+		if (arg_node_p->node_kind==NormalNode &&
+			(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+		{
+			arg_node_p->node_state=*element_state_p;
+		}
+
+		node->node_arguments->arg_state=*element_state_p;
+	}
+
+	if (symb->symb_tail_strictness)
+		node->node_arguments->arg_next->arg_state=StrictState;
+
+	return 0;
+}
+
 static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGenNodeIdsP code_gen_node_ids_p)
 {
 	Symbol symb;
@@ -3383,129 +3442,67 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					return;
 				} else {
 					int lazy_fill;
+					LabDef *strict_cons_lab_p,strict_cons_lab;
+					int a_size,b_size;
 					
-					if (node->node_arity==2){
-						lazy_fill=IsLazyState (node->node_state);
-
-						if (lazy_fill){
-							int has_unevaluated_strict_arg;
-							
-							has_unevaluated_strict_arg=0;
-							
-							if (symb->symb_head_strictness>1){
-								NodeP arg_node_p;
-								
-								arg_node_p=node->node_arguments->arg_node;
-								if (arg_node_p->node_kind!=NodeIdNode){
-									if (arg_node_p->node_kind==NormalNode &&
-										(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
-										;
-									else
-										if (IsLazyState (arg_node_p->node_state))
-											has_unevaluated_strict_arg=1;
-								} else
-									if (IsLazyState (arg_node_p->node_node_id->nid_state))
-										has_unevaluated_strict_arg=1;
-							}
-
-							if (symb->symb_tail_strictness){
-								NodeP arg_node_p;
-
-								arg_node_p=node->node_arguments->arg_next->arg_node;
-								if (arg_node_p->node_kind!=NodeIdNode){
-									if (IsLazyState (arg_node_p->node_state))
-										has_unevaluated_strict_arg=1;
-								} else
-									if (IsLazyState (arg_node_p->node_node_id->nid_state))
-										has_unevaluated_strict_arg=1;
-							}
-
-							if (!has_unevaluated_strict_arg){
-								if (symb->symb_head_strictness>1){
-									NodeP arg_node_p;
-									StateP element_state_p;
-
-									if (symb->symb_head_strictness==4)
-										element_state_p=symb->symb_unboxed_cons_state_p;
-									else
-										element_state_p=&StrictState;
-									
-									arg_node_p=node->node_arguments->arg_node;
-									if (arg_node_p->node_kind==NormalNode &&
-										(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
-									{
-										arg_node_p->node_state=*element_state_p;
-									}
-									
-									node->node_arguments->arg_state=*element_state_p;
-								}
-
-								if (symb->symb_tail_strictness)
-									node->node_arguments->arg_next->arg_state=StrictState;
-
-								lazy_fill=0;
-							}
-						}
-					} else
+					if (node->node_arity==2 && IsLazyState (node->node_state))
+						lazy_fill=lazy_fill_for_cons_in_lazy_context (node);
+					else
 						lazy_fill=0;
 
 					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
-					{
-						LabDef *strict_cons_lab_p,strict_cons_lab;
-						int a_size,b_size;
-
-						if (symb->symb_head_strictness==4){
-							if (lazy_fill){
-								MakeSymbolLabel (&strict_cons_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
-								strict_cons_lab_p=&strict_cons_lab;
-							} else
-								strict_cons_lab_p=unboxed_cons_label (symb);
-
-							DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
-						} else {
-							if (symb->symb_head_strictness>1){
-								if (symb->symb_tail_strictness)
-									strict_cons_lab_p=&conssts_lab;
-								else
-									strict_cons_lab_p=&conss_lab;
-							} else
-								strict_cons_lab_p=&consts_lab;
-
-							a_size=node->node_arity;
-							b_size=0;
-						}
-
+					if (symb->symb_head_strictness==4){
 						if (lazy_fill){
-							LabDef n_strict_cons_lab;
-							
-							n_strict_cons_lab = *strict_cons_lab_p;
-							n_strict_cons_lab.lab_pref = n_pref;
-							
-							if (update_node_id==NULL){
-								*asp_p+=1-a_size;
-								GenBuild (strict_cons_lab_p,a_size,&n_strict_cons_lab);
-							} else {
-								GenFill (strict_cons_lab_p,a_size,&n_strict_cons_lab,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill);
-								*asp_p-=a_size;
-							}
-						} else {
-							if (update_node_id==NULL){
-								*asp_p+=1-a_size;
-								if (symb->symb_head_strictness==4)
-									GenBuildhr (strict_cons_lab_p,a_size,b_size);
-								else
-									GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);									
-							} else {
-								if (symb->symb_head_strictness==4)
-									GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
-								else
-									GenFillh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
-								*asp_p-=a_size;
-							}
-						}
-						*bsp_p-=b_size;
+							MakeSymbolLabel (&strict_cons_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
+							strict_cons_lab_p=&strict_cons_lab;
+						} else
+							strict_cons_lab_p=unboxed_cons_label (symb);
+
+						DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+					} else {
+						if (symb->symb_head_strictness>1){
+							if (symb->symb_tail_strictness)
+								strict_cons_lab_p=&conssts_lab;
+							else
+								strict_cons_lab_p=&conss_lab;
+						} else
+							strict_cons_lab_p=&consts_lab;
+
+						a_size=node->node_arity;
+						b_size=0;
 					}
+
+					if (lazy_fill){
+						LabDef n_strict_cons_lab;
+
+						n_strict_cons_lab = *strict_cons_lab_p;
+						n_strict_cons_lab.lab_pref = n_pref;
+
+						if (update_node_id==NULL){
+							*asp_p+=1-a_size;
+							GenBuild (strict_cons_lab_p,a_size,&n_strict_cons_lab);
+						} else {
+							GenFill (strict_cons_lab_p,a_size,&n_strict_cons_lab,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill);
+							*asp_p-=a_size;
+						}
+					} else {
+						if (update_node_id==NULL){
+							*asp_p+=1-a_size;
+							if (symb->symb_head_strictness==4)
+								GenBuildhr (strict_cons_lab_p,a_size,b_size);
+							else
+								GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);
+						} else {
+							if (symb->symb_head_strictness==4)
+								GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+							else
+								GenFillh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
+							*asp_p-=a_size;
+						}
+					}
+					*bsp_p-=b_size;
+
 					return;
 				}
 			}
