@@ -801,7 +801,6 @@ newAttribute DAK_None var_ident TA_Unique oti cs
 	= (TA_Unique, oti, cs)
 newAttribute DAK_None var_ident attr oti cs
 	= (TA_Multi, oti, cs)
-			
 
 getTypeDef :: !Index !Index !Index !u:{# CheckedTypeDef} !v:{# DclModule} -> (!CheckedTypeDef, !Index , !u:{# CheckedTypeDef}, !v:{# DclModule})
 getTypeDef type_index type_module module_index type_defs modules
@@ -854,8 +853,14 @@ where
 	incr_ref_count tv_info_ptr _ th_vars
 		= th_vars
 
-	check_attribute var_ident DAK_Ignore (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
-		= (TA_Multi, oti, cs)
+	check_attribute var_ident DAK_Ignore (TVI_AttrAndRefCount _ _) this_attr oti cs
+		= case this_attr of
+			TA_Multi
+				-> (TA_Multi, oti, cs)
+			TA_None
+				-> (TA_Multi, oti, cs)
+			_
+				-> (TA_Multi, oti, {cs & cs_error = checkError var_ident "attribute not allowed" cs.cs_error})
 	check_attribute var_ident dem_attr (TVI_AttrAndRefCount prev_attr ref_count) this_attr oti cs=:{cs_error}
 		# (new_attr, cs_error) = determine_attribute var_ident dem_attr this_attr cs_error
 		= check_var_attribute prev_attr new_attr oti { cs & cs_error = cs_error }
@@ -869,11 +874,9 @@ where
 		check_var_attribute var_attr=:(TA_Var old_var) TA_Anonymous oti cs
 			= (var_attr, oti, cs)
 		check_var_attribute TA_Unique new_attr oti cs
-			= case new_attr of
-				TA_Unique
-					-> (TA_Unique, oti, cs)
-				_
-					-> (TA_Unique, oti, { cs & cs_error = checkError var_ident "inconsistently attributed (4)" cs.cs_error })
+			| new_attr=:TA_Unique
+				= (TA_Unique, oti, cs)
+				= (TA_Unique, oti, {cs & cs_error = checkError var_ident "inconsistently attributed (4)" cs.cs_error})
 		check_var_attribute TA_Multi new_attr oti cs
 			= case new_attr of
 				TA_Multi
