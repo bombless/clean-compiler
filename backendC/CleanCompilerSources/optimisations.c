@@ -1805,6 +1805,9 @@ static int optimise_partial_function_application (NodeP node,SymbDef sdef,StateP
 		NodeP arg_node_p;
 
 		arg_node_p=arg_p->arg_node;
+
+		if (arg_node_p->node_kind==NodeIdNode)
+			return 0;
 		
 		if (arg_node_p->node_symbol->symb_kind==definition){
 			SymbDef arg_sdef;
