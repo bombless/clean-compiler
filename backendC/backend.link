@@ -17,6 +17,7 @@
 /EXPORT: BETypeSymbolNoMark
 /EXPORT: BEExternalTypeSymbol
 /EXPORT: BEDontCareDefinitionSymbol
+/EXPORT: BEDontCareTypeDefinitionSymbol
 /EXPORT: BEBoolSymbol
 /EXPORT: BELiteralSymbol
 /EXPORT: BEPredefineListConstructorSymbol
@@ -29,6 +30,7 @@
 /EXPORT: BEPredefineConstructorSymbol
 /EXPORT: BEPredefineTypeSymbol
 /EXPORT: BEBasicSymbol
+/EXPORT: BEBasicTypeSymbol
 /EXPORT: BEVar0TypeNode
 /EXPORT: BEVarNTypeNode
 /EXPORT: BESymbolTypeNode

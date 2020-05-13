@@ -2711,7 +2711,7 @@ void GenImport (SymbDef sdef)
 				if (sdef->sdef_mark & SDEF_USED_LAZILY_MASK){
 					char *record_name;
 	
-					record_name	= sdef->sdef_type->type_symbol->symb_def->sdef_name;
+					record_name	= sdef->sdef_type->type_symbol->ts_def->sdef_name;
 	
 					put_directiveb (impdesc);
 					put_space_label_module_d_name (sdef->sdef_module,record_name);
@@ -2806,7 +2806,7 @@ void GenExportFieldSelector (SymbDef sdef)
 	
 	name = sdef->sdef_name;
 	
-	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_name;
+	record_name=sdef->sdef_type->type_symbol->ts_def->sdef_name;
 
 	put_directive (Dexport);
 	put_space_label_module_d_name (CurrentModule,record_name);
@@ -3638,7 +3638,7 @@ void GenFieldSelectorDescriptor (SymbDef sdef,StateS field_state,int a_pos,int b
 	gc_updates_selector=IsSimpleState (field_state);
 
 	name = sdef->sdef_name;
-	record_name=sdef->sdef_type->type_symbol->symb_def->sdef_name;
+	record_name=sdef->sdef_type->type_symbol->ts_def->sdef_name;
 
 	put_directive (gc_updates_selector ? Ddescs : Ddesc);
 	if (sdef->sdef_exported){
@@ -4082,22 +4082,22 @@ void import_not_yet_imported_system_labels (void)
 static void print_foreign_export_type (TypeNode type)
 {
 	if (!type->type_node_is_var){
-		Symbol symbol_p;
+		SymbKind type_symbol_kind;
 
-		symbol_p=type->type_node_symbol;
+		type_symbol_kind=type->type_node_symbol->ts_kind;
 
-		if (symbol_p->symb_kind==int_type){
+		if (type_symbol_kind==int_type){
 			PutSOutFile ("I");
 			return;
-		} else if (symbol_p->symb_kind==real_type){
+		} else if (type_symbol_kind==real_type){
 			PutSOutFile ("R");
 			return;
-		} else if (symbol_p->symb_kind==unboxed_array_type){
+		} else if (type_symbol_kind==unboxed_array_type){
 			TypeNode type_node_p;
 
 			type_node_p=type->type_node_arguments->type_arg_node;
 			if (!type_node_p->type_node_is_var){
-				switch (type_node_p->type_node_symbol->symb_kind){
+				switch (type_node_p->type_node_symbol->ts_kind){
 					case char_type:
 						PutSOutFile ("S");
 						return;
@@ -4109,7 +4109,7 @@ static void print_foreign_export_type (TypeNode type)
 						return;
 				}
 			}
-		} else if (symbol_p->symb_kind==tuple_type){
+		} else if (type_symbol_kind==tuple_type){
 			TypeArgs type_arg_p;
 			
 			for_l (type_arg_p,type->type_node_arguments,type_arg_next)
@@ -4124,7 +4124,7 @@ static void print_foreign_export_type (TypeNode type)
 
 static void print_foreign_export_result_type (TypeNode type)
 {
-	if (!type->type_node_is_var && type->type_node_symbol->symb_kind==tuple_type)
+	if (!type->type_node_is_var && type->type_node_symbol->ts_kind==tuple_type)
 		PutSOutFile ("V");
 
 	print_foreign_export_type (type);

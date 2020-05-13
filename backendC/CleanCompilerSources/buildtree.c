@@ -129,9 +129,6 @@ NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity)
 	node->node_symbol		= symb;
 	node->node_arity		= arity;
 
-	if (arity > MaxNodeArity)
-		StaticErrorMessage_s_Ss ("<node>", symb, " Too many arguments (> 32)");
-
 	return (node);
 } /* NewNodeByKind */
 

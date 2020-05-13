@@ -33,6 +33,9 @@ Clean (:: *BackEnd (:== CPtr))
 typedef struct symbol *BESymbolP;
 Clean (:: BESymbolP (:== CPtr))
 
+typedef struct type_symbol *BETypeSymbolP;
+Clean (:: BETypeSymbolP (:== CPtr))
+
 typedef struct type_node *BETypeNodeP;
 Clean (:: BETypeNodeP (:== CPtr))
 
@@ -106,26 +109,23 @@ enum {
 typedef int	BESymbKind;
 Clean (:: BESymbKind :== Int)
 enum {
-	BEIntType, BEBoolType, BECharType, BERealType,
-	BEFileType, BEStringType, BEWorldType, BEProcIdType,
-	BERedIdType,
 	BERationalDenot,
-
-	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot, BEIntegerDenot,
-
+	BEIntDenot, BEBoolDenot, BECharDenot, BERealDenot,
+	BEIntegerDenot,
 	BEStringDenot,
-	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEPackedArrayType,
-	BEListType, BETupleType, BEEmptyType,
- 	BEDynamicType, 
- 	BENrOfPredefTypes,
-	
-	BETupleSymb, BEConsSymb, BENilSymb,
-	BEApplySymb, BEIfSymb, BEFailSymb, BEAllSymb,
-	BESelectSymb,
-	BENrOfPredefFunsOrConses,
+	BETupleSymb,
+	BEConsSymb, BENilSymb,
+	BEApplySymb, BEIfSymb, BEFailSymb
+};
 
-	BEDefinition, BENewSymbol, BEInstanceSymb, BEEmptySymbol, BEFieldSymbolList,
-	BEErroneousSymb
+typedef int	BETypeSymbKind;
+Clean (:: BETypeSymbKind :== Int)
+enum {
+	BEIntType, BEBoolType, BECharType, BERealType,
+	BEFileType, BEWorldType, BEProcIdType, BERedIdType,
+	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEPackedArrayType,
+	BEListType, BETupleType,
+	BEDynamicType, BEApplyType
 };
 
 typedef int BEArrayFunKind;
@@ -200,17 +200,20 @@ Clean (BEConstructorSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BEFieldSymbol (int fieldIndex, int moduleIndex);
 Clean (BEFieldSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
 
-BESymbolP BETypeSymbol (int typeIndex, int moduleIndex);
-Clean (BETypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+BETypeSymbolP BETypeSymbol (int typeIndex, int moduleIndex);
+Clean (BETypeSymbol :: Int Int BackEnd -> (BETypeSymbolP, BackEnd))
 
-BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
-Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BESymbolP, BackEnd))
+BETypeSymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex);
+Clean (BETypeSymbolNoMark :: Int Int BackEnd -> (BETypeSymbolP, BackEnd))
 
-BESymbolP BEExternalTypeSymbol (int typeIndex, int moduleIndex);
-Clean (BEExternalTypeSymbol :: Int Int BackEnd -> (BESymbolP, BackEnd))
+BETypeSymbolP BEExternalTypeSymbol (int typeIndex, int moduleIndex);
+Clean (BEExternalTypeSymbol :: Int Int BackEnd -> (BETypeSymbolP, BackEnd))
 
 BESymbolP BEDontCareDefinitionSymbol (void);
 Clean (BEDontCareDefinitionSymbol :: BackEnd -> (BESymbolP, BackEnd))
+
+BETypeSymbolP BEDontCareTypeDefinitionSymbol (void);
+Clean (BEDontCareTypeDefinitionSymbol :: BackEnd -> (BETypeSymbolP, BackEnd))
 
 BESymbolP BEBoolSymbol (int value);
 Clean (BEBoolSymbol :: Bool BackEnd -> (BESymbolP, BackEnd))
@@ -218,12 +221,11 @@ Clean (BEBoolSymbol :: Bool BackEnd -> (BESymbolP, BackEnd))
 BESymbolP BELiteralSymbol (BESymbKind kind, CleanString value);
 Clean (BELiteralSymbol :: BESymbKind String BackEnd -> (BESymbolP, BackEnd))
 
-
 void BEPredefineListConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
 Clean (BEPredefineListConstructorSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
 
-void BEPredefineListTypeSymbol (int typeIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
-Clean (BEPredefineListTypeSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
+void BEPredefineListTypeSymbol (int typeIndex, int moduleIndex, BETypeSymbKind symbolKind,int head_strictness,int tail_strictness);
+Clean (BEPredefineListTypeSymbol :: Int Int BETypeSymbKind Int Int BackEnd -> BackEnd)
 
 void BEAdjustStrictListConsInstance (int functionIndex, int moduleIndex);
 Clean (BEAdjustStrictListConsInstance :: Int Int BackEnd -> BackEnd)
@@ -243,11 +245,14 @@ Clean (BEOverloadedPushNode :: Int BESymbolP BEArgP BENodeIdListP BENodeP BackEn
 void BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, BESymbKind symbolKind);
 Clean (BEPredefineConstructorSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
 
-void BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BESymbKind symbolKind);
-Clean (BEPredefineTypeSymbol :: Int Int Int BESymbKind BackEnd -> BackEnd)
+void BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BETypeSymbKind symbolKind);
+Clean (BEPredefineTypeSymbol :: Int Int Int BETypeSymbKind BackEnd -> BackEnd)
 
 BESymbolP BEBasicSymbol (BESymbKind kind);
 Clean (BEBasicSymbol :: Int BackEnd -> (BESymbolP, BackEnd))
+
+BETypeSymbolP BEBasicTypeSymbol (BETypeSymbKind kind);
+Clean (BEBasicTypeSymbol :: Int BackEnd -> (BETypeSymbolP, BackEnd))
 
 BETypeNodeP BEVar0TypeNode (BEAnnotation annotation, BEAttribution attribution);
 Clean (BEVar0TypeNode :: BEAnnotation BEAttribution BackEnd -> (BETypeNodeP, BackEnd))
@@ -255,8 +260,8 @@ Clean (BEVar0TypeNode :: BEAnnotation BEAttribution BackEnd -> (BETypeNodeP, Bac
 BETypeNodeP BEVarNTypeNode (BEAnnotation annotation, BEAttribution attribution, int argument_n);
 Clean (BEVarNTypeNode :: BEAnnotation BEAttribution Int BackEnd -> (BETypeNodeP, BackEnd))
 
-BETypeNodeP BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BESymbolP symbol, BETypeArgP args);
-Clean (BESymbolTypeNode :: BEAnnotation BEAttribution BESymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
+BETypeNodeP BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BETypeSymbolP symbol, BETypeArgP args);
+Clean (BESymbolTypeNode :: BEAnnotation BEAttribution BETypeSymbolP BETypeArgP BackEnd -> (BETypeNodeP, BackEnd))
 
 BETypeArgP BENoTypeArgs (void);
 Clean (BENoTypeArgs :: BackEnd -> (BETypeArgP, BackEnd))
@@ -373,17 +378,17 @@ Clean (BENoRules :: BackEnd -> (BEImpRuleP, BackEnd))
 BEImpRuleP BERules (BEImpRuleP rule, BEImpRuleP rules);
 Clean (BERules :: BEImpRuleP BEImpRuleP BackEnd -> (BEImpRuleP, BackEnd))
 
-void BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
-Clean (BEDefineAlgebraicType:: BESymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
+void BEDefineAlgebraicType (BETypeSymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
+Clean (BEDefineAlgebraicType:: BETypeSymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
 
-void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
-Clean (BEDefineExtensibleAlgebraicType:: BESymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
+void BEDefineExtensibleAlgebraicType (BETypeSymbolP symbol, BEAttribution attribution, BEConstructorListP constructors);
+Clean (BEDefineExtensibleAlgebraicType:: BETypeSymbolP BEAttribution BEConstructorListP BackEnd -> BackEnd)
 
-void BEDefineRecordType (BESymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields);
-Clean (BEDefineRecordType :: BESymbolP BEAttribution Int Int BETypeArgP Int BEFieldListP BackEnd -> BackEnd)
+void BEDefineRecordType (BETypeSymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields);
+Clean (BEDefineRecordType :: BETypeSymbolP BEAttribution Int Int BETypeArgP Int BEFieldListP BackEnd -> BackEnd)
 
-void BEAbstractType (BESymbolP symbol);
-Clean (BEAbstractType :: BESymbolP BackEnd -> BackEnd)
+void BEAbstractType (BETypeSymbolP symbol);
+Clean (BEAbstractType :: BETypeSymbolP BackEnd -> BackEnd)
 
 BEConstructorListP BENoConstructors (void);
 Clean (BENoConstructors:: BackEnd -> (BEConstructorListP, BackEnd))
@@ -493,5 +498,5 @@ int BEGetIntFromArray  (int index, int *ints);
 void BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex);
 Clean (BEDeclareDynamicTypeSymbol :: Int Int BackEnd -> BackEnd)
 
-BESymbolP BEDynamicTempTypeSymbol (void);
-Clean (BEDynamicTempTypeSymbol :: BackEnd -> (BESymbolP, BackEnd))
+BETypeSymbolP BEDynamicTempTypeSymbol (void);
+Clean (BEDynamicTempTypeSymbol :: BackEnd -> (BETypeSymbolP, BackEnd))

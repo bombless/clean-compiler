@@ -47,10 +47,10 @@ static int tuple_state_has_more_strictness (StateS *state_p,TypeNode type_node,S
 	StateS *arg_state_p,*function_arg_state_p;
 	TypeArg *type_arg;
 
-	if (type_node->type_node_is_var || type_node->type_node_symbol->symb_kind!=tuple_type)
+	if (type_node->type_node_is_var || type_node->type_node_symbol->ts_kind!=tuple_type)
 		return 0;
 	
-	if (type_node->type_node_arity!=state_p->state_arity || type_node->type_node_symbol->symb_arity!=state_p->state_arity)
+	if (type_node->type_node_arity!=state_p->state_arity || type_node->type_node_symbol->ts_arity!=state_p->state_arity)
 		return 0;
 	
 	type_arg=type_node->type_node_arguments;
@@ -91,7 +91,7 @@ static int equal_strictness_in_types (TypeNode lazy_type_node,TypeNode strict_ty
 {
 	TypeArg *lazy_type_arg,*strict_type_arg;
 
-	if (lazy_type_node->type_node_is_var || lazy_type_node->type_node_symbol->symb_kind!=tuple_type)
+	if (lazy_type_node->type_node_is_var || lazy_type_node->type_node_symbol->ts_kind!=tuple_type)
 		return 0;
 	
 	for_l_l (lazy_type_arg,lazy_type_node->type_node_arguments,type_arg_next,
@@ -105,7 +105,7 @@ static int equal_strictness_in_types (TypeNode lazy_type_node,TypeNode strict_ty
 		if (lazy_type_arg_node->type_node_annotation==StrictAnnot != strict_type_arg_node->type_node_annotation==StrictAnnot)
 			return 0;
 
-		if (!lazy_type_arg_node->type_node_is_var && lazy_type_arg_node->type_node_symbol->symb_kind==tuple_type)
+		if (!lazy_type_arg_node->type_node_is_var && lazy_type_arg_node->type_node_symbol->ts_kind==tuple_type)
 			if (!equal_strictness_in_types (lazy_type_arg_node,strict_type_arg_node))
 				return 0;				
 	}
@@ -118,10 +118,10 @@ static int type_and_strictness_in_state_equals_type (TypeNode lazy_type_node,Sta
 	StateS *arg_state_p;
 	TypeArg *lazy_type_arg,*strict_type_arg;
 
-	if (lazy_type_node->type_node_is_var || lazy_type_node->type_node_symbol->symb_kind!=tuple_type)
+	if (lazy_type_node->type_node_is_var || lazy_type_node->type_node_symbol->ts_kind!=tuple_type)
 		return 0;
 	
-	if (lazy_type_node->type_node_arity!=state_p->state_arity || lazy_type_node->type_node_symbol->symb_arity!=state_p->state_arity)
+	if (lazy_type_node->type_node_arity!=state_p->state_arity || lazy_type_node->type_node_symbol->ts_arity!=state_p->state_arity)
 		return 0;
 	
 	arg_state_p=state_p->state_tuple_arguments;
@@ -140,7 +140,7 @@ static int type_and_strictness_in_state_equals_type (TypeNode lazy_type_node,Sta
 		if (strict != strict_type_arg_node->type_node_annotation==StrictAnnot)
 			return 0;
 
-		if (!lazy_type_arg_node->type_node_is_var && lazy_type_arg_node->type_node_symbol->symb_kind==tuple_type)
+		if (!lazy_type_arg_node->type_node_is_var && lazy_type_arg_node->type_node_symbol->ts_kind==tuple_type)
 			if (arg_state_p->state_type==TupleState){
 				if (!type_and_strictness_in_state_equals_type (lazy_type_arg_node,arg_state_p,strict_type_arg_node))
 					return 0;
@@ -162,10 +162,10 @@ static void add_strictness_in_state_to_type (StateS *state_p,TypeNode type_node)
 	StateS *arg_state_p;
 	TypeArg *type_arg;
 
-	if (type_node->type_node_is_var || type_node->type_node_symbol->symb_kind!=tuple_type)
+	if (type_node->type_node_is_var || type_node->type_node_symbol->ts_kind!=tuple_type)
 		return;
 	
-	if (type_node->type_node_arity!=state_p->state_arity || type_node->type_node_symbol->symb_arity!=state_p->state_arity)
+	if (type_node->type_node_arity!=state_p->state_arity || type_node->type_node_symbol->ts_arity!=state_p->state_arity)
 		return;
 	
 	arg_state_p=state_p->state_tuple_arguments;
@@ -189,7 +189,7 @@ static void add_strictness_in_state_to_type (StateS *state_p,TypeNode type_node)
 				if (type_arg_node->type_node_annotation==NoAnnot)
 					type_arg_node->type_node_annotation=StrictAnnot;
 				
-				if (!type_arg_node->type_node_is_var && type_arg_node->type_node_symbol->symb_kind==tuple_type)
+				if (!type_arg_node->type_node_is_var && type_arg_node->type_node_symbol->ts_kind==tuple_type)
 					add_strictness_in_state_to_type (arg_state_p,type_arg_node);
 				break;
 		}
@@ -1534,7 +1534,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 				*rhs_arg_p=new_arg;
 				rhs_arg_p=&new_arg->arg_next;
 
-				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&arg_node->node_symbol->symb_def->sdef_type->type_symbol->ts_def->sdef_record_state;
 
 				if (arg_node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
@@ -1724,7 +1724,7 @@ static ImpRuleP create_new_partially_applied_local_function (Node node,int old_f
 		end_function_name=function_name+sizeof (function_name);
 		function_name_p=&function_name[strlen (function_name)];
 		
-		f_name=CurrentSymbol->symb_def->sdef_name;
+		f_name=CurrentSymbDef->sdef_name;
 		length=strlen (f_name);
 		
 		if (function_name_p+2+length < end_function_name){
@@ -1928,7 +1928,7 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 		end_function_name=function_name+sizeof (function_name);
 		function_name_p=&function_name[strlen (function_name)];
 		
-		f_name=CurrentSymbol->symb_def->sdef_name;
+		f_name=CurrentSymbDef->sdef_name;
 		length=strlen (f_name);
 		
 		if (function_name_p+2+length < end_function_name){
@@ -3217,7 +3217,7 @@ static void optimise_node_in_then_or_else (NodeP node,FreeUniqueNodeIdsS **f_nod
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
 
-				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->ts_def->sdef_record_state;
 
 				if (node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
@@ -3492,7 +3492,7 @@ static void optimise_node (NodeP node,FreeUniqueNodeIdsS **f_node_ids_l)
 				StateP selector_arg_state_p;
 				StateS tuple_state,tuple_arg_states[2];
 
-				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->symb_def->sdef_record_state;
+				selector_arg_state_p=&node->node_symbol->symb_def->sdef_type->type_symbol->ts_def->sdef_record_state;
 				
 				if (node->node_arity>=SELECTOR_L)
 					selector_arg_state_p=selector_l_or_n_state_p (&tuple_state,tuple_arg_states,selector_arg_state_p);
@@ -4619,10 +4619,9 @@ static ImpRuleS **OptimiseRule (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
 	RuleAlts alt;
-
-	CurrentSymbol = rule->rule_root->node_symbol;
 	
-	rule_sdef= CurrentSymbol->symb_def;
+	rule_sdef= rule->rule_root->node_symbol->symb_def;
+	CurrentSymbDef = rule_sdef;
 
 	alt=rule->rule_alts;
 	CurrentLine = alt->alt_line;

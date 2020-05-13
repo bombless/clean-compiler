@@ -17,6 +17,7 @@ BETypeSymbol
 BETypeSymbolNoMark
 BEExternalTypeSymbol
 BEDontCareDefinitionSymbol
+BEDontCareTypeDefinitionSymbol
 BEBoolSymbol
 BELiteralSymbol
 BEPredefineListConstructorSymbol
@@ -29,6 +30,7 @@ BEOverloadedPushNode
 BEPredefineConstructorSymbol
 BEPredefineTypeSymbol
 BEBasicSymbol
+BEBasicTypeSymbol
 BEVar0TypeNode
 BEVarNTypeNode
 BESymbolTypeNode

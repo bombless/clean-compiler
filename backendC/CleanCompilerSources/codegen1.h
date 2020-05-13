@@ -15,7 +15,9 @@ extern char channel_code [],ext_nf_reducer_code[],nf_reducer_code[],hnf_reducer_
 
 extern LabDef
 	cycle_lab, reserve_lab, type_error_lab, indirection_lab, ind_lab,
-	hnf_lab, cons_lab, nil_lab, tuple_lab, empty_lab, add_arg_lab, match_error_lab,
+	hnf_lab, empty_lab, add_arg_lab, match_error_lab,
+	tuple_lab,
+	cons_lab, nil_lab,
 #if STRICT_LISTS
 	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[5][2],unboxed_cons_array_label,
 #endif

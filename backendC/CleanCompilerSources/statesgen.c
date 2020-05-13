@@ -63,7 +63,9 @@ static char *Wunkannot       = "unknown annotation";
 
 /* some routines for setting the state fields of an object */
 
-StateS BasicSymbolStates [Nr_Of_Predef_Types];
+StateS BasicSymbolStates [last_denot+1];
+
+StateS BasicTypeSymbolStates [Nr_Of_Predef_Types];
 
 int FirstStateIsStricter (StateS offered_state,StateS demanded_state)
 {
@@ -216,44 +218,44 @@ static void GenRecordState (SymbDef sdef);
 
 void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 {
-	Symbol symbol;
+	TypeSymbol type_symbol;
 
-	symbol=type->type_node_symbol;
+	type_symbol=type->type_node_symbol;
 
-	if (symbol->symb_kind < Nr_Of_Predef_Types){
-		*state_p = BasicSymbolStates [symbol->symb_kind];
+	if (type_symbol->ts_kind < Nr_Of_Predef_Types){
+		*state_p = BasicTypeSymbolStates [type_symbol->ts_kind];
 		if (kind!=StrictOnA)
 			state_p->state_kind=kind;
-	} else if (symbol->symb_kind==definition && symbol->symb_def->sdef_kind==RECORDTYPE){
+	} else if (type_symbol->ts_kind==type_definition && type_symbol->ts_def->sdef_kind==RECORDTYPE){
 		if (kind==StrictOnA){
-			GenRecordState (symbol->symb_def);
+			GenRecordState (type_symbol->ts_def);
 #if BOXED_RECORDS
-			if (symbol->symb_def->sdef_boxed_record)
+			if (type_symbol->ts_def->sdef_boxed_record)
 				SetUnaryState (state_p,StrictOnA,RecordObj);
 			else
 #endif
-				*state_p=symbol->symb_def->sdef_record_state;
+				*state_p=type_symbol->ts_def->sdef_record_state;
 		} else
 			SetUnaryState (state_p,kind,RecordObj);
 	} else
 #if ABSTRACT_OBJECT
-	if (symbol->symb_kind==definition && symbol->symb_def->sdef_kind==ABSTYPE)
+	if (type_symbol->ts_kind==type_definition && type_symbol->ts_def->sdef_kind==ABSTYPE)
 		SetUnaryState (state_p,kind,AbstractObj);
 	else
 #endif
 		SetUnaryState (state_p,kind,UnknownObj);
 
 #ifdef REUSE_UNIQUE_NODES
-	if (type->type_node_attribute==UniqueAttr || (symbol->symb_kind==definition && 
-			(symbol->symb_def->sdef_kind==TYPE || symbol->symb_def->sdef_kind==RECORDTYPE) &&
-			symbol->symb_def->sdef_type->type_attribute==UniqueAttr))
+	if (type->type_node_attribute==UniqueAttr || (type_symbol->ts_kind==type_definition && 
+			(type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE) &&
+			type_symbol->ts_def->sdef_type->type_attribute==UniqueAttr))
 	{
 		state_p->state_mark |= STATE_UNIQUE_MASK;
 	}
 
 	if ((state_p->state_mark & STATE_UNIQUE_MASK) && state_p->state_type==SimpleState){
-		if (symbol->symb_kind==list_type || symbol->symb_kind==tuple_type || 
-			(symbol->symb_kind==definition && (symbol->symb_def->sdef_kind==TYPE || symbol->symb_def->sdef_kind==RECORDTYPE)))
+		if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || 
+			(type_symbol->ts_kind==type_definition && (type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE)))
 		{
 			unsigned long unq_type_args;
 			TypeArgs type_arg;
@@ -325,23 +327,22 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 	}
 }
 
+TypeSymbol CurrentTypeSymbol;
+
 static void GenRecordState (SymbDef sdef)
 {
 	if (sdef->sdef_checkstatus < ConvertingToState){
 		Types rectype;
 		FieldList fields;
 		States fieldstates;
-		int i,oldline;
-		Symbol oldsymbol;
+		int i;
+		TypeSymbol old_CurrentTypeSymbol;
 		int strict_record;
 
 		rectype = sdef->sdef_type;
 		
-		oldline		= CurrentLine;
-		oldsymbol	= CurrentSymbol;
-		
-		CurrentSymbol	= rectype->type_symbol;
-		CurrentLine		= 0 /*rectype->type_line*/;
+		old_CurrentTypeSymbol = CurrentTypeSymbol;
+		CurrentTypeSymbol = rectype->type_symbol;
 
 		sdef->sdef_checkstatus = ConvertingToState; /* to detect cyclic strict field dependencies */
 		SetRecordState (&sdef->sdef_record_state, sdef, sdef->sdef_arity);
@@ -393,13 +394,12 @@ static void GenRecordState (SymbDef sdef)
 
 		sdef->sdef_strict_constructor=strict_record;
 		sdef->sdef_checkstatus = ConvertedToState; /* to detect cyclic strict field dependencies */
-				
-		CurrentSymbol = oldsymbol;
-		CurrentLine = oldline;
+
+		CurrentTypeSymbol = old_CurrentTypeSymbol;
 	} else if (sdef->sdef_checkstatus == ConvertedToState)
 		return;
 	else
-		StaticErrorMessage_S_ss (CurrentSymbol, sdef->sdef_name, " cyclic strict field dependencies are not allowed");
+		StaticErrorMessage_T_ss (CurrentTypeSymbol, sdef->sdef_name, " cyclic strict field dependencies are not allowed");
 }
 
 static void GenResultStatesOfLazyFields (SymbDef sdef)
@@ -410,14 +410,13 @@ static void GenResultStatesOfLazyFields (SymbDef sdef)
 
 	rectype = sdef->sdef_type;
 	
-	CurrentSymbol = rectype->type_symbol;
-	CurrentLine = 0 /*rectype->type_line*/;
+	CurrentTypeSymbol = rectype->type_symbol;
 	
 	for (i=0, fields = rectype->type_fields; fields; i++, fields = fields->fl_next){
 		TypeNode field_type_node = fields->fl_type;
 
 		if (field_type_node->type_node_annotation!=StrictAnnot){
-			if (field_type_node->type_node_is_var || field_type_node->type_node_symbol->symb_kind==apply_symb)
+			if (field_type_node->type_node_is_var || field_type_node->type_node_symbol->ts_kind==apply_type_symb)
 				SetUnaryState (&fields->fl_state, LazyRedirection, UnknownObj);
 			else
 				ConvertTypeToState (field_type_node,&fields->fl_state,StrictOnA);
@@ -433,8 +432,7 @@ static void ChangeFieldRecordStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbD
 
 	icl_type = icl_sdef->sdef_type;
 
-	CurrentSymbol = icl_type->type_symbol;
-	CurrentLine = 0 /*icl_type->type_line*/;
+	CurrentTypeSymbol = icl_type->type_symbol;
 
 	icl_fieldstate_p=icl_sdef->sdef_record_state.state_record_arguments;
 	dcl_fieldstate_p=dcl_sdef->sdef_record_state.state_record_arguments;
@@ -444,7 +442,7 @@ static void ChangeFieldRecordStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbD
 			(icl_fieldstate_p->state_type!=SimpleState ||
 			icl_fieldstate_p->state_kind!=dcl_fieldstate_p->state_kind))
 		{
-			StaticMessage_S_Ss (False, CurrentSymbol, icl_field->fl_symbol,
+			StaticMessage_T_Ss (False, icl_type->type_symbol, icl_field->fl_symbol->symb_def,
 								" strict field is boxed because the field type is an abstract type");
 			
 			*icl_fieldstate_p=*dcl_fieldstate_p;
@@ -459,17 +457,14 @@ static void GenerateStatesForConstructors (SymbDef sdef)
 {
 	ConstructorList constructor;
 
-	CurrentLine	 = 0 /*sdef->sdef_type->type_line*/;
-
 	for_l (constructor,sdef->sdef_type->type_constructors,cl_next){
 		int strict_constructor;
 		SymbDef constructor_sdef;
 		TypeArgs arg;
 		StateP state_p;
 
-		CurrentSymbol=constructor->cl_constructor_symbol;
-
-		constructor_sdef=CurrentSymbol->symb_def;
+		constructor_sdef=constructor->cl_constructor_symbol->symb_def;
+		CurrentSymbDef=constructor_sdef;
 
 		state_p = NewArrayOfStates (constructor_sdef->sdef_arity);
 		constructor->cl_state_p = state_p;		
@@ -515,8 +510,6 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 	Types icl_type = icl_sdef->sdef_type, dcl_type = dcl_sdef->sdef_type;
 	ConstructorList icl_cons, dcl_cons;
 
-	CurrentLine = 0 /*icl_type->type_line*/;
-
 	for (icl_cons = icl_type->type_constructors, dcl_cons = dcl_type->type_constructors; dcl_cons;
 		 icl_cons = icl_cons->cl_next, dcl_cons = dcl_cons->cl_next)
 	{
@@ -528,8 +521,7 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 			TypeArgs icl_arg,dcl_arg;
 			StateP icl_arg_state_p,dcl_arg_state_p;
 			
-			CurrentSymbol=dcl_cons->cl_constructor_symbol;
-			dcl_constructor=CurrentSymbol->symb_def;
+			dcl_constructor=dcl_cons->cl_constructor_symbol->symb_def;
 					
 			icl_arg=icl_cons->cl_constructor_arguments;
 			dcl_arg=dcl_cons->cl_constructor_arguments;
@@ -545,7 +537,7 @@ static void ChangeElementStateForStrictAbsTypeFields (SymbDef icl_sdef,SymbDef d
 				if (dcl_arg_state_p->state_type==SimpleState &&
 					(icl_arg_state_p->state_type!=SimpleState || icl_arg_state_p->state_kind!=dcl_arg_state_p->state_kind))
 				{
-					StaticMessage_S_Ss (False, CurrentSymbol, icl_element_node->type_node_symbol,
+					StaticMessage_S_Ts (False, dcl_cons->cl_constructor_symbol->symb_def, icl_element_node->type_node_symbol,
 										" element is boxed because its type is an abstract type");
 					
 					*icl_arg_state_p=*dcl_arg_state_p;
@@ -567,15 +559,15 @@ SymbDefP special_types[2];
 void GenerateStatesForRecords (struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[])
 {
 	int n_types,i,dcl_type_symbols_n;
-	SymbolP type_symbol_a;
+	TypeSymbolP type_symbol_a;
 
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;	
 	for (i=0; i<n_types; ++i)
-		if (type_symbol_a[i].symb_kind==definition){
+		if (type_symbol_a[i].ts_kind==type_definition){
 			SymbDef def;
 
-			def=type_symbol_a[i].symb_def;
+			def=type_symbol_a[i].ts_def;
 			if (def->sdef_kind==RECORDTYPE){
 				GenRecordState (def);
 				GenResultStatesOfLazyFields (def);
@@ -609,10 +601,10 @@ void GenerateStatesForRecords (struct module_function_and_type_symbols mfts,int 
 		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
 		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
-			if (type_symbol_a[i].symb_kind==definition){
+			if (type_symbol_a[i].ts_kind==type_definition){
 				SymbDef def;
 
-				def=type_symbol_a[i].symb_def;
+				def=type_symbol_a[i].ts_def;
 				if (def->sdef_kind==RECORDTYPE){
 					GenRecordState (def);
 					GenResultStatesOfLazyFields (def);
@@ -650,13 +642,14 @@ static StateS DetermineStatesOfRuleType (TypeAlts ruletype,StateS *const functio
 	TypeArgs type_arg;
 	StateP arg_state_p;
 	
-	CurrentSymbol = ruletype->type_alt_lhs_symbol;
+	CurrentSymbDef = ruletype->type_alt_lhs_symbol->symb_def;
 	CurrentLine = 0 /*ruletype->type_alt_line*/;
-	
+	CurrentTypeSymbol = NULL;
+
 	arg_state_p=function_state_p;
 	for_l (type_arg,ruletype->type_alt_lhs_arguments,type_arg_next){
 		if (!(type_arg->type_arg_node->type_node_annotation==NoAnnot || type_arg->type_arg_node->type_node_annotation==StrictAnnot))
-			StaticMessage_S_s (False, CurrentSymbol, Wtypeannot);
+			StaticMessage_S_s (False, CurrentSymbDef, Wtypeannot);
 	
 		if (!type_arg->type_arg_node->type_node_is_var)
 			ConvertTypeToState (type_arg->type_arg_node,arg_state_p,type_arg->type_arg_node->type_node_annotation==NoAnnot ? OnA : StrictOnA);
@@ -666,7 +659,7 @@ static StateS DetermineStatesOfRuleType (TypeAlts ruletype,StateS *const functio
 		++arg_state_p;
 	}
 
-	if (ruletype->type_alt_rhs->type_node_is_var || ruletype->type_alt_rhs->type_node_symbol->symb_kind==apply_symb){
+	if (ruletype->type_alt_rhs->type_node_is_var || ruletype->type_alt_rhs->type_node_symbol->ts_kind==apply_type_symb){
 		function_state_p[-1] = StrictState;
 		function_state_p[-1].state_kind = StrictRedirection;
 	} else
@@ -697,12 +690,12 @@ static void determine_unique_state_of_constructor_argument (StateP result_state_
 			result_state_p->state_mark |= STATE_UNIQUE_MASK;
 		
 		if ((result_state_p->state_mark & STATE_UNIQUE_MASK) && result_state_p->state_type==SimpleState){
-			Symbol symbol;
+			TypeSymbol type_symbol;
 			
-			symbol=type_arg_node->type_node_symbol;
+			type_symbol=type_arg_node->type_node_symbol;
 
-			if (symbol->symb_kind==list_type || symbol->symb_kind==tuple_type || (symbol->symb_kind==definition && 
-				(symbol->symb_def->sdef_kind==TYPE || symbol->symb_def->sdef_kind==RECORDTYPE)))
+			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || (type_symbol->ts_kind==type_definition && 
+				(type_symbol->symb_def->sdef_kind==TYPE || type_symbol->symb_def->sdef_kind==RECORDTYPE)))
 			{
 				unsigned long unq_type_args;
 				TypeArgs type_arg;
@@ -772,12 +765,12 @@ static StateP determine_unique_state_of_constructor_argument
 			result_state_p=NULL;
 		
 		if ((type_state_p->state_mark & STATE_UNIQUE_MASK) && type_state_p->state_type==SimpleState){
-			Symbol symbol;
+			TypeSymbol type_symbol;
 			
-			symbol=type_arg_node->type_node_symbol;
+			type_symbol=type_arg_node->type_node_symbol;
 
-			if (symbol->symb_kind==list_type || symbol->symb_kind==tuple_type || (symbol->symb_kind==definition && 
-				(symbol->symb_def->sdef_kind==TYPE || symbol->symb_def->sdef_kind==RECORDTYPE)))
+			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || (type_symbol->ts_kind==type_definition && 
+				(type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE)))
 			{
 				unsigned long unq_type_args;
 				TypeArgs type_arg;
@@ -1262,7 +1255,7 @@ void ExamineTypesAndLhsOfSymbols
 	(struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[],ImpRuleP new_imp_rules)
 {
 	int dcl_mfts_i,n_types,i,dcl_type_symbols_n;
-	SymbolP type_symbol_a;
+	TypeSymbolP type_symbol_a;
 	PolyList array_fun;
 	int n_functions;
 	SymbolP function_symbol_a;
@@ -1297,15 +1290,15 @@ void ExamineTypesAndLhsOfSymbols
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i)
-		if (type_symbol_a[i].symb_kind==definition)
-			ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
+		if (type_symbol_a[i].ts_kind==type_definition)
+			ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].ts_def);
 
 	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
 		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
 		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
-			if (type_symbol_a[i].symb_kind==definition)
-				ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].symb_def);
+			if (type_symbol_a[i].ts_kind==type_definition)
+				ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].ts_def);
 	}
 
 #if STRICT_LISTS
@@ -1368,17 +1361,17 @@ void ImportSymbols (int size_dcl_mfts_a,struct module_function_and_type_symbols 
 
 	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
 		int n_types;
-		SymbolP type_symbol_a;
+		TypeSymbolP type_symbol_a;
 		SymbDef sdef;
 		int i;
 
 		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
 		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i){
-			if (type_symbol_a[i].symb_kind!=definition)
+			if (type_symbol_a[i].ts_kind!=type_definition)
 				continue;
 
-			sdef=type_symbol_a[i].symb_def;
+			sdef=type_symbol_a[i].ts_def;
 			if (sdef->sdef_module!=CurrentModule){
 				if (sdef->sdef_isused
 					&& sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)
@@ -1435,16 +1428,16 @@ void import_not_yet_imported_record_r_labels (int size_dcl_mfts_a,struct module_
 	
 	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_mfts_a; ++dcl_type_symbols_n){
 		int n_types;
-		SymbolP type_symbol_a;
+		TypeSymbolP type_symbol_a;
 		int i;
 
 		n_types = dcl_mfts_a[dcl_type_symbols_n].mfts_n_types;
 		type_symbol_a = dcl_mfts_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
-			if (type_symbol_a[i].symb_kind==definition){
+			if (type_symbol_a[i].ts_kind==type_definition){
 				SymbDef sdef;
 
-				sdef=type_symbol_a[i].symb_def;
+				sdef=type_symbol_a[i].ts_def;
 				if ((sdef->sdef_mark & (SDEF_USED_STRICTLY_MASK | SDEF_RECORD_R_LABEL_IMPORTED_MASK))==SDEF_USED_STRICTLY_MASK
 					&& sdef->sdef_kind==RECORDTYPE && sdef->sdef_module!=CurrentModule)
 				{
@@ -1556,7 +1549,7 @@ static void DecrRefCountCopiesOfArg (Args arg IF_OPTIMIZE_LAZY_TUPLE_RECURSION(i
 					node_id_def_node=node_id->nid_node_def->def_node;
 					if (node_id_def_node->node_kind==NormalNode && node_id_def_node->node_symbol->symb_kind==definition
 						&& node_id_def_node->node_symbol->symb_def->sdef_kind==IMPRULE && IsLazyState (node_id_def_node->node_state)
-						&& node_id_def_node->node_symbol==CurrentSymbol
+						&& node_id_def_node->node_symbol->symb_def==CurrentSymbDef
 					){
 						SymbDef function_sdef_p;
 						RuleAltP rule_alt_p;
@@ -2185,7 +2178,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				node->node_state = StrictState;
 
 				if (node->node_arity==3){
-					if (DetermineStrictArgContext (args, BasicSymbolStates[bool_type], local_scope))
+					if (DetermineStrictArgContext (args, BasicTypeSymbolStates[bool_type], local_scope))
 						parallel = True;
 
 					args = args->arg_next;
@@ -2493,7 +2486,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 				}
 				break;
 			default:
-				if (rootsymb->symb_kind < Nr_Of_Predef_Types){
+				if (rootsymb->symb_kind <= last_denot){
 					node->node_state = BasicSymbolStates [rootsymb->symb_kind];
 					node->node_state.state_kind = demanded_state.state_kind;
 				}
@@ -2507,9 +2500,9 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 #endif		
 		ssymb = node->node_symbol->symb_def;
 
-		unboxed_record_state_p=&ssymb->sdef_type->type_symbol->symb_def->sdef_record_state;
+		unboxed_record_state_p=&ssymb->sdef_type->type_symbol->ts_def->sdef_record_state;
 #if BOXED_RECORDS		
-		if (ssymb->sdef_type->type_symbol->symb_def->sdef_boxed_record){
+		if (ssymb->sdef_type->type_symbol->ts_def->sdef_boxed_record){
 			SetUnaryState (&boxed_record_state,StrictOnA,RecordObj);
 			record_state_p = &boxed_record_state;
 		} else
@@ -2695,9 +2688,9 @@ static Bool NodeInASemiStrictContext (Node node,int local_scope)
 }
 
 static void DetermineStatesOfNonIfRootNode (Node root,NodeId root_id,StateS demstate,int local_scope)
-{	
+{
 	if (root->node_state.state_kind != OnA){
-		StaticMessage_S_s (False, CurrentSymbol, Wrootannot);
+		StaticMessage_S_s (False, CurrentSymbDef, Wrootannot);
 		root->node_state.state_kind = OnA;
 	}
 	
@@ -2724,7 +2717,7 @@ static void DetermineStatesIfRootNode (Node node, StateS demstate,int local_scop
 
 	condpart = node->node_arguments;
 			
-	AdjustState (&condpart->arg_state, BasicSymbolStates [bool_type]);
+	AdjustState (&condpart->arg_state, BasicTypeSymbolStates [bool_type]);
 
 	if (condpart->arg_node->node_kind!=NodeIdNode)
 		DetermineStatesRootNode (condpart->arg_node, NULL,condpart->arg_state, local_scope);
@@ -2800,7 +2793,7 @@ static void ParAnnotInAStrictContext (Node node,Annotation annot, int local_scop
 		at_node=get_p_at_node (node);
 		
 		if (at_node->node_kind!=NodeIdNode)
-			NodeInAStrictContext (at_node,BasicSymbolStates[procid_type],local_scope);
+			NodeInAStrictContext (at_node,BasicTypeSymbolStates[procid_type],local_scope);
 	}
 }
 
@@ -2892,7 +2885,7 @@ static void DetermineStatesOfNodeDefs (NodeDefs firstdef, int local_scope)
 			if (! (next->def_id->nid_ref_count_copy<0 ||
 					(next->def_id->nid_ref_count_copy==0 && (next->def_id->nid_mark & ON_A_CYCLE_MASK))))
 #if 1
-				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbol->symb_def->sdef_name);
+				error_in_function_s ("DetermineStatesOfNodeDefs",CurrentSymbDef->sdef_name);
 #else
 			{
 				char s[20];
@@ -3372,8 +3365,8 @@ void GenerateStatesForRule (ImpRuleS *rule)
 	StateP function_state_p;
 #endif
 
-	CurrentSymbol=rule->rule_root->node_symbol;
-	rule_sdef=CurrentSymbol->symb_def;
+	rule_sdef=rule->rule_root->node_symbol->symb_def;
+	CurrentSymbDef=rule_sdef;
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 	function_state_p=rule->rule_state_p;
@@ -3396,7 +3389,7 @@ void GenerateStatesForRule (ImpRuleS *rule)
 		set_states_of_array_selects_in_pattern (alt);
 #endif
 	} else if (rule->rule_type==NULL)
-		StaticMessage_S_s (True, CurrentSymbol, ECodeBlock);
+		StaticMessage_S_s (True, CurrentSymbDef, ECodeBlock);
 
 	if (rule_sdef->sdef_arity==1 &&
 			function_state_p[-1].state_type==SimpleState && function_state_p[-1].state_kind==OnB && function_state_p[-1].state_object==BoolObj &&
@@ -3460,7 +3453,7 @@ void DetermineNodeState (Node node)
 			if (DoParallel)
 				/* node->node_attribute = AnnotHasDeferAttr (node->node_annotation->annot_kind) */;
 			else {
-				StaticMessage_S_s (False, CurrentSymbol, Wparannot);
+				StaticMessage_S_s (False, CurrentSymbDef, Wparannot);
 				node->node_state.state_kind = OnA;
 			}
 		}
@@ -3721,13 +3714,13 @@ static SymbolP copy_imp_rule_and_add_arguments (SymbDef rule_sdef,int n_extra_ar
 			last_lhs_type_arg_p=&(*last_lhs_type_arg_p)->type_arg_next;
 		
 		for (n=0; n<n_extra_arguments; ++n){
-			if (rhs_type_node_p->type_node_is_var || rhs_type_node_p->type_node_symbol->symb_kind!=fun_type)
+			if (rhs_type_node_p->type_node_is_var || rhs_type_node_p->type_node_symbol->ts_kind!=fun_type)
 				error_in_function ("copy_imp_rule_and_add_arguments");
 
 			{
 				struct type_arg *first_arg_p;
 				
-				if (rhs_type_node_p->type_node_symbol->symb_kind!=fun_type)
+				if (rhs_type_node_p->type_node_symbol->ts_kind!=fun_type)
 					error_in_function ("copy_imp_rule_and_add_arguments");
 							
 				first_arg_p=rhs_type_node_p->type_node_arguments;
@@ -3841,7 +3834,7 @@ static void create_new_function_with_more_arguments (NodeP node_p)
 							n=0;
 #endif
 							break;
-						} else if (rhs_type_node_p->type_node_symbol->symb_kind==fun_type){
+						} else if (rhs_type_node_p->type_node_symbol->ts_kind==fun_type){
 							rhs_type_node_p=rhs_type_node_p->type_node_arguments->type_arg_next->type_arg_node;
 							--n;
 						} else
@@ -4234,14 +4227,14 @@ static void AnnotateStrictNodeIds (Node node,StrictNodeIdP strict_node_ids,NodeD
 			uselect_sdef=array_uselect_node->node_symbol->symb_def;
 			
 			if (uselect_sdef->sdef_kind==IMPRULE)
-				type_arg=uselect_sdef->sdef_rule->rule_type->type_alt_lhs_arguments;
+				type_arg=uselect_sdef->sdef_rule->rule_type->type_alt_lhs->type_node_arguments;
 			else
-				type_arg=uselect_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
+				type_arg=uselect_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs->type_node_arguments;
 
 			if (!type_arg->type_arg_node->type_node_is_var &&
-				(type_arg->type_arg_node->type_node_symbol->symb_kind==strict_array_type ||
-				 type_arg->type_arg_node->type_node_symbol->symb_kind==unboxed_array_type ||
-				 type_arg->type_arg_node->type_node_symbol->symb_kind==packed_array_type)
+				(type_arg->type_arg_node->type_node_symbol->ts_kind==strict_array_type ||
+				 type_arg->type_arg_node->type_node_symbol->ts_kind==unboxed_array_type ||
+				 type_arg->type_arg_node->type_node_symbol->ts_kind==packed_array_type)
 			){
 				node_id->nid_node->node_annotation=StrictAnnot;
 			} else {
@@ -4326,10 +4319,9 @@ static void DetermineSharedAndAnnotatedNodesOfRule (ImpRuleP rule)
 {
 	SymbDef rule_sdef;
 	RuleAlts alt;
-
-	CurrentSymbol=rule->rule_root->node_symbol;
 	
-	rule_sdef=CurrentSymbol->symb_def;
+	rule_sdef=rule->rule_root->node_symbol->symb_def;
+	CurrentSymbDef=rule_sdef;
 
 	alt=rule->rule_alts;
 	if (alt->alt_kind==Contractum){
@@ -4481,10 +4473,9 @@ void reset_states_and_ref_count_copies (ImpRuleS *rule)
 {
 	SymbDef rule_sdef;
 	RuleAlts alt;
-
-	CurrentSymbol=rule->rule_root->node_symbol;
 	
-	rule_sdef=CurrentSymbol->symb_def;
+	rule_sdef=rule->rule_root->node_symbol->symb_def;
+	CurrentSymbDef=rule_sdef;
 
 	alt=rule->rule_alts;
 	if (alt->alt_kind==Contractum){
@@ -4549,28 +4540,28 @@ void InitStatesGen (void)
 	SetUnaryState (& StrictState, StrictOnA, UnknownObj);
 	SetUnaryState (& LazyState, OnA, UnknownObj);
 	
-	SetUnaryState (& BasicSymbolStates[int_type], OnB, IntObj);
-	SetUnaryState (& BasicSymbolStates[bool_type], OnB, BoolObj);
-	SetUnaryState (& BasicSymbolStates[char_type], OnB, CharObj);
-	SetUnaryState (& BasicSymbolStates[real_type], OnB, RealObj);
-	SetUnaryState (& BasicSymbolStates[file_type], OnB, FileObj);
-	SetUnaryState (& BasicSymbolStates[world_type], StrictOnA, WorldObj);
-	SetUnaryState (& BasicSymbolStates[procid_type], OnB, ProcIdObj);
-	SetUnaryState (& BasicSymbolStates[redid_type], OnB, RedIdObj);
+	SetUnaryState (& BasicTypeSymbolStates[int_type], OnB, IntObj);
+	SetUnaryState (& BasicTypeSymbolStates[bool_type], OnB, BoolObj);
+	SetUnaryState (& BasicTypeSymbolStates[char_type], OnB, CharObj);
+	SetUnaryState (& BasicTypeSymbolStates[real_type], OnB, RealObj);
+	SetUnaryState (& BasicTypeSymbolStates[file_type], OnB, FileObj);
+	SetUnaryState (& BasicTypeSymbolStates[world_type], StrictOnA, WorldObj);
+	SetUnaryState (& BasicTypeSymbolStates[procid_type], OnB, ProcIdObj);
+	SetUnaryState (& BasicTypeSymbolStates[redid_type], OnB, RedIdObj);
 	SetUnaryState (& BasicSymbolStates[int_denot], OnB, IntObj);
 	SetUnaryState (& BasicSymbolStates[bool_denot], OnB, BoolObj);
 	SetUnaryState (& BasicSymbolStates[char_denot], OnB, CharObj);
-	SetUnboxedArrayState (& BasicSymbolStates[string_denot],&BasicSymbolStates[char_type]);
+	SetUnboxedArrayState (& BasicSymbolStates[string_denot],&BasicTypeSymbolStates[char_type]);
 	SetUnaryState (& BasicSymbolStates[real_denot], OnB, RealObj);
-	SetUnaryState (& BasicSymbolStates[array_type], StrictOnA, ArrayObj);
-	SetUnaryState (& BasicSymbolStates[strict_array_type], StrictOnA, StrictArrayObj);
-	SetUnaryState (& BasicSymbolStates[unboxed_array_type], StrictOnA, UnboxedArrayObj);
-	SetUnaryState (& BasicSymbolStates[packed_array_type], StrictOnA, PackedArrayObj);
-	SetUnaryState (& BasicSymbolStates[fun_type], StrictOnA, UnknownObj);
-	SetUnaryState (& BasicSymbolStates[list_type], StrictOnA, ListObj);
-	SetUnaryState (& BasicSymbolStates[tuple_type], StrictOnA, TupleObj);
+	SetUnaryState (& BasicTypeSymbolStates[array_type], StrictOnA, ArrayObj);
+	SetUnaryState (& BasicTypeSymbolStates[strict_array_type], StrictOnA, StrictArrayObj);
+	SetUnaryState (& BasicTypeSymbolStates[unboxed_array_type], StrictOnA, UnboxedArrayObj);
+	SetUnaryState (& BasicTypeSymbolStates[packed_array_type], StrictOnA, PackedArrayObj);
+	SetUnaryState (& BasicTypeSymbolStates[fun_type], StrictOnA, UnknownObj);
+	SetUnaryState (& BasicTypeSymbolStates[list_type], StrictOnA, ListObj);
+	SetUnaryState (& BasicTypeSymbolStates[tuple_type], StrictOnA, TupleObj);
 #ifdef CLEAN2
-	SetUnaryState (& BasicSymbolStates[dynamic_type], StrictOnA, DynamicObj);
+	SetUnaryState (& BasicTypeSymbolStates[dynamic_type], StrictOnA, DynamicObj);
 	SetUnaryState (& BasicSymbolStates[rational_denot], StrictOnA, UnknownObj);
 #endif
 }

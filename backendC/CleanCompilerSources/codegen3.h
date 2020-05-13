@@ -15,7 +15,7 @@ struct saved_node_id_ref_counts* save_rhs_node_id_ref_counts (NodeP node_p,NodeD
 void restore_node_id_ref_counts (struct saved_node_id_ref_counts *snir_p,struct saved_case_node_id_ref_counts *scnirc_p);
 
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
-int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs);
+int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs,SymbDefP current_symb_def_p);
 #endif
 
 #if OPTIMIZE_LAZY_TUPLE_RECURSION

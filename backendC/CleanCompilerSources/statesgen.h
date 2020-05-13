@@ -6,6 +6,7 @@
 #define IsLazyStateKind(statekind) ((statekind)>StrictOnA)
 
 extern StateS BasicSymbolStates[],LazyState,StrictState;
+extern StateS BasicTypeSymbolStates[];
 extern int FirstStateIsStricter (StateS offered_state,StateS demanded_state);
 extern int FieldArgumentNodeStatesAreStricter (ArgS *offered_args,ArgS *field_args,States record_states);
 extern void ConvertAnnotationToState (Annotation annot, States state);

@@ -227,6 +227,14 @@ static void PrintSymbol (Symbol symbol, File file)
 		FPutS (symbol_to_string (symbol), file);
 }
 
+static void PrintTypeSymbol (TypeSymbol type_symbol, File file)
+{
+	if (type_symbol->ts_kind==definition)
+		PrintSymbolOfIdent (type_symbol->ts_def->sdef_name, 0, file);
+	else
+		FPutS (type_symbol_to_string (type_symbol), file);
+}
+
 void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 {
 /*
@@ -244,11 +252,13 @@ void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 			PrintArguments (node -> node_arguments, ',', False,n_leading_spaces,file);
 			FPutC (')', file);
 		}
+/*
 		else if (node_symb -> symb_kind == list_type)
 		{	FPutC ('[', file);
 			PrintArguments (node -> node_arguments, ',', False,n_leading_spaces,file);
 			FPutC (']', file);
 		}
+*/
 		else if (node_symb -> symb_kind == nil_symb)
 			FPutS ("[]", file);
 		else if (node_symb -> symb_kind == cons_symb)
@@ -698,27 +708,27 @@ void PrintTypeNode (TypeNode node, File file)
 
 	if (node->type_node_is_var)
 		fprintf (file, "%d:", node->type_node_tv_argument_n);
-	else if (node->type_node_symbol->symb_kind == tuple_type)
+	else if (node->type_node_symbol->ts_kind == tuple_type)
 	{	FPutC ('(', file);
 		PrintTypeArguments (node->type_node_arguments, ',', file);
 		FPutC (')', file);
 	}
-	else if (node->type_node_symbol->symb_kind == list_type)
+	else if (node->type_node_symbol->ts_kind == list_type)
 	{	FPutC ('[', file);
 		PrintTypeArguments (node->type_node_arguments,',', file);
 		FPutC (']', file);
 	}
-	else if (node->type_node_symbol->symb_kind >= array_type &&
-			 node->type_node_symbol->symb_kind <= unboxed_array_type)
+	else if (node->type_node_symbol->ts_kind >= array_type &&
+			 node->type_node_symbol->ts_kind <= unboxed_array_type)
 	{	char *delim_chars = ":|#";
-		char array_delim = delim_chars [node->type_node_symbol->symb_kind - array_type];
+		char array_delim = delim_chars [node->type_node_symbol->ts_kind - array_type];
 		FPutC ('{', file);
 		FPutC (array_delim, file);
 		PrintTypeArguments (node->type_node_arguments,',', file);
 		FPutC (array_delim, file);
 		FPutC ('}', file);
 	}
-	else if (node->type_node_symbol->symb_kind == apply_symb)
+	else if (node->type_node_symbol->ts_kind == apply_type_symb)
 	{	FPutC ('(', file);
 		PrintTypeArguments (node -> type_node_arguments, ' ', file);
 		FPutC (')', file);
@@ -726,7 +736,7 @@ void PrintTypeNode (TypeNode node, File file)
 	{	if (node->type_node_arguments)
 			FPutC ('(', file);
 
-		PrintSymbol (node->type_node_symbol, file);
+		PrintTypeSymbol (node->type_node_symbol, file);
 		
 		if (node->type_node_arguments){
 			FPutC (' ', file);

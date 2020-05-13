@@ -77,12 +77,13 @@ LabDef type_error_lab		= {NULL, "", False, "_type_error", 0};
 LabDef indirection_lab		= {NULL, "", False, "e_system_nind", 0};
 LabDef ind_lab				= {NULL, "", False, "e_system_dind", 0};
 LabDef hnf_lab				= {NULL, "", False, "_hnf", 0};
-LabDef cons_lab				= {NULL, "", False, "_Cons", 0};
-LabDef nil_lab				= {NULL, "", False, "_Nil", 0};
-LabDef tuple_lab			= {NULL, "", False, "_Tuple", 0};
 LabDef empty_lab			= {NULL, "", False, "_", 0};
 LabDef add_arg_lab			= {NULL, "", False, "_add_arg", 0};
 LabDef match_error_lab		= {NULL, "", False, "_match_error", 0};
+LabDef tuple_lab			= {NULL, "", False, "_Tuple", 0};
+
+LabDef cons_lab				= {NULL, "", False, "_Cons", 0};
+LabDef nil_lab				= {NULL, "", False, "_Nil", 0};
 #if STRICT_LISTS
 LabDef conss_lab			= {NULL, "", False, "_Conss", 0};
 LabDef consts_lab			= {NULL, "", False, "_Consts", 0};
@@ -432,7 +433,7 @@ void ParComment (Args arg)
 /*		if (arg->arg_id)
 			PrintNodeId (arg->arg_id);
 		else
-			PrintSymbol (arg->arg_pattern->node_symbol,OutFile);
+			WriteSymbolToOutFile (arg->arg_pattern->node_symbol);
 */
 		PutSOutFile (": parallel subgraph");
 	}
@@ -1000,7 +1001,7 @@ static void GenLazyFieldSelectorEntry (SymbDef field_def,StateS recstate,int tot
 
 		update_root_node = ! ExpectsResultNode (offfieldstate);
 
-		record_name=field_def->sdef_type->type_symbol->symb_def->sdef_name;
+		record_name=field_def->sdef_type->type_symbol->ts_def->sdef_name;
 		
 		if (field_def->sdef_calledwithrootnode){
 			ealab = CurrentAltLabel;
@@ -1506,14 +1507,14 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			int tail_strict;
 					
 			type_node_arguments_p=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
-			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
+			tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->ts_tail_strictness;
 			
 			if (ExportLocalLabels){
 				unboxed_record_cons_lab.lab_mod=CurrentModule;
-				unboxed_record_cons_lab.lab_symbol=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
+				unboxed_record_cons_lab.lab_symbol=type_node_arguments_p->type_arg_node->type_node_symbol->ts_def;
 				unboxed_record_cons_lab.lab_issymbol=True;
 			} else {
-				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def->sdef_name;
+				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->ts_def->sdef_name;
 				unboxed_record_cons_lab.lab_issymbol=False;			
 			}
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
@@ -1559,7 +1560,7 @@ void GenerateCodeForLazyArrayFunctionEntries (void)
 void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symbols mfts)
 {
 	int n_types,i;
-	SymbolP type_symbol_a;
+	TypeSymbolP type_symbol_a;
 #if STRICT_LISTS
 	PolyList unboxed_record_cons_element;
 #endif
@@ -1567,10 +1568,10 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i){
-		if (type_symbol_a[i].symb_kind==definition){
+		if (type_symbol_a[i].ts_kind==type_definition){
 			SymbDef def;
 		
-			def = type_symbol_a[i].symb_def;
+			def = type_symbol_a[i].ts_def;
 
 			if (def->sdef_module==CurrentModule){
 				if (def->sdef_kind==TYPE){
@@ -1648,8 +1649,8 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 		
 		cons_instance_sdef=unboxed_record_cons_element->pl_elem;
 		type_node_arguments_p=cons_instance_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
-		record_sdef=type_node_arguments_p->type_arg_node->type_node_symbol->symb_def;
-		tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->symb_tail_strictness;
+		record_sdef=type_node_arguments_p->type_arg_node->type_node_symbol->ts_def;
+		tail_strict=type_node_arguments_p->type_arg_next->type_arg_node->type_node_symbol->ts_tail_strictness;
 		
 		GenUnboxedConsRecordDescriptor (record_sdef,tail_strict);
 	}
@@ -2721,7 +2722,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 	select_function_symbol=NewSymbol (definition);
 	select_function_symbol->symb_def=select_function_sdef;
 
-	record_state_p=&selector_sdef->sdef_type->type_symbol->symb_def->sdef_record_state;
+	record_state_p=&selector_sdef->sdef_type->type_symbol->ts_def->sdef_record_state;
 	fieldnr = selector_sdef->sdef_sel_field_number;
 	
 	record_node_id=NewNodeId();
@@ -3134,7 +3135,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 		}
 		
 		lhs_type_root_state_p=&match_imp_rule->rule_state_p[-1];
-		if (!(type_node->type_node_is_var || type_node->type_node_symbol->symb_kind==apply_symb)
+		if (!(type_node->type_node_is_var || type_node->type_node_symbol->ts_kind==apply_type_symb)
 			&& !IsLazyState (constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries]))
 		{
 			*lhs_type_root_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries];
@@ -3660,7 +3661,7 @@ static int generate_int_char_or_bool_match (struct arg *first_arg,int *matches_a
 				
 				MakeLabel (&case_label,case_symb,NewLabelNr,no_pref);
 				
-				if (symbol->symb_kind < Nr_Of_Predef_Types){
+				if (symbol->symb_kind <= last_denot){
 					if (symbol->symb_kind==bool_denot && case_number==1){
 						GenJmp (&case_label);
 						*matches_always_p=1;
@@ -4135,7 +4136,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 							break;
 						}
 						default:
-							if (symbol->symb_kind < Nr_Of_Predef_Types){
+							if (symbol->symb_kind <= last_denot){
 								ObjectKind denot_type;
 
 								denot_type = BasicSymbolStates [symbol->symb_kind].state_object;
@@ -4317,7 +4318,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 						DetermineSizeOfState (result_state,&a_size,&b_size);
 						asp+=a_size;
 						bsp+=b_size;
-						CoerceArgumentOnTopOfStack (&asp,&bsp,BasicSymbolStates [bool_type],result_state,a_size,b_size);
+						CoerceArgumentOnTopOfStack (&asp,&bsp,BasicTypeSymbolStates [bool_type],result_state,a_size,b_size);
 
 						bsp -= 1;
 					} else {

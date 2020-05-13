@@ -977,7 +977,7 @@ void BuildOrFillLazyFieldSelector (SymbDef selector_sdef,StateKind result_state_
 
 	ConvertSymbolToDandNLabel (&dsellab,&nsellab,selector_sdef);
 
-	record_sdef=selector_sdef->sdef_type->type_symbol->symb_def;
+	record_sdef=selector_sdef->sdef_type->type_symbol->ts_def;
 	record_name=record_sdef->sdef_name;
 
 	field_result_state_p=&record_sdef->sdef_record_state.state_record_arguments [selector_sdef->sdef_sel_field_number];
@@ -1251,7 +1251,7 @@ static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unb
 				SymbDef record_sdef;
 				StateP record_state_p;
 				
-				record_sdef=seldef->sdef_type->type_symbol->symb_def;
+				record_sdef=seldef->sdef_type->type_symbol->ts_def;
 				record_state_p=&record_sdef->sdef_record_state;
 				if (record_state_p->state_type==RecordState && record_state_p->state_arity==1 && !record_sdef->sdef_boxed_record){
 					int asize,bsize;
@@ -1283,7 +1283,7 @@ static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unb
 				int asize,bsize,apos,bpos,tot_asize,tot_bsize;
 				StateP record_state_p;
 			
-				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 				if (record_state_p->state_type!=RecordState)
 					error_in_function ("FillOrReduceFieldSelection_of_selection_in_single_field_unboxable_record");
 
@@ -1303,7 +1303,7 @@ static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unb
 			int asize,bsize,apos,bpos,tot_asize,tot_bsize;
 			StateP record_state_p;
 
-			record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+			record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 
 			Build (arg_node,asp_p,bsp_p,code_gen_node_ids_p);
 
@@ -1353,7 +1353,7 @@ static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unb
 				StateP record_state_p;
 			
 				recindex = arg_node_id->nid_a_index;
-				record_sdef=seldef->sdef_type->type_symbol->symb_def;
+				record_sdef=seldef->sdef_type->type_symbol->ts_def;
 				record_state_p=&record_sdef->sdef_record_state;
 
 				if (record_state_p->state_type!=RecordState)
@@ -1412,7 +1412,7 @@ static struct state *FillOrReduceFieldSelection_of_selection_in_single_field_unb
 				recstate.state_kind = StrictOnA;
 			}
 
-			record_sdef=seldef->sdef_type->type_symbol->symb_def;
+			record_sdef=seldef->sdef_type->type_symbol->ts_def;
 			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,&record_sdef->sdef_record_state);
 # if BOXED_RECORDS
 			if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
@@ -1486,7 +1486,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 
 				BuildArg (arg,asp_p,bsp_p,code_gen_node_ids_p);
 				
-				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 #if BOXED_RECORDS
 				if (node->node_arity<SELECTOR_L ?
 					arg->arg_state.state_type==SimpleState :
@@ -1526,7 +1526,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			
 				arg_node_id=arg_node->node_node_id;
 
-				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 
 				tuple_state.state_type=TupleState;
 				tuple_state.state_arity=2;
@@ -1575,7 +1575,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				SymbDef record_sdef;
 				StateP record_state_p;
 				
-				record_sdef=seldef->sdef_type->type_symbol->symb_def;
+				record_sdef=seldef->sdef_type->type_symbol->ts_def;
 				record_state_p=&record_sdef->sdef_record_state;
 				if (record_state_p->state_type==RecordState && record_state_p->state_arity==1 && !record_sdef->sdef_boxed_record){
 					int asize,bsize;
@@ -1613,7 +1613,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				int asize,bsize,apos,bpos,tot_asize,tot_bsize;
 				StateP record_state_p,field_state_p;
 			
-				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 				if (record_state_p->state_type!=RecordState)
 					error_in_function ("FillOrReduceFieldSelection");
 
@@ -1638,7 +1638,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 			int asize,bsize,apos,bpos,tot_asize,tot_bsize;
 			StateP record_state_p;
 #if 1
-			record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+			record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 #else
 			record_state_p=&arg->arg_state;
 #endif
@@ -1706,7 +1706,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				StateP record_state_p,field_state_p;
 			
 				recindex = arg_node_id->nid_a_index;
-				record_sdef=seldef->sdef_type->type_symbol->symb_def;
+				record_sdef=seldef->sdef_type->type_symbol->ts_def;
 				record_state_p=&record_sdef->sdef_record_state;
 
 				if (record_state_p->state_type!=RecordState)
@@ -1770,7 +1770,7 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 				recstate.state_kind = StrictOnA;
 			}
 
-			record_sdef=seldef->sdef_type->type_symbol->symb_def;
+			record_sdef=seldef->sdef_type->type_symbol->ts_def;
 			DetermineFieldSizeAndPositionAndRecordSize (fieldnr,&a_size,&b_size,&apos, &bpos,&tot_asize,&tot_bsize,&record_sdef->sdef_record_state);
 # if BOXED_RECORDS
 			if (record_sdef->sdef_boxed_record && (arg_node_id->nid_mark2 & (NID_RECORD_USED_BY_UPDATE | NID_RECORD_USED_BY_NON_SELECTOR_OR_UPDATES))==NID_RECORD_USED_BY_UPDATE
@@ -3296,7 +3296,7 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 		unboxed_record_cons_lab.lab_post='\0';
 
 		return &unboxed_record_cons_lab;
-	} else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==ArrayState){		
+	} else if (cons_symbol_p->symb_unboxed_cons_state_p->state_type==ArrayState){
 		return &unboxed_cons_array_label;
 	} else
 		error_in_function ("unboxed_cons_label");
@@ -3633,17 +3633,10 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			}
 			return;
 		default:
-			if (symb->symb_kind<Nr_Of_Basic_Types){
-				if (update_node_id==NULL){
-					*asp_p+=1;
-					GenBuildh (&BasicDescriptors[symb->symb_kind],0);
-				} else
-					GenFillh (&BasicDescriptors[symb->symb_kind],0,*asp_p-update_node_id->nid_a_index,
-						node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
-			} else {
+			{
 				ObjectKind denottype;
 
-				denottype = (symb->symb_kind < Nr_Of_Predef_Types)
+				denottype = (symb->symb_kind <= last_denot)
 					? BasicSymbolStates [symb->symb_kind].state_object
 					: UnknownObj;
 

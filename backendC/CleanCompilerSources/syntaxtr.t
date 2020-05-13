@@ -25,9 +25,11 @@ typedef enum {
 #if ABSTRACT_OBJECT
 	AbstractObj,
 #endif
-	IntObj, BoolObj, CharObj, RealObj, FileObj, unusedObjectKind0/*StringObj*/,
-	TupleObj, ListObj, RecordObj, ArrayObj, StrictArrayObj, UnboxedArrayObj,
-	PackedArrayObj, WorldObj, ProcIdObj, RedIdObj
+	IntObj, BoolObj, CharObj, RealObj, FileObj,
+	TupleObj, RecordObj,
+	ArrayObj, StrictArrayObj, UnboxedArrayObj, PackedArrayObj,
+	ListObj,
+	WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
 	,DynamicObj
 #endif
@@ -35,39 +37,26 @@ typedef enum {
 } ObjectKind;
 
 #if ABSTRACT_OBJECT
-# define BASIC_ELEMS_STRING "uuibcrfsaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uuibcrfaaaaaaaippa" /* index by ObjectKind */
 #else
-# define BASIC_ELEMS_STRING "uibcrfsaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uibcrfaaaaaaaippa" /* index by ObjectKind */
 #endif
 
 typedef enum {
-	int_type, bool_type, char_type, real_type,
-	file_type, unusedSymbKind0/*string_type*/, world_type, procid_type,
-	redid_type,
-#ifdef CLEAN2
 	rational_denot,
-#else
-	Nr_Of_Basic_Types,
-#endif
 	int_denot, bool_denot, char_denot, real_denot,
-/*	Nr_Of_Basic_Denots, */ integer_denot,
+	integer_denot,
 	string_denot,
-	fun_type, array_type, strict_array_type, unboxed_array_type, packed_array_type, list_type, tuple_type, empty_type,
-#ifdef CLEAN2
-	dynamic_type,
-#endif
-	Nr_Of_Predef_Types,
-	tuple_symb, cons_symb, nil_symb,
+	tuple_symb,
+	cons_symb, nil_symb,
 	apply_symb, if_symb, fail_symb, seq_symb,
 	select_symb,
 	Nr_Of_Predef_FunsOrConses,
-	definition, newsymbol, instance_symb, empty_symbol, field_symbol_list,
+	definition = 20, instance_symb,
 	erroneous_symb
 } SymbKind;
 
-#ifdef CLEAN2
-# define Nr_Of_Basic_Types rational_denot
-#endif
+#define last_denot string_denot
 
 STRUCT (state,State){
 	union {
@@ -109,18 +98,18 @@ typedef enum {
 } TableKind;
 
 typedef union symb_value {
-	struct symbol_def *				val_def;
-	char *							val_int;
-	Bool 							val_bool;
-	char *							val_char;
-	char *							val_string;
-	char *							val_real;
-	int								val_arity;
+	struct symbol_def *		val_def;
+	char *					val_int;
+	Bool 					val_bool;
+	char *					val_char;
+	char *					val_string;
+	char *					val_real;
+	int						val_arity;
 #if STRICT_LISTS
-	struct state *					val_state_p;		/* element state for unboxed list cons in lhs */
-	struct unboxed_cons *			val_unboxed_cons_p;	/* state and symbol definition for unboxed list cons in rhs */
+	struct state *			val_state_p;					/* element state for unboxed list cons in lhs */
+	struct unboxed_cons *	val_unboxed_cons_p;				/* state and symbol definition for unboxed list cons in rhs */
 #endif
-	struct symbol_def *				val_apply_instance_field_def;
+	struct symbol_def *		val_apply_instance_field_def;	/* apply_symb if symb_instance_apply==1 */
 } SymbValue;
 
 #if STRICT_LISTS
@@ -212,16 +201,16 @@ STRUCT (node_id,NodeId){
 #define nid_state 				nid_inf1.inf1_state						/* codegen2,instructions */
 
 #define nid_forward_node_id				nid_inf2.inf2_forward_node_id	/* checker,transform */
-#define nid_node_id_ref_count_element	nid_u3.u3_ref_count_element		/* pattern_match */
-#define nid_node_id_ref_count_element_	nid_u3.u3_ref_count_element		/* pattern_match */
+#define nid_forward_node_id_			nid_inf2.inf2_forward_node_id	/* checker,transform */
 #define nid_a_index						nid_inf2.inf2_index.index_a		/* codegen2,instructions */
+#define nid_a_index_					nid_inf2.inf2_index.index_a		/* codegen2,instructions */
 #define nid_b_index 					nid_inf2.inf2_index.index_b		/* codegen2,instructions */
+#define nid_b_index_					nid_inf2.inf2_index.index_b		/* codegen2,instructions */
 
 #define nid_lazy_selector_ref_count		nid_inf2.inf2_lazy_selector_ref_count/* statesgen */
 
-#define nid_forward_node_id_			nid_inf2.inf2_forward_node_id	/* checker,transform */
-#define nid_a_index_					nid_inf2.inf2_index.index_a		/* codegen2,instructions */
-#define nid_b_index_					nid_inf2.inf2_index.index_b		/* codegen2,instructions */
+#define nid_node_id_ref_count_element	nid_u3.u3_ref_count_element		/* pattern_match */
+#define nid_node_id_ref_count_element_	nid_u3.u3_ref_count_element		/* pattern_match */
 
 #define nid_exp					nid_u3.u3_exp							/* sa */
 #define nid_lhs_tuple_node_id	nid_u3.u3_lhs_tuple_node_id
@@ -628,8 +617,6 @@ STRUCT (symbol_def,SymbDef){
 
 /* some macros to reuse bit fields */
 
-#define sdef_group_number		sdef_ancestor
-
 #define sdef_next_version	sdef_u2.sdef_u2_next_version
 #define sdef_special_array_function_symbol	sdef_u2.sdef_u2_special_array_function_symbol
 #define sdef_member_type_of_field	sdef_u2.sdef_u2_member_type_of_field
@@ -666,10 +653,10 @@ struct foreign_export_list {
 typedef char *ModuleFileTime;
 
 struct module_function_and_type_symbols {
-	int		mfts_n_functions;
-	SymbolP	mfts_function_symbol_a;
-	int		mfts_n_types;
-	SymbolP	mfts_type_symbol_a;
+	int			mfts_n_functions;
+	SymbolP		mfts_function_symbol_a;
+	int			mfts_n_types;
+	TypeSymbolP	mfts_type_symbol_a;
 };
 
 typedef struct {

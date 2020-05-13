@@ -88,7 +88,7 @@ STRUCT (be_module, BEModule)
 	unsigned int	bem_nFunctions;
 	SymbolP			bem_functions;
 	unsigned int	bem_nTypes;
-	SymbolP			bem_types;
+	TypeSymbolP		bem_types;
 	unsigned int	bem_nConstructors;
 	SymbolP			bem_constructors;
 	unsigned int	bem_nFields;
@@ -118,6 +118,7 @@ STRUCT (be_state, BEState)
 	unsigned int	be_nModules;
 
 	SymbolP			be_dontCareSymbol;
+	TypeSymbolP		be_dontCareTypeSymbol;
 	SymbolP			be_dictionarySelectFunSymbol;
 	SymbolP			be_dictionaryUpdateFunSymbol;
 
@@ -142,6 +143,7 @@ static BELocallyGeneratedFunctionS gLocallyGeneratedFunctions[] = {{"_dictionary
 static NodeIdP (*gCurrentNodeIds)=NULL;
 static int n_gCurrentNodeIds = 0;
 static SymbolP	gBasicSymbols [Nr_Of_Predef_FunsOrConses];
+static TypeSymbolP gBasicTypeSymbols [NTypeSymbKinds];
 static SymbolP	gTupleSelectSymbols [MaxNodeArity];
 
 static int number_of_node_ids=0;
@@ -162,6 +164,19 @@ PredefinedSymbol (SymbKind symbolKind, int arity)
 	return (symbol);
 } /* PredefinedSymbol */
 
+static TypeSymbolP
+PredefinedTypeSymbol (SymbKind symbolKind, int arity)
+{
+	TypeSymbolP	symbol;
+
+	symbol	= ConvertAllocType (TypeSymbolS);
+
+	symbol->ts_kind	= symbolKind;
+	symbol->ts_arity = arity;
+
+	return symbol;
+}
+
 static SymbolP
 AllocateSymbols (int n_symbols)
 {	
@@ -178,26 +193,41 @@ AllocateSymbols (int n_symbols)
 		return NULL;
 } /* AllocateSymbols */
 
+static TypeSymbolP AllocateTypeSymbols (int n_symbols)
+{
+	if (n_symbols!=0){
+		TypeSymbolP symbols;
+		int i;
+
+		symbols	= (TypeSymbolP) ConvertAlloc (n_symbols * sizeof (TypeSymbolS));
+		for (i = 0; i < n_symbols; i++)
+			symbols[i].ts_kind = erroneous_symb;
+
+		return symbols;
+	} else
+		return NULL;
+}
+
 static void
 InitPredefinedSymbols (void)
 {
 	int	i;
 
-	gBasicSymbols [int_type]		= PredefinedSymbol (int_type, 0);
-	gBasicSymbols [bool_type]		= PredefinedSymbol (bool_type, 0);
-	gBasicSymbols [char_type]		= PredefinedSymbol (char_type, 0);
-	gBasicSymbols [real_type]		= PredefinedSymbol (real_type, 0);
-	gBasicSymbols [file_type]		= PredefinedSymbol (file_type, 0);
-	gBasicSymbols [world_type]		= PredefinedSymbol (world_type, 0);
+	gBasicTypeSymbols [int_type]		= PredefinedTypeSymbol (int_type, 0);
+	gBasicTypeSymbols [bool_type]		= PredefinedTypeSymbol (bool_type, 0);
+	gBasicTypeSymbols [char_type]		= PredefinedTypeSymbol (char_type, 0);
+	gBasicTypeSymbols [real_type]		= PredefinedTypeSymbol (real_type, 0);
+	gBasicTypeSymbols [file_type]		= PredefinedTypeSymbol (file_type, 0);
+	gBasicTypeSymbols [world_type]		= PredefinedTypeSymbol (world_type, 0);
 #if DYNAMIC_TYPE
-	gBasicSymbols [dynamic_type]= PredefinedSymbol (dynamic_type, 0);
+	gBasicTypeSymbols [dynamic_type]= PredefinedTypeSymbol (dynamic_type, 0);
 #endif
-	gBasicSymbols [array_type]			= PredefinedSymbol (array_type, 1);
-	gBasicSymbols [strict_array_type]	= PredefinedSymbol (strict_array_type, 1);
-	gBasicSymbols [unboxed_array_type]	= PredefinedSymbol (unboxed_array_type, 1);
-	gBasicSymbols [packed_array_type]	= PredefinedSymbol (packed_array_type, 1);
+	gBasicTypeSymbols [array_type]			= PredefinedTypeSymbol (array_type, 1);
+	gBasicTypeSymbols [strict_array_type]	= PredefinedTypeSymbol (strict_array_type, 1);
+	gBasicTypeSymbols [unboxed_array_type]	= PredefinedTypeSymbol (unboxed_array_type, 1);
+	gBasicTypeSymbols [packed_array_type]	= PredefinedTypeSymbol (packed_array_type, 1);
 
-	gBasicSymbols [fun_type]	= PredefinedSymbol (fun_type, 2);
+	gBasicTypeSymbols [fun_type]	= PredefinedTypeSymbol (fun_type, 2);
 
 	ApplySymbol	= PredefinedSymbol (apply_symb, 2);
 	ApplySymbol->symb_instance_apply = 0;
@@ -205,7 +235,8 @@ InitPredefinedSymbols (void)
 
 	TupleSymbol	= PredefinedSymbol (tuple_symb, 2); /* arity doesn't matter */
 	gBasicSymbols [tuple_symb]	= TupleSymbol;
-	gBasicSymbols [tuple_type]	= PredefinedSymbol (tuple_type, 2);
+
+	gBasicTypeSymbols [tuple_type]	= PredefinedTypeSymbol (tuple_type, 2);
 
 	gBasicSymbols [if_symb]		= PredefinedSymbol (if_symb, 3);
 	gBasicSymbols [fail_symb]	= PredefinedSymbol (fail_symb, 0);
@@ -215,6 +246,8 @@ InitPredefinedSymbols (void)
 
 	for (i = 0; i < MaxNodeArity; i++)
 		gTupleSelectSymbols [i]	= NULL;
+
+	gBasicTypeSymbols [apply_type_symb] = PredefinedTypeSymbol (apply_type_symb, 2);
 
 } /* InitPredefinedSymbols */
 
@@ -251,9 +284,11 @@ static void
 DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,int nTypes, int nConstructors, int nFields)
 {
 	SymbolP symbols;
+	TypeSymbolP type_symbols;
 	BEModuleP	module;
 
-	symbols = AllocateSymbols (nFunctions + nTypes + nConstructors + nFields);
+	symbols = AllocateSymbols (nFunctions + nConstructors + nFields);
+	type_symbols = AllocateTypeSymbols (nTypes);
 
 	Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
 	module	= &gBEState.be_modules [moduleIndex];
@@ -266,21 +301,19 @@ DeclareModule (int moduleIndex, char *name, Bool isSystemModule, int nFunctions,
 	symbols	+=	nFunctions;
 
 	module->bem_nTypes	= (unsigned int) nTypes;
-	module->bem_types = symbols;
+	module->bem_types = type_symbols;
 	{
 		/* +++ change this */
 		int		i;
-		for (i = 0; i < nTypes; i++)
-		{
+		for (i = 0; i < nTypes; i++){
 			SymbDef	newSymbDef;
 
 			newSymbDef	= ConvertAllocType (SymbDefS);
-			newSymbDef->sdef_mark		= 0;
+			newSymbDef->sdef_mark	= 0;
 			newSymbDef->sdef_isused	= False;
-			symbols [i].symb_def	= newSymbDef;
+			type_symbols[i].ts_def = newSymbDef;
 		}
 	}
-	symbols	+=	nTypes;
 
 	module->bem_nConstructors	= (unsigned int) nConstructors;
 	module->bem_constructors = symbols;
@@ -518,13 +551,13 @@ extern SymbDefP special_types[]; /* defined in statesgen */
 
 void BEBindSpecialType (int special_type_n,int type_index,int module_index)
 {
-	SymbolP		type_symbol_p;
+	TypeSymbolP	type_symbol_p;
 	BEModuleP	module;
 
 	module	= &gBEState.be_modules [module_index];
 	type_symbol_p = &module->bem_types [type_index];
-	if (type_symbol_p->symb_kind==definition)
-		special_types[special_type_n] = type_symbol_p->symb_def;
+	if (type_symbol_p->ts_kind==type_definition)
+		special_types[special_type_n] = type_symbol_p->ts_def;
 	else
 		special_types[special_type_n] = NULL;
 }
@@ -600,7 +633,7 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		newTypeAlt	= ConvertAllocType (TypeAlt);
 
 		Assert (!arrayType->type_node_is_var);
-		switch (arrayType->type_node_symbol->symb_kind)
+		switch (arrayType->type_node_symbol->ts_kind)
 		{
 			case strict_array_type:
 			case unboxed_array_type:
@@ -617,9 +650,9 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 		switch (arrayFunKind)
 		{
 			case BE_UnqArraySelectFun:
-				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 											BETypeArgs (elementType, BETypeArgs (arrayType, NULL)));
-				lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
+				lhsArgs	= BETypeArgs (arrayType, BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [int_type], NULL), NULL));
 				functionPrefix	= "_uselectf";
 				break;
 			case BE_UnqArraySelectLastFun:
@@ -627,12 +660,12 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 				TypeNode			rType;
 
 				rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
-				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+				rhs	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 											BETypeArgs (elementType, BETypeArgs (rType, NULL)));
 				lhsArgs	= BETypeArgs (
-							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 									BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
-							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL), NULL));
+							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [int_type], NULL), NULL));
 				functionPrefix	= "_uselectl";
 				break;
 			}
@@ -643,9 +676,9 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 				rType	= BEVar0TypeNode (StrictAnnot,NoUniAttr);
 				rhs	= rType;
 				lhsArgs	= BETypeArgs (
-							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+							BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 									BETypeArgs (arrayType, BETypeArgs (rType, NULL))),
-							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
+							BETypeArgs (BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [int_type], NULL),
 							BETypeArgs (elementType,
 							NULL)));
 				functionPrefix	= "_updatei";
@@ -794,16 +827,16 @@ CreateDictionarySelectFunSymbol (void)
 	lhsArgs	=	BETypeArgs (
 					BEVar0TypeNode (StrictAnnot,NoUniAttr),
 				BETypeArgs (
-					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 								BETypeArgs (
 									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								BETypeArgs (
 									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								NULL))),
 				BETypeArgs (
-					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [int_type], NULL),
 				NULL)));
-	rhsType	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+	rhsType	= BESymbolTypeNode (NoAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 								BETypeArgs (BEVar0TypeNode (NoAnnot,NoUniAttr), BETypeArgs (BEVar0TypeNode (StrictAnnot,NoUniAttr), NULL)));
 
 	return (CreateLocallyDefinedFunction (kDictionarySelect, abcCode, lhsArgs, rhsType));
@@ -837,14 +870,14 @@ CreateDictionaryUpdateFunSymbol (void)
 	lhsArgs	=	BETypeArgs (
 					BEVar0TypeNode (StrictAnnot,NoUniAttr),
 				BETypeArgs (
-					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [tuple_type],
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [tuple_type],
 								BETypeArgs (
 									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								BETypeArgs (
 									BEVar0TypeNode (StrictAnnot,NoUniAttr),
 								NULL))),
 				BETypeArgs (
-					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicSymbols [int_type], NULL),
+					BESymbolTypeNode (StrictAnnot,NoUniAttr,gBasicTypeSymbols [int_type], NULL),
 				BETypeArgs (
 					BEVar0TypeNode (NoAnnot,NoUniAttr),
 				NULL))));
@@ -870,11 +903,11 @@ BEDictionaryUpdateFunSymbol (void)
 	return (gBEState.be_dictionaryUpdateFunSymbol);
 } /* BEDictionaryUpdateFunSymbol */
 
-BESymbolP
+BETypeSymbolP
 BETypeSymbol (int typeIndex, int moduleIndex)
 {
 	BEModuleP	module;
-	SymbolP		typeSymbol;
+	TypeSymbolP	typeSymbol;
 
 	if ((unsigned int) moduleIndex >= gBEState.be_nModules)
 		Assert ((unsigned int) moduleIndex < gBEState.be_nModules);
@@ -886,28 +919,28 @@ BETypeSymbol (int typeIndex, int moduleIndex)
 				|| (moduleIndex == kPredefinedModuleIndex && typeSymbol->symb_kind != erroneous_symb));
 */
 	if (moduleIndex == main_dcl_module_n)
-		typeSymbol->symb_def->sdef_isused	= True;
+		typeSymbol->ts_def->sdef_isused	= True;
 
 	return (typeSymbol);
 } /* BETypeSymbol */
 
-BESymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
+BETypeSymbolP BETypeSymbolNoMark (int typeIndex, int moduleIndex)
 {
 	return &gBEState.be_modules [moduleIndex].bem_types [typeIndex];
 }
 
-BESymbolP
+BETypeSymbolP
 BEExternalTypeSymbol (int typeIndex, int moduleIndex)
 {
-	SymbolP	typeSymbol;
+	TypeSymbolP	typeSymbol;
 
 	if (moduleIndex==main_dcl_module_n){
 		typeSymbol = &gBEState.be_modules[moduleIndex].bem_types[typeIndex];
-		typeSymbol->symb_def->sdef_isused = True;
+		typeSymbol->ts_def->sdef_isused = True;
 
 		if (typeIndex < gBEState.be_icl.beicl_dcl_module.bem_nTypes){
 			typeSymbol = &gBEState.be_icl.beicl_dcl_module.bem_types[typeIndex];
-			typeSymbol->symb_def->sdef_isused = True;
+			typeSymbol->ts_def->sdef_isused = True;
 		}
 	} else
 		typeSymbol = &gBEState.be_modules[moduleIndex].bem_types[typeIndex];
@@ -931,10 +964,35 @@ BEDontCareDefinitionSymbol (void)
 		symbDef->sdef_name	= "_Don'tCare"; /* +++ name */
 
 		symbol	= ConvertAllocType (SymbolS);
-		symbol->symb_kind	= definition;
-		symbol->symb_def	= symbDef;
+		symbol->symb_kind = definition;
+		symbol->symb_def = symbDef;
 
 		gBEState.be_dontCareSymbol	= symbol;
+	}
+
+	return (symbol);
+} /* BEDontCareDefinitionSymbol */
+
+BETypeSymbolP
+BEDontCareTypeDefinitionSymbol (void)
+{
+	TypeSymbolP	symbol;
+
+	symbol	= gBEState.be_dontCareTypeSymbol;
+	if (symbol == NULL)
+	{
+		SymbDefP	symbDef;
+
+		symbDef	= ConvertAllocType (SymbDefS);
+		symbDef->sdef_kind	= ABSTYPE;
+
+		symbDef->sdef_name	= "_Don'tCare"; /* +++ name */
+
+		symbol	= ConvertAllocType (TypeSymbolS);
+		symbol->ts_kind = type_definition;
+		symbol->ts_def = symbDef;
+
+		gBEState.be_dontCareTypeSymbol	= symbol;
 	}
 
 	return (symbol);
@@ -1027,10 +1085,10 @@ void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESy
 		strict_list_cons_symbols[(head_strictness<<1)+tail_strictness]=symbol_p;
 }
 
-void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness)
+void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BETypeSymbKind symbolKind,int head_strictness,int tail_strictness)
 {
 	BEModuleP	module;
-	SymbolP symbol_p;
+	TypeSymbolP symbol_p;
 
 	Assert (moduleIndex == kPredefinedModuleIndex);
 
@@ -1039,78 +1097,71 @@ void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolK
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
 	symbol_p=&module->bem_types [typeIndex];
-	symbol_p->symb_kind = symbolKind;
-	symbol_p->symb_arity = 1;
-	symbol_p->symb_head_strictness=head_strictness;
-	symbol_p->symb_tail_strictness=tail_strictness;
+	symbol_p->ts_kind = symbolKind;
+	symbol_p->ts_arity = 1;
+	symbol_p->ts_head_strictness=head_strictness;
+	symbol_p->ts_tail_strictness=tail_strictness;
 }
 
 void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex)
 {
 	SymbolP symbol_p;
+	TypeNode element_type_p,list_type_p;
+	SymbDef sdef;
+	TypeArgs type_args_p;
 
 	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
 
-	if (symbol_p->symb_kind==definition){
-		TypeNode element_type_p,list_type_p;
-		SymbDef sdef;
-		TypeArgs type_args_p;
-		
-		sdef=symbol_p->symb_def;
-		type_args_p=sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
-		element_type_p=type_args_p->type_arg_node;
-		list_type_p=type_args_p->type_arg_next->type_arg_node;
-		
-		Assert (list_type_p->type_node_is_var==0);
-		Assert (list_type_p->type_node_symbol->symb_kind==list_type);
+	Assert (symbol_p->symb_kind==definition);
+	sdef=symbol_p->symb_def;
+	type_args_p=sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
+	element_type_p=type_args_p->type_arg_node;
+	list_type_p=type_args_p->type_arg_next->type_arg_node;
 
-		symbol_p->symb_head_strictness=list_type_p->type_node_symbol->symb_head_strictness;
-		symbol_p->symb_tail_strictness=list_type_p->type_node_symbol->symb_tail_strictness;
+	Assert (list_type_p->type_node_is_var==0);
+	Assert (list_type_p->type_node_symbol->ts_kind==list_type);
 
-		if (list_type_p->type_node_symbol->symb_head_strictness==3){
-			int element_symbol_kind;
-			struct unboxed_cons *unboxed_cons_p;
+	symbol_p->symb_kind = cons_symb;
+	symbol_p->symb_head_strictness=list_type_p->type_node_symbol->ts_head_strictness;
+	symbol_p->symb_tail_strictness=list_type_p->type_node_symbol->ts_tail_strictness;
 
-			Assert (element_type_p->type_node_is_var==0);
+	if (list_type_p->type_node_symbol->ts_head_strictness==3){
+		int element_symbol_kind;
+		struct unboxed_cons *unboxed_cons_p;
 
-			element_symbol_kind=element_type_p->type_node_symbol->symb_kind;
+		Assert (element_type_p->type_node_is_var==0);
 
-			symbol_p->symb_head_strictness=4;
+		element_symbol_kind=element_type_p->type_node_symbol->ts_kind;
 
-			unboxed_cons_p=ConvertAllocType (struct unboxed_cons);
+		symbol_p->symb_head_strictness=4;
 
-			unboxed_cons_p->unboxed_cons_sdef_p=sdef;
+		unboxed_cons_p=ConvertAllocType (struct unboxed_cons);
 
-			if (element_symbol_kind < Nr_Of_Predef_Types)
-				unboxed_cons_p->unboxed_cons_state_p = unboxed_list_symbols[element_symbol_kind][symbol_p->symb_tail_strictness].symb_state_p;
-			else if (element_symbol_kind==definition && element_type_p->type_node_symbol->symb_def->sdef_kind==RECORDTYPE){
-				PolyList new_unboxed_record_cons_element;
-				SymbDef record_sdef;
-				
-				record_sdef=element_type_p->type_node_symbol->symb_def;
-				record_sdef->sdef_isused=True;
-				sdef->sdef_isused=True;
-				unboxed_cons_p->unboxed_cons_state_p = &record_sdef->sdef_record_state;
-				
-				new_unboxed_record_cons_element=ConvertAllocType (struct poly_list);
-				new_unboxed_record_cons_element->pl_elem = sdef;
-				new_unboxed_record_cons_element->pl_next = unboxed_record_cons_list;
-				unboxed_record_cons_list = new_unboxed_record_cons_element;
-				
-				sdef->sdef_module=NULL;
-			} else
-				unboxed_cons_p->unboxed_cons_state_p = &StrictState;
+		unboxed_cons_p->unboxed_cons_sdef_p=sdef;
+
+		if (element_symbol_kind < Nr_Of_Predef_Types)
+			unboxed_cons_p->unboxed_cons_state_p = unboxed_list_symbols[element_symbol_kind][symbol_p->symb_tail_strictness].symb_state_p;
+		else if (element_symbol_kind==type_definition && element_type_p->type_node_symbol->ts_def->sdef_kind==RECORDTYPE){
+			PolyList new_unboxed_record_cons_element;
+			SymbDef record_sdef;
+
+			record_sdef=element_type_p->type_node_symbol->ts_def;
+			record_sdef->sdef_isused=True;
+			sdef->sdef_isused=True;
+			unboxed_cons_p->unboxed_cons_state_p = &record_sdef->sdef_record_state;
+
+			new_unboxed_record_cons_element=ConvertAllocType (struct poly_list);
+			new_unboxed_record_cons_element->pl_elem = sdef;
+			new_unboxed_record_cons_element->pl_next = unboxed_record_cons_list;
+			unboxed_record_cons_list = new_unboxed_record_cons_element;
 			
-			symbol_p->symb_unboxed_cons_p=unboxed_cons_p;
-		}
-	} else {
-		Assert (symbol_p->symb_kind==definition);
+			sdef->sdef_module=NULL;
+		} else
+			unboxed_cons_p->unboxed_cons_state_p = &StrictState;
 		
-		symbol_p->symb_head_strictness=0;
-		symbol_p->symb_tail_strictness=0;
+		symbol_p->symb_unboxed_cons_p=unboxed_cons_p;
 	}
 	
-	symbol_p->symb_kind = cons_symb;
 	/* symbol_p->symb_arity = 2; no symb_arity for cons_symb, because symb_state_p is used of this union */
 }
 
@@ -1119,6 +1170,7 @@ void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex)
 	SymbolP symbol_p,cons_symbol_p;
 	SymbDefP sdef_p;
 	TypeNode element_type_p,list_type_p;
+	TypeSymbolP list_type_symbol;
 	PolyList new_unboxed_record_decons_element;
 
 	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
@@ -1127,19 +1179,19 @@ void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex)
 	sdef_p=symbol_p->symb_def;
 	
 	list_type_p=sdef_p->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments->type_arg_node;
+	list_type_symbol=list_type_p->type_node_symbol;
 	element_type_p=list_type_p->type_node_arguments->type_arg_node;
 	
 	Assert (list_type_p->type_node_is_var==0);
-	Assert (list_type_p->type_node_symbol->symb_kind==list_type);
-	Assert (list_type_p->type_node_symbol->symb_head_strictness==3);
-	Assert (element_type_p->type_node_symbol->symb_def->sdef_kind==RECORDTYPE);
+	Assert (list_type_symbol->ts_kind==list_type);
+	Assert (list_type_symbol->ts_head_strictness==3);
+	Assert (element_type_p->type_node_symbol->ts_def->sdef_kind==RECORDTYPE);
 	
 	cons_symbol_p=ConvertAllocType (SymbolS);
-
 	cons_symbol_p->symb_kind = cons_symb;
 	cons_symbol_p->symb_head_strictness=4;
-	cons_symbol_p->symb_tail_strictness=list_type_p->type_node_symbol->symb_tail_strictness;
-	cons_symbol_p->symb_state_p=&element_type_p->type_node_symbol->symb_def->sdef_record_state;
+	cons_symbol_p->symb_tail_strictness=list_type_symbol->ts_tail_strictness;
+	cons_symbol_p->symb_state_p=&element_type_p->type_node_symbol->ts_def->sdef_record_state;
 
 	sdef_p->sdef_unboxed_cons_symbol=cons_symbol_p;
 	
@@ -1155,16 +1207,16 @@ void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex)
 
 	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
 
+	symbol_p->symb_kind = nil_symb;
 	symbol_p->symb_head_strictness=1;
 	symbol_p->symb_tail_strictness=0;
-	
-	symbol_p->symb_kind = nil_symb;
 }
 
 BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex)
 {
 	BEModuleP module,decons_module;
-	SymbolP constructor_symbol,decons_symbol,list_type_symbol;
+	SymbolP constructor_symbol,decons_symbol;
+	TypeSymbolP list_type_symbol;
 	TypeNode list_type,element_type;
 
 	Assert ((unsigned int) deconsModuleIndex < gBEState.be_nModules);
@@ -1192,19 +1244,19 @@ BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int decon
 
 	list_type_symbol=list_type->type_node_symbol;
 
-	if (constructor_symbol->symb_head_strictness==1 && list_type_symbol->symb_head_strictness<4)
-		constructor_symbol=strict_list_cons_symbols[(list_type_symbol->symb_head_strictness<<1)+list_type_symbol->symb_tail_strictness];
+	if (constructor_symbol->symb_head_strictness==1 && list_type_symbol->ts_head_strictness<4)
+		constructor_symbol=strict_list_cons_symbols[(list_type_symbol->ts_head_strictness<<1)+list_type_symbol->ts_tail_strictness];
 
-	if (list_type_symbol->symb_head_strictness==3){
+	if (list_type_symbol->ts_head_strictness==3){
 		int element_symbol_kind;
 		
 		Assert (element_type->type_node_is_var==0);
 
-		element_symbol_kind=element_type->type_node_symbol->symb_kind;
+		element_symbol_kind=element_type->type_node_symbol->ts_kind;
 
 		if (element_symbol_kind<Nr_Of_Predef_Types)
-			constructor_symbol=&unboxed_list_symbols[element_symbol_kind][list_type_symbol->symb_tail_strictness];
-		else if (element_symbol_kind==definition && element_type->type_node_symbol->symb_def->sdef_kind==RECORDTYPE)
+			constructor_symbol=&unboxed_list_symbols[element_symbol_kind][list_type_symbol->ts_tail_strictness];
+		else if (element_symbol_kind==definition && element_type->type_node_symbol->ts_def->sdef_kind==RECORDTYPE)
 			constructor_symbol=decons_symbol->symb_def->sdef_unboxed_cons_symbol;
 	}
 	
@@ -1252,7 +1304,7 @@ BEPredefineConstructorSymbol (int arity, int constructorIndex, int moduleIndex, 
 } /* BEPredefineConstructorSymbol */
 
 void
-BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BESymbKind symbolKind)
+BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BETypeSymbKind symbolKind)
 {
 	BEModuleP	module;
 
@@ -1262,10 +1314,10 @@ BEPredefineTypeSymbol (int arity, int typeIndex, int moduleIndex, BESymbKind sym
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-	Assert (module->bem_types [typeIndex].symb_kind == erroneous_symb);
+	Assert (module->bem_types [typeIndex].ts_kind == erroneous_symb);
 
-	module->bem_types [typeIndex].symb_kind		= symbolKind;
-	module->bem_types [typeIndex].symb_arity	= arity;
+	module->bem_types [typeIndex].ts_kind	= symbolKind;
+	module->bem_types [typeIndex].ts_arity	= arity;
 } /* BEPredefineTypeSymbol */
 
 BESymbolP
@@ -1275,6 +1327,14 @@ BEBasicSymbol (BESymbKind kind)
 
 	return (gBasicSymbols [kind]);
 } /* BEBasicSymbol */
+
+BETypeSymbolP
+BEBasicTypeSymbol (BESymbKind kind)
+{
+	Assert (gBasicTypeSymbols [kind] != NULL);
+
+	return (gBasicTypeSymbols [kind]);
+}
 
 BETypeNodeP
 BEVar0TypeNode (BEAnnotation annotation, BEAttribution attribution)
@@ -1309,7 +1369,7 @@ BEVarNTypeNode (BEAnnotation annotation, BEAttribution attribution, int argument
 }
 
 BETypeNodeP
-BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BESymbolP symbol, BETypeArgP args)
+BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BETypeSymbolP type_symbol, BETypeArgP args)
 {
 	TypeNode	node;
 
@@ -1319,7 +1379,7 @@ BESymbolTypeNode (BEAnnotation annotation, BEAttribution attribution, BESymbolP 
 	node->type_node_arity		= CountTypeArgs (args);
 	node->type_node_annotation	= annotation;
 	node->type_node_attribute	= attribution;
-	node->type_node_symbol		= symbol;
+	node->type_node_symbol		= type_symbol;
 	node->type_node_arguments	= args;
 
 	return node;
@@ -1886,7 +1946,7 @@ BEUpdateNode (BEArgP args)
 	Assert (args->arg_next->arg_node->node_kind == SelectorNode);
 	Assert (args->arg_next->arg_node->node_arity == BESelector);
 
-	record_sdef = args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_symbol->symb_def;
+	record_sdef = args->arg_next->arg_node->node_symbol->symb_def->sdef_type->type_symbol->ts_def;
 
 	node	= ConvertAllocType (NodeS);
 
@@ -2445,13 +2505,13 @@ void
 BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 {
 	SymbDefP	newSymbDef;
-	SymbolP	 	type_p;
+	TypeSymbolP	type_p;
 	BEModuleP	module;
 
 	module	= &gBEState.be_modules [moduleIndex];
 
 	Assert ((unsigned int) typeIndex < module->bem_nTypes);
-	Assert (module->bem_types [typeIndex].symb_kind == erroneous_symb);
+	Assert (module->bem_types [typeIndex].ts_kind == erroneous_symb);
 	Assert (module->bem_types != NULL);
 
 	type_p = &module->bem_types[typeIndex];
@@ -2459,7 +2519,7 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 /* RWS change this
 	newSymbDef	= ConvertAllocType (SymbDefS);
 */
-	newSymbDef	= type_p->symb_def;
+	newSymbDef	= type_p->ts_def;
 	Assert (newSymbDef != NULL);
 
 	newSymbDef->sdef_kind		= NEWDEFINITION;
@@ -2471,12 +2531,12 @@ BEDeclareType (int typeIndex, int moduleIndex, CleanString name)
 	newSymbDef->sdef_module		= module->bem_name;
 	newSymbDef->sdef_name = ConvertCleanString (name);
 
-	type_p->symb_kind	= definition;
-	type_p->symb_def	= newSymbDef;
+	type_p->ts_kind	= type_definition;
+	type_p->ts_def	= newSymbDef;
 } /* BEDeclareType */
 
 void
-BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors)
+BEDefineAlgebraicType (BETypeSymbolP type_symbol, BEAttribution attribution, BEConstructorListP constructors)
 {
 	Types		type;
 	SymbDefP	sdef;
@@ -2484,7 +2544,7 @@ BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructo
 
 	type	= ConvertAllocType (struct type);
 
-	type->type_symbol =	symbol;
+	type->type_symbol =	type_symbol;
 	type->type_attribute = attribution;
 	type->type_constructors	= constructors;
 
@@ -2504,20 +2564,20 @@ BEDefineAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructo
 
 	type->type_nr_of_constructors	= nConstructors;
 
-	Assert (symbol->symb_kind == definition);
-	sdef = symbol->symb_def;
+	Assert (type_symbol->ts_kind == type_definition);
+	sdef = type_symbol->ts_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_kind 		= TYPE;
 	sdef->sdef_type			= type;
 }
 
-void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attribution, BEConstructorListP constructors)
+void BEDefineExtensibleAlgebraicType (BETypeSymbolP type_symbol, BEAttribution attribution, BEConstructorListP constructors)
 {
 	Types type;
 	SymbDefP sdef;
 
 	type = ConvertAllocType (struct type);
-	type->type_symbol =	symbol;
+	type->type_symbol =	type_symbol;
 	type->type_attribute = attribution;
 	type->type_constructors	= constructors;
 	type->type_nr_of_constructors = 0;
@@ -2525,13 +2585,13 @@ void BEDefineExtensibleAlgebraicType (BESymbolP symbol, BEAttribution attributio
 	for (; constructors!=NULL; constructors=constructors->cl_next)
 		constructors->cl_constructor_symbol->symb_def->sdef_type = type;
 
-	sdef = symbol->symb_def;
+	sdef = type_symbol->ts_def;
 	sdef->sdef_kind = TYPE;
 	sdef->sdef_type = type;
 }
 
 void BEDefineRecordType
-	(BESymbolP symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields)
+	(BETypeSymbolP type_symbol, BEAttribution attribution, int moduleIndex, int constructorIndex, BETypeArgP constructor_args, int is_boxed_record, BEFieldListP fields)
 {
 	struct symbol *constructor_symbol_p;
 	int					nFields;
@@ -2547,7 +2607,7 @@ void BEDefineRecordType
 	constructor->cl_constructor_arguments = constructor_args;
 
 	type = ConvertAllocType (struct type);
-	type->type_symbol =	symbol;
+	type->type_symbol =	type_symbol;
 	type->type_attribute = attribution;
 	type->type_constructors	= constructor;
 	type->type_fields		= fields;
@@ -2567,29 +2627,29 @@ void BEDefineRecordType
 
 	type->type_nr_of_constructors	= 0;
 
-	Assert (symbol->symb_kind == definition);
-	sdef = symbol->symb_def;
+	Assert (type_symbol->ts_kind == type_definition);
+	sdef = type_symbol->ts_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= RECORDTYPE;
 	sdef->sdef_type			= type;
-	sdef->sdef_arity		= CountTypeArgs (constructor_args);;
+	sdef->sdef_arity		= CountTypeArgs (constructor_args);
 
 	sdef->sdef_boxed_record	= is_boxed_record;
 
 	constructor_symbol_p->symb_arity = 0;
 
-	constructor_symbol_p->symb_val = symbol->symb_val;
-	constructor_symbol_p->symb_kind = symbol->symb_kind;
+	constructor_symbol_p->symb_def = type_symbol->ts_def;
+	constructor_symbol_p->symb_kind = type_symbol->ts_kind /*definition*/;
 }
 
 void
-BEAbstractType (BESymbolP symbol_p)
+BEAbstractType (BETypeSymbolP type_symbol_p)
 {
 	SymbDefP sdef;
 
-	Assert (symbol_p->symb_kind == definition);
-	sdef	= symbol_p->symb_def;
+	Assert (type_symbol_p->ts_kind == type_definition);
+	sdef = type_symbol_p->ts_def;
 	Assert (sdef->sdef_kind == NEWDEFINITION);
 	sdef->sdef_checkstatus	= TypeChecked;
 	sdef->sdef_kind 		= ABSTYPE;
@@ -2952,16 +3012,16 @@ void
 BEExportType (int isDictionary, int typeIndex)
 {
 	BEModuleP	dclModule, iclModule;
-	SymbolP		typeSymbol;
+	TypeSymbolP	typeSymbol;
 	SymbDefP	iclDef, dclDef;
 
 	iclModule	= &gBEState.be_modules [main_dcl_module_n];
 
 	Assert ((unsigned int) typeIndex < iclModule->bem_nTypes);
 	typeSymbol = &iclModule->bem_types [typeIndex];
-	Assert (typeSymbol->symb_kind == definition);
+	Assert (typeSymbol->ts_kind == type_definition);
 
-	iclDef	= typeSymbol->symb_def;
+	iclDef	= typeSymbol->ts_def;
 	iclDef->sdef_exported	= True;
 
 	dclModule	= &gBEState.be_icl.beicl_dcl_module;
@@ -2972,8 +3032,8 @@ BEExportType (int isDictionary, int typeIndex)
 	{
 		Assert ((unsigned int) typeIndex < dclModule->bem_nTypes);
 		typeSymbol = &dclModule->bem_types [typeIndex];
-		Assert (typeSymbol->symb_kind == definition);
-		dclDef	= typeSymbol->symb_def;
+		Assert (typeSymbol->ts_kind == type_definition);
+		dclDef	= typeSymbol->ts_def;
 	}
 	Assert (strcmp (iclDef->sdef_name, dclDef->sdef_name) == 0);
 
@@ -3147,6 +3207,21 @@ CheckBEEnumTypes (void)
  	Assert (FirstUniVarNumber	== BEFirstUniVarNumber);
 
 	/* SymbKind */
+	Assert (rational_denot				== BERationalDenot);
+	Assert (int_denot					== BEIntDenot);
+	Assert (bool_denot					== BEBoolDenot);
+	Assert (char_denot					== BECharDenot);
+	Assert (real_denot					== BERealDenot);
+	Assert (integer_denot				== BEIntegerDenot);
+	Assert (string_denot				== BEStringDenot);
+	Assert (tuple_symb					== BETupleSymb);
+	Assert (cons_symb					== BEConsSymb);
+	Assert (nil_symb					== BENilSymb);
+	Assert (apply_symb					== BEApplySymb);
+	Assert (if_symb						== BEIfSymb);
+	Assert (fail_symb					== BEFailSymb);
+
+	/* TypeSymbKind */
 	Assert (int_type					== BEIntType);
 	Assert (bool_type					== BEBoolType);
 	Assert (char_type					== BECharType);
@@ -3155,13 +3230,6 @@ CheckBEEnumTypes (void)
 	Assert (world_type					== BEWorldType);
 	Assert (procid_type					== BEProcIdType);
 	Assert (redid_type					== BERedIdType);
-	Assert (rational_denot				== BERationalDenot);
-	Assert (int_denot					== BEIntDenot);
-	Assert (bool_denot					== BEBoolDenot);
-	Assert (char_denot					== BECharDenot);
-	Assert (real_denot					== BERealDenot);
-	Assert (integer_denot				== BEIntegerDenot);
-	Assert (string_denot				== BEStringDenot);
 	Assert (fun_type					== BEFunType);
 	Assert (array_type					== BEArrayType);
 	Assert (strict_array_type			== BEStrictArrayType);
@@ -3169,25 +3237,9 @@ CheckBEEnumTypes (void)
 	Assert (packed_array_type			== BEPackedArrayType);
 	Assert (list_type					== BEListType);
 	Assert (tuple_type					== BETupleType);
-	Assert (empty_type					== BEEmptyType);
 #if DYNAMIC_TYPE
 	Assert (dynamic_type				== BEDynamicType);
 #endif
-	Assert (Nr_Of_Predef_Types			== BENrOfPredefTypes);
-	Assert (tuple_symb					== BETupleSymb);
-	Assert (cons_symb					== BEConsSymb);
-	Assert (nil_symb					== BENilSymb);
-	Assert (apply_symb					== BEApplySymb);
-	Assert (if_symb						== BEIfSymb);
-	Assert (fail_symb					== BEFailSymb);
-	Assert (select_symb					== BESelectSymb);
-	Assert (Nr_Of_Predef_FunsOrConses	== BENrOfPredefFunsOrConses);
-	Assert (definition					== BEDefinition);
-	Assert (newsymbol					== BENewSymbol);
-	Assert (instance_symb				== BEInstanceSymb);
-	Assert (empty_symbol				== BEEmptySymbol);
-	Assert (field_symbol_list			== BEFieldSymbolList);
-	Assert (erroneous_symb				== BEErroneousSymb);
 
 	/* ArrayFunKind */
 	Assert (CreateArrayFun			== BECreateArrayFun);
@@ -3241,13 +3293,13 @@ static void init_unboxed_list_symbols (void)
 		symbol_p->symb_kind=cons_symb;
 		symbol_p->symb_head_strictness=4;
 		symbol_p->symb_tail_strictness=0;
-		symbol_p->symb_state_p=&BasicSymbolStates[i];
+		symbol_p->symb_state_p=&BasicTypeSymbolStates[i];
 
 		symbol_p=&unboxed_list_symbols[i][1];
 		symbol_p->symb_kind=cons_symb;
 		symbol_p->symb_head_strictness=4;
 		symbol_p->symb_tail_strictness=1;
-		symbol_p->symb_state_p=&BasicSymbolStates[i];
+		symbol_p->symb_state_p=&BasicTypeSymbolStates[i];
 	}
 
 	array_state_p=ConvertAllocType (StateS);
@@ -3274,6 +3326,7 @@ static void init_unboxed_list_symbols (void)
 	unboxed_array_state_p->state_type = ArrayState;
 	unboxed_array_state_p->state_arity = 1;
 	unboxed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
+	unboxed_array_state_p->state_mark = 0;
 	unboxed_array_state_p->state_array_arguments [0] = StrictState;
 
 	unboxed_list_symbols[unboxed_array_type][0].symb_state_p=unboxed_array_state_p;
@@ -3341,6 +3394,7 @@ BEInit (int argc)
 
 	gBEState.be_modules						= NULL;
 	gBEState.be_dontCareSymbol				= NULL;
+	gBEState.be_dontCareTypeSymbol			= NULL;
 	gBEState.be_dictionarySelectFunSymbol	= NULL;
 	gBEState.be_dictionaryUpdateFunSymbol	= NULL;
 
@@ -3407,7 +3461,7 @@ BEDeclareDynamicTypeSymbol (int typeIndex, int moduleIndex)
 } /* BEDeclareDynamicTypeSymbol */
 
 
-BESymbolP
+BETypeSymbolP
 BEDynamicTempTypeSymbol (void)
 {
 	return (BETypeSymbol (gBEState.be_dynamicTypeIndex, gBEState.be_dynamicModuleIndex));

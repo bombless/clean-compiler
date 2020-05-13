@@ -630,10 +630,6 @@ int lazy_tuple_recursion=0;
 int call_code_generator_again;
 #endif
 
-#if TAIL_CALL_MODULO_CONS_OPTIMIZATION
-extern int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs);
-#endif
-
 int function_called_only_curried_or_lazy_with_one_return=0;
 
 #if 0
@@ -654,11 +650,10 @@ static void CodeRule (ImpRuleP rule)
 	PrintImpRule (rule,4,StdOut);
 # endif
 
-	CurrentSymbol=rule->rule_root->node_symbol;
 	CurrentLine=rule->rule_alts->alt_line;
-
+	rule_sdef = rule->rule_root->node_symbol->symb_def;
+	CurrentSymbDef=rule_sdef;
 	resultstate	= rule->rule_root->node_state;
-	rule_sdef = CurrentSymbol->symb_def;
 	
 	ConvertSymbolToLabel (&CurrentAltLabel,rule_sdef);
 
@@ -894,7 +889,7 @@ static void CodeRule (ImpRuleP rule)
 
 	if ((rule_sdef->sdef_mark & SDEF_INLINE_IS_CONSTRUCTOR)!=0){
 		generate_is_constructor (rule);
-		GenRtn (0, 1, BasicSymbolStates[bool_type]);
+		GenRtn (0, 1, BasicTypeSymbolStates[bool_type]);
 		rule_may_fail = False;
 	} else
 		rule_may_fail = CodeRuleAlt (rule->rule_alts,init_a_stack_top,init_b_stack_top,CurrentAltLabel.lab_post,resultstate);
@@ -964,7 +959,7 @@ static void CodeRule (ImpRuleP rule)
 
 		CurrentLine=rule->rule_alts->alt_line;
 		if (FunctionMayFailWarningOrError!=0)
-			StaticMessage_S_s (FunctionMayFailWarningOrError==2, CurrentSymbol, "function may fail");
+			StaticMessage_S_s (FunctionMayFailWarningOrError==2, CurrentSymbDef, "function may fail");
 
 		MatchError (asize,bsize,rule_sdef,root_node_needed,0);
 	}
@@ -1258,9 +1253,9 @@ void CodeGeneration (ImpMod imod, char *fname)
 		if (OptimizeTailCallModuloCons)
 			for_l (rule,imod->im_rules,rule_next)
 				if (rule->rule_alts->alt_kind==Contractum){
-					CurrentSymbol=rule->rule_root->node_symbol;
+					CurrentSymbDef=rule->rule_root->node_symbol->symb_def;
 					
-					if (does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs))
+					if (does_tail_call_modulo_cons (rule->rule_alts->alt_rhs_root,rule->rule_alts->alt_rhs_defs,CurrentSymbDef))
 						rule->rule_mark |= RULE_TAIL_MODULO_CONS_ENTRY_MASK;
 				}
 #endif

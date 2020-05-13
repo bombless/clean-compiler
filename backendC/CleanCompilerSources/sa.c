@@ -2052,7 +2052,7 @@ static unsigned CountStrictArgs (TypeArgs args)
 			
 		n += 1;
 		
-		if (!node->type_node_is_var && node->type_node_symbol->symb_kind==tuple_type)
+		if (!node->type_node_is_var && node->type_node_symbol->ts_kind==tuple_type)
 			n += CountStrictArgs (node->type_node_arguments);
 	}
 	
@@ -2061,7 +2061,7 @@ static unsigned CountStrictArgs (TypeArgs args)
 
 static void ConvertStrictSelections (Exp exp, TypeNode node, Exp *e_args, unsigned *i)
 {
-	if (!node->type_node_is_var && node->type_node_symbol->symb_kind==tuple_type){
+	if (!node->type_node_is_var && node->type_node_symbol->ts_kind==tuple_type){
 		TypeArgs typeargs;
 		unsigned j;
 		Exp selexp;
@@ -2871,16 +2871,16 @@ static void InitStrictResult (StrictInfo *s)
 
 static void ConvertStateToStrictInfo (TypeNode node, StrictInfo *s, Bool adopt_annots)
 {
-	if (node->type_node_is_var || node->type_node_symbol->symb_kind!=tuple_type){
+	if (node->type_node_is_var || node->type_node_symbol->ts_kind!=tuple_type){
 /*
 	#ifdef _DB_
 			if (node->type_node_is_var)
 				printf ("ConvertStateToStrictInfo Var\n");
 			else {
-				if (node->type_node_symbol->symb_kind==definition)
-					printf ("ConvertStateToStrictInfo Definition %s\n",node->type_node_symbol->symb_def->sdef_name);
+				if (node->type_node_symbol->ts_kind==type_definition)
+					printf ("ConvertStateToStrictInfo Definition %s\n",node->type_node_symbol->ts_def->sdef_name);
 				else
-					printf ("ConvertStateToStrictInfo NoTuple %d\n",node->type_node_symbol->symb_kind);
+					printf ("ConvertStateToStrictInfo NoTuple %d\n",node->type_node_symbol->ts_kind);
 			}
 	#endif
 */
@@ -3228,7 +3228,7 @@ static Bool IsListArg (Fun *f, unsigned n)
 	for (i = 0; i < n; i++)
 		args = args->type_arg_next;
 	
-	return (! args->type_arg_node->type_node_is_var && args->type_arg_node->type_node_symbol->symb_kind==list_type);
+	return (! args->type_arg_node->type_node_is_var && args->type_arg_node->type_node_symbol->ts_kind==list_type);
 }
 
 static Bool HasListResult (Fun *f)
@@ -3240,7 +3240,7 @@ static Bool HasListResult (Fun *f)
 	else
 		return False;
 		
-	return (!typerule->type_alt_rhs->type_node_is_var && typerule->type_alt_rhs->type_node_symbol->symb_kind==list_type);
+	return (!typerule->type_alt_rhs->type_node_is_var && typerule->type_alt_rhs->type_node_symbol->ts_kind==list_type);
 }
 
 static void BuildInfFunction (Fun *f)
@@ -3647,7 +3647,7 @@ SymbDef scc_dependency_list;
 static void ConvertSyntaxTree
 	(struct module_function_and_type_symbols mfts,int size_dcl_type_symbols_a,struct module_function_and_type_symbols dcl_type_symbols_a[])
 {
-	SymbolP type_symbol_a;
+	TypeSymbolP type_symbol_a;
 	Bool		annot_warning;
 	SymbDef 	sdef;
 	int i,n_types,dcl_type_symbols_n;
@@ -3660,15 +3660,15 @@ static void ConvertSyntaxTree
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;
 	for (i=0; i<n_types; ++i)
-		if (type_symbol_a[i].symb_kind==definition)
-			convert_type (type_symbol_a[i].symb_def);
+		if (type_symbol_a[i].ts_kind==type_definition)
+			convert_type (type_symbol_a[i].ts_def);
 
 	for (dcl_type_symbols_n=0; dcl_type_symbols_n<size_dcl_type_symbols_a; ++dcl_type_symbols_n){		
 		n_types = dcl_type_symbols_a[dcl_type_symbols_n].mfts_n_types;
 		type_symbol_a = dcl_type_symbols_a[dcl_type_symbols_n].mfts_type_symbol_a;	
 		for (i=0; i<n_types; ++i)
-			if (type_symbol_a[i].symb_kind==definition)
-				convert_type (type_symbol_a[i].symb_def);
+			if (type_symbol_a[i].ts_kind==type_definition)
+				convert_type (type_symbol_a[i].ts_def);
 	}
 	
 	/* initialise the function table with symbols with a definition */

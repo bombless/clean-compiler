@@ -1094,14 +1094,12 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 			}
 			return;
 		default:
-			if (rootsymb->symb_kind < Nr_Of_Basic_Types)
-				FillRhsRoot (&BasicDescriptors[rootsymb->symb_kind], root, asp, bsp,code_gen_node_ids_p);
-			else {
+			{
 				/*	in case of a denotation: */
 				
 				ObjectKind denottype;
 
-				denottype = (rootsymb->symb_kind < Nr_Of_Predef_Types)
+				denottype = (rootsymb->symb_kind <= last_denot)
 					? BasicSymbolStates [rootsymb->symb_kind].state_object
 					: UnknownObj;
 
@@ -1168,7 +1166,7 @@ static void CodeRootFieldSelector (Node root,NodeId rootid,int asp,int bsp,CodeG
 			offstate = arg_node->node_state;
 			Build (arg_node,&asp,&bsp,code_gen_node_ids_p);
 
-			record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+			record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 
 			if (root->node_arity>=SELECTOR_U){
 				int record_a_size,record_b_size,asize,bsize,aindex,bindex,offstate_a_size,offstate_b_size;
@@ -1289,7 +1287,7 @@ static void CodeRootFieldSelector (Node root,NodeId rootid,int asp,int bsp,CodeG
 				int a_size,b_size;
 				StateP record_state_p;
 
-				record_state_p=&seldef->sdef_type->type_symbol->symb_def->sdef_record_state;
+				record_state_p=&seldef->sdef_type->type_symbol->ts_def->sdef_record_state;
 				if (root->node_arity>=SELECTOR_U){
 					int	asize,bsize,aindex,bindex,offered_a_size,offered_b_size;
 					
@@ -1516,7 +1514,7 @@ static void CodeRootUpdateNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				UpdateAAndBStack (asp,bsp,record_a_size,record_b_size,&asp,&bsp);
 				GenRtn (record_a_size,record_b_size,result_state);
 			} else {
-				if (CurrentSymbol->symb_def->sdef_mark & SDEF_USED_LAZILY_MASK){
+				if (CurrentSymbDef->sdef_mark & SDEF_USED_LAZILY_MASK){
 					BuildRecord (record_state_p->state_record_symbol,asp,bsp,asp,bsp,record_a_size,record_b_size,
 									0,ReleaseAndFill,False);
 					GenPopA (asp);
@@ -2016,14 +2014,14 @@ static void generate_code_for_tail_call_modulo_cons (NodeP node_p,NodeId node_de
 	}
 }
 
-static int is_tail_call_modulo_cons_node (NodeP node_p)
+static int is_tail_call_modulo_cons_node (NodeP node_p,SymbDefP current_symb_def_p)
 {
 	if (node_p->node_kind==NormalNode && node_p->node_symbol->symb_kind==definition){
 		SymbDef sdef;
 		
 		sdef=node_p->node_symbol->symb_def;
 		
-		if (sdef->sdef_kind==IMPRULE && sdef->sdef_ancestor==CurrentSymbol->symb_def->sdef_ancestor &&
+		if (sdef->sdef_kind==IMPRULE && sdef->sdef_ancestor==current_symb_def_p->sdef_ancestor &&
 			sdef->sdef_arity==node_p->node_arity && !IsLazyState (node_p->node_state) &&
 			ExpectsResultNode (node_p->node_state) && node_p->node_state.state_kind!=Parallel)
 		{
@@ -2539,7 +2537,7 @@ int CodeRhsNodeDefs
 					if (arg_node_p->node_kind==FillUniqueNode)
 						arg_node_p=arg_node_p->node_arguments->arg_node;
 
-					if (is_tail_call_modulo_cons_node (arg_node_p) && (arg_node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
+					if (is_tail_call_modulo_cons_node (arg_node_p,CurrentSymbDef) && (arg_node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK)){
 						arg_p2=arg_p;
 						break;
 					}
@@ -2569,7 +2567,7 @@ int CodeRhsNodeDefs
 								node_p=node_p->node_arguments->arg_node;
 							}
 							
-							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_p)
+							if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_p,CurrentSymbDef)
 								&& (node_p->node_symbol->symb_def->sdef_rule->rule_mark & RULE_TAIL_MODULO_CONS_ENTRY_MASK))
 							{
 								n_node_id_refs=node_def_id->nid_refcount;
@@ -2906,7 +2904,7 @@ void restore_node_id_ref_counts (struct saved_node_id_ref_counts *snir_p,struct 
 #endif
 
 #if TAIL_CALL_MODULO_CONS_OPTIMIZATION
-static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
+static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs,SymbDefP current_symb_def_p)
 {
 	if (node_p->node_kind==NormalNode){
 		SymbolP node_symbol_p;
@@ -2926,7 +2924,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 				if (arg_node_p->node_kind==FillUniqueNode)
 					arg_node_p=arg_node_p->node_arguments->arg_node;
 
-				if (is_tail_call_modulo_cons_node (arg_node_p))
+				if (is_tail_call_modulo_cons_node (arg_node_p,current_symb_def_p))
 					return 1;
 			}
 
@@ -2948,7 +2946,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 					if (node_def_node_p->node_kind==FillUniqueNode)
 						node_def_node_p=node_def_node_p->node_arguments->arg_node;
 					
-					if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_def_node_p)){
+					if (!(node_def_id->nid_mark & ON_A_CYCLE_MASK) && is_tail_call_modulo_cons_node (node_def_node_p,current_symb_def_p)){
 						int n_node_id_refs;
 						
 						n_node_id_refs=node_def_id->nid_refcount;
@@ -2971,7 +2969,7 @@ static int tail_call_modulo_cons_call (NodeP node_p,NodeDefP node_defs)
 	return 0;
 }
 
-int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs)
+int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs,SymbDefP current_symb_def_p)
 {
 	switch (node_p->node_kind){
 		case SwitchNode:
@@ -2981,27 +2979,27 @@ int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs)
 			
 			r=0;
 			for_l (arg_p,node_p->node_arguments,arg_next)
-				if (does_tail_call_modulo_cons (arg_p->arg_node->node_arguments->arg_node,arg_p->arg_node->node_node_defs))
+				if (does_tail_call_modulo_cons (arg_p->arg_node->node_arguments->arg_node,arg_p->arg_node->node_node_defs,current_symb_def_p))
 					r=1;
 			
 			return r;
 		}
 		case PushNode:
-			return does_tail_call_modulo_cons (node_p->node_arguments->arg_next->arg_node,node_defs);
+			return does_tail_call_modulo_cons (node_p->node_arguments->arg_next->arg_node,node_defs,current_symb_def_p);
 		case GuardNode:
 		{
 			int r;
 			
 			r=0;
 			while (node_p->node_kind==GuardNode){
-				if (does_tail_call_modulo_cons (node_p->node_arguments->arg_node,node_defs))
+				if (does_tail_call_modulo_cons (node_p->node_arguments->arg_node,node_defs,current_symb_def_p))
 					r=1;
 		
 				node_defs=node_p->node_node_defs;
 				node_p=node_p->node_arguments->arg_next->arg_node;
 			}
 
-			if (does_tail_call_modulo_cons (node_p,node_defs))
+			if (does_tail_call_modulo_cons (node_p,node_defs,current_symb_def_p))
 				r=1;
 			
 			return r;
@@ -3015,20 +3013,20 @@ int does_tail_call_modulo_cons (NodeP node_p,NodeDefP node_defs)
 			r=0;
 			then_arg_p=node_p->node_arguments->arg_next;
 			
-			r=does_tail_call_modulo_cons (then_arg_p->arg_node,node_p->node_then_node_defs);
+			r=does_tail_call_modulo_cons (then_arg_p->arg_node,node_p->node_then_node_defs,current_symb_def_p);
 			
 			else_node_p=then_arg_p->arg_next->arg_node;
 
 			if (else_node_p->node_kind==NormalNode && else_node_p->node_symbol->symb_kind==fail_symb)
 				return r;
 
-			if (does_tail_call_modulo_cons (else_node_p,node_p->node_else_node_defs))
+			if (does_tail_call_modulo_cons (else_node_p,node_p->node_else_node_defs,current_symb_def_p))
 				r=1;			
 			
 			return r;	
 		}
 		default:
-			return tail_call_modulo_cons_call (node_p,node_defs);
+			return tail_call_modulo_cons_call (node_p,node_defs,current_symb_def_p);
 	}
 		
 	return 0;

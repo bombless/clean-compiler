@@ -4,6 +4,7 @@ implementation module backend;
 :: *UWorld :== Int;
 :: *BackEnd :== CPtr;
 :: BESymbolP :== CPtr;
+:: BETypeSymbolP :== CPtr;
 :: BETypeNodeP :== CPtr;
 :: BETypeArgP :== CPtr;
 :: BETypeAltP :== CPtr;
@@ -24,6 +25,7 @@ implementation module backend;
 :: BEAnnotation :== Int;
 :: BEAttribution :== Int;
 :: BESymbKind :== Int;
+:: BETypeSymbKind :== Int;
 :: BEArrayFunKind :== Int;
 :: BESelectorKind :== Int;
 :: BESpecialIdentIndex :== Int;
@@ -118,29 +120,35 @@ BEFieldSymbol a0 a1 a2 = code {
 }
 // BESymbolP BEFieldSymbol (int fieldIndex,int moduleIndex);
 
-BETypeSymbol :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+BETypeSymbol :: !Int !Int !BackEnd -> (!BETypeSymbolP,!BackEnd);
 BETypeSymbol a0 a1 a2 = code {
 	ccall BETypeSymbol "II:p:p"
 }
-// BESymbolP BETypeSymbol (int typeIndex,int moduleIndex);
+// BETypeSymbolP BETypeSymbol (int typeIndex,int moduleIndex);
 
-BETypeSymbolNoMark :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+BETypeSymbolNoMark :: !Int !Int !BackEnd -> (!BETypeSymbolP,!BackEnd);
 BETypeSymbolNoMark a0 a1 a2 = code {
 	ccall BETypeSymbolNoMark "II:p:p"
 }
-// BESymbolP BETypeSymbolNoMark (int typeIndex,int moduleIndex);
+// BETypeSymbolP BETypeSymbolNoMark (int typeIndex,int moduleIndex);
 
-BEExternalTypeSymbol :: !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
+BEExternalTypeSymbol :: !Int !Int !BackEnd -> (!BETypeSymbolP,!BackEnd);
 BEExternalTypeSymbol a0 a1 a2 = code {
 	ccall BEExternalTypeSymbol "II:p:p"
 }
-// BESymbolP BEExternalTypeSymbol (int typeIndex,int moduleIndex);
+// BETypeSymbolP BEExternalTypeSymbol (int typeIndex,int moduleIndex);
 
 BEDontCareDefinitionSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
 BEDontCareDefinitionSymbol a0 = code {
 	ccall BEDontCareDefinitionSymbol ":p:p"
 }
 // BESymbolP BEDontCareDefinitionSymbol ();
+
+BEDontCareTypeDefinitionSymbol :: !BackEnd -> (!BETypeSymbolP,!BackEnd);
+BEDontCareTypeDefinitionSymbol a0 = code {
+	ccall BEDontCareTypeDefinitionSymbol ":p:p"
+}
+// BETypeSymbolP BEDontCareTypeDefinitionSymbol ();
 
 BEBoolSymbol :: !Bool !BackEnd -> (!BESymbolP,!BackEnd);
 BEBoolSymbol a0 a1 = code {
@@ -160,11 +168,11 @@ BEPredefineListConstructorSymbol a0 a1 a2 a3 a4 a5 = code {
 }
 // void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness);
 
-BEPredefineListTypeSymbol :: !Int !Int !BESymbKind !Int !Int !BackEnd -> BackEnd;
+BEPredefineListTypeSymbol :: !Int !Int !BETypeSymbKind !Int !Int !BackEnd -> BackEnd;
 BEPredefineListTypeSymbol a0 a1 a2 a3 a4 a5 = code {
 	ccall BEPredefineListTypeSymbol "IIIII:V:p"
 }
-// void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness);
+// void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BETypeSymbKind symbolKind,int head_strictness,int tail_strictness);
 
 BEAdjustStrictListConsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustStrictListConsInstance a0 a1 a2 = code {
@@ -202,17 +210,23 @@ BEPredefineConstructorSymbol a0 a1 a2 a3 a4 = code {
 }
 // void BEPredefineConstructorSymbol (int arity,int constructorIndex,int moduleIndex,BESymbKind symbolKind);
 
-BEPredefineTypeSymbol :: !Int !Int !Int !BESymbKind !BackEnd -> BackEnd;
+BEPredefineTypeSymbol :: !Int !Int !Int !BETypeSymbKind !BackEnd -> BackEnd;
 BEPredefineTypeSymbol a0 a1 a2 a3 a4 = code {
 	ccall BEPredefineTypeSymbol "IIII:V:p"
 }
-// void BEPredefineTypeSymbol (int arity,int typeIndex,int moduleIndex,BESymbKind symbolKind);
+// void BEPredefineTypeSymbol (int arity,int typeIndex,int moduleIndex,BETypeSymbKind symbolKind);
 
 BEBasicSymbol :: !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BEBasicSymbol a0 a1 = code {
 	ccall BEBasicSymbol "I:p:p"
 }
 // BESymbolP BEBasicSymbol (BESymbKind kind);
+
+BEBasicTypeSymbol :: !Int !BackEnd -> (!BETypeSymbolP,!BackEnd);
+BEBasicTypeSymbol a0 a1 = code {
+	ccall BEBasicTypeSymbol "I:p:p"
+}
+// BETypeSymbolP BEBasicTypeSymbol (BETypeSymbKind kind);
 
 BEVar0TypeNode :: !BEAnnotation !BEAttribution !BackEnd -> (!BETypeNodeP,!BackEnd);
 BEVar0TypeNode a0 a1 a2 = code {
@@ -226,11 +240,11 @@ BEVarNTypeNode a0 a1 a2 a3 = code {
 }
 // BETypeNodeP BEVarNTypeNode (BEAnnotation annotation,BEAttribution attribution,int argument_n);
 
-BESymbolTypeNode :: !BEAnnotation !BEAttribution !BESymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
+BESymbolTypeNode :: !BEAnnotation !BEAttribution !BETypeSymbolP !BETypeArgP !BackEnd -> (!BETypeNodeP,!BackEnd);
 BESymbolTypeNode a0 a1 a2 a3 a4 = code {
 	ccall BESymbolTypeNode "IIpp:p:p"
 }
-// BETypeNodeP BESymbolTypeNode (BEAnnotation annotation,BEAttribution attribution,BESymbolP symbol,BETypeArgP args);
+// BETypeNodeP BESymbolTypeNode (BEAnnotation annotation,BEAttribution attribution,BETypeSymbolP symbol,BETypeArgP args);
 
 BENoTypeArgs :: !BackEnd -> (!BETypeArgP,!BackEnd);
 BENoTypeArgs a0 = code {
@@ -454,35 +468,29 @@ BERules a0 a1 a2 = code {
 }
 // BEImpRuleP BERules (BEImpRuleP rule,BEImpRuleP rules);
 
-BEDefineAlgebraicType :: !BESymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
+BEDefineAlgebraicType :: !BETypeSymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
 BEDefineAlgebraicType a0 a1 a2 a3 = code {
 	ccall BEDefineAlgebraicType "pIp:V:p"
 }
-// void BEDefineAlgebraicType (BESymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
+// void BEDefineAlgebraicType (BETypeSymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
 
-BEDefineExtensibleAlgebraicType :: !BESymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
+BEDefineExtensibleAlgebraicType :: !BETypeSymbolP !BEAttribution !BEConstructorListP !BackEnd -> BackEnd;
 BEDefineExtensibleAlgebraicType a0 a1 a2 a3 = code {
 	ccall BEDefineExtensibleAlgebraicType "pIp:V:p"
 }
-// void BEDefineExtensibleAlgebraicType (BESymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
+// void BEDefineExtensibleAlgebraicType (BETypeSymbolP symbol,BEAttribution attribution,BEConstructorListP constructors);
 
-BEDefineRecordType :: !BESymbolP !BEAttribution !Int !Int !BETypeArgP !Int !BEFieldListP !BackEnd -> BackEnd;
+BEDefineRecordType :: !BETypeSymbolP !BEAttribution !Int !Int !BETypeArgP !Int !BEFieldListP !BackEnd -> BackEnd;
 BEDefineRecordType a0 a1 a2 a3 a4 a5 a6 a7 = code {
 	ccall BEDefineRecordType "pIIIpIp:V:p"
 }
-// void BEDefineRecordType (BESymbolP symbol,BEAttribution attribution,int moduleIndex,int constructorIndex,BETypeArgP constructor_args,int is_boxed_record,BEFieldListP fields);
+// void BEDefineRecordType (BETypeSymbolP symbol,BEAttribution attribution,int moduleIndex,int constructorIndex,BETypeArgP constructor_args,int is_boxed_record,BEFieldListP fields);
 
-BEAbstractType :: !BESymbolP !BackEnd -> BackEnd;
+BEAbstractType :: !BETypeSymbolP !BackEnd -> BackEnd;
 BEAbstractType a0 a1 = code {
 	ccall BEAbstractType "p:V:p"
 }
-// void BEAbstractType (BESymbolP symbol);
-
-BEConstructorList :: !BESymbolP !BETypeArgP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
-BEConstructorList a0 a1 a2 a3 = code {
-	ccall BEConstructorList "ppp:p:p"
-}
-// BEConstructorListP BEConstructorList (BESymbolP symbol_p,BETypeArgP type_args,BEConstructorListP constructors);
+// void BEAbstractType (BETypeSymbolP symbol);
 
 BENoConstructors :: !BackEnd -> (!BEConstructorListP,!BackEnd);
 BENoConstructors a0 = code {
@@ -490,11 +498,17 @@ BENoConstructors a0 = code {
 }
 // BEConstructorListP BENoConstructors ();
 
+BEConstructorList :: !BESymbolP !BETypeArgP !BEConstructorListP !BackEnd -> (!BEConstructorListP,!BackEnd);
+BEConstructorList a0 a1 a2 a3 = code {
+	ccall BEConstructorList "ppp:p:p"
+}
+// BEConstructorListP BEConstructorList (BESymbolP symbol_p,BETypeArgP type_args,BEConstructorListP constructors);
+
 BEFieldList :: !Int !Int !String !BETypeNodeP !BEFieldListP !BackEnd -> (!BEFieldListP,!BackEnd);
 BEFieldList a0 a1 a2 a3 a4 a5 = code {
 	ccall BEFieldList "IISpp:p:p"
 }
-// BEFieldListP BEField (int fieldIndex,int moduleIndex,CleanString name,BETypeNodeP type,BEFieldListP fields);
+// BEFieldListP BEFieldList (int fieldIndex,int moduleIndex,CleanString name,BETypeNodeP type,BEFieldListP next_fields);
 
 BESetMemberTypeOfField :: !Int !Int !BETypeAltP !BackEnd -> BackEnd;
 BESetMemberTypeOfField a0 a1 a2 a3 = code {
@@ -506,13 +520,13 @@ BESetDictionaryFieldOfMember :: !Int !Int !Int !BackEnd -> (!Int,!BackEnd);
 BESetDictionaryFieldOfMember a0 a1 a2 a3 = code {
 	ccall BESetDictionaryFieldOfMember "III:I:p"
 }
-// int BESetDictionaryFieldOfMember (int function_index, int field_index, int field_module_index);
+// int BESetDictionaryFieldOfMember (int function_index,int field_index,int field_module_index);
 
 BESetInstanceFunctionOfFunction :: !Int !Int !BackEnd -> BackEnd;
 BESetInstanceFunctionOfFunction a0 a1 a2 = code {
 	ccall BESetInstanceFunctionOfFunction "II:V:p"
 }
-// void BESetInstanceFunctionOfFunction (int function_index, int instance_function_index);
+// void BESetInstanceFunctionOfFunction (int function_index,int instance_function_index);
 
 BENoFields :: !BackEnd -> (!BEFieldListP,!BackEnd);
 BENoFields a0 = code {
@@ -694,11 +708,11 @@ BEDeclareDynamicTypeSymbol a0 a1 a2 = code {
 }
 // void BEDeclareDynamicTypeSymbol (int typeIndex,int moduleIndex);
 
-BEDynamicTempTypeSymbol :: !BackEnd -> (!BESymbolP,!BackEnd);
+BEDynamicTempTypeSymbol :: !BackEnd -> (!BETypeSymbolP,!BackEnd);
 BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":p:p"
 }
-// BESymbolP BEDynamicTempTypeSymbol ();
+// BETypeSymbolP BEDynamicTempTypeSymbol ();
 kBEVersionCurrent:==0x02116000;
 kBEVersionOldestDefinition:==0x02100401;
 kBEVersionOldestImplementation:==0x02100401;
@@ -712,47 +726,36 @@ BEUniqueAttr:==2;
 BEExistsAttr:==3;
 BEUniqueVariable:==4;
 BEFirstUniVarNumber:==5;
+BERationalDenot:==0;
+BEIntDenot:==1;
+BEBoolDenot:==2;
+BECharDenot:==3;
+BERealDenot:==4;
+BEIntegerDenot:==5;
+BEStringDenot:==6;
+BETupleSymb:==7;
+BEConsSymb:==8;
+BENilSymb:==9;
+BEApplySymb:==10;
+BEIfSymb:==11;
+BEFailSymb:==12;
 BEIntType:==0;
 BEBoolType:==1;
 BECharType:==2;
 BERealType:==3;
 BEFileType:==4;
-BEStringType:==5;
-BEWorldType:==6;
-BEProcIdType:==7;
-BERedIdType:==8;
-BERationalDenot:==9;
-BEIntDenot:==10;
-BEBoolDenot:==11;
-BECharDenot:==12;
-BERealDenot:==13;
-BEIntegerDenot:==14;
-BEStringDenot:==15;
-BEFunType:==16;
-BEArrayType:==17;
-BEStrictArrayType:==18;
-BEUnboxedArrayType:==19;
-BEPackedArrayType:==20;
-BEListType:==21;
-BETupleType:==22;
-BEEmptyType:==23;
-BEDynamicType:==24;
-BENrOfPredefTypes:==25;
-BETupleSymb:==26;
-BEConsSymb:==27;
-BENilSymb:==28;
-BEApplySymb:==29;
-BEIfSymb:==30;
-BEFailSymb:==31;
-BEAllSymb:==32;
-BESelectSymb:==33;
-BENrOfPredefFunsOrConses:==34;
-BEDefinition:==35;
-BENewSymbol:==36;
-BEInstanceSymb:==37;
-BEEmptySymbol:==38;
-BEFieldSymbolList:==39;
-BEErroneousSymb:==40;
+BEWorldType:==5;
+BEProcIdType:==6;
+BERedIdType:==7;
+BEFunType:==8;
+BEArrayType:==9;
+BEStrictArrayType:==10;
+BEUnboxedArrayType:==11;
+BEPackedArrayType:==12;
+BEListType:==13;
+BETupleType:==14;
+BEDynamicType:==15;
+BEApplyType:==16;
 BECreateArrayFun:==0;
 BEArraySelectFun:==1;
 BEUnqArraySelectFun:==2;

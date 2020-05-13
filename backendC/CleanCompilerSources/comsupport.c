@@ -33,7 +33,7 @@
 
 char *CurrentModule;
 unsigned CurrentLine;
-Symbol CurrentSymbol;
+SymbDef CurrentSymbDef;
 Bool CompilerError;
 
 int ExitEnv_valid=0;
@@ -280,6 +280,13 @@ void FatalCompError (char *mod, char *proc, char *mess)
 static char *ConvertSymbolKindToString (SymbKind skind)
 {
 	switch (skind){
+		default:			return "Erroneous";
+	}
+}
+
+static char *ConvertTypeSymbolKindToString (SymbKind skind)
+{
+	switch (skind){
 		case int_type: 		return "Int";
 		case bool_type:		return "Bool";
 		case char_type:		return "Char";
@@ -332,6 +339,18 @@ char *symbol_to_string (Symbol symbol)
 		return NULL;
 	default:
 		return ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind);
+	}
+}
+
+char *type_symbol_to_string (TypeSymbol symbol)
+{
+	switch (symbol->ts_kind){
+	case apply_type_symb:
+		return "AP";
+	case definition:
+		return NULL;
+	default:
+		return ConvertTypeSymbolKindToString ((SymbKind)symbol->ts_kind);
 	}
 }
 
@@ -415,12 +434,12 @@ static void WriteSymbolOfIdentToStdError (char *name, unsigned line_nr)
 	PutSStdError (name);
 }
 
-static void WriteSymbolToStdError (Symbol symbol)
+static void WriteTypeSymbolToStdError (TypeSymbol type_symbol)
 {
-	if (symbol->symb_kind==definition)
-		WriteSymbolOfIdentToStdError (symbol->symb_def->sdef_name, 0);
+	if (type_symbol->ts_kind==type_definition)
+		WriteSymbolOfIdentToStdError (type_symbol->ts_def->sdef_name, 0);
 	else
-		PutSStdError (symbol_to_string (symbol));
+		PutSStdError (type_symbol_to_string (type_symbol));
 }
 
 void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
@@ -446,7 +465,7 @@ void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message)
 		CompilerError = True;
 }
 
-void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
+void StaticMessage_S_s (Bool error,struct symbol_def *symb_def_p,char *message)
 {
 	if (! (error || DoWarning))
 		return;
@@ -458,7 +477,7 @@ void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
 		PutIStdError (CurrentLine);
 	}
 	PutCStdError (',');
-	WriteSymbolToStdError (symbol_p);
+	WriteSymbolOfIdentToStdError (symb_def_p->sdef_name, 0);
 	PutSStdError ("]: ");
 
 	PutSStdError (message);
@@ -469,22 +488,38 @@ void StaticMessage_S_s (Bool error,struct symbol *symbol_p,char *message)
 		CompilerError = True;
 }
 
-void StaticMessage_S_Ss (Bool error,struct symbol *symbol_p1,struct symbol *symbol_p2,char *message)
+void StaticMessage_S_Ts (Bool error,struct symbol_def *symb_def_p1,struct type_symbol *symbol_p2,char *message)
 {
 	if (! (error || DoWarning))
 		return;
 
 	PutSStdError (error ? "Error [" : "Warning [");
 	PutSStdError (CurrentModule);
-	if (CurrentLine > 0){
-		PutCStdError (',');
-		PutIStdError (CurrentLine);
-	}
 	PutCStdError (',');
-	WriteSymbolToStdError (symbol_p1);
+	WriteSymbolOfIdentToStdError (symb_def_p1->sdef_name, 0);
 	PutSStdError ("]: ");
 
-	WriteSymbolToStdError (symbol_p2);
+	WriteTypeSymbolToStdError (symbol_p2);
+	PutSStdError (message);
+
+	PutCStdError ('\n');
+
+	if (error)
+		CompilerError = True;
+}
+
+void StaticMessage_T_Ss (Bool error,struct type_symbol *symbol_p1,struct symbol_def *symb_def_p2,char *message)
+{
+	if (! (error || DoWarning))
+		return;
+
+	PutSStdError (error ? "Error [" : "Warning [");
+	PutSStdError (CurrentModule);
+	PutCStdError (',');
+	WriteTypeSymbolToStdError (symbol_p1);
+	PutSStdError ("]: ");
+
+	WriteSymbolOfIdentToStdError (symb_def_p2->sdef_name, 0);
 	PutSStdError (message);
 
 	PutCStdError ('\n');
@@ -516,16 +551,12 @@ void StaticMessage_s_s (Bool error,char *symbol_s,char *message)
 		CompilerError = True;
 }
 
-void StaticErrorMessage_S_ss (struct symbol *symbol_p,char *message1,char *message2)
+void StaticErrorMessage_T_ss (struct type_symbol *symbol_p,char *message1,char *message2)
 {
 	PutSStdError ("Error [");
 	PutSStdError (CurrentModule);
-	if (CurrentLine > 0){
-		PutCStdError (',');
-		PutIStdError (CurrentLine);
-	}
 	PutCStdError (',');
-	WriteSymbolToStdError (symbol_p);
+	WriteTypeSymbolToStdError (symbol_p);
 	PutSStdError ("]: ");
 
 	PutSStdError (message1);
@@ -556,34 +587,10 @@ void StaticErrorMessage_s_Ds (char *symbol_s,struct symbol_def *symb_def_p,char 
 	CompilerError = True;
 }
 
-void StaticErrorMessage_s_Ss (char *symbol_s,struct symbol *symbol_p,char *message)
-{
-	PutSStdError ("Error [");
-	PutSStdError (CurrentModule);
-	if (CurrentLine > 0){
-		PutCStdError (',');
-		PutIStdError (CurrentLine);
-	}
-	PutCStdError (',');
-	PutSStdError (symbol_s);
-	PutSStdError ("]: ");
-
-	WriteSymbolToStdError (symbol_p);
-	PutSStdError (message);
-
-	PutCStdError ('\n');
-
-	CompilerError = True;
-}
-
 void StaticErrorMessage_s_ss (char *symbol_s,char *message1,char *message2)
 {
 	PutSStdError ("Error [");
 	PutSStdError (CurrentModule);
-	if (CurrentLine > 0){
-		PutCStdError (',');
-		PutIStdError (CurrentLine);
-	}
 	PutCStdError (',');
 	PutSStdError (symbol_s);
 	PutSStdError ("]: ");
