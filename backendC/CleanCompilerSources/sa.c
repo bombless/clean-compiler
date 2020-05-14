@@ -102,6 +102,9 @@ Fun
 static Fun
 #endif
 	* conssym,					/* the cons id							*/
+#if STRICT_LISTS
+	*lazy_cons_sym0,*strict_cons_sym0,*tail_strict_cons_sym0,*strict_tail_strict_cons_sym0,
+#endif
 	* nilsym,					/* the nil id							*/
 	* apsym,					/* the apply id							*/
 	* if_sym,					/* the if id							*/
@@ -109,18 +112,14 @@ static Fun
 	* false_sym,				/* the false id							*/
 	* selectsym[MaxNodeArity],	/* the select ids						*/
 	* tuplesym[MaxNodeArity],	/* the tuple ids						*/
+	* lazy_just_sym0,
+	* strict_just_sym0,
+	* nothing_sym,
 	* strict_sym[MaxNrAnnots],	/* the strict ids						*/
 	* fail_sym,					/* the fail id							*/
 	* inffunct_sym,				/* the E2 id							*/
 	* botmemfunct_sym,			/* the E3 id							*/
 	* strictapsym;				/* the strict apply id					*/
-
-#if STRICT_LISTS
-# ifndef _DB_
-static
-# endif
-Fun *lazy_cons_sym0,*strict_cons_sym0,*tail_strict_cons_sym0,*strict_tail_strict_cons_sym0;
-#endif
 
 static ExpRepr top;
 static ExpRepr bottom;
@@ -2245,6 +2244,18 @@ static Exp ConvertNode (Node node, NodeId nid)
 					e->e_hnf = True;
 					e->e_fun = nilsym;
 					break;
+				case just_symb:
+					if (node->node_symbol->symb_head_strictness>1)
+						e->e_fun = strict_just_sym0+arity;
+					else {
+						e->e_hnf = True;
+						e->e_fun = lazy_just_sym0+arity;
+					}
+					break;
+				case nothing_symb:
+					e->e_hnf = True;
+					e->e_fun = nothing_sym;
+					break;
 				case apply_symb:
 					e->e_fun = apsym;
 
@@ -2651,6 +2662,18 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 		case nil_symb:
 			e->e_hnf = True;
 			e->e_fun = nilsym;
+			break;
+		case just_symb:
+			if (symbol_p->symb_head_strictness>1)
+				e->e_fun = strict_just_sym0+arity;
+			else {
+				e->e_hnf = True;
+				e->e_fun = lazy_just_sym0+arity;
+			}
+			break;
+		case nothing_symb:
+			e->e_hnf = True;
+			e->e_fun = nothing_sym;
 			break;
 		case definition:
 		{
@@ -3356,6 +3379,7 @@ static void init_predefined_symbols (void)
 				/* +3 */
 				+11
 #endif
+				+5 /* maybe */
 	;
 	if (StrictDoLists)
 		nr_funs += 2;
@@ -3484,6 +3508,39 @@ static void init_predefined_symbols (void)
 
 	conssym = lazy_cons_sym0+2;
 #endif
+
+	nothing_sym = f;
+	f->fun_symbol     = NULL;
+	f->fun_arity      = 0;
+	f->fun_kind       = Constructor;
+	f->fun_strictargs = NULL;
+	f->fun_single     = False;
+	InitStrictResult (& f->fun_strictresult);
+	f++;
+
+	lazy_just_sym0 = f;
+
+	for (i=0; i<=1; ++i){
+		f->fun_symbol = NULL;
+		f->fun_arity = i;
+		f->fun_kind = Constructor;
+		f->fun_strictargs = NULL;
+		f->fun_single = False;
+		InitStrictResult (&f->fun_strictresult);
+		f++;
+	}
+	
+	strict_just_sym0 = f;
+
+	for (i=0; i<=1; ++i){
+		f->fun_symbol = NULL;
+		f->fun_arity = i;
+		f->fun_kind = Constructor;
+		f->fun_strictargs = InitNewStrictInfos (1,HnfStrict);;
+		f->fun_single = False;
+		InitStrictResult (&f->fun_strictresult);
+		++f;
+	}
 
 	if_sym = f;
 	f->fun_symbol     = NULL;

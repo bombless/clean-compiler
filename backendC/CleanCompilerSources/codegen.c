@@ -1283,6 +1283,7 @@ void CodeGeneration (ImpMod imod, char *fname)
 #if STRICT_LISTS
 		GenerateCodeForLazyUnboxedRecordListFunctions();
 #endif
+		GenerateCodeForLazyUnboxedRecordMaybeFunctions();
 
 		import_not_yet_imported_record_r_labels (imod->im_size_dcl_mfts_a,imod->im_dcl_mfts_a);
 		import_not_yet_imported_system_labels();

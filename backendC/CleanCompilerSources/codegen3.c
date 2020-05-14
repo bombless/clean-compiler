@@ -957,6 +957,58 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 #endif
 			FillRhsRoot (&cons_lab, root, asp, bsp,code_gen_node_ids_p);
 			return;
+		case just_symb:
+			if (rootsymb->symb_head_strictness>1){
+				if (rootsymb->symb_head_strictness==4 && root->node_arity<1){
+					CodeRootSymbolApplication (root,rootid,rootsymb->symb_unboxed_cons_sdef_p,asp,bsp,code_gen_node_ids_p,resultstate);
+					return;
+				} else {
+					if (IsSemiStrictState (root->node_state)){
+						LabDef d_just_lab,n_just_lab;
+
+						if (rootsymb->symb_head_strictness==4){
+							MakeSymbolLabel (&d_just_lab,rootsymb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,rootsymb->symb_unboxed_cons_sdef_p,0);
+						} else {
+							d_just_lab=justs_lab;
+							d_just_lab.lab_pref=d_pref;
+						}
+						
+						n_just_lab = d_just_lab;
+						n_just_lab.lab_pref = n_pref;
+						
+						CreateSemiStrictRootNode (&d_just_lab,&n_just_lab,root,rootid,asp,bsp,code_gen_node_ids_p,resultstate);
+						return;
+					} else {
+						LabDef *strict_just_lab_p;
+						int a_size;
+
+						BuildArgs (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
+
+						if (rootsymb->symb_head_strictness==4){
+							int b_size;
+
+							strict_just_lab_p=unboxed_just_label (rootsymb);
+							
+							DetermineSizeOfArguments (root->node_arguments,&a_size,&b_size);
+							GenFillR (strict_just_lab_p,a_size,b_size,asp,0,0,ReleaseAndFill,True);
+							bsp-=b_size;
+						} else {
+							strict_just_lab_p=&justs_lab;
+							a_size=root->node_arity;
+							GenFillh (root->node_arity==1 ? &just_lab : strict_just_lab_p,a_size,asp,ReleaseAndFill);
+						}
+
+						asp-=a_size;
+
+						GenPopA	(asp);
+						GenPopB	(bsp);
+						GenRtn (1,0,OnAState);
+						return;
+					}
+				}
+			}
+			FillRhsRoot (&just_lab,root,asp,bsp,code_gen_node_ids_p);
+			return;
 		case nil_symb:
 #if STRICT_LISTS
 			if (rootsymb->symb_head_strictness & 1){
@@ -982,6 +1034,30 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 #endif
 
 			FillRhsRoot (&nil_lab, root, asp, bsp,code_gen_node_ids_p);
+			return;
+		case nothing_symb:
+			if (rootsymb->symb_head_strictness & 1){
+				if (!simple_expression_without_node_ids (root->node_arguments->arg_node)){
+					BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);
+					GenPopA (1);
+					--asp;
+				}
+
+				if (resultstate.state_kind==StrictRedirection){
+					GenPopA	(asp);
+					GenPopB	(bsp);
+					GenBuildh (&nothing_lab,0);
+				} else {
+					GenFillh (&nothing_lab,0,asp,ReleaseAndFill);
+
+					GenPopA	(asp);
+					GenPopB	(bsp);
+				}
+				GenRtn (1,0,OnAState);
+				return;
+			}
+
+			FillRhsRoot (&nothing_lab,root,asp,bsp,code_gen_node_ids_p);
 			return;
 		case apply_symb:
 #ifdef NEW_APPLY

@@ -28,7 +28,7 @@ typedef enum {
 	IntObj, BoolObj, CharObj, RealObj, FileObj,
 	TupleObj, RecordObj,
 	ArrayObj, StrictArrayObj, UnboxedArrayObj, PackedArrayObj,
-	ListObj,
+	ListObj, MaybeObj,
 	WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
 	,DynamicObj
@@ -37,9 +37,9 @@ typedef enum {
 } ObjectKind;
 
 #if ABSTRACT_OBJECT
-# define BASIC_ELEMS_STRING "uuibcrfaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uuibcrfaaaaaaaaippa" /* index by ObjectKind */
 #else
-# define BASIC_ELEMS_STRING "uibcrfaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uibcrfaaaaaaaaippa" /* index by ObjectKind */
 #endif
 
 typedef enum {
@@ -48,7 +48,7 @@ typedef enum {
 	integer_denot,
 	string_denot,
 	tuple_symb,
-	cons_symb, nil_symb,
+	cons_symb, just_symb, nil_symb, nothing_symb,
 	apply_symb, if_symb, fail_symb, seq_symb,
 	select_symb,
 	Nr_Of_Predef_FunsOrConses,
@@ -57,6 +57,9 @@ typedef enum {
 } SymbKind;
 
 #define last_denot string_denot
+
+#define IsOverloadedConstructor(symb_kind) ((unsigned)((symb_kind)-cons_symb)<=3u)
+#define IsOverloadedConsOrJust(symb_kind) ((unsigned)((symb_kind)-cons_symb)<=1u)
 
 STRUCT (state,State){
 	union {
@@ -104,7 +107,7 @@ typedef union symb_value {
 	char *					val_char;
 	char *					val_string;
 	char *					val_real;
-	int						val_arity;
+	int						val_arity;						/* select_symb */
 #if STRICT_LISTS
 	struct state *			val_state_p;					/* element state for unboxed list cons in lhs */
 	struct unboxed_cons *	val_unboxed_cons_p;				/* state and symbol definition for unboxed list cons in rhs */
@@ -118,6 +121,10 @@ struct unboxed_cons {
 	struct symbol_def *				unboxed_cons_sdef_p;
 };
 #endif
+
+#define OVERLOADED_CONS 1
+#define UNBOXED_OVERLOADED_CONS 3
+#define UNBOXED_CONS 4
 
 STRUCT (symbol,Symbol) {
 	SymbValue			symb_val;
@@ -454,7 +461,7 @@ STRUCT (rule_alt,RuleAlt){
 #define alt_rhs_code alt_rhs.rhs_code
 
 typedef enum {
-	NEWDEFINITION, ABSTYPE, TYPE, TYPESYN, DEFRULE, IMPRULE,
+	NEWDEFINITION, ABSTYPE, TYPE, TYPESYN /* not used */, DEFRULE, IMPRULE,
 	CONSTRUCTOR, SYSRULE, 
 	RECORDTYPE, FIELDSELECTOR
 } SDefKind;

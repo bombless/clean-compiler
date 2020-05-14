@@ -277,13 +277,6 @@ void FatalCompError (char *mod, char *proc, char *mess)
 	longjmp (ExitEnv, 1);
 }
 
-static char *ConvertSymbolKindToString (SymbKind skind)
-{
-	switch (skind){
-		default:			return "Erroneous";
-	}
-}
-
 static char *ConvertTypeSymbolKindToString (SymbKind skind)
 {
 	switch (skind){
@@ -327,6 +320,10 @@ char *symbol_to_string (Symbol symbol)
 		return "[:]";
 	case nil_symb:
 		return "[]";
+	case just_symb:
+		return "+?";
+	case nothing_symb:
+		return "-?";
 	case select_symb:
 		return "_Select";
 	case apply_symb:
@@ -338,7 +335,7 @@ char *symbol_to_string (Symbol symbol)
 	case definition:
 		return NULL;
 	default:
-		return ConvertSymbolKindToString ((SymbKind)symbol -> symb_kind);
+		return "Erroneous";
 	}
 }
 

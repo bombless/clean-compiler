@@ -22,10 +22,15 @@ EXPORTS
  BEBoolSymbol
  BELiteralSymbol
  BEPredefineListConstructorSymbol
+ BEPredefineMaybeConstructorSymbol
  BEPredefineListTypeSymbol
+ BEPredefineMaybeTypeSymbol
  BEAdjustStrictListConsInstance
+ BEAdjustStrictJustInstance
  BEAdjustUnboxedListDeconsInstance
+ BEAdjustUnboxedFromJustInstance
  BEAdjustOverloadedNilFunction
+ BEAdjustOverloadedNothingFunction
  BEOverloadedConsSymbol
  BEOverloadedPushNode
  BEPredefineConstructorSymbol

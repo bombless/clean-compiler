@@ -21,10 +21,15 @@
 /EXPORT: BEBoolSymbol
 /EXPORT: BELiteralSymbol
 /EXPORT: BEPredefineListConstructorSymbol
+/EXPORT: BEPredefineMaybeConstructorSymbol
 /EXPORT: BEPredefineListTypeSymbol
+/EXPORT: BEPredefineMaybeTypeSymbol
 /EXPORT: BEAdjustStrictListConsInstance
+/EXPORT: BEAdjustStrictJustInstance
 /EXPORT: BEAdjustUnboxedListDeconsInstance
+/EXPORT: BEAdjustUnboxedFromJustInstance
 /EXPORT: BEAdjustOverloadedNilFunction
+/EXPORT: BEAdjustOverloadedNothingFunction
 /EXPORT: BEOverloadedConsSymbol
 /EXPORT: BEOverloadedPushNode
 /EXPORT: BEPredefineConstructorSymbol

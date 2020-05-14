@@ -4,7 +4,7 @@ typedef enum {
 	file_type, world_type, procid_type, redid_type,
 	fun_type,
 	array_type, strict_array_type, unboxed_array_type, packed_array_type,
-	list_type, tuple_type,
+	list_type, maybe_type, tuple_type,
 	dynamic_type,
 	apply_type_symb,
 	NTypeSymbKinds,

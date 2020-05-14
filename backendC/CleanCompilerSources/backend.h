@@ -114,7 +114,7 @@ enum {
 	BEIntegerDenot,
 	BEStringDenot,
 	BETupleSymb,
-	BEConsSymb, BENilSymb,
+	BEConsSymb, BEJustSymb, BENilSymb, BENothingSymb,
 	BEApplySymb, BEIfSymb, BEFailSymb
 };
 
@@ -124,7 +124,7 @@ enum {
 	BEIntType, BEBoolType, BECharType, BERealType,
 	BEFileType, BEWorldType, BEProcIdType, BERedIdType,
 	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEPackedArrayType,
-	BEListType, BETupleType,
+	BEListType, BEMaybeType, BETupleType,
 	BEDynamicType, BEApplyType
 };
 
@@ -224,17 +224,32 @@ Clean (BELiteralSymbol :: BESymbKind String BackEnd -> (BESymbolP, BackEnd))
 void BEPredefineListConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness,int tail_strictness);
 Clean (BEPredefineListConstructorSymbol :: Int Int BESymbKind Int Int BackEnd -> BackEnd)
 
+void BEPredefineMaybeConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness);
+Clean (BEPredefineMaybeConstructorSymbol :: Int Int BESymbKind Int BackEnd -> BackEnd)
+
 void BEPredefineListTypeSymbol (int typeIndex, int moduleIndex, BETypeSymbKind symbolKind,int head_strictness,int tail_strictness);
 Clean (BEPredefineListTypeSymbol :: Int Int BETypeSymbKind Int Int BackEnd -> BackEnd)
+
+void BEPredefineMaybeTypeSymbol (int typeIndex, int moduleIndex, int head_strictness);
+Clean (BEPredefineMaybeTypeSymbol :: Int Int Int BackEnd -> BackEnd)
 
 void BEAdjustStrictListConsInstance (int functionIndex, int moduleIndex);
 Clean (BEAdjustStrictListConsInstance :: Int Int BackEnd -> BackEnd)
 
+void BEAdjustStrictJustInstance (int functionIndex, int moduleIndex);
+Clean (BEAdjustStrictJustInstance :: Int Int BackEnd -> BackEnd)
+
 void BEAdjustUnboxedListDeconsInstance (int functionIndex, int moduleIndex);
 Clean (BEAdjustUnboxedListDeconsInstance :: Int Int BackEnd -> BackEnd)
 
+void BEAdjustUnboxedFromJustInstance (int functionIndex, int moduleIndex);
+Clean (BEAdjustUnboxedFromJustInstance :: Int Int BackEnd -> BackEnd)
+
 void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
 Clean (BEAdjustOverloadedNilFunction :: Int Int BackEnd -> BackEnd)
+
+void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex);
+Clean (BEAdjustOverloadedNothingFunction :: Int Int BackEnd -> BackEnd)
 
 BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex);
 Clean (BEOverloadedConsSymbol :: Int Int Int Int BackEnd -> (BESymbolP,BackEnd))

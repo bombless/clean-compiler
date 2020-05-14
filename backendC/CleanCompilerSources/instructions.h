@@ -196,6 +196,7 @@ void GenRecordDescriptor (SymbDef sdef);
 #ifdef STRICT_LISTS
 void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict);
 #endif
+void GenUnboxedJustRecordDescriptor (SymbDef sdef);
 void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_state_p);
 void GenArrayFunctionDescriptor (SymbDef arr_fun_def, Label desclab, int arity);
 

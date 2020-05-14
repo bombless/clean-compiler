@@ -3303,6 +3303,31 @@ LabDef *unboxed_cons_label (SymbolP cons_symbol_p)
 }
 #endif
 
+LabDef *unboxed_just_label (SymbolP just_symbol_p)
+{
+	static LabDef unboxed_record_just_lab;
+	
+	if (just_symbol_p->symb_unboxed_cons_state_p->state_type==SimpleState && BETWEEN (IntObj,FileObj,just_symbol_p->symb_unboxed_cons_state_p->state_object))
+		return &unboxed_just_labels[just_symbol_p->symb_unboxed_cons_state_p->state_object-IntObj];
+	else if (just_symbol_p->symb_unboxed_cons_state_p->state_type==RecordState){
+		if (ExportLocalLabels){
+			unboxed_record_just_lab.lab_mod=CurrentModule;
+			unboxed_record_just_lab.lab_symbol=just_symbol_p->symb_unboxed_cons_state_p->state_record_symbol;			
+			unboxed_record_just_lab.lab_issymbol=True;
+		} else {
+			unboxed_record_just_lab.lab_name=just_symbol_p->symb_unboxed_cons_state_p->state_record_symbol->sdef_name;
+			unboxed_record_just_lab.lab_issymbol=False;
+		}
+		unboxed_record_just_lab.lab_pref="r_Just#";
+		unboxed_record_just_lab.lab_post='\0';
+
+		return &unboxed_record_just_lab;
+	} else if (just_symbol_p->symb_unboxed_cons_state_p->state_type==ArrayState){
+		return &unboxed_just_array_label;
+	} else
+		error_in_function ("unboxed_just_label");
+}
+
 #if STRICT_LISTS
 int simple_expression_without_node_ids (NodeP node_p)
 {
@@ -3389,6 +3414,45 @@ static int lazy_fill_for_cons_in_lazy_context (Node node)
 
 	if (symb->symb_tail_strictness)
 		node->node_arguments->arg_next->arg_state=StrictState;
+
+	return 0;
+}
+
+static int lazy_fill_for_just_in_lazy_context (Node node)
+{
+	Symbol symb;
+	
+	symb = node->node_symbol;
+
+	if (symb->symb_head_strictness>1){
+		NodeP arg_node_p;
+		StateP element_state_p;
+		
+		arg_node_p=node->node_arguments->arg_node;
+		if (arg_node_p->node_kind!=NodeIdNode){
+			if (arg_node_p->node_kind==NormalNode &&
+				(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+				;
+			else
+				if (IsLazyState (arg_node_p->node_state))
+					return 1;
+		} else
+			if (IsLazyState (arg_node_p->node_node_id->nid_state))
+				return 1;
+
+		if (symb->symb_head_strictness==4)
+			element_state_p=symb->symb_unboxed_cons_state_p;
+		else
+			element_state_p=&StrictState;
+		
+		if (arg_node_p->node_kind==NormalNode &&
+			(BETWEEN (int_denot,real_denot,arg_node_p->node_symbol->symb_kind) || arg_node_p->node_symbol->symb_kind==string_denot))
+		{
+			arg_node_p->node_state=*element_state_p;
+		}
+		
+		node->node_arguments->arg_state=*element_state_p;
+	}
 
 	return 0;
 }
@@ -3530,6 +3594,93 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				GenBuildh (&nil_lab,0);
 			} else
 				GenFillh (&nil_lab,0,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
+			return;
+		case just_symb:
+			if (symb->symb_head_strictness>1){
+				if (symb->symb_head_strictness==4 && node->node_arity<1){
+					FillSymbol (node,symb->symb_unboxed_cons_sdef_p,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
+					return;
+				} else {
+					int lazy_fill;
+					LabDef *strict_just_lab_p,strict_just_lab;
+					int a_size,b_size;
+					
+					if (node->node_arity==1 && IsLazyState (node->node_state))
+						lazy_fill=lazy_fill_for_just_in_lazy_context (node);
+					else
+						lazy_fill=0;
+
+					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+					if (symb->symb_head_strictness==4){
+						if (lazy_fill){
+							MakeSymbolLabel (&strict_just_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
+							strict_just_lab_p=&strict_just_lab;
+						} else
+							strict_just_lab_p=unboxed_just_label (symb);
+
+						DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+					} else {
+						strict_just_lab_p=&justs_lab;
+
+						a_size=node->node_arity;
+						b_size=0;
+					}
+
+					if (lazy_fill){
+						LabDef n_strict_just_lab;
+						
+						n_strict_just_lab = *strict_just_lab_p;
+						n_strict_just_lab.lab_pref = n_pref;
+						
+						if (update_node_id==NULL){
+							*asp_p+=1-a_size;
+							GenBuild (strict_just_lab_p,a_size,&n_strict_just_lab);
+						} else {
+							GenFill (strict_just_lab_p,a_size,&n_strict_just_lab,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? PartialFill : NormalFill);
+							*asp_p-=a_size;
+						}
+					} else {
+						if (update_node_id==NULL){
+							*asp_p+=1-a_size;
+							if (symb->symb_head_strictness==4)
+								GenBuildhr (strict_just_lab_p,a_size,b_size);
+							else
+								GenBuildh (node->node_arity==1 ? &just_lab : strict_just_lab_p,a_size);
+						} else {
+							if (symb->symb_head_strictness==4)
+								GenFillR (strict_just_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
+							else
+								GenFillh (node->node_arity==1 ? &just_lab : strict_just_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
+							*asp_p-=a_size;
+						}
+					}
+					*bsp_p-=b_size;
+
+					return;
+				}
+			}
+			BuildLazyArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+			if (update_node_id==NULL){
+				*asp_p+=1-node->node_arity;
+				GenBuildh (&just_lab,node->node_arity);
+			} else {
+				GenFillh (&just_lab, node->node_arity,*asp_p-update_node_id->nid_a_index,
+					node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
+				*asp_p-=node->node_arity;
+			}
+			return;
+		case nothing_symb:
+			if ((symb->symb_head_strictness & 1) && !simple_expression_without_node_ids (node->node_arguments->arg_node)){
+				BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+				GenPopA (1);
+				--*asp_p;
+			}
+			if (update_node_id==NULL){
+				*asp_p+=1;
+				GenBuildh (&nothing_lab,0);
+			} else
+				GenFillh (&nothing_lab,0,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
 			return;
 		case string_denot:
 			GenBuildString (symb->symb_val);
@@ -4462,7 +4613,10 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			node_arity_eq_one=0;
 	} else {
 		n_dictionaries=0;
-		node_arity_eq_one=0;
+		if (symbol->symb_kind==just_symb)
+			node_arity_eq_one=1;
+		else
+			node_arity_eq_one=0;
 	}
 
 	if (IsSimpleState (node->node_state) && !(node_arity_eq_one && !IsLazyState (node->node_state))){
@@ -4508,9 +4662,12 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				strict_constructor=1;
 #endif
 			new_match_sdef=create_match_function (symbol,node->node_arity,n_dictionaries,strict_constructor);
-		} else
+		} else {
+			if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>1)
+				strict_constructor=1;
 			new_match_sdef=create_select_and_match_function (symbol,n_dictionaries,strict_constructor);
-	
+		}
+
 		ConvertSymbolToDandNLabel (&name,&codelab,new_match_sdef);
 		
 		n_arguments=1;
@@ -4549,6 +4706,13 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				} else
 #endif
 				GenEqDesc (&cons_lab,2,0);
+				break;
+			case just_symb:
+				if (symbol->symb_head_strictness==1){
+					GenEqDesc (&nothing_lab,0,0);
+					GenNotB();
+				} else
+					GenEqDesc (&just_lab,1,0);
 				break;
 			case definition:
 			{
@@ -4666,6 +4830,25 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			}
 		} else
 #endif
+		if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>1){
+			StateS value_state;
+
+			if (symbol->symb_head_strictness==4){
+				value_state=*symbol->symb_state_p;
+				DetermineSizeOfState (value_state,&a_size,&b_size);
+
+				GenReplRArgs (a_size,b_size);
+				*asp_p += a_size;
+				*bsp_p += b_size;
+
+				AdjustTuple (a_size,b_size,asp_p,bsp_p,1,demanded_state_array,&value_state,a_size,b_size);
+			} else {
+				GenReplArg (1,0);
+
+				value_state=StrictState;
+				AdjustTuple (1,0,asp_p,bsp_p,1,demanded_state_array,&value_state,1,0);
+			}
+		} else
 		{
 			*asp_p-=1;
 
@@ -5031,7 +5214,7 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 					strict_cons_lab_p=unboxed_cons_label (symbol);
 						
 					fill_strict_unique_node (node,update_node,bits,strict_cons_lab_p,free_unique_node_id,asp_p,bsp_p,code_gen_node_ids_p);
-				} else {					
+				} else {
 #if GENERATE_CODE_AGAIN
 					ArgP removed_args=
 #endif
@@ -5062,6 +5245,59 @@ static void FillUniqueNodeWithNode (NodeP update_node,int *asp_p,int *bsp_p,Code
 				bits[0]='1';
 
 			label_p=&cons_lab;
+			break;
+		case just_symb:
+			node_arity=1;
+
+			if (symbol->symb_head_strictness>1){
+				SymbolP pattern_symbol_p;
+				
+				pattern_symbol_p=push_node->node_push_symbol;
+				if (pattern_symbol_p->symb_kind==just_symb && push_node->node_arity==node_arity
+					&& ((pattern_symbol_p->symb_head_strictness<3 && symbol->symb_head_strictness<3)
+						|| (pattern_symbol_p->symb_head_strictness==4 && symbol->symb_head_strictness==4
+							&& pattern_symbol_p->symb_tail_strictness==symbol->symb_tail_strictness
+							&& EqualState (*pattern_symbol_p->symb_state_p,*symbol->symb_unboxed_cons_state_p))))
+					bits[0]='0';
+				else
+					bits[0]='1';
+
+				if (symbol->symb_head_strictness==4){
+					LabDef *strict_just_lab_p;
+					
+					strict_just_lab_p=unboxed_just_label (symbol);
+					
+					fill_strict_unique_node (node,update_node,bits,strict_just_lab_p,free_unique_node_id,asp_p,bsp_p,code_gen_node_ids_p);
+				} else {
+#if GENERATE_CODE_AGAIN
+					ArgP removed_args=
+#endif
+					compute_bits_and_remove_unused_arguments (node,bits,update_node->node_arguments->arg_occurrence,&n_args);
+
+					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
+
+#if GENERATE_CODE_AGAIN
+					if (call_code_generator_again)
+						restore_removed_arguments (&node->node_arguments,removed_args,update_node->node_arguments->arg_occurrence,node_arity);
+#endif
+					GenFill1 (&just_lab,node_arity,*asp_p-free_unique_node_id->nid_a_index,bits);
+
+					*asp_p-=n_args;
+
+					GenPushA (*asp_p-free_unique_node_id->nid_a_index);
+					*asp_p+=1;
+
+					decrement_reference_count_of_node_id (free_unique_node_id,&code_gen_node_ids_p->free_node_ids);
+				}
+				return;
+			}
+
+			if (push_node->node_push_symbol->symb_kind==just_symb && push_node->node_arity==node_arity)
+				bits[0]='0';
+			else
+				bits[0]='1';
+
+			label_p=&just_lab;
 			break;
 		case tuple_symb:
 			node_arity=node->node_arity;
@@ -6796,8 +7032,10 @@ void InitCoding (void)
 	for (i=0; i<5; ++i){
 		unboxed_cons_mark[i][0]=0;
 		unboxed_cons_mark[i][1]=0;
+		unboxed_just_mark[i]=0;
 	}
 	unboxed_cons_array_mark=0;
+	unboxed_just_array_mark=0;
 
 	next_update_function_n=0;
 	next_match_function_n=0;

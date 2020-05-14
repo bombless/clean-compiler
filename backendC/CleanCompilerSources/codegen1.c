@@ -101,8 +101,23 @@ LabDef unboxed_cons_array_label = {NULL, "", False, "_Consa", 0};
 
 int unboxed_cons_mark[5][2];
 int unboxed_cons_array_mark;
-
 #endif
+
+LabDef just_lab					= {NULL, "", False, "_Just", 0};
+LabDef justs_lab				= {NULL, "", False, "_Justs", 0};
+LabDef unboxed_just_array_label = {NULL, "", False, "_Justa", 0};
+LabDef unboxed_just_labels[5] = {
+					/*IntObj*/	  {NULL, "", False, "_Justi", 0},
+					/*BoolObj*/	  {NULL, "", False, "_Justb", 0},
+					/*CharObj*/	  {NULL, "", False, "_Justc", 0},
+					/*RealObj*/	  {NULL, "", False, "_Justr", 0},
+					/*FileObj*/	  {NULL, "", False, "_Justf", 0}
+	};
+LabDef nothing_lab				= {NULL, "", False, "_Nothing", 0};
+
+int unboxed_just_mark[5];
+int unboxed_just_array_mark;
+
 #ifdef CLEAN2
 LabDef select_with_dictionary_lab	= {NULL, "", False, "_select_with_dictionary", 0};
 LabDef update_with_dictionary_lab	= {NULL, "", False, "_update_with_dictionary", 0};
@@ -1344,7 +1359,7 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 	return 0;
 }
 
-static void GenUnboxedRecordCons (SymbDef fun_def,struct label *unboxed_record_cons_lab_p)
+static void GenUnboxedRecordConsOrJust (SymbDef fun_def,struct label *unboxed_record_cons_lab_p)
 {
 	int a_size,b_size,maxasize,arity,n_result_nodes_on_a_stack;
 	struct state *rule_type_state_p;
@@ -1392,7 +1407,7 @@ static void GenUnboxedRecordCons (SymbDef fun_def,struct label *unboxed_record_c
 		GenPE();
 }
 
-static void GenUnboxedRecordDecons (SymbDef fun_def)
+static void GenUnboxedRecordDeconsOrFromJust (SymbDef fun_def)
 {
 	LabDef ealab;
 	int a_size,b_size,maxasize,arity,n_result_nodes_on_a_stack;
@@ -1490,9 +1505,10 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,i
 	*b_size_p=bsize;
 }
 
-#if STRICT_LISTS
 extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
+extern PolyList unboxed_record_just_list,unboxed_record_from_just_list;
 
+#if STRICT_LISTS
 void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 {
 	PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
@@ -1515,12 +1531,12 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 				unboxed_record_cons_lab.lab_issymbol=True;
 			} else {
 				unboxed_record_cons_lab.lab_name=type_node_arguments_p->type_arg_node->type_node_symbol->ts_def->sdef_name;
-				unboxed_record_cons_lab.lab_issymbol=False;			
+				unboxed_record_cons_lab.lab_issymbol=False;
 			}
 			unboxed_record_cons_lab.lab_pref=tail_strict ? "r_Cons#!" : "r_Cons#";
 			unboxed_record_cons_lab.lab_post='\0';
 			
-			GenUnboxedRecordCons (fun_def,&unboxed_record_cons_lab);
+			GenUnboxedRecordConsOrJust (fun_def,&unboxed_record_cons_lab);
 		}
 	}
 
@@ -1529,10 +1545,47 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 		
 		fun_def=unboxed_record_decons_elem->pl_elem;
 		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
-			GenUnboxedRecordDecons (fun_def);
+			GenUnboxedRecordDeconsOrFromJust (fun_def);
 	}
 }
 #endif
+
+void GenerateCodeForLazyUnboxedRecordMaybeFunctions (void)
+{
+	PolyList unboxed_record_just_elem,unboxed_record_from_just_elem;
+	
+	for_l (unboxed_record_just_elem,unboxed_record_just_list,pl_next){
+		SymbDef fun_def;
+		
+		fun_def=unboxed_record_just_elem->pl_elem;
+		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK)){
+			SymbDef record_sdef;
+			LabDef unboxed_record_just_lab;
+			
+			record_sdef=fun_def->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments->type_arg_node->type_node_symbol->ts_def;
+			if (ExportLocalLabels){
+				unboxed_record_just_lab.lab_mod=CurrentModule;
+				unboxed_record_just_lab.lab_symbol=record_sdef;
+				unboxed_record_just_lab.lab_issymbol=True;
+			} else {
+				unboxed_record_just_lab.lab_name=record_sdef->sdef_name;
+				unboxed_record_just_lab.lab_issymbol=False;
+			}
+			unboxed_record_just_lab.lab_pref="r_Just#";
+			unboxed_record_just_lab.lab_post='\0';
+
+			GenUnboxedRecordConsOrJust (fun_def,&unboxed_record_just_lab);
+		}
+	}
+
+	for_l (unboxed_record_from_just_elem,unboxed_record_from_just_list,pl_next){
+		SymbDef fun_def;
+		
+		fun_def=unboxed_record_from_just_elem->pl_elem;
+		if (fun_def->sdef_mark & (SDEF_USED_LAZILY_MASK | SDEF_USED_CURRIED_MASK))
+			GenUnboxedRecordDeconsOrFromJust (fun_def);
+	}
+}
 
 extern PolyList UserDefinedArrayFunctions;
 
@@ -1564,6 +1617,7 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 #if STRICT_LISTS
 	PolyList unboxed_record_cons_element;
 #endif
+	PolyList unboxed_record_just_element;
 	
 	n_types = mfts.mfts_n_types;
 	type_symbol_a = mfts.mfts_type_symbol_a;
@@ -1655,6 +1709,17 @@ void GenerateCodeForConstructorsAndRecords (struct module_function_and_type_symb
 		GenUnboxedConsRecordDescriptor (record_sdef,tail_strict);
 	}
 #endif
+
+	for_l (unboxed_record_just_element,unboxed_record_just_list,pl_next){
+		SymbDef cons_instance_sdef,record_sdef;
+		TypeArgs type_node_arguments_p;
+		
+		cons_instance_sdef=unboxed_record_just_element->pl_elem;
+		type_node_arguments_p=cons_instance_sdef->sdef_rule_type->rule_type_rule->type_alt_lhs_arguments;
+		record_sdef=type_node_arguments_p->type_arg_node->type_node_symbol->ts_def;
+		
+		GenUnboxedJustRecordDescriptor (record_sdef);
+	}
 }
 
 Bool NodeEntry (StateS *const function_state_p,int arity,Label ealab,SymbDef rootsymb)
@@ -2841,9 +2906,9 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 
 		if (strict_constructor){
 #if STRICT_LISTS
-			if (constructor_symbol->symb_kind==cons_symb && (constructor_symbol->symb_head_strictness>1 || constructor_symbol->symb_tail_strictness)){
-				if (constructor_symbol->symb_head_strictness>1){
-					if (constructor_symbol->symb_head_strictness==4)
+			if (constructor_symbol->symb_kind==cons_symb && (constructor_symbol->symb_head_strictness>OVERLOADED_CONS || constructor_symbol->symb_tail_strictness)){
+				if (constructor_symbol->symb_head_strictness>OVERLOADED_CONS){
+					if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
 						head_and_tail_states[0]=*constructor_symbol->symb_state_p;
 					else
 						head_and_tail_states[0]=StrictState;
@@ -2858,6 +2923,15 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 				constructor_arg_state_p=head_and_tail_states;
 			} else
 #endif
+			if (constructor_symbol->symb_kind==just_symb && constructor_symbol->symb_head_strictness>OVERLOADED_CONS){
+				if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
+					head_and_tail_states[0]=*constructor_symbol->symb_state_p;
+				else
+					head_and_tail_states[0]=StrictState;
+				
+				constructor_arg_state_p=head_and_tail_states;
+			} else
+
 			constructor_arg_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p;
 		}
 
@@ -3564,17 +3638,39 @@ void generate_is_constructor (ImpRuleP rule)
 
 	case_node = rule->rule_alts->alt_rhs_root->node_arguments->arg_node;
 
-	if (case_node->node_symbol->symb_kind==nil_symb)
-		GenEqDesc (&nil_lab,case_node->node_arity,0);
-	else if (case_node->node_symbol->symb_kind==cons_symb){
-		struct symbol *symbol;
-		
-		symbol=case_node->node_symbol;
-		if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
-			GenEqDesc (&nil_lab,0,0);
-			GenNotB();
-		} else
-			GenEqDesc (&cons_lab,case_node->node_arity,0);
+	if (IsOverloadedConstructor (case_node->node_symbol->symb_kind)){
+		switch (case_node->node_symbol->symb_kind){
+			case nil_symb:
+				GenEqDesc (&nil_lab,case_node->node_arity,0);
+				break;
+			case cons_symb:
+			{
+				struct symbol *symbol;
+				
+				symbol=case_node->node_symbol;
+				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
+					GenEqDesc (&nil_lab,0,0);
+					GenNotB();
+				} else
+					GenEqDesc (&cons_lab,case_node->node_arity,0);
+				break;
+			}
+			case nothing_symb:
+				GenEqDesc (&nothing_lab,case_node->node_arity,0);
+				break;
+			case just_symb:
+			{
+				struct symbol *symbol;
+				
+				symbol=case_node->node_symbol;
+				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
+					GenEqDesc (&nothing_lab,0,0);
+					GenNotB();
+				} else
+					GenEqDesc (&just_lab,case_node->node_arity,0);
+				break;
+			}
+		}
 	} else {
 		SymbDef sdef;
 		sdef=case_node->node_symbol->symb_def;
@@ -4019,7 +4115,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								matches_always=1;
 							} else {
 #if STRICT_LISTS
-								if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
+								if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
 									GenEqDesc (&nil_lab,0,asp-a_index);
 									GenJmpFalse (&case_label);
 								} else
@@ -4036,6 +4132,29 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								matches_always=1;
 							} else {
 								GenEqDesc (&nil_lab,case_node->node_arity,asp-a_index);
+								GenJmpTrue (&case_label);
+							}
+							break;
+						case just_symb:
+							if (case_number==1){
+								GenJmp (&case_label);
+								matches_always=1;
+							} else {
+								if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
+									GenEqDesc (&nothing_lab,0,asp-a_index);
+									GenJmpFalse (&case_label);
+								} else {
+									GenEqDesc (&just_lab,case_node->node_arity,asp-a_index);
+									GenJmpTrue (&case_label);
+								}
+							}
+							break;
+						case nothing_symb:
+							if (case_number==1){
+								GenJmp (&case_label);
+								matches_always=1;
+							} else {
+								GenEqDesc (&nothing_lab,case_node->node_arity,asp-a_index);
 								GenJmpTrue (&case_label);
 							}
 							break;
@@ -4489,8 +4608,7 @@ int unused_node_id_ (NodeId node_id)
 	return False;
 }
 
-#if STRICT_LISTS
-static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
+static void repl_overloaded_cons_or_just_arguments (NodeP node_p,int *asp_p,int *bsp_p,SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
 {
 	CodeGenNodeIdsS code_gen_node_ids;
 	
@@ -4500,7 +4618,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 	code_gen_node_ids.a_node_ids=ab_node_ids_p->a_node_ids;
 	code_gen_node_ids.b_node_ids=ab_node_ids_p->b_node_ids;
 	code_gen_node_ids.doesnt_fail=0;
-	
+
 	Build (node_p->node_decons_node,asp_p,bsp_p,&code_gen_node_ids);
 
 	*asp_p -= 2;
@@ -4539,7 +4657,7 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
 											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
 
-			if (member_states_of_field[-1].state_type==TupleState){
+			if (node_p->node_push_symbol->symb_kind==just_symb || member_states_of_field[-1].state_type==TupleState){
 				int a_size,b_size;
 
 				DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
@@ -4556,9 +4674,9 @@ static void repl_overloaded_cons_arguments (NodeP node_p,int *asp_p,int *bsp_p,S
 
 	GenJsrAp (1);
 
-	GenReplArgs (2,2);
+	if (node_p->node_push_symbol->symb_kind==cons_symb)
+		GenReplArgs (2,2);
 }
-#endif
 
 static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *esc_p,NodeDefs defs,StateP result_state_p,
 										SavedNidStateS **save_states_p,AbNodeIdsP ab_node_ids_p)
@@ -4705,9 +4823,9 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 			if (node_id_p->nid_a_index==asp){
 				if (b_size==0){
 #if STRICT_LISTS
-					if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
-						repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
-					} else
+					if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1))
+						repl_overloaded_cons_or_just_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+					else
 #endif
 					GenReplArgs (a_size,a_size);
 				} else
@@ -4731,15 +4849,13 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 				--asp;
 			} else {
 				if (b_size==0){
-#if STRICT_LISTS
-					if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
+					if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1)){
 						GenPushA (asp-node_id_p->nid_a_index);
 						++asp;
 						
-						repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+						repl_overloaded_cons_or_just_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
 					} else
-#endif
-					GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
+						GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
 				} else
 					GenPushRArgs (asp-node_id_p->nid_a_index,a_size,b_size);
 				
@@ -4750,11 +4866,11 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 		} else {
 			if (b_size==0){
 #if STRICT_LISTS
-				if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1)){
+				if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1)){
 					GenPushA (asp-node_id_p->nid_a_index);
 					++asp;
 						
-					repl_overloaded_cons_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+					repl_overloaded_cons_or_just_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
 				} else
 #endif
 				GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);

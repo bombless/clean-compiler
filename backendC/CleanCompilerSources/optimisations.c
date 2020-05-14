@@ -566,10 +566,8 @@ static Node copy_root_node (Node old)
 					new_push_node_arg_1->arg_node = copy_node (push_node_arg_1->arg_node,False);
 					new_push_node_arg_2->arg_node = copy_root_node (push_node_arg_2_node);
 					
-#if STRICT_LISTS
-					if (new_push_node->node_push_symbol->symb_kind==cons_symb && (new_push_node->node_push_symbol->symb_head_strictness & 1))
+					if (IsOverloadedConsOrJust (new_push_node->node_push_symbol->symb_kind) && (new_push_node->node_push_symbol->symb_head_strictness & 1))
 						new_push_node->node_decons_node=copy_node (new_push_node->node_decons_node,False);
-#endif
 				} else {
 					copy_nodes_of_node_defs (new_case_node_p->node_node_defs,False);
 					new_case_node_arg_p->arg_node = copy_root_node (case_node_arg_p->arg_node);
@@ -1573,7 +1571,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					call_state_p=&node_id->nid_node->node_state;
 			} else if (arg_node->node_kind==NormalNode){
 #ifdef STRICT_STATE_FOR_LAZY_TUPLE_CONSTRUCTORS
-				if (BETWEEN (tuple_symb,nil_symb,arg_node->node_symbol->symb_kind)
+				if (BETWEEN (tuple_symb,nothing_symb,arg_node->node_symbol->symb_kind)
 					&& arg_node->node_state.state_type==SimpleState && arg_node->node_state.state_kind==OnA)
 				{
 					call_state_p=&StrictState;
@@ -2218,11 +2216,10 @@ static void optimise_normal_node (Node node)
 #else
 		if ((BETWEEN (int_denot,real_denot,symbol->symb_kind)
 			 || symbol->symb_kind==string_denot
-# if STRICT_LISTS
-			 || (BETWEEN (tuple_symb,nil_symb,symbol->symb_kind) && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)))
-# else
-			 || BETWEEN (tuple_symb,nil_symb,symbol->symb_kind)
-# endif
+			 || (BETWEEN (tuple_symb,nothing_symb,symbol->symb_kind)
+				 && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness))
+				 && !(symbol->symb_kind==just_symb && (symbol->symb_head_strictness>1))
+				 )
 			) && node->node_state.state_kind==OnA){
 #endif
 			node->node_state.state_kind=StrictOnA;
@@ -2863,19 +2860,33 @@ static Bool try_insert_constructor_update_node (NodeP node,FreeUniqueNodeIdsP *f
 				if (node->node_symbol->symb_head_strictness>1 || node->node_symbol->symb_tail_strictness){
 					if (!IsLazyStateKind (node->node_state.state_kind) && !(node->node_symbol->symb_head_strictness & 1) && node->node_arity==2){
 						if (node->node_symbol->symb_head_strictness!=4)
-							return insert_unique_fill_node (node,f_node_ids,2,0);			
+							return insert_unique_fill_node (node,f_node_ids,2,0);
 						else {
 							int a_size,b_size;
 
 							DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
-															
 							return insert_unique_fill_node (node,f_node_ids,a_size,b_size);
 						}
 					} else
 						return False;
 				} else
 #endif
-				return insert_unique_fill_node (node,f_node_ids,2,0);
+					return insert_unique_fill_node (node,f_node_ids,2,0);
+			case just_symb:
+				if (node->node_symbol->symb_head_strictness>1){
+					if (!IsLazyStateKind (node->node_state.state_kind) && !(node->node_symbol->symb_head_strictness & 1) && node->node_arity==1){
+						if (node->node_symbol->symb_head_strictness!=4)
+							return insert_unique_fill_node (node,f_node_ids,1,0);
+						else {
+							int a_size,b_size;
+
+							DetermineSizeOfArguments (node->node_arguments,&a_size,&b_size);
+							return insert_unique_fill_node (node,f_node_ids,a_size,b_size);
+						}
+					} else
+						return False;
+				} else
+					return insert_unique_fill_node (node,f_node_ids,1,0);
 			case tuple_symb:
 				return insert_unique_fill_node (node,f_node_ids,node->node_arity,0);
 		}
@@ -3565,10 +3576,8 @@ static FreeUniqueNodeIdsP check_unique_push_node (NodeP node,FreeUniqueNodeIdsP 
 {
 	NodeIdP node_id_p;
 
-# if STRICT_LISTS
-	if (node->node_push_symbol->symb_kind==cons_symb && (node->node_push_symbol->symb_head_strictness & 1))
+	if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1))
 		return f_node_ids;
-#endif
 
 	node_id_p=node->node_arguments->arg_node->node_node_id;
 
@@ -3923,7 +3932,28 @@ static void ExamineSymbolApplication (struct node *node)
 					if (BETWEEN (IntObj,FileObj,unboxed_cons_state_p->state_object))
 						unboxed_cons_mark[unboxed_cons_state_p->state_object-IntObj][symbol->symb_tail_strictness] |= mark;
 				} else if (unboxed_cons_state_p->state_type==ArrayState){
-					unboxed_cons_array_mark |= mark;				
+					unboxed_cons_array_mark |= mark;
+				}
+			}
+		} else if (symbol->symb_kind==just_symb && symbol->symb_head_strictness==4){
+			if (node->node_arity<2)
+				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
+			else {
+				StateP unboxed_cons_state_p;
+				int mark;
+				
+				if (IsLazyState (node->node_state)){
+					symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_LAZILY_MASK;
+					mark = SDEF_USED_LAZILY_MASK;
+				} else {
+					mark = SDEF_USED_STRICTLY_MASK;
+				}
+				unboxed_cons_state_p = symbol->symb_unboxed_cons_state_p;
+				if (unboxed_cons_state_p->state_type==SimpleState){
+					if (BETWEEN (IntObj,FileObj,unboxed_cons_state_p->state_object))
+						unboxed_just_mark[unboxed_cons_state_p->state_object-IntObj] |= mark;
+				} else if (unboxed_cons_state_p->state_type==ArrayState){
+					unboxed_just_array_mark |= mark;
 				}
 			}
 		} else if (symbol->symb_kind==seq_symb){

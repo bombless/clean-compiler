@@ -3213,6 +3213,59 @@ void GenUnboxedConsRecordDescriptor (SymbDef sdef,int tail_strict)
 }
 #endif
 
+void GenUnboxedJustRecordDescriptor (SymbDef sdef)
+{
+	int asize,bsize,has_unboxed_record;
+	char *name,*unboxed_record_cons_prefix;
+
+	asize=0;
+	bsize=0;
+	if (sdef->sdef_record_state.state_type==RecordState)
+		has_unboxed_record = AddSizeOfStatesAndImportRecords (sdef->sdef_record_state.state_arity,sdef->sdef_record_state.state_record_arguments,&asize,&bsize);
+	else
+		has_unboxed_record = AddSizeOfStateAndImportRecords (sdef->sdef_record_state,&asize,&bsize);
+
+	name = sdef->sdef_name;
+	
+	unboxed_record_cons_prefix="r_Just#";
+	
+	if (ExportLocalLabels){
+		put_directive (Dexport);
+		put_space_label_module_prefix_name (CurrentModule,unboxed_record_cons_prefix,name);
+		put_directive (Drecord);
+		put_space_label_module_prefix_name (CurrentModule,unboxed_record_cons_prefix,name);
+	} else {
+		put_directive_ (Drecord);
+		PutSSOutFile (unboxed_record_cons_prefix,name);
+	}
+
+	PutCOutFile (' ');
+
+	GenABStackElemsOfRecord (sdef->sdef_record_state);
+
+	put_arguments_nn_b (asize,bsize);
+	if (has_unboxed_record)
+		GenUnboxedRecordLabelsReversedForRecord (sdef->sdef_record_state);
+	
+	if (!sdef->sdef_exported && sdef->sdef_module==CurrentModule && !ExportLocalLabels){
+		if (DoDebug)
+			PutSSOutFile (" " R_PREFIX,name);
+		else
+			PutSUOutFile (" " R_PREFIX,sdef->sdef_number);
+	} else
+		put_space_label_module_r_name (sdef->sdef_module,name);
+
+	if (ExportLocalLabels){
+		PutSOutFile (" \"_Just#");
+		PutSOutFile (name);
+		PutSOutFile ("\"");
+	} else {
+		PutSOutFile (" \"+?#");
+		PutSOutFile (name);
+		PutSOutFile ("\"");
+	}
+}
+
 void GenStrictConstructorDescriptor (SymbDef sdef,StateP constructor_arg_states)
 {
 	int asize,bsize,state_arity,arg_n,has_unboxed_record;

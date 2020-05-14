@@ -254,7 +254,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 	}
 
 	if ((state_p->state_mark & STATE_UNIQUE_MASK) && state_p->state_type==SimpleState){
-		if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || 
+		if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==maybe_type || type_symbol->ts_kind==tuple_type || 
 			(type_symbol->ts_kind==type_definition && (type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE)))
 		{
 			unsigned long unq_type_args;
@@ -694,8 +694,8 @@ static void determine_unique_state_of_constructor_argument (StateP result_state_
 			
 			type_symbol=type_arg_node->type_node_symbol;
 
-			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || (type_symbol->ts_kind==type_definition && 
-				(type_symbol->symb_def->sdef_kind==TYPE || type_symbol->symb_def->sdef_kind==RECORDTYPE)))
+			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==maybe_type || type_symbol->ts_kind==tuple_type ||
+				(type_symbol->ts_kind==type_definition && (type_symbol->symb_def->sdef_kind==TYPE || type_symbol->symb_def->sdef_kind==RECORDTYPE)))
 			{
 				unsigned long unq_type_args;
 				TypeArgs type_arg;
@@ -769,8 +769,8 @@ static StateP determine_unique_state_of_constructor_argument
 			
 			type_symbol=type_arg_node->type_node_symbol;
 
-			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==tuple_type || (type_symbol->ts_kind==type_definition && 
-				(type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE)))
+			if (type_symbol->ts_kind==list_type || type_symbol->ts_kind==maybe_type || type_symbol->ts_kind==tuple_type ||
+				(type_symbol->ts_kind==type_definition && (type_symbol->ts_def->sdef_kind==TYPE || type_symbol->ts_def->sdef_kind==RECORDTYPE)))
 			{
 				unsigned long unq_type_args;
 				TypeArgs type_arg;
@@ -979,6 +979,25 @@ static void GenStatesInLhsNode (Node node,StateP arg_state_p)
 			if (arg_node!=NULL)
 				GenStatesInLhsNode (arg_node,&arg->arg_state);
 		
+			return;
+		} else if (symbol->symb_kind==just_symb && (arg_state_p->state_mark & STATE_UNIQUE_MASK) && node->node_arity==1){
+			Node arg_node;
+
+			arg=node->node_arguments;
+			
+			arg->arg_state=LazyState;
+			if ((arg_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) && (arg_state_p->state_unq_type_args & 1)){
+				arg->arg_state.state_mark |= STATE_UNIQUE_MASK;
+			}
+
+			arg_node=arg->arg_node;
+			if (arg_node->node_kind==NodeIdNode){
+				arg_node->node_node_id->nid_lhs_state_p_=&arg->arg_state;
+				arg_node=arg_node->node_node_id->nid_node;
+			}
+			if (arg_node!=NULL)
+				GenStatesInLhsNode (arg_node,&arg->arg_state);
+
 			return;
 		} else if (symbol->symb_kind==tuple_symb && (arg_state_p->state_mark & STATE_UNIQUE_MASK)){
 			int i;
@@ -1247,9 +1266,8 @@ void ExamineTypesAndLhsOfSymbolDefinition (SymbDef def)
 	}
 }
 
-#if STRICT_LISTS
 extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
-#endif
+extern PolyList unboxed_record_just_list,unboxed_record_from_just_list;
 
 void ExamineTypesAndLhsOfSymbols
 	(struct module_function_and_type_symbols mfts,int size_dcl_mfts_a,struct module_function_and_type_symbols dcl_mfts_a[],ImpRuleP new_imp_rules)
@@ -1300,17 +1318,20 @@ void ExamineTypesAndLhsOfSymbols
 			if (type_symbol_a[i].ts_kind==type_definition)
 				ExamineTypesAndLhsOfSymbolDefinition (type_symbol_a[i].ts_def);
 	}
-
-#if STRICT_LISTS
 	{
 		PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
+		PolyList unboxed_record_just_elem,unboxed_record_from_just_elem;
 		
 		for_l (unboxed_record_cons_elem,unboxed_record_cons_list,pl_next)
 			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_cons_elem->pl_elem);
 		for_l (unboxed_record_decons_elem,unboxed_record_decons_list,pl_next)
 			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_decons_elem->pl_elem);
+
+		for_l (unboxed_record_just_elem,unboxed_record_just_list,pl_next)
+			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_just_elem->pl_elem);
+		for_l (unboxed_record_from_just_elem,unboxed_record_from_just_list,pl_next)
+			ExamineTypesAndLhsOfSymbolDefinition (unboxed_record_from_just_elem->pl_elem);
 	}
-#endif
 }
 
 PolyList UserDefinedArrayFunctions;
@@ -2076,6 +2097,28 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 
 				SetUnaryState (&node->node_state, StrictOnA, ListObj);
 				break;
+			case just_symb:
+				if (node->node_arity==1){
+					if (rootsymb->symb_head_strictness>1){
+						if (rootsymb->symb_head_strictness==4)
+							parallel = DetermineStrictArgContext (node->node_arguments,*rootsymb->symb_unboxed_cons_state_p,local_scope);
+						else
+							parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+					} else if (ShouldDecrRefCount){
+						DecrRefCountCopiesOfArg (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+					}
+				} else
+					if (ShouldDecrRefCount)
+						DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+
+				SetUnaryState (&node->node_state, StrictOnA, MaybeObj);
+				break;
+			case nothing_symb:
+				if (rootsymb->symb_head_strictness & 1)
+					parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
+
+				SetUnaryState (&node->node_state, StrictOnA, MaybeObj);
+				break;
 			case apply_symb:
 				if (node->node_symbol->symb_instance_apply){ /* if set by optimisations.c */
 					struct symbol_def *field_sdef;
@@ -2660,7 +2703,17 @@ static Bool NodeInASemiStrictContext (Node node,int local_scope)
 						DecrRefCountCopiesOfArg (arg_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
 			}
 #endif
-			else
+			else if (symb->symb_kind==just_symb && node->node_arity==1){
+				ArgP arg_p;
+				
+				arg_p=node->node_arguments;
+				if (symb->symb_head_strictness>1){
+					if (ArgInAStrictContext (arg_p,StrictState,True,local_scope))
+						parallel = True;
+				} else
+					if (ShouldDecrRefCount)
+						DecrRefCountCopiesOfArg (arg_p IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
+			} else
 				DecrRefCountCopiesOfArgs (node->node_arguments IF_OPTIMIZE_LAZY_TUPLE_RECURSION(local_scope));
 
 			if (parallel)
@@ -3158,7 +3211,45 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 								node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
 							} else
 # endif
-							set_lazy_push_node_id_states (node_ids);
+							if (symbol->symb_kind==just_symb){
+# ifdef REUSE_UNIQUE_NODES
+								if ((node_id_state_p->state_mark & STATE_UNIQUE_MASK) && case_alt_node_p->node_arity==1){
+									NodeIdP node_id_p;
+									StateP element_state_p;
+									
+									node_id_p=node_ids->nidl_node_id;
+									node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
+
+									if (symbol->symb_head_strictness>1)
+										if (symbol->symb_head_strictness==4)
+											element_state_p=symbol->symb_state_p;
+										else
+											element_state_p=&StrictState;
+									else
+										element_state_p=&LazyState;
+
+									if ((node_id_state_p->state_mark & STATE_UNIQUE_TYPE_ARGUMENTS_MASK) && (node_id_state_p->state_unq_type_args & 1)){
+										StateP unique_state_p;
+										
+										unique_state_p=CompAllocType (StateS);
+										*unique_state_p=*element_state_p;
+										unique_state_p->state_mark |= STATE_UNIQUE_MASK;
+
+										node_id_p->nid_lhs_state_p_=unique_state_p;
+									} else
+										node_id_p->nid_lhs_state_p_=element_state_p;
+								} else
+#endif
+								if (symbol->symb_head_strictness>1 && case_alt_node_p->node_arity==1){
+									NodeIdP node_id_p;
+								
+									node_id_p=node_ids->nidl_node_id;
+									node_id_p->nid_lhs_state_p_= symbol->symb_head_strictness>1 ? (symbol->symb_head_strictness==4 ? symbol->symb_state_p : &StrictState) : &LazyState;
+									node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
+								} else
+									set_lazy_push_node_id_states (node_ids);
+							} else
+								set_lazy_push_node_id_states (node_ids);
 						}
 					}
 					
@@ -3328,7 +3419,7 @@ static void mark_is_constructor_function (ImpRuleP rule)
 
 					symbol=case_node->node_symbol;
 					if (((symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR) ||
-						 symbol->symb_kind==nil_symb || symbol->symb_kind==cons_symb) &&
+						 IsOverloadedConstructor (symbol->symb_kind)) &&
 						case_node->node_node_defs==NULL &&
 						case_rhs_node->node_kind==NormalNode && case_rhs_node->node_symbol->symb_kind==bool_denot &&
 						case_rhs_node->node_symbol->symb_bool==True)
@@ -3557,6 +3648,8 @@ static int get_symbol_arity_or_zero (SymbolP symbol_p)
 		}
 		case cons_symb:
 			return 2;
+		case just_symb:
+			return 1;
 		case if_symb:
 			return 3;
 	}
@@ -4559,6 +4652,7 @@ void InitStatesGen (void)
 	SetUnaryState (& BasicTypeSymbolStates[packed_array_type], StrictOnA, PackedArrayObj);
 	SetUnaryState (& BasicTypeSymbolStates[fun_type], StrictOnA, UnknownObj);
 	SetUnaryState (& BasicTypeSymbolStates[list_type], StrictOnA, ListObj);
+	SetUnaryState (& BasicTypeSymbolStates[maybe_type], StrictOnA, MaybeObj);
 	SetUnaryState (& BasicTypeSymbolStates[tuple_type], StrictOnA, TupleObj);
 #ifdef CLEAN2
 	SetUnaryState (& BasicTypeSymbolStates[dynamic_type], StrictOnA, DynamicObj);

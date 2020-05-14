@@ -21,13 +21,15 @@ extern LabDef
 #if STRICT_LISTS
 	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[5][2],unboxed_cons_array_label,
 #endif
-#ifdef CLEAN2
+	just_lab, justs_lab, unboxed_just_array_label, unboxed_just_labels[5], nothing_lab,
 	select_with_dictionary_lab, update_with_dictionary_lab,
-#endif
 	CurrentAltLabel;
 
 extern int unboxed_cons_mark[5][2];
 extern int unboxed_cons_array_mark;
+
+extern int unboxed_just_mark[5];
+extern int unboxed_just_array_mark;
 
 extern Label ReduceError;
 
@@ -107,8 +109,9 @@ extern Bool ConvertExternalToInternalCall (int arity,StateS *const ext_function_
 extern void GenerateCodeForLazyTupleSelectorEntries (Bool *selectors);
 extern void GenerateCodeForLazyArrayFunctionEntries (void);
 #if STRICT_LISTS
-void GenerateCodeForLazyUnboxedRecordListFunctions (void);
+extern void GenerateCodeForLazyUnboxedRecordListFunctions (void);
 #endif
+extern void GenerateCodeForLazyUnboxedRecordMaybeFunctions (void);
 extern int next_update_function_n,next_match_function_n;
 
 extern ImpRuleS *first_update_function,**update_function_p;
