@@ -276,7 +276,8 @@ backEndConvertModulesH predefs {fe_icl =
 				icl_imported_objects, icl_foreign_exports, icl_used_module_numbers, icl_modification_time},
 	fe_components, fe_dcls,
 	fe_iaci = { iaci_array_and_list_instances
-				= {ali_array_first_instance_indices,ali_list_first_instance_indices,ali_tail_strict_list_first_instance_indices},
+				= {ali_array_first_instance_indices,ali_list_first_instance_indices,
+					ali_tail_strict_list_first_instance_indices,ali_unboxed_maybe_first_instance_indices},
 				iaci_start_index_generic_classes, iaci_not_exported_generic_classes }
 	}
 	main_dcl_module_n type_var_heap backEnd
@@ -303,6 +304,8 @@ backEndConvertModulesH predefs {fe_icl =
 
 	# (old_cons_vi,cons_vi_ptr,var_heap)
 		= remove_VI_ExpandedMemberType_of_List_cons fe_dcls main_dcl_module_n icl_used_module_numbers predefs backEnd.bes_varHeap
+	  (old_just_vi,just_vi_ptr,var_heap)
+		= remove_VI_ExpandedMemberType_of_Maybe_cJust fe_dcls main_dcl_module_n icl_used_module_numbers predefs var_heap
 	  backEnd & bes_varHeap = var_heap
 
 	#! (type_var_heap,backEnd)
@@ -310,7 +313,9 @@ backEndConvertModulesH predefs {fe_icl =
 	#! (type_var_heap,backEnd)
 		=	defineOtherDclModules fe_dcls main_dcl_module_n icl_used_module_numbers type_var_heap backEnd
 
-	# backEnd & bes_varHeap = restore_VI_ExpandedMemberType_of_List_cons old_cons_vi cons_vi_ptr backEnd.bes_varHeap
+	# backEnd & bes_varHeap
+		= restore_VI_ExpandedMemberType old_cons_vi cons_vi_ptr
+		 (restore_VI_ExpandedMemberType old_just_vi just_vi_ptr backEnd.bes_varHeap)
 
 	#! backEnd
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) backEnd
@@ -322,11 +327,13 @@ backEndConvertModulesH predefs {fe_icl =
 	#! backEnd
 		= declareGeneratedUnboxedRecordInstances
 			ali_array_first_instance_indices ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices
-			predefs main_dcl_module_n icl_functions fe_dcls backEnd
+			ali_unboxed_maybe_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		=	adjustArrayFunctions ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers backEnd
 	#! backEnd
 		=	adjustStrictListFunctions ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd
+	#! backEnd
+		=	adjustStrictMaybeFunctions ali_unboxed_maybe_first_instance_indices predefs fe_dcls icl_used_module_numbers main_dcl_module_n backEnd
 	#! (rules, backEnd)
 		=	convertRules [(index, icl_functions.[index]) \\ (_, index) <- functionIndices] main_dcl_module_n predefined_idents.[PD_DummyForStrictAliasFun] (backEnd -*-> "convertRules")
 	# backEnd
@@ -414,6 +421,19 @@ remove_VI_ExpandedMemberType_of_List_cons dcls main_dcl_module_n icl_used_module
 		= abort "error in function remove_VI_ExpandedMemberType_of_List_cons"
 	= remove_VI_ExpandedMemberType sd_type_ptr var_heap
 
+remove_VI_ExpandedMemberType_of_Maybe_cJust :: !{#DclModule} !Int !NumberSet !PredefinedSymbols !*VarHeap -> (!VarInfo,!VarInfoPtr,!*VarHeap)
+remove_VI_ExpandedMemberType_of_Maybe_cJust dcls main_dcl_module_n icl_used_module_numbers predefs var_heap
+	# std_strict_maybe_module_index = predefs.[PD_StdStrictMaybes].pds_def
+	| std_strict_maybe_module_index==NoIndex || std_strict_maybe_module_index==main_dcl_module_n
+			|| not (inNumberSet std_strict_maybe_module_index icl_used_module_numbers)
+		= (VI_Empty,nilPtr,var_heap)
+	# {com_selector_defs,com_type_defs} = dcls.[std_strict_maybe_module_index].dcl_common
+	// _cons is the first selector in _SystemStrictLists
+	# {sd_type_ptr,sd_ident,sd_type_index} = com_selector_defs.[0]
+	| sd_ident.id_name<>"_cJust" || com_type_defs.[sd_type_index].td_ident.id_name<>"Maybe;"
+		= abort "error in function remove_VI_ExpandedMemberType_of_Maybe_cJust"
+	= remove_VI_ExpandedMemberType sd_type_ptr var_heap
+
 remove_VI_ExpandedMemberType :: !VarInfoPtr !*VarHeap -> (!VarInfo,!VarInfoPtr,!*VarHeap)
 remove_VI_ExpandedMemberType sd_type_ptr var_heap
 	# (old_cons_vi,var_heap) = readPtr sd_type_ptr var_heap
@@ -424,8 +444,8 @@ remove_VI_ExpandedMemberType sd_type_ptr var_heap
 		_
 			-> (VI_Empty,nilPtr,var_heap)
 
-restore_VI_ExpandedMemberType_of_List_cons :: !VarInfo !VarInfoPtr !*VarHeap -> *VarHeap
-restore_VI_ExpandedMemberType_of_List_cons old_cons_vi cons_vi_ptr var_heap
+restore_VI_ExpandedMemberType :: !VarInfo !VarInfoPtr !*VarHeap -> *VarHeap
+restore_VI_ExpandedMemberType old_cons_vi cons_vi_ptr var_heap
 	| isNilPtr cons_vi_ptr
 		= var_heap
 		= writePtr cons_vi_ptr old_cons_vi var_heap
@@ -641,13 +661,15 @@ folds op l r :== folds l r
 
 declareGeneratedUnboxedRecordInstances
 		ali_array_first_instance_indices ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices
-		predefs main_dcl_module_n icl_functions fe_dcls backEnd
+		ali_unboxed_maybe_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		= declareGeneratedUnboxedRecordInstancesOfClass ali_array_first_instance_indices PD_StdArray PD_ArrayClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		= declareGeneratedUnboxedRecordInstancesOfClass ali_list_first_instance_indices PD_StdStrictLists PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		= declareGeneratedUnboxedRecordInstancesOfClass ali_tail_strict_list_first_instance_indices PD_StdStrictLists PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		= declareGeneratedUnboxedRecordInstancesOfClass ali_unboxed_maybe_first_instance_indices PD_StdStrictMaybes PD_UMaybeClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	= backEnd
 
 declareGeneratedUnboxedRecordInstancesOfClass :: [Int] Int Int PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
@@ -1090,8 +1112,10 @@ predefineSymbols {dcl_common} predefs
 	=	appBackEnd (BEDeclarePredefinedModule (size dcl_common.com_type_defs) (size dcl_common.com_cons_defs))
 	o`	foldState predefine_list_type list_types
 	o`	foldState predefineType types
+	o`	foldState predefine_maybe_type maybe_types
 	o`	foldState predefine_list_constructor list_constructors
 	o`	foldState predefineConstructor constructors
+	o`	foldState predefine_maybe_constructor maybe_constructors
 	o`	define_unit_type
 	where
 		list_types :: [(Int,Int,Int)]
@@ -1154,6 +1178,33 @@ predefineSymbols {dcl_common} predefs
 			| predefs.[index].pds_def == NoIndex
 				=	abort "backendconvert, predefineSymbols predef is not a constructor"
 			=	appBackEnd (BEPredefineConstructorSymbol arity predefs.[index].pds_def cPredefinedModuleIndex symbolKind)
+
+		maybe_types :: [(Int,Int)]
+		maybe_types = [(PD_MaybeType,0), (PD_StrictMaybeType,2), (PD_UnboxedMaybeType,3)]
+
+		predefine_maybe_type (index,head_strictness)
+			# pds_def = predefs.[index].pds_def
+			| pds_def == NoIndex
+				=	abort "backendconvert, predefineSymbols predef is not a type"
+			=	appBackEnd (BEPredefineMaybeTypeSymbol pds_def cPredefinedModuleIndex head_strictness)
+
+		maybe_constructors :: [(Int,BESymbKind,Int)]
+		maybe_constructors
+			=	[	(PD_NothingSymbol, BENothingSymb,0),
+					(PD_StrictNothingSymbol, BENothingSymb,2),
+					(PD_UnboxedNothingSymbol, BENothingSymb,4/*3*/),
+					(PD_OverloadedNothingSymbol, BENothingSymb,0),
+					(PD_JustSymbol, BEJustSymb,0),
+					(PD_StrictJustSymbol, BEJustSymb,2),
+					(PD_UnboxedJustSymbol, BEJustSymb,3),
+					(PD_OverloadedJustSymbol, BEJustSymb,1)
+				]
+
+		predefine_maybe_constructor (index,symbolKind,head_strictness)
+			# pds_def = predefs.[index].pds_def
+			| pds_def == NoIndex
+				=	abort "backendconvert, predefineSymbols predef is not a constructor"
+			= appBackEnd (BEPredefineMaybeConstructorSymbol pds_def cPredefinedModuleIndex symbolKind head_strictness)
 
 		define_unit_type
 			# constructor_symbol_be_f = BEConstructorSymbol predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex
@@ -1269,6 +1320,66 @@ where
 		  backend = BEAdjustUnboxedListDeconsInstance (index+1) main_dcl_module_n backend
 		  (r1,backend) = BESetDictionaryFieldOfMember (index+1) rt_fields.[1].fs_index std_strict_list_module_index backend
 		= adjustRecordListInstances indices rt_fields backend
+
+adjustStrictMaybeFunctions :: [Int] {#PredefinedSymbol} {#DclModule} NumberSet Int *BackEndState -> *BackEndState;
+adjustStrictMaybeFunctions maybe_unboxed_first_instance_indices predefs dcls used_module_numbers main_dcl_module_n backEnd
+	| std_strict_maybes_module_index==NoIndex || not (inNumberSet std_strict_maybes_module_index used_module_numbers)
+		|| std_strict_maybes_module_index==main_dcl_module_n
+		= backEnd
+		# std_strict_maybes_instances=std_strict_maybes.dcl_common.com_instance_defs
+		# backEnd = adjust_strict_maybe_instances 0 std_strict_maybes_instances backEnd
+		# std_strict_maybes_nothing_functions=std_strict_maybes.dcl_functions
+		# first_instance_index=std_strict_maybes.dcl_instances.ir_from;
+		# backEnd=adjust_overloaded_nothing_functions 0 first_instance_index std_strict_maybes_nothing_functions backEnd
+
+		# std_maybe_common_defs = std_strict_maybes.dcl_common
+		  indexUMaybeClass = predefs.[PD_UMaybeClass].pds_def
+		  dictionaryIndexUMaybeClass = std_maybe_common_defs.com_class_defs.[indexUMaybeClass].class_dictionary.ds_index
+		  (RecordType {rt_fields}) = std_maybe_common_defs.com_type_defs.[dictionaryIndexUMaybeClass].td_rhs
+
+		= appBackEnd (adjustRecordMaybeInstances maybe_unboxed_first_instance_indices rt_fields) backEnd
+where
+	std_strict_maybes=dcls.[std_strict_maybes_module_index]
+	std_strict_maybes_module_index=predefs.[PD_StdStrictMaybes].pds_def
+
+	adjust_strict_maybe_instances i instances backEnd
+		| i<size instances
+			# instance_i = instances.[i]
+			| instance_i.ins_type.it_context=:[]
+				# backEnd = adjust_strict_maybe_members 0 instance_i.ins_members backEnd
+				= adjust_strict_maybe_instances (i+1) instances backEnd
+				= adjust_strict_maybe_instances (i+1) instances backEnd
+			= backEnd
+	where
+		adjust_strict_maybe_members i members backEnd
+			| i<size members
+				# member=members.[i]
+				# member_name=member.cim_ident.id_name
+				| size member_name>1 && member_name.[1]=='c'
+					# (ft_type,backEnd) = read_from_var_heap std_strict_maybes.dcl_functions.[member.cim_index].ft_type_ptr backEnd
+					= case ft_type of
+						VI_ExpandedType _
+							# backEnd=appBackEnd (BEAdjustStrictJustInstance member.cim_index std_strict_maybes_module_index) backEnd
+							-> adjust_strict_maybe_members (i+1) members backEnd
+						_
+							-> adjust_strict_maybe_members (i+1) members backEnd
+					= adjust_strict_maybe_members (i+1) members backEnd
+				= backEnd
+
+	adjust_overloaded_nothing_functions function_index first_instance_index std_strict_maybes_nothing_functions backEnd
+		| function_index<first_instance_index
+			# backEnd = appBackEnd (BEAdjustOverloadedNothingFunction function_index std_strict_maybes_module_index) backEnd
+			= adjust_overloaded_nothing_functions (function_index+1) first_instance_index std_strict_maybes_nothing_functions backEnd
+			= backEnd
+
+	adjustRecordMaybeInstances [] rt_fields backend
+		= backend
+	adjustRecordMaybeInstances [index:indices] rt_fields backend
+		# backend = BEAdjustStrictJustInstance index main_dcl_module_n backend
+		  (r0,backend) = BESetDictionaryFieldOfMember index rt_fields.[0].fs_index std_strict_maybes_module_index backend
+		  backend = BEAdjustUnboxedFromJustInstance (index+1) main_dcl_module_n backend
+		  (r1,backend) = BESetDictionaryFieldOfMember (index+1) rt_fields.[1].fs_index std_strict_maybes_module_index backend
+		= adjustRecordMaybeInstances indices rt_fields backend
 
 :: AdjustStdArrayInfo =
 	{	asai_moduleIndex	:: !Int

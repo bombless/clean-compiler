@@ -380,11 +380,16 @@ cNope			:== -1
 
 :: ConsumerAnalysisRO = ConsumerAnalysisRO !ConsumerAnalysisRORecord;
 
+:: StdStrictModuleNs =
+	{ stdStrictLists_module_n	:: !Int
+	, stdStrictMaybes_module_n	:: !Int
+	}
+
 :: ConsumerAnalysisRORecord =
-	{ common_defs				:: !{# CommonDefs}
-	, imported_funs				:: !{#{#FunType}}
-	, main_dcl_module_n			:: !Int
-	, stdStrictLists_module_n	:: !Int
+	{ common_defs			:: !{#CommonDefs}
+	, imported_funs			:: !{#{#FunType}}
+	, main_dcl_module_n		:: !Int
+	, stdStrict_module_ns	:: !StdStrictModuleNs
 	}
 
 ::	UnsafePatternBool :== Bool
@@ -515,7 +520,7 @@ where
 
 instance consumerRequirements App where
 	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_ident}, app_args}
-			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrictLists_module_n,imported_funs})
+			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n,stdStrict_module_ns,imported_funs})
 			ai=:{ai_cons_class,ai_group_members}
 
 		| glob_module == main_dcl_module_n
@@ -526,7 +531,8 @@ instance consumerRequirements App where
 				= reqs_of_args (-1) 0 fun_class.cc_args app_args CPassive common_defs ai
 			= consumerRequirements app_args common_defs ai
 
-		| glob_module == stdStrictLists_module_n && (not (isEmpty app_args))
+		| (glob_module==stdStrict_module_ns.stdStrictLists_module_n || glob_module==stdStrict_module_ns.stdStrictMaybes_module_n)
+				&& not app_args=:[]
 				&& is_nil_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 			# [app_arg:app_args]=app_args
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
@@ -1023,16 +1029,17 @@ instance consumerRequirements (Bind a b) | consumerRequirements a where
 //@ Analysis
 
 // determine consumerRequirements for functions
-analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap 
-				-> (!CleanupInfo, !*{! ConsClasses}, !*{!Component}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
-analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n groups fun_defs var_heap expr_heap
+analyseGroups	:: !{#CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !Int
+												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap
+				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap)
+analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n stdStrictMaybes_module_n
+		groups fun_defs var_heap expr_heap
 	#! nr_of_funs	= size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups	= size groups
 	# consumerAnalysisRO=ConsumerAnalysisRO
-		{ common_defs				= common_defs
-		, imported_funs				= imported_funs
-		, main_dcl_module_n			= main_dcl_module_n
-		, stdStrictLists_module_n	= stdStrictLists_module_n
+		{ common_defs = common_defs, imported_funs = imported_funs, main_dcl_module_n = main_dcl_module_n
+		, stdStrict_module_ns
+			= {stdStrictLists_module_n=stdStrictLists_module_n, stdStrictMaybes_module_n=stdStrictMaybes_module_n}
 		}
 	# class_env = createArray nr_of_funs {cc_size=0, cc_args=[], cc_linear_bits=[#!], cc_producer=False}
 	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
@@ -1185,15 +1192,15 @@ where
 
 :: FunctionPointerOrIndex = FunctionPointer !FunctionInfoPtr | FunctionIndex !Int
 
-reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![Component] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
-				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
-reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n
-	groups fun_defs var_heap expr_heap fun_heap class_env
+reanalyseGroups	:: !{#CommonDefs} !{#{#FunType}} !Int !Int !Int ![Component]
+								 !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
+				-> (!CleanupInfo,!*{#FunDef},!*VarHeap,!*ExpressionHeap,!*FunctionHeap,!*{!ConsClasses},!Bool)
+reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n stdStrictMaybes_module_n groups
+		fun_defs var_heap expr_heap fun_heap class_env
 	# consumerAnalysisRO=ConsumerAnalysisRO
-		{ common_defs				= common_defs
-		, imported_funs				= imported_funs
-		, main_dcl_module_n			= main_dcl_module_n
-		, stdStrictLists_module_n	= stdStrictLists_module_n
+		{ common_defs = common_defs, imported_funs = imported_funs, main_dcl_module_n = main_dcl_module_n
+		, stdStrict_module_ns
+			= {stdStrictLists_module_n=stdStrictLists_module_n, stdStrictMaybes_module_n=stdStrictMaybes_module_n}
 		}
 	= foldSt (reanalyse_group consumerAnalysisRO) groups
 				([], fun_defs, var_heap, expr_heap, fun_heap, class_env, True)

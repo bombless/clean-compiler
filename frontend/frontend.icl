@@ -8,12 +8,12 @@ instance == FrontEndPhase where
 	(==) a b
 		=	equal_constructor a b
 
-frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_and_list_instances heaps
 	:== (Yes {
 				fe_icl = {icl_mod & icl_functions=fun_defs }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
-			,	fe_iaci = {	iaci_array_and_list_instances = array_instances,
+			,	fe_iaci = {	iaci_array_and_list_instances = array_and_list_instances,
 							iaci_start_index_generic_classes = 0,
 							iaci_not_exported_generic_classes = {}
 						  }
@@ -83,9 +83,9 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	  fun_defs = icl_functions
 
 	| options.feo_up_to_phase == FrontEndPhaseCheck
-		# array_instances = {ali_array_first_instance_indices=[],ali_list_first_instance_indices=[],ali_tail_strict_list_first_instance_indices=[],ali_instances_range={ir_from=0,ir_to=0}}
+		# array_and_list_instances = {ali_instances_range={ir_from=0,ir_to=0},ali_array_first_instance_indices=[],ali_list_first_instance_indices=[],ali_tail_strict_list_first_instance_indices=[],ali_unboxed_maybe_first_instance_indices=[]}
 		=	frontSyntaxTree cached_dcl_macros dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs (groups_to_components groups) array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs (groups_to_components groups) array_and_list_instances heaps
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 /*
@@ -159,7 +159,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| not ok
 		= (No,{},{},main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 
-	# (ok, fun_defs, array_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
+	# (ok, fun_defs, array_and_list_instances, common_defs, imported_funs, type_def_infos, heaps, predef_symbols, error,out)
 		= typeProgram groups main_dcl_module_n fun_defs icl_function_indices.ifi_specials_indices list_inferred_types icl_common icl_imported_instances dcl_mods icl_used_module_numbers
 			td_infos heaps predef_symbols error out
 
@@ -177,7 +177,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		
 	| options.feo_up_to_phase == FrontEndPhaseTypeCheck
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_and_list_instances heaps
 
 	# (dcl_types, components, fun_defs, predef_symbols, var_heap, type_heaps, expression_heap, tcl_file)
   		= convertDynamicPatternsIntoUnifyAppls common_defs main_dcl_module_n dcl_mods icl_mod directly_imported_dcl_modules
@@ -187,20 +187,23 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| options.feo_up_to_phase == FrontEndPhaseConvertDynamics
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap, hp_generic_heap=newHeap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_and_list_instances heaps
 
-	#  (stdStrictLists_module_n,predef_symbols) = get_StdStrictLists_module_n predef_symbols
+	#! stdStrictLists_module_n = predef_symbols.[PD_StdStrictLists].pds_def
+	#! stdStrictMaybes_module_n = predef_symbols.[PD_StdStrictMaybes].pds_def
 
 	# (cleanup_info, acc_args, components, fun_defs, var_heap, expression_heap)
-		 = analyseGroups common_defs imported_funs array_instances.ali_instances_range main_dcl_module_n stdStrictLists_module_n components fun_defs var_heap expression_heap
+		= analyseGroups common_defs imported_funs array_and_list_instances.ali_instances_range
+							main_dcl_module_n stdStrictLists_module_n stdStrictMaybes_module_n
+							   components  fun_defs  var_heap  expression_heap
 
 	# (def_max, acc_args)		= usize acc_args
 	# (def_min, fun_defs)		= usize fun_defs
 
 	  (components, used_conses, fun_defs, dcl_types, var_heap, type_heaps, expression_heap, error, predef_symbols)
-	  	= transformGroups cleanup_info main_dcl_module_n stdStrictLists_module_n def_min def_max components acc_args
+		= transformGroups cleanup_info main_dcl_module_n def_min def_max components acc_args
 	  						common_defs imported_funs type_def_infos dcl_mods options.feo_fusion
-							fun_defs dcl_types var_heap type_heaps expression_heap error predef_symbols
+								fun_defs  dcl_types  var_heap  type_heaps  expression_heap  error  predef_symbols
 
 	# error_admin = {ea_file = error, ea_loc = [], ea_ok = True }
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
@@ -234,7 +237,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| options.feo_up_to_phase == FrontEndPhaseTransformGroups
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=heaps.hp_generic_heap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_and_list_instances heaps
 
 	# generic_heap = heaps.hp_generic_heap
 	#! first_not_exported_generic_def_index = size dcl_mods.[main_dcl_module_n].dcl_common.com_generic_defs;
@@ -242,11 +245,14 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= convertIclModule main_dcl_module_n start_index_generic_classes first_not_exported_generic_def_index common_defs dcl_types used_conses
 			var_heap type_heaps generic_heap
 	# (used_conses,var_heap,predef_symbols)
-		= mark_imported_unboxed_list_class array_instances.ali_list_first_instance_indices PD_UListClass
-											main_dcl_module_n common_defs used_conses var_heap predef_symbols
+		= mark_imported_unboxed_class array_and_list_instances.ali_list_first_instance_indices PD_UListClass
+										main_dcl_module_n common_defs used_conses var_heap predef_symbols
 	# (used_conses,var_heap,predef_symbols)
-		= mark_imported_unboxed_list_class array_instances.ali_tail_strict_list_first_instance_indices PD_UTSListClass
-											main_dcl_module_n common_defs used_conses var_heap predef_symbols
+		= mark_imported_unboxed_class array_and_list_instances.ali_tail_strict_list_first_instance_indices PD_UTSListClass
+										main_dcl_module_n common_defs used_conses var_heap predef_symbols
+	# (used_conses,var_heap,predef_symbols)
+		= mark_imported_unboxed_class array_and_list_instances.ali_unboxed_maybe_first_instance_indices PD_UMaybeClass
+										main_dcl_module_n common_defs used_conses var_heap predef_symbols
 
 	# (dcl_types,used_conses,var_heap,type_heaps) = convertDclModule main_dcl_module_n dcl_mods common_defs dcl_types used_conses var_heap type_heaps
 
@@ -255,7 +261,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	| options.feo_up_to_phase == FrontEndPhaseConvertModules
 		# heaps = {hp_var_heap=var_heap, hp_type_heaps=type_heaps, hp_expression_heap=expression_heap,hp_generic_heap=generic_heap}
 		=	frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n
-							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_instances heaps
+							predef_symbols hash_table files error io out tcl_file icl_mod dcl_mods fun_defs components array_and_list_instances heaps
 
 //	  (components, fun_defs, out) = showComponents components 0 False fun_defs out
 	# (used_funs, components, fun_defs, dcl_types, used_conses, var_heap, type_heaps, expression_heap)
@@ -286,7 +292,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 						 icl_modification_time=icl_mod.icl_modification_time }
 			,	fe_dcls = dcl_mods
 			,	fe_components = components
-			,	fe_iaci = {	iaci_array_and_list_instances = array_instances,
+			,	fe_iaci = {	iaci_array_and_list_instances = array_and_list_instances,
 							iaci_start_index_generic_classes = start_index_generic_classes,
 							iaci_not_exported_generic_classes = not_exported_generic_classes
 						  }
@@ -319,12 +325,6 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 					# cached_dcl_macros_i = {cached_dcl_macros_i & [j].fun_info.fi_group_index= (-1)}
 					= clear_group_indices2 (j+1) cached_dcl_macros_i	
 
-		get_StdStrictLists_module_n predef_symbols
-  			# (pre_mod,predef_symbols) = predef_symbols![PD_StdStrictLists]
-			| pre_mod.pds_def<>NoIndex
-				= (pre_mod.pds_def,predef_symbols)
-				= (-1,predef_symbols)
-
 		get_index_of_start_rule main_dcl_module_n predef_symbols
 			# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
 			| pds_def <> NoIndex && pds_module == main_dcl_module_n
@@ -337,11 +337,11 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		group_members_to_component_members [e:l] = ComponentMember e (group_members_to_component_members l)
 		group_members_to_component_members [] = NoComponentMembers
 
-mark_imported_unboxed_list_class :: ![Int] !Int !Int !{#CommonDefs} !ImportedConstructors !*VarHeap !*PredefinedSymbols
-																-> (!ImportedConstructors,!*VarHeap,!*PredefinedSymbols)
-mark_imported_unboxed_list_class [] predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
+mark_imported_unboxed_class :: ![Int] !Int !Int !{#CommonDefs} !ImportedConstructors !*VarHeap !*PredefinedSymbols
+															-> (!ImportedConstructors,!*VarHeap,!*PredefinedSymbols)
+mark_imported_unboxed_class [] predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
 	= (used_conses,var_heap,predef_symbols)
-mark_imported_unboxed_list_class _ predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
+mark_imported_unboxed_class _ predef_index main_dcl_module_n common_defs used_conses var_heap predef_symbols
 	# ({pds_module,pds_def},predef_symbols) = predef_symbols![predef_index]
 	# (used_conses,var_heap) = mark_imported_class pds_module pds_def main_dcl_module_n common_defs used_conses var_heap
 	= (used_conses,var_heap,predef_symbols)

@@ -2529,6 +2529,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 					<=< adjust_predefined_module_symbol PD_StdEnum
 					<=< adjust_predefined_module_symbol PD_StdBool
 					<=< adjust_predefined_module_symbol PD_StdStrictLists
+					<=< adjust_predefined_module_symbol PD_StdStrictMaybes
 					<=< adjust_predefined_module_symbol PD_StdDynamic
 					<=< adjust_predefined_module_symbol PD_StdGeneric
 					<=< adjust_predefined_module_symbol PD_StdMisc										
@@ -3110,6 +3111,9 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 	# cs = case x_needed_modules bitand cNeedStdStrictLists of
 			0 -> cs
 			_ -> check_it PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
+	# cs = case x_needed_modules bitand cNeedStdStrictMaybes of
+			0 -> cs
+			_ -> check_it PD_StdStrictMaybes mod_ident " (needed for strict maybe types)" extension cs
 	= cs
   where
 	check_it pd mod_ident explanation extension cs=:{cs_symbol_table}
@@ -3428,7 +3432,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 
 	# cs & cs_predef_symbols=cs_predef_symbols, cs_error=cs_error
 	# (com_instance_defs, cs)
-		= adjust_instance_types_of_std_array_and_std_list_functions mod_index com_instance_defs cs
+		= adjust_instance_types_of_std_array_lists_and_maybes_functions mod_index com_instance_defs cs
 	#! dcl_mod = {dcl_mod & dcl_functions = dcl_functions,
 			  				dcl_specials = { ir_from = nr_of_dcl_functions_and_instances,
 			  								ir_to = nr_of_dcl_funs_insts_and_specs },
@@ -3442,7 +3446,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 	   dcl_modules = { dcl_modules & [mod_index] = dcl_mod }
 	= (dcl_modules, heaps, cs)
   where
-	adjust_instance_types_of_std_array_and_std_list_functions mod_index class_instances cs=:{cs_predef_symbols}
+	adjust_instance_types_of_std_array_lists_and_maybes_functions mod_index class_instances cs=:{cs_predef_symbols}
 		| mod_index == cs_predef_symbols.[PD_StdArray].pds_def
 			#! nr_of_instances = size class_instances
 			# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
@@ -3453,6 +3457,11 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			#! n_of_instances = size class_instances
 			# (class_instances, cs_predef_symbols)
 				= iFoldSt (adjust_instances_of__SystemStrictLists_module mod_index) 0 n_of_instances (class_instances, cs_predef_symbols)
+			= (class_instances, {cs & cs_predef_symbols = cs_predef_symbols})
+		| mod_index == cs_predef_symbols.[PD_StdStrictMaybes].pds_def
+			#! n_instances = size class_instances
+			# (class_instances, cs_predef_symbols)
+				= iFoldSt (adjust_instance_of__SystemStrictMaybes_module mod_index) 0 n_instances (class_instances, cs_predef_symbols)
 			= (class_instances, {cs & cs_predef_symbols = cs_predef_symbols})
 			= (class_instances, cs)
 	where
@@ -3482,6 +3491,18 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 						-> (class_instances, predef_symbols)
 						-> (class_instances, predef_symbols)
 				= (class_instances, predef_symbols)
+
+		adjust_instance_of__SystemStrictMaybes_module :: !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})
+																	-> (!*{#ClassInstance},!v:{#PredefinedSymbol})
+		adjust_instance_of__SystemStrictMaybes_module strict_maybes_mod_index inst_index (class_instances, predef_symbols)
+			# {ins_class_index={gi_module,gi_index},ins_type={it_types}} = class_instances.[inst_index]
+			| gi_module==strict_maybes_mod_index && gi_index==predef_symbols.[PD_UMaybeClass].pds_def
+			= case it_types of
+				[TV _]
+					# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
+					-> (class_instances, predef_symbols)
+					-> (class_instances, predef_symbols)
+			= (class_instances, predef_symbols)
 
 checkPredefinedDclModule :: !NumberSet ![Int] !(IntKeyHashtable SolvedImports) !Bool !LargeBitvect !Bool
 							!(Module (CollectedDefinitions ClassInstance)) !Index !*ExplImpInfos !*{#DclModule} !*{#*{#FunDef}} !*Heaps !*CheckState
@@ -3599,6 +3620,11 @@ where
 				<=< adjust_predef_symbols PD_cons PD_decons_uts mod_index STE_Member
 				<=< adjust_predef_symbols PD_nil PD_nil_uts mod_index STE_DclFunction
 				<=< adjust_predef_symbols PD_ListClass PD_UTSListClass mod_index STE_Class
+		| mod_index==cs_predef_symbols.[PD_StdStrictMaybes].pds_def
+			= cs
+				<=< adjust_predef_symbols PD_just PD_from_just_u mod_index STE_Member
+				<=< adjust_predef_symbols PD_nothing PD_nothing_u mod_index STE_DclFunction
+				<=< adjust_predef_symbols PD_MaybeClass PD_UMaybeClass mod_index STE_Class
 		| mod_index==cs_predef_symbols.[PD_StdDynamic].pds_def
 			= cs
 				<=< adjustPredefSymbol PD_Dyn_DynamicTemp			mod_index STE_Type

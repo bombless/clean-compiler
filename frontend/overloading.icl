@@ -457,7 +457,6 @@ where
 					-> (ok && succ, coercion_env)
 				_
 					-> (False, coercion_env)
-	
 		adjust_attribute attr1 attr (ok, coercion_env)
 			= case attr1 of
 				TA_Multi
@@ -561,6 +560,9 @@ check_unboxed_array_or_list_type ri_main_dcl_module_n glob_module ins_class_inde
 	| is_predefined_global_symbol ins_class_index PD_UTSListClass rs_predef_symbols
 		= check_unboxed_tail_strict_list_type ri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members ri_defs class_instances
 			rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
+	| is_predefined_global_symbol ins_class_index PD_UMaybeClass rs_predef_symbols
+		= check_unboxed_maybe_type ri_main_dcl_module_n glob_module ins_class_index ins_members tc_types class_members ri_defs class_instances
+			rs_special_instances (rs_predef_symbols, rs_type_heaps) rs_error
 where
 	is_predefined_global_symbol :: !GlobalIndex !Int !PredefinedSymbols -> Bool
 	is_predefined_global_symbol {gi_module,gi_index} predef_index predef_symbols
@@ -598,14 +600,14 @@ where
 					special_instances, predef_symbols_type_heaps, unboxError "Array" elem_type error)
 	where
 		add_record_to_array_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
-		add_record_to_array_instances record members special_instances=:{si_next_array_member_index,si_array_instances}
-			# may_be_there = look_up_array_or_list_instance record si_array_instances
+		add_record_to_array_instances record members special_instances=:{si_next_generated_unboxed_record_member_index,si_array_instances}
+			# may_be_there = look_up_generated_unboxed_record_instance record si_array_instances
 			= case may_be_there of
 				Yes inst
 					-> (inst.ai_members, special_instances)
 				No
-					# inst = new_array_instance record members si_next_array_member_index
-					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
+					# inst = new_generated_unboxed_record_instance record members si_next_generated_unboxed_record_member_index
+					-> (inst.ai_members, { special_instances &  si_next_generated_unboxed_record_member_index = si_next_generated_unboxed_record_member_index + size members,
 																si_array_instances = [ inst : si_array_instances ] })
 
 	is_packed_array:: [Type] PredefinedSymbols -> Bool
@@ -644,7 +646,7 @@ where
 						special_instances, predef_symbols_type_heaps, error)
 			No
 				| not unboxed_type=:TE
-					# {glob_module,glob_object} = find_unboxed_list_instance unboxed_type class_instances defs
+					# {glob_module,glob_object} = find_unboxed_list_or_maybe_instance unboxed_type class_instances defs
 					| glob_module <> NotFound
 						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
 						-> ({rc_class_index=ins_class_index, rc_inst_module=glob_module, rc_inst_members=ins_members, rc_types=types, rc_red_contexts=[]},
@@ -655,14 +657,14 @@ where
 					special_instances, predef_symbols_type_heaps, unboxError "UList" elem_type error)
 	where
 		add_record_to_list_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
-		add_record_to_list_instances record members special_instances=:{si_next_array_member_index,si_list_instances}
-			# may_be_there = look_up_array_or_list_instance record si_list_instances
+		add_record_to_list_instances record members special_instances=:{si_next_generated_unboxed_record_member_index,si_list_instances}
+			# may_be_there = look_up_generated_unboxed_record_instance record si_list_instances
 			= case may_be_there of
 				Yes inst
 					-> (inst.ai_members, special_instances)
 				No
-					# inst = new_array_instance record members si_next_array_member_index
-					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
+					# inst = new_generated_unboxed_record_instance record members si_next_generated_unboxed_record_member_index
+					-> (inst.ai_members, { special_instances &  si_next_generated_unboxed_record_member_index = si_next_generated_unboxed_record_member_index + size members,
 																si_list_instances = [ inst : si_list_instances ] })
 
 	check_unboxed_tail_strict_list_type :: Int Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} InstanceTree
@@ -678,7 +680,7 @@ where
 						special_instances, predef_symbols_type_heaps, error)
 			No
 				| not unboxed_type=:TE
-					# {glob_module,glob_object} = find_unboxed_list_instance unboxed_type class_instances defs
+					# {glob_module,glob_object} = find_unboxed_list_or_maybe_instance unboxed_type class_instances defs
 					| glob_module <> NotFound
 						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
 						-> ({rc_class_index=ins_class_index, rc_inst_module=glob_module, rc_inst_members=ins_members, rc_types=types, rc_red_contexts=[]},
@@ -689,15 +691,51 @@ where
 					special_instances, predef_symbols_type_heaps, unboxError "UTSList" elem_type error)
 	where
 		add_record_to_tail_strict_list_instances :: !TypeSymbIdent !{#DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
-		add_record_to_tail_strict_list_instances record members special_instances=:{si_next_array_member_index,si_tail_strict_list_instances}
-			# may_be_there = look_up_array_or_list_instance record si_tail_strict_list_instances
+		add_record_to_tail_strict_list_instances record members special_instances=:{si_next_generated_unboxed_record_member_index,si_tail_strict_list_instances}
+			# may_be_there = look_up_generated_unboxed_record_instance record si_tail_strict_list_instances
 			= case may_be_there of
 				Yes inst
 					-> (inst.ai_members, special_instances)
 				No
-					# inst = new_array_instance record members si_next_array_member_index
-					-> (inst.ai_members, { special_instances &  si_next_array_member_index = si_next_array_member_index + size members,
+					# inst = new_generated_unboxed_record_instance record members si_next_generated_unboxed_record_member_index
+					-> (inst.ai_members, { special_instances &  si_next_generated_unboxed_record_member_index = si_next_generated_unboxed_record_member_index + size members,
 																si_tail_strict_list_instances = [ inst : si_tail_strict_list_instances ] })
+
+	check_unboxed_maybe_type :: Int Int GlobalIndex {#ClassInstanceMember} ![Type] {#DefinedSymbol} {#CommonDefs} InstanceTree
+						   *SpecialInstances *(*PredefinedSymbols,*TypeHeaps) *ErrorAdmin
+		-> (ReducedContext,*SpecialInstances,(*PredefinedSymbols,*TypeHeaps), *ErrorAdmin)
+	check_unboxed_maybe_type main_dcl_module_n ins_module ins_class_index ins_members types=:[elem_type:_] class_members defs class_instances
+			special_instances predef_symbols_type_heaps error
+		# (unboxed_type, opt_record, predef_symbols_type_heaps) = try_to_unbox elem_type defs predef_symbols_type_heaps
+		= case opt_record of
+			Yes record
+				# (ins_members, special_instances) = add_record_to_maybe_instances record class_members special_instances
+				-> ({rc_class_index = ins_class_index, rc_inst_module = main_dcl_module_n, rc_inst_members = ins_members, rc_red_contexts = [], rc_types = types},
+						special_instances, predef_symbols_type_heaps, error)
+			No
+				| not unboxed_type=:TE
+					# {glob_module,glob_object} = find_unboxed_list_or_maybe_instance unboxed_type class_instances defs
+					| glob_module <> NotFound
+						# {ins_members,ins_class_index} = defs.[glob_module].com_instance_defs.[glob_object]
+						-> ({rc_class_index=ins_class_index, rc_inst_module=glob_module, rc_inst_members=ins_members, rc_types=types, rc_red_contexts=[]},
+							special_instances, predef_symbols_type_heaps, error)
+						# error = unboxError "UMaybe" elem_type error
+						-> ({rc_class_index=ins_class_index, rc_inst_module=ins_module, rc_inst_members=ins_members, rc_red_contexts=[], rc_types=types},
+							special_instances, predef_symbols_type_heaps, error)
+				# error = unboxError "UMaybe" elem_type error
+				-> ({rc_class_index=ins_class_index, rc_inst_module=ins_module, rc_inst_members=ins_members, rc_red_contexts=[], rc_types=types},
+					special_instances, predef_symbols_type_heaps, error)
+	where
+		add_record_to_maybe_instances :: !TypeSymbIdent !{# DefinedSymbol} !*SpecialInstances -> (!{#ClassInstanceMember},!*SpecialInstances)
+		add_record_to_maybe_instances record members special_instances=:{si_next_generated_unboxed_record_member_index,si_unboxed_maybe_instances}
+			# may_be_there = look_up_generated_unboxed_record_instance record si_unboxed_maybe_instances
+			= case may_be_there of
+				Yes inst
+					-> (inst.ai_members, special_instances)
+				No
+					# inst = new_generated_unboxed_record_instance record members si_next_generated_unboxed_record_member_index
+					-> (inst.ai_members, { special_instances &  si_next_generated_unboxed_record_member_index = si_next_generated_unboxed_record_member_index + size members,
+																si_unboxed_maybe_instances = [inst : si_unboxed_maybe_instances] })
 
 	try_to_unbox :: Type !{#CommonDefs} (!*PredefinedSymbols, !*TypeHeaps) -> (!Type, !Optional TypeSymbIdent, !(!*PredefinedSymbols, !*TypeHeaps))
 	try_to_unbox type=:(TB _) _ predef_symbols_type_heaps
@@ -771,57 +809,57 @@ where
 	unboxed_array_instance_type_matches _ _ _
 		= False
 
-	find_unboxed_list_instance :: Type !InstanceTree {#CommonDefs} -> Global Int
-	find_unboxed_list_instance element_type (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs
-		# left_index = find_unboxed_list_instance element_type left defs
+	find_unboxed_list_or_maybe_instance :: Type !InstanceTree {#CommonDefs} -> Global Int
+	find_unboxed_list_or_maybe_instance element_type (IT_Node this_inst_index=:{glob_object,glob_module} left right) defs
+		# left_index = find_unboxed_list_or_maybe_instance element_type left defs
 		| FoundObject left_index
 			= left_index
-		| unboxed_list_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
+		| unboxed_list_or_maybe_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
 			= this_inst_index
-			= find_unboxed_list_instance element_type right defs
-	find_unboxed_list_instance element_type IT_Empty defs
+			= find_unboxed_list_or_maybe_instance element_type right defs
+	find_unboxed_list_or_maybe_instance element_type IT_Empty defs
 		= ObjectNotFound
-	find_unboxed_list_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs
-		# index = find_sorted_unboxed_list_instance element_type sorted_instances defs
+	find_unboxed_list_or_maybe_instance element_type (IT_Trees sorted_instances other_instances default_instances) defs
+		# index = find_sorted_unboxed_list_or_maybe_instance element_type sorted_instances defs
 		| FoundObject index
 			= index
-		# index = find_unboxed_list_instance element_type other_instances defs
+		# index = find_unboxed_list_or_maybe_instance element_type other_instances defs
 		| FoundObject index
 			= index
-			= find_unboxed_list_instance element_type default_instances defs
+			= find_unboxed_list_or_maybe_instance element_type default_instances defs
 	where
-		find_sorted_unboxed_list_instance element_type (SI_Node instances left right) defs
-			# left_index = find_sorted_unboxed_list_instance element_type left defs
+		find_sorted_unboxed_list_or_maybe_instance element_type (SI_Node instances left right) defs
+			# left_index = find_sorted_unboxed_list_or_maybe_instance element_type left defs
 			| FoundObject left_index
 				= left_index
-			# inst_index = find_unboxed_list_instance_in_list element_type instances defs
+			# inst_index = find_unboxed_list_or_maybe_instance_in_list element_type instances defs
 			| FoundObject inst_index
 				= inst_index
-				= find_sorted_unboxed_list_instance element_type right defs
-		find_sorted_unboxed_list_instance element_type SI_Empty defs
+				= find_sorted_unboxed_list_or_maybe_instance element_type right defs
+		find_sorted_unboxed_list_or_maybe_instance element_type SI_Empty defs
 			= ObjectNotFound
 	
-		find_unboxed_list_instance_in_list element_type [this_inst_index=:{glob_object,glob_module}:instances] defs
-			| unboxed_list_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
+		find_unboxed_list_or_maybe_instance_in_list element_type [this_inst_index=:{glob_object,glob_module}:instances] defs
+			| unboxed_list_or_maybe_instance_type_matches defs.[glob_module].com_instance_defs.[glob_object].ins_type.it_types element_type
 				= this_inst_index
-				= find_unboxed_list_instance_in_list element_type instances defs
-		find_unboxed_list_instance_in_list element_type [] defs
+				= find_unboxed_list_or_maybe_instance_in_list element_type instances defs
+		find_unboxed_list_or_maybe_instance_in_list element_type [] defs
 			= ObjectNotFound
 
-	unboxed_list_instance_type_matches [TB bt1] (TB bt2) = bt1==bt2
-	unboxed_list_instance_type_matches [TA {type_index=ti1} [_]] (TA {type_index=ti2} [_]) = ti1==ti2	// for array elements
-	unboxed_list_instance_type_matches _ _ = False
+	unboxed_list_or_maybe_instance_type_matches [TB bt1] (TB bt2) = bt1==bt2
+	unboxed_list_or_maybe_instance_type_matches [TA {type_index=ti1} [_]] (TA {type_index=ti2} [_]) = ti1==ti2	// for array elements
+	unboxed_list_or_maybe_instance_type_matches _ _ = False
 
-	look_up_array_or_list_instance :: !TypeSymbIdent ![ArrayInstance] -> Optional ArrayInstance
-	look_up_array_or_list_instance record []
-		= No
-	look_up_array_or_list_instance record [inst : insts]
+	look_up_generated_unboxed_record_instance :: !TypeSymbIdent ![ArrayInstance] -> Optional ArrayInstance
+	look_up_generated_unboxed_record_instance record [inst : insts]
 		| record == inst.ai_record
 			= Yes inst
-			= look_up_array_or_list_instance record insts
+			= look_up_generated_unboxed_record_instance record insts
+	look_up_generated_unboxed_record_instance record []
+		= No
 	
-	new_array_instance :: !TypeSymbIdent !{#DefinedSymbol} !Index -> ArrayInstance
-	new_array_instance record members next_member_index
+	new_generated_unboxed_record_instance :: !TypeSymbIdent !{#DefinedSymbol} !Index -> ArrayInstance
+	new_generated_unboxed_record_instance record members next_member_index
 		= {	ai_members = { {cim_ident=ds_ident,cim_arity=ds_arity,cim_index=next_inst_index} \\ {ds_ident,ds_arity} <-: members & next_inst_index <- [next_member_index .. ]},
 			ai_record = record }
 
@@ -853,6 +891,9 @@ where
 			||
 			(is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_ListClass predef_symbols &&
 			is_lazy_or_strict_list_type first_type predef_symbols)
+			||
+			(is_predefined_symbol tc_class.glob_module tc_class.glob_object.ds_index PD_MaybeClass predef_symbols &&
+			is_lazy_or_strict_maybe_type first_type predef_symbols)
 
 	is_lazy_or_strict_array_type :: Type PredefinedSymbols -> Bool
 	is_lazy_or_strict_array_type (TA {type_index={glob_module,glob_object}} _) predef_symbols
@@ -870,6 +911,14 @@ where
 		  is_predefined_symbol glob_module glob_object PD_UnboxedListType predef_symbols ||
 		  is_predefined_symbol glob_module glob_object PD_UnboxedTailStrictListType predef_symbols
 	is_lazy_or_strict_list_type _ _
+		= False
+
+	is_lazy_or_strict_maybe_type :: Type PredefinedSymbols -> Bool
+	is_lazy_or_strict_maybe_type (TA {type_index={glob_module,glob_object}} _) predef_symbols
+		= is_predefined_symbol glob_module glob_object PD_MaybeType predef_symbols ||
+		  is_predefined_symbol glob_module glob_object PD_StrictMaybeType predef_symbols ||
+		  is_predefined_symbol glob_module glob_object PD_UnboxedMaybeType predef_symbols
+	is_lazy_or_strict_maybe_type _ _
 		= False
 
 	is_reducible :: [Type] (Global DefinedSymbol) PredefinedSymbols -> Bool

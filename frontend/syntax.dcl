@@ -225,6 +225,7 @@ instance == FunctionOrMacroIndex
 		ali_array_first_instance_indices :: ![Int],
 		ali_list_first_instance_indices :: ![Int],
 		ali_tail_strict_list_first_instance_indices :: ![Int],
+		ali_unboxed_maybe_first_instance_indices :: ![Int],
 		ali_instances_range :: !IndexRange
 	}
 
@@ -1420,6 +1421,8 @@ cIsNotStrict	:== False
 ::	OverloadedListType	= UnboxedList !Index !Index !Index // StdStrictLists module index, decons_u index, nil_u index
 						| UnboxedTailStrictList !Index !Index !Index // StdStrictLists module index, decons_uts index, nil_uts index
 						| OverloadedList !Index !Index !Index // StdStrictLists module index, decons index, nil index
+						| OverloadedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just index, nothing index
+						| UnboxedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just_u index, nothing_u index
 
 instance == OverloadedListType
 

@@ -140,6 +140,12 @@ cleanup_attributes expr_info_ptr symbol_heap
 
 :: RI = { ri_fun_index :: !Int, ri_fun_ptr :: !FunctionInfoPtr}
 
+::	SpecialModuleNs =
+	{	smn_StdStrictLists_module_n :: !Int
+	,	smn_StdStrictMaybes_module_n :: !Int
+	,	smn_StdGeneric_module_n	:: !Int
+	}
+
 ::	ReadOnlyTI = 
 	{	ro_imported_funs	:: !{# {# FunType} }
 	,	ro_common_defs		:: !{# CommonDefs }
@@ -148,8 +154,7 @@ cleanup_attributes expr_info_ptr symbol_heap
 	,	ro_tfi					:: !TransformFunctionInfo
 	,	ro_main_dcl_module_n 	:: !Int
 	,	ro_transform_fusion		:: !Int	// fusion switch
-	,	ro_StdStrictLists_module_n :: !Int
-	,	ro_StdGeneric_module_n	:: !Int
+	,	ro_special_module_ns :: !SpecialModuleNs
 	}
 
 NoFusion:==0
@@ -482,15 +487,15 @@ where
 		isFoldExpression (App app)	ti_fun_defs ti_cons_args = isFoldSymbol app.app_symb.symb_kind
 			where
 				isFoldSymbol (SK_Function {glob_module,glob_object})
-					| glob_module==ro.ro_StdStrictLists_module_n
+					| glob_module==ro.ro_special_module_ns.smn_StdStrictLists_module_n || glob_module==ro.ro_special_module_ns.smn_StdStrictMaybes_module_n
 						# type_arity = ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_arity
-						| type_arity==0 || (type_arity==2 && case app.app_args of [_:_] -> True; _ -> False)
+						| type_arity==0 || (type_arity==2 && not app.app_args=:[])
 							= False
 							= True
 					| glob_module==ro.ro_main_dcl_module_n && glob_object>=size ti_cons_args &&
 						(ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsUnboxedListOfRecordsConsOrNil<>0) &&
 							(case ti_fun_defs.[glob_object].fun_type of
-								Yes type ->(type.st_arity==0 || (type.st_arity==2 && case app.app_args of [_:_] -> True; _ -> False)))
+								Yes type ->(type.st_arity==0 || (type.st_arity==2 && not app.app_args=:[])))
 							= False						
 						= True
 				isFoldSymbol (SK_LocalMacroFunction _)	= True
@@ -524,15 +529,15 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 			  (may_be_match_expr, ti) = match_and_instantiate aci_linearity_of_patterns cons_index app_args case_guards case_info_ptr case_default ro ti
 			-> expr_or_never_matching_case may_be_match_expr case_ident ti
 		SK_Function {glob_module,glob_object}
-			| glob_module==ro.ro_StdStrictLists_module_n &&
-				(let type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
-				 in (type.st_arity==0 || (type.st_arity==2 && case app_args of [_:_] -> True; _ -> False)))
+			| (glob_module==ro.ro_special_module_ns.smn_StdStrictLists_module_n || glob_module==ro.ro_special_module_ns.smn_StdStrictMaybes_module_n)
+				&& (let type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
+					in (type.st_arity==0 || (type.st_arity==2 && not app_args=:[])))
 				# type = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
 				-> trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 			| glob_module==ro.ro_main_dcl_module_n && glob_object>=size ti.ti_cons_args &&
 				(ti.ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsUnboxedListOfRecordsConsOrNil)<>0 &&
 				(case ti.ti_fun_defs.[glob_object].fun_type of
-					Yes type ->(type.st_arity==0 || (type.st_arity==2 && case app_args of [_:_] -> True; _ -> False)))
+					Yes type ->(type.st_arity==0 || (type.st_arity==2 && not app_args=:[])))
 				# (Yes type,ti) = ti!ti_fun_defs.[glob_object].fun_type
 				-> trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 		// otherwise it's a function application
@@ -640,6 +645,30 @@ where
 									= abort "equal_list_contructor"
 			match_and_instantiate_overloaded_list _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
+	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedMaybe _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
+		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
+		  ti & ti_symbol_heap=ti_symbol_heap
+		= match_and_instantiate_overloaded_maybe linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
+		where
+			match_and_instantiate_overloaded_maybe [!linearity:linearities!] cons_index=:{glob_module=cons_glob_module,glob_object=cons_ds_index} app_args
+									[{ap_symbol={glob_module,glob_object={ds_index}}, ap_vars, ap_expr} : guards]
+									[cons_type:cons_types] case_default ro ti
+				| equal_maybe_contructor glob_module ds_index cons_glob_module cons_ds_index
+					# args_strictness = ro.ro_common_defs.[cons_glob_module].com_cons_defs.[cons_ds_index].cons_type.st_args_strictness
+					= instantiate linearity app_args ap_vars ap_expr args_strictness cons_type ti
+					= match_and_instantiate_overloaded_maybe linearities cons_index app_args guards cons_types case_default ro ti
+					where
+						equal_maybe_contructor glob_module ds_index cons_glob_module cons_ds_index
+							| glob_module==cPredefinedModuleIndex && cons_glob_module==cPredefinedModuleIndex
+								# index=ds_index+FirstConstructorPredefinedSymbolIndex
+								# cons_index=cons_ds_index+FirstConstructorPredefinedSymbolIndex
+								| index==PD_OverloadedJustSymbol
+									= cons_index==PD_JustSymbol || cons_index==PD_StrictJustSymbol
+								| index==PD_OverloadedNothingSymbol
+									= cons_index==PD_NothingSymbol || cons_index==PD_StrictNothingSymbol
+									= abort "equal_maybe_contructor"
+			match_and_instantiate_overloaded_maybe _ cons_index app_args [] cons_types case_default ro ti
+				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
 
 	trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 		| type.st_arity==0
@@ -691,6 +720,7 @@ where
 					| glob_module==cPredefinedModuleIndex
 						# index=ds_index+FirstConstructorPredefinedSymbolIndex
 						| index==PD_UnboxedConsSymbol || index==PD_UnboxedTailStrictConsSymbol || index==PD_OverloadedConsSymbol
+						|| index==PD_UnboxedJustSymbol || index==PD_OverloadedJustSymbol
 							= instantiate linearity app_args ap_vars ap_expr cons_function_type.st_args_strictness cons_function_type.st_args ti
 		//				| index==PD_UnboxedNilSymbol || index==PD_UnboxedTailStrictNilSymbol || index==PD_OverloadedNilSymbol
 							= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args guards case_default ro ti
@@ -3217,7 +3247,8 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 					= (App app, ti)
 					= (App { app & app_args = app_args ++ extra_args}, ti)
 
-		| glob_module==ro.ro_StdStrictLists_module_n && is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && (not (isEmpty app_args))
+		| (glob_module==ro.ro_special_module_ns.smn_StdStrictLists_module_n || glob_module==ro.ro_special_module_ns.smn_StdStrictMaybes_module_n)
+			&& is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && not app_args=:[]
 //			&& True ---> ("transformApplication "+++toString symb.symb_ident)
 			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
 			# [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
@@ -3887,8 +3918,9 @@ determineProducer app=:{app_symb = symb=:{symb_kind = SK_Constructor cons_index,
 	  rnf										= rnf_args app_args 0 cons_type.st_args_strictness ro
 	| SwitchConstructorFusion
 		(ro.ro_transform_fusion>=FullFusion && SwitchRnfConstructorFusion (linear_bit || rnf) linear_bit)
-		(ro.ro_transform_fusion>=FullFusion && (cons_index.glob_module==ro.ro_StdGeneric_module_n || consumer_properties bitand FI_GenericFun<>0)
-											&& (linear_bit || rnf))
+		(ro.ro_transform_fusion>=FullFusion
+			&& (cons_index.glob_module==ro.ro_special_module_ns.smn_StdGeneric_module_n || consumer_properties bitand FI_GenericFun<>0)
+			&& (linear_bit || rnf))
 		False
 		# producers = {producers & [prod_index] = PR_Constructor symb (length app_args) app_args }
 		= (producers, app_args ++ new_args, ti)
@@ -4058,7 +4090,7 @@ where
 		= (True,ti)
 	expression_may_be_copied (App {app_symb={symb_kind = SK_Constructor cons_index}, app_args}) ro ti
 		# cons_type = ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object].cons_type
-		| cons_index.glob_module==ro.ro_StdGeneric_module_n && is_not_strict cons_type.st_args_strictness
+		| cons_index.glob_module==ro.ro_special_module_ns.smn_StdGeneric_module_n && is_not_strict cons_type.st_args_strictness
 			= expressions_may_be_copied app_args ro ti
 			= (False,ti)
 	expression_may_be_copied (App {app_symb={symb_kind = SK_Function {glob_object,glob_module}}, app_args}) ro ti
@@ -4083,7 +4115,7 @@ where
 			= (False,ti)
 	expression_may_be_copied (Selection NormalSelector (Var _) [RecordSelection {glob_module,glob_object={ds_index}} _]) ro ti
 		# selector_type = ro.ro_common_defs.[glob_module].com_selector_defs.[ds_index].sd_type
-		| glob_module==ro.ro_StdGeneric_module_n && is_not_strict selector_type.st_args_strictness
+		| glob_module==ro.ro_special_module_ns.smn_StdGeneric_module_n && is_not_strict selector_type.st_args_strictness
 			= (True,ti)
 			= (False,ti)
 	expression_may_be_copied _ ro ti
@@ -4361,11 +4393,11 @@ where
 				= mark_fused_members_of_instances (instance_i+1) instance_defs instances common_defs fun_heap fun_defs
 			= fun_defs
 
-transformGroups :: !CleanupInfo !Int !Int !Int !Int !*{!Component} !*{!ConsClasses}
+transformGroups :: !CleanupInfo !Int !Int !Int !*{!Component} !*{!ConsClasses}
 					!{#CommonDefs} !{#{#FunType}} !*TypeDefInfos !{#DclModule} !FusionOptions
 											 !*{#FunDef} !*ImportedTypes !*VarHeap !*TypeHeaps !*ExpressionHeap !*File !*PredefinedSymbols
 	-> (!*{!Component},!ImportedConstructors,!*{#FunDef},!*ImportedTypes,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!*File,!*PredefinedSymbols)
-transformGroups cleanup_info main_dcl_module_n ro_StdStrictLists_module_n def_min def_max groups cons_args
+transformGroups cleanup_info main_dcl_module_n def_min def_max groups cons_args
 		common_defs imported_funs type_def_infos dcl_mods {compile_with_fusion,generic_fusion}
 		fun_defs imported_types var_heap type_heaps symbol_heap error predef_symbols
 	#! nr_of_funs = size fun_defs
@@ -4471,8 +4503,10 @@ where
 		# ti = {ti & ti_fun_heap=ti_fun_heap}
 		# (new_groups,ti) = partition_group group_nr (append_ComponentMembers component_members new_functions_in_component) ti
 		// reanalyse consumers
+		#! stdStrictLists_module_n = ti.ti_predef_symbols.[PD_StdStrictLists].pds_def
+		#! stdStrictMaybes_module_n = ti.ti_predef_symbols.[PD_StdStrictMaybes].pds_def
 		# (cleanup,ti_fun_defs,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_cons_args,same)
-				= reanalyseGroups common_defs imported_funs main_dcl_module_n ro_StdStrictLists_module_n
+				= reanalyseGroups common_defs imported_funs main_dcl_module_n stdStrictLists_module_n stdStrictMaybes_module_n
 					new_groups
 					ti.ti_fun_defs ti.ti_var_heap ti.ti_symbol_heap ti.ti_fun_heap ti.ti_cons_args
 		# ti = {ti 
@@ -4573,9 +4607,11 @@ where
 
 		transform_function :: !(Optional SymbolType) !FunctionBody !SymbIdent !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo
 								-> (!FunctionBody,!*TransformInfo)
-		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb transform_fusion common_defs imported_funs ti
-			# (ro_StdGeneric_module_n,ti) = ti!ti_predef_symbols.[PD_StdGeneric].pds_def
-			  ti_var_heap					= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
+		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb transform_fusion common_defs imported_funs ti=:{ti_predef_symbols}
+			#! stdStrictLists_module_n = ti_predef_symbols.[PD_StdStrictLists].pds_def
+			   stdStrictMaybes_module_n = ti_predef_symbols.[PD_StdStrictMaybes].pds_def
+			   stdGeneric_module_n = ti_predef_symbols.[PD_StdGeneric].pds_def
+			# ti_var_heap					= fold2St store_arg_type_info tb.tb_args st_args ti.ti_var_heap
 			  tfi =	{ tfi_root				= fun_symb
 					, tfi_case				= fun_symb
 					, tfi_orig				= fun_symb
@@ -4590,8 +4626,11 @@ where
 					, ro_tfi						= tfi
 					, ro_main_dcl_module_n			= main_dcl_module_n
 					, ro_transform_fusion			= transform_fusion
-					, ro_StdStrictLists_module_n	= ro_StdStrictLists_module_n
-					, ro_StdGeneric_module_n		= ro_StdGeneric_module_n
+					, ro_special_module_ns = {
+						smn_StdStrictLists_module_n = stdStrictLists_module_n,
+						smn_StdStrictMaybes_module_n = stdStrictMaybes_module_n,
+						smn_StdGeneric_module_n = stdGeneric_module_n
+					  }
 					}
 			  ti = {ti & ti_var_heap = ti_var_heap}
 		  

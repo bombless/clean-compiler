@@ -12,11 +12,13 @@ CVarOfMultimatchCase	:== -6
 
 ::	CleanupInfo :== [ExprInfoPtr]
 
-analyseGroups	:: !{# CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap 
-				-> (!CleanupInfo, !*{!ConsClasses}, !*{!Component}, !*{#FunDef}, !*VarHeap, !*ExpressionHeap)
+analyseGroups	:: !{#CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !Int
+												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap
+				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap)
 
-reanalyseGroups	:: !{# CommonDefs} !{#{#FunType}} !Int !Int ![Component] !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
-				-> (!CleanupInfo, !*{#FunDef}, !*VarHeap, !*ExpressionHeap, !*FunctionHeap, !*{!ConsClasses}, !Bool)
+reanalyseGroups	:: !{#CommonDefs} !{#{#FunType}} !Int !Int !Int ![Component]
+								 !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}
+				-> (!CleanupInfo,!*{#FunDef},!*VarHeap,!*ExpressionHeap,!*FunctionHeap,!*{!ConsClasses},!Bool)
 
 :: *PRState =
 	{ prs_group				:: !ComponentMembers

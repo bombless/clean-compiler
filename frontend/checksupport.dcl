@@ -15,6 +15,7 @@ cStdEnumImportMissing	:== 2
 cNeedStdDynamic 		:== 4
 cNeedStdGeneric			:== 8
 cNeedStdStrictLists		:== 16
+cNeedStdStrictMaybes	:== 32
 
 ::	Heaps =
 	{	hp_var_heap			::!.VarHeap

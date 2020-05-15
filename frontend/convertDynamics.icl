@@ -594,6 +594,10 @@ where
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
 				PD_PackedArrayType
 					-> type_code_constructor_expression PD_TC__PackedArray ci
+				PD_MaybeType
+					-> type_code_constructor_expression PD_TC__Maybe ci
+				PD_StrictMaybeType
+					-> type_code_constructor_expression PD_TC__StrictMaybe ci
 				PD_UnitType
 					-> type_code_constructor_expression PD_TC__Unit ci
 	typeConstructor (GTT_Constructor fun_ident _) ci

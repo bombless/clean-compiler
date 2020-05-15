@@ -168,11 +168,23 @@ BEPredefineListConstructorSymbol a0 a1 a2 a3 a4 a5 = code {
 }
 // void BEPredefineListConstructorSymbol (int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness,int tail_strictness);
 
+BEPredefineMaybeConstructorSymbol :: !Int !Int !BESymbKind !Int !BackEnd -> BackEnd;
+BEPredefineMaybeConstructorSymbol a0 a1 a2 a3 a4 = code {
+	ccall BEPredefineMaybeConstructorSymbol "IIII:V:p"
+}
+// void BEPredefineMaybeConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness);
+
 BEPredefineListTypeSymbol :: !Int !Int !BETypeSymbKind !Int !Int !BackEnd -> BackEnd;
 BEPredefineListTypeSymbol a0 a1 a2 a3 a4 a5 = code {
 	ccall BEPredefineListTypeSymbol "IIIII:V:p"
 }
 // void BEPredefineListTypeSymbol (int typeIndex,int moduleIndex,BETypeSymbKind symbolKind,int head_strictness,int tail_strictness);
+
+BEPredefineMaybeTypeSymbol :: !Int !Int !Int !BackEnd -> BackEnd;
+BEPredefineMaybeTypeSymbol a0 a1 a2 a3 = code {
+	ccall BEPredefineMaybeTypeSymbol "III:V:p"
+}
+// void BEPredefineMaybeTypeSymbol (int typeIndex,int moduleIndex,int head_strictness);
 
 BEAdjustStrictListConsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustStrictListConsInstance a0 a1 a2 = code {
@@ -180,17 +192,35 @@ BEAdjustStrictListConsInstance a0 a1 a2 = code {
 }
 // void BEAdjustStrictListConsInstance (int functionIndex,int moduleIndex);
 
+BEAdjustStrictJustInstance :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustStrictJustInstance a0 a1 a2 = code {
+	ccall BEAdjustStrictJustInstance "II:V:p"
+}
+// void BEAdjustStrictJustInstance (int functionIndex, int moduleIndex);
+
 BEAdjustUnboxedListDeconsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustUnboxedListDeconsInstance a0 a1 a2 = code {
 	ccall BEAdjustUnboxedListDeconsInstance "II:V:p"
 }
 // void BEAdjustUnboxedListDeconsInstance (int functionIndex,int moduleIndex);
 
+BEAdjustUnboxedFromJustInstance :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustUnboxedFromJustInstance a0 a1 a2 = code {
+	ccall BEAdjustUnboxedFromJustInstance "II:V:p"
+}
+// void BEAdjustUnboxedFromJustInstance (int functionIndex, int moduleIndex);
+
 BEAdjustOverloadedNilFunction :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustOverloadedNilFunction a0 a1 a2 = code {
 	ccall BEAdjustOverloadedNilFunction "II:V:p"
 }
 // void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
+
+BEAdjustOverloadedNothingFunction :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustOverloadedNothingFunction a0 a1 a2 = code {
+	ccall BEAdjustOverloadedNothingFunction "II:V:p"
+}
+// void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex);
 
 BEOverloadedConsSymbol :: !Int !Int !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BEOverloadedConsSymbol a0 a1 a2 a3 a4 = code {

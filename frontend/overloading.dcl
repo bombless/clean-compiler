@@ -22,10 +22,11 @@ from check_instances import ::SortedInstances
 	}
 
 ::	SpecialInstances =
-	{	si_next_array_member_index			:: !Index
+	{	si_next_generated_unboxed_record_member_index :: !Index
 	,	si_array_instances					:: ![ArrayInstance]
 	,	si_list_instances					:: ![ArrayInstance]
 	,	si_tail_strict_list_instances		:: ![ArrayInstance]
+	,	si_unboxed_maybe_instances			:: ![ArrayInstance]
 	}
 	
 ::	OverloadingState =
