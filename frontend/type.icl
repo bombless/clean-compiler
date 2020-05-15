@@ -2673,6 +2673,123 @@ addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,
 			 st_vars = st_vars ++ drop (length st_vars) new_vars, st_attr_vars = (take (length new_attrs - length st_attr_vars) new_attrs) ++ st_attr_vars,
 			 st_arity = st_arity + nr_of_lifted_arguments,st_context = take (length new_context - length st_context) new_context ++ st_context }
 
+create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index} fun_env_size common_defs fun_defs predef_symbols type_heaps error
+	# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
+		with
+			add_extra_elements_to_fun_def_array n_new_elements fun_defs
+				| n_new_elements==0
+					= fun_defs
+					# dummy_fun_def = { fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
+													fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
+					= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
+	  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
+			= convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps	error
+	  (list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
+			= convert_list_instances si_list_instances PD_UListClass common_defs fun_defs predef_symbols type_heaps error
+	  (tail_strict_list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
+			= convert_list_instances si_tail_strict_list_instances PD_UTSListClass common_defs fun_defs predef_symbols type_heaps error
+	  array_first_instance_indices = first_instance_indices si_array_instances
+	  array_and_list_instances = {
+			ali_array_first_instance_indices=array_first_instance_indices,
+			ali_list_first_instance_indices=list_first_instance_indices,
+			ali_tail_strict_list_first_instance_indices=tail_strict_list_first_instance_indices,
+			ali_instances_range={ ir_from = fun_env_size, ir_to = si_next_array_member_index }
+		}
+	= (array_and_list_instances,fun_defs,predef_symbols,type_heaps,error)
+where
+	convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps error
+		| isEmpty array_instances
+			= ([],fun_defs, predef_symbols, type_heaps, error)
+			# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
+			# pds_ident = predefined_idents.[PD_UnboxedArrayType]
+			  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
+			  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
+			  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
+			  array_members = common_defs.[pds_module].com_member_defs
+			  (offset_table, _, predef_symbols) = arrayFunOffsetToPD_IndexTable array_members predef_symbols
+			  (fun_defs, type_heaps, error) = foldSt (convert_array_instance class_members array_members unboxed_array_type offset_table) array_instances (fun_defs, type_heaps, error)
+			  array_first_instance_indices = first_instance_indices array_instances
+			= (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
+	where
+		convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record,ai_members} funs_heaps_and_error
+			= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_heaps_and_error
+		where
+			first_instance_index=ai_members.[0].cim_index
+
+			create_instance_types :: {#DefinedSymbol} {#MemberDef} Type {#Int} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
+				-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
+			create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
+				| member_index == 0
+					= funs_heaps_and_error
+					# member_index = dec member_index
+					  funs_heaps_and_error = create_instance_type members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
+					= create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
+
+			create_instance_type members array_members unboxed_array_type offset_table record_type member_index (fun_defs, type_heaps, error)
+				# {me_type,me_ident,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
+				  instance_type = {it_vars = [], it_attr_vars = [], it_context = [], it_types = [unboxed_array_type, record_type]}
+				  (instance_type, _, type_heaps, _, error)
+					= determineTypeOfMemberInstance me_type me_class_vars instance_type SP_None type_heaps No error
+				  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
+				  fun_index = first_instance_index+member_index
+				  fun =
+					{	fun_ident		= me_ident
+					,	fun_arity		= me_type.st_arity
+					,	fun_priority	= NoPrio
+					,	fun_body		= NoBody
+					,	fun_type		= Yes instance_type
+					,	fun_pos			= me_pos
+					,	fun_kind		= FK_Unknown
+					,	fun_lifted		= 0
+					,	fun_info		= EmptyFunInfo
+					}
+				= ({fun_defs & [fun_index]=fun}, type_heaps, error)
+
+	convert_list_instances list_instances predef_list_class_index common_defs fun_defs predef_symbols type_heaps error
+		| isEmpty list_instances
+			= ([],fun_defs, predef_symbols, type_heaps, error)
+			# ({pds_module,pds_def},predef_symbols) = predef_symbols![predef_list_class_index]
+			  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
+			  list_members = common_defs.[pds_module].com_member_defs
+			  (fun_defs, type_heaps, error) = foldSt (convert_list_instance class_members list_members) list_instances (fun_defs, type_heaps, error)
+			  list_first_instance_indices = first_instance_indices list_instances
+			= (list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
+	where
+		convert_list_instance class_members list_members {ai_record,ai_members} funs_heaps_and_error
+			= create_instance_types class_members list_members (TA ai_record []) (size class_members) funs_heaps_and_error
+		where
+			first_instance_index=ai_members.[0].cim_index
+
+			create_instance_types :: {#DefinedSymbol} {#MemberDef} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
+				-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
+			create_instance_types members list_members record_type member_index funs_heaps_and_error
+				| member_index == 0
+					= funs_heaps_and_error
+					# member_index = dec member_index
+					  funs_heaps_and_error = create_instance_type members list_members record_type member_index funs_heaps_and_error
+					= create_instance_types members list_members record_type member_index funs_heaps_and_error
+
+			create_instance_type members list_members record_type member_index (fun_defs, type_heaps, error)
+				# {me_type,me_ident,me_class_vars,me_pos} = list_members.[members.[member_index].ds_index]
+				  (instance_type, _, type_heaps, _, error) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
+														it_types = [record_type]} SP_None type_heaps No error
+				  fun_index = first_instance_index+member_index
+				  fun =
+					{	fun_ident		= me_ident
+					,	fun_arity		= me_type.st_arity
+					,	fun_priority	= NoPrio
+					,	fun_body		= NoBody
+					,	fun_type		= Yes instance_type
+					,	fun_pos			= me_pos
+					,	fun_kind		= FK_Unknown
+					,	fun_lifted		= 0
+					,	fun_info		= {EmptyFunInfo & fi_properties=FI_IsUnboxedListOfRecordsConsOrNil}
+					}
+				= ({fun_defs & [fun_index]=fun}, type_heaps, error)
+
+	first_instance_indices instances
+		= [ai_members.[0].cim_index \\ {ai_members}<-instances]
+
 ::	FunctionRequirements =
 	{	fe_requirements	:: !Requirements
 	,	fe_context		:: !Optional [TypeContext]
@@ -2704,14 +2821,8 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  (type_error, predef_symbols, special_instances,out, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, predef_symbols, special_instances, out,
 							{ ts & ts_fun_env = ts_fun_env,ts_fun_defs=fun_defs })
-	  (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,predef_symbols,ts_type_heaps,ts_error)
+	  (array_and_list_instances,fun_defs,predef_symbols,ts_type_heaps,ts_error)
 	  		= create_special_instances special_instances fun_env_size ti_common_defs ts_fun_defs predef_symbols ts_type_heaps ts_error
-	  array_and_list_instances = {
-		  	ali_array_first_instance_indices=array_first_instance_indices,
-			ali_list_first_instance_indices=list_first_instance_indices,
-			ali_tail_strict_list_first_instance_indices=tail_strict_list_first_instance_indices,
-			ali_instances_range={ ir_from = fun_env_size, ir_to = special_instances.si_next_array_member_index }
-		}
 	# ts_var_heap = clear_var_heap ti_functions ti_common_defs ts_var_heap
 	= (not type_error, fun_defs, array_and_list_instances, ti_common_defs, ti_functions,
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
@@ -3176,116 +3287,6 @@ where
 		 
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
-
-	create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_next_array_member_index} fun_env_size common_defs fun_defs predef_symbols type_heaps error
-		# fun_defs = add_extra_elements_to_fun_def_array (si_next_array_member_index-fun_env_size) fun_defs
-		  	with
-		  		add_extra_elements_to_fun_def_array n_new_elements fun_defs
-		  			| n_new_elements==0
-		  				= fun_defs
-			  			# dummy_fun_def = { fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
-										  				fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
-			  			= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
-		  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
-		  		= convert_array_instances si_array_instances common_defs fun_defs predef_symbols type_heaps	error  
-		  (list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
-		  		= convert_list_instances si_list_instances PD_UListClass common_defs fun_defs predef_symbols type_heaps error
-		  (tail_strict_list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
-		  		= convert_list_instances si_tail_strict_list_instances PD_UTSListClass common_defs fun_defs predef_symbols type_heaps error
-		  array_first_instance_indices = first_instance_indices si_array_instances
-		= (array_first_instance_indices,list_first_instance_indices,tail_strict_list_first_instance_indices,fun_defs,predef_symbols,type_heaps,error)
-	where
-		convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps error
-			| isEmpty array_instances
-				= ([],fun_defs, predef_symbols, type_heaps, error)
-				# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
-				# pds_ident = predefined_idents.[PD_UnboxedArrayType]
-				  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
-				  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
-				  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
-				  array_members = common_defs.[pds_module].com_member_defs
-				  (offset_table, _, predef_symbols) = arrayFunOffsetToPD_IndexTable array_members predef_symbols
-				  (fun_defs, type_heaps, error) = foldSt (convert_array_instance class_members array_members unboxed_array_type offset_table) array_instances (fun_defs, type_heaps, error)
-		  		  array_first_instance_indices = first_instance_indices array_instances
-				= (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
-		where
-			convert_array_instance class_members array_members unboxed_array_type offset_table {ai_record,ai_members} funs_heaps_and_error
-				= create_instance_types class_members array_members unboxed_array_type offset_table (TA ai_record []) (size class_members) funs_heaps_and_error
-			where
-				first_instance_index=ai_members.[0].cim_index
-
-				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type {#Int} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
-					-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin);
-				create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
-					| member_index == 0
-						= funs_heaps_and_error
-						# member_index = dec member_index
-						  funs_heaps_and_error = create_instance_type members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
-						= create_instance_types members array_members unboxed_array_type offset_table record_type member_index funs_heaps_and_error
-		
-				create_instance_type members array_members unboxed_array_type offset_table record_type member_index (fun_defs, type_heaps, error)
-					# {me_type,me_ident,me_class_vars,me_pos} = array_members.[members.[member_index].ds_index]
-					  (instance_type, _, type_heaps, _, error) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
-															it_types = [unboxed_array_type, record_type]} SP_None type_heaps No error
-					  instance_type = makeElemTypeOfArrayFunctionStrict instance_type member_index offset_table
-					  fun_index = first_instance_index+member_index
-					  fun = 
-						{	fun_ident		= me_ident
-						,	fun_arity		= me_type.st_arity
-						,	fun_priority	= NoPrio
-						,	fun_body		= NoBody
-						,	fun_type		= Yes instance_type
-						,	fun_pos			= me_pos
-						,	fun_kind		= FK_Unknown
-						,	fun_lifted		= 0
-						,	fun_info		= EmptyFunInfo
-						}
-					= ({fun_defs & [fun_index]=fun}, type_heaps, error)
-
-		convert_list_instances list_instances predef_list_class_index common_defs fun_defs predef_symbols type_heaps error
-			| isEmpty list_instances
-				= ([],fun_defs, predef_symbols, type_heaps, error)
-				# ({pds_module,pds_def},predef_symbols) = predef_symbols![predef_list_class_index]
-				  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
-				  list_members = common_defs.[pds_module].com_member_defs
-				  (fun_defs, type_heaps, error) = foldSt (convert_list_instance class_members list_members) list_instances (fun_defs, type_heaps, error)
-		  		  list_first_instance_indices = first_instance_indices list_instances
-				= (list_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
-		where
-			convert_list_instance class_members list_members {ai_record,ai_members} funs_heaps_and_error
-				= create_instance_types class_members list_members (TA ai_record []) (size class_members) funs_heaps_and_error
-			where
-				first_instance_index=ai_members.[0].cim_index
-
-				create_instance_types :: {#DefinedSymbol} {#MemberDef} Type !Int !(!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
-					-> (!*{#FunDef}, !*TypeHeaps, !*ErrorAdmin)
-				create_instance_types members list_members record_type member_index funs_heaps_and_error
-					| member_index == 0
-						= funs_heaps_and_error
-						# member_index = dec member_index
-						  funs_heaps_and_error = create_instance_type members list_members record_type member_index funs_heaps_and_error
-						= create_instance_types members list_members record_type member_index funs_heaps_and_error
-
-				create_instance_type members list_members record_type member_index (fun_defs, type_heaps, error)
-					# {me_type,me_ident,me_class_vars,me_pos} = list_members.[members.[member_index].ds_index]
-					  (instance_type, _, type_heaps, _, error) = determineTypeOfMemberInstance me_type me_class_vars {it_vars = [], it_attr_vars = [], it_context = [],
-															it_types = [record_type]} SP_None type_heaps No error
-					  fun_index = first_instance_index+member_index
-					  fun = 
-						{	fun_ident		= me_ident
-						,	fun_arity		= me_type.st_arity
-						,	fun_priority	= NoPrio
-						,	fun_body		= NoBody
-						,	fun_type		= Yes instance_type
-						,	fun_pos			= me_pos
-						,	fun_kind		= FK_Unknown
-						,	fun_lifted		= 0
-						,	fun_info		= {EmptyFunInfo & fi_properties=FI_IsUnboxedListOfRecordsConsOrNil}
-						}
-					= ({fun_defs & [fun_index]=fun}, type_heaps, error)
-	
-		first_instance_indices instances
-			= [ai_members.[0].cim_index \\ {ai_members}<-instances]
 	
 	create_erroneous_function_types group ts
 		= foldSt create_erroneous_function_type group ts

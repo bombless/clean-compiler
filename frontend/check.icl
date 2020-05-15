@@ -3473,14 +3473,13 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 		adjust_instances_of__SystemStrictLists_module :: !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})
 																	-> (!*{#ClassInstance},!v:{#PredefinedSymbol})
 		adjust_instances_of__SystemStrictLists_module strict_lists_mod_index inst_index (class_instances, predef_symbols)
-			# ({ins_class_index={gi_module,gi_index},ins_type={it_types}}, class_instances) = class_instances![inst_index]
+			# {ins_class_index={gi_module,gi_index},ins_type={it_types}} = class_instances.[inst_index]
 			| gi_module==strict_lists_mod_index
 				&& (gi_index==predef_symbols.[PD_UListClass].pds_def || gi_index==predef_symbols.[PD_UTSListClass].pds_def)
 				= case it_types of
 					[TV _]
 						# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
 						-> (class_instances, predef_symbols)
-					_
 						-> (class_instances, predef_symbols)
 				= (class_instances, predef_symbols)
 

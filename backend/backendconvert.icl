@@ -320,11 +320,9 @@ backEndConvertModulesH predefs {fe_icl =
 	#! (type_var_heap,backEnd)
 		=	declare_icl_common_defs main_dcl_module_n iaci_start_index_generic_classes iaci_not_exported_generic_classes icl_common currentDcl.dcl_common currentDcl.dcl_module_kind type_var_heap backEnd
 	#! backEnd
-		=	declareArrayInstances ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		=	declareListInstances ali_list_first_instance_indices PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		=	declareListInstances ali_tail_strict_list_first_instance_indices PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+		= declareGeneratedUnboxedRecordInstances
+			ali_array_first_instance_indices ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices
+			predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	#! backEnd
 		=	adjustArrayFunctions ali_array_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls icl_common.com_instance_defs icl_used_module_numbers backEnd
 	#! backEnd
@@ -414,6 +412,10 @@ remove_VI_ExpandedMemberType_of_List_cons dcls main_dcl_module_n icl_used_module
 	# {sd_type_ptr,sd_ident,sd_type_index} = com_selector_defs.[0]
 	| sd_ident.id_name<>"_cons" || com_type_defs.[sd_type_index].td_ident.id_name<>"List;"
 		= abort "error in function remove_VI_ExpandedMemberType_of_List_cons"
+	= remove_VI_ExpandedMemberType sd_type_ptr var_heap
+
+remove_VI_ExpandedMemberType :: !VarInfoPtr !*VarHeap -> (!VarInfo,!VarInfoPtr,!*VarHeap)
+remove_VI_ExpandedMemberType sd_type_ptr var_heap
 	# (old_cons_vi,var_heap) = readPtr sd_type_ptr var_heap
 	= case old_cons_vi of
 		VI_ExpandedMemberType _ previous_vi
@@ -637,56 +639,37 @@ folds op l r :== folds l r
 		folds [] r = r
 		folds [a:x]	r = folds x (op a r)
 
-declareArrayInstances :: [Int] /*IndexRange*/ PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
-declareArrayInstances [] predefs main_dcl_module_n functions dcls
-	= identity
-declareArrayInstances array_first_instance_indices /*{ir_from, ir_to}*/ predefs main_dcl_module_n functions dcls
-//	| trace_tn ("declareArrayInstances "+++toString ir_from+++" "+++toString ir_to)
-//	=	foldStateWithIndexRangeA declareArrayInstance ir_from ir_to functions
-	= folds (declareArrayInstances 0) array_first_instance_indices
-	where
-		arrayModuleIndex = predefs.[PD_StdArray].pds_def
-		arrayClassIndex = predefs.[PD_ArrayClass].pds_def
-		stdArray = dcls.[arrayModuleIndex]
-		arrayClass = stdArray.dcl_common.com_class_defs.[arrayClassIndex]
-		n_array_class_members=size arrayClass.class_members
+declareGeneratedUnboxedRecordInstances
+		ali_array_first_instance_indices ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices
+		predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		= declareGeneratedUnboxedRecordInstancesOfClass ali_array_first_instance_indices PD_StdArray PD_ArrayClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		= declareGeneratedUnboxedRecordInstancesOfClass ali_list_first_instance_indices PD_StdStrictLists PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	#! backEnd
+		= declareGeneratedUnboxedRecordInstancesOfClass ali_tail_strict_list_first_instance_indices PD_StdStrictLists PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
+	= backEnd
 
-		declareArrayInstances :: Int Index *BackEndState -> *BackEndState
-		declareArrayInstances member_n first_member_index backend
-			| member_n==n_array_class_members
+declareGeneratedUnboxedRecordInstancesOfClass :: [Int] Int Int PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
+declareGeneratedUnboxedRecordInstancesOfClass [] predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls
+	= identity
+declareGeneratedUnboxedRecordInstancesOfClass ali_first_instance_indices predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls
+	#! n_class_members=size dcls.[class_module_index].dcl_common.com_class_defs.[class_index].class_members
+	= folds (declareInstances 0 n_class_members) ali_first_instance_indices
+	where
+		class_module_index = predefs.[predef_class_module_index].pds_def
+		class_index = predefs.[predef_class_index].pds_def
+
+		declareInstances :: Int Int Index *BackEndState -> *BackEndState
+		declareInstances member_n n_class_members first_member_index backend
+			| member_n==n_class_members
 				= backend
 				# function_index=first_member_index+member_n
-				# backend = declareArrayInstance function_index functions.[function_index] backend
-				= declareArrayInstances (member_n+1) first_member_index backend
+				# backend = declareInstance function_index functions.[function_index] backend
+				= declareInstances (member_n+1) n_class_members first_member_index backend
 
-		declareArrayInstance :: Index FunDef -> BackEnder
-		declareArrayInstance index {fun_ident={id_name}, fun_type=Yes type}
-			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
-			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
-
-declareListInstances :: [Int] Int PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
-declareListInstances [] predef_list_class_index predefs main_dcl_module_n functions dcls
-	= identity
-declareListInstances array_first_instance_indices predef_list_class_index predefs main_dcl_module_n functions dcls
-	= folds (declareListInstances 0) array_first_instance_indices
-	where
-		strictListModuleIndex = predefs.[PD_StdStrictLists].pds_def
-		listClassIndex = predefs.[predef_list_class_index].pds_def
-		stdStrictLists = dcls.[strictListModuleIndex]
-		listClass = stdStrictLists.dcl_common.com_class_defs.[listClassIndex]
-		n_list_class_members=size listClass.class_members
-
-		declareListInstances :: Int Index *BackEndState -> *BackEndState
-		declareListInstances member_n first_member_index backend
-			| member_n==n_list_class_members
-				= backend
-				# function_index=first_member_index+member_n
-				# backend = declareListInstance function_index functions.[function_index] backend
-				= declareListInstances (member_n+1) first_member_index backend
-
-		declareListInstance :: Index FunDef -> BackEnder
-		declareListInstance index {fun_ident={id_name}, fun_type=Yes type}
-//			| trace_tn ("declareListInstance "+++toString index+++" "+++toString main_dcl_module_n)
+		declareInstance :: Index FunDef -> BackEnder
+		declareInstance index {fun_ident={id_name}, fun_type=Yes type}
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type)
 
@@ -1113,8 +1096,7 @@ predefineSymbols {dcl_common} predefs
 	where
 		list_types :: [(Int,Int,Int)]
 		list_types
-			=	[
-					(PD_ListType,0,0),
+			=	[	(PD_ListType,0,0),
 					(PD_StrictListType,2,0),
 					(PD_UnboxedListType,3,0),
 					(PD_TailStrictListType,0,1),
@@ -1129,8 +1111,7 @@ predefineSymbols {dcl_common} predefs
 
 		types :: [(Int, Int, BESymbKind)]
 		types
-			=	[	
-					(PD_LazyArrayType, 1, BEArrayType)
+			=	[	(PD_LazyArrayType, 1, BEArrayType)
 				,	(PD_StrictArrayType, 1, BEStrictArrayType)
 				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
 				,	(PD_PackedArrayType, 1, BEPackedArrayType)
@@ -1144,8 +1125,7 @@ predefineSymbols {dcl_common} predefs
 
 		list_constructors :: [(Int,BESymbKind,Int,Int)]
 		list_constructors
-			=	[
-					(PD_NilSymbol, BENilSymb,0,0),
+			=	[	(PD_NilSymbol, BENilSymb,0,0),
 					(PD_StrictNilSymbol, BENilSymb,2,0),
 					(PD_UnboxedNilSymbol, BENilSymb,4/*3*/,0),
 					(PD_TailStrictNilSymbol, BENilSymb,0,1),
