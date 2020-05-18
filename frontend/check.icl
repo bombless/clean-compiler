@@ -3469,14 +3469,15 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 																-> (!*{#ClassInstance},!v:{#PredefinedSymbol})
 		adjust_instances_of_array_functions array_mod_index array_class_index inst_index (class_instances, predef_symbols)
 			# ({ins_class_index={gi_module,gi_index},ins_type}, class_instances) = class_instances![inst_index]
-			| gi_module==array_mod_index && gi_index==array_class_index && is_polymorphic_unboxed_array_instance_type ins_type.it_types predef_symbols
+			| gi_module==array_mod_index && gi_index==array_class_index && is_polymorphic_unboxed_or_packed_array_instance_type ins_type.it_types predef_symbols
 				# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
 				= (class_instances, predef_symbols)
 				= (class_instances, predef_symbols)
 
-		is_polymorphic_unboxed_array_instance_type [TA {type_index={glob_object,glob_module}} _, TV _ : _] predef_symbols
-			= glob_module == predef_symbols.[PD_PredefinedModule].pds_def && glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def
-		is_polymorphic_unboxed_array_instance_type _ _
+		is_polymorphic_unboxed_or_packed_array_instance_type [TA {type_index={glob_object,glob_module}} _, TV _ : _] predef_symbols
+			= glob_module == predef_symbols.[PD_PredefinedModule].pds_def &&
+				(glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def || glob_object == predef_symbols.[PD_PackedArrayType].pds_def)
+		is_polymorphic_unboxed_or_packed_array_instance_type _ _
 			= False
 
 		adjust_instances_of__SystemStrictLists_module :: !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})
