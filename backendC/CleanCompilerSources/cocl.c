@@ -3,9 +3,6 @@
 #include "comsupport.h"
 #include "settings.h"
 #include <ctype.h>
-#include "compiler.h"
-
-#include "MAIN_CLM.d"
 
 #if defined (_MSC_VER) || defined (_SUN_)
 FILE *std_out_file_p,*std_error_file_p;
