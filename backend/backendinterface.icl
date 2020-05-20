@@ -72,10 +72,26 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	BEInit (length commandLineArgs) backEndFiles
 	# backEnd
 		=	foldState BEArg commandLineArgs backEnd
+	# (be_parse_command_args_result, backEnd) = BEParseCommandArgs backEnd
+	| be_parse_command_args_result<0
+		# error_arg_n = -1-be_parse_command_args_result
+		  errorFile = errorFile <<< "Command line error: "
+		  errorFile
+			= if (error_arg_n<length commandLineArgs)
+				(errorFile <<< "unknown flag: " <<< (commandLineArgs !! error_arg_n))
+				(errorFile <<< "file name expected after : " <<< (commandLineArgs !! (error_arg_n-1)))
+		  errorFile = errorFile <<< '\n'
+		  backEndFiles = BEFree backEnd backEndFiles
+		=	(backEndFiles == 0 && False, var_heap, type_var_heap, attrHeap, errorFile, outFile)
+		
 	# (type_var_heap,var_heap,attrHeap,backEnd)
 		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n type_var_heap varHeap attrHeap backEnd
 	# (success, backEnd)
-		=	BEGenerateCode outputFileName backEnd
+		=	BEGenerateStatesAndOptimise backEnd
+	# (success, backEnd)
+		=	if success
+				(BEGenerateCode outputFileName backEnd)
+				(False, backEnd)
 	# backEnd
 		=	BECloseFiles backEnd
 	# (attrHeap, outFile, backEnd)

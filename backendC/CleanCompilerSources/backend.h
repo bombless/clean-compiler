@@ -477,6 +477,12 @@ Clean (BEDeclarePredefinedModule :: Int Int BackEnd -> BackEnd)
 void BEDefineRules (BEImpRuleP rules);
 Clean (BEDefineRules :: BEImpRuleP BackEnd -> BackEnd)
 
+int BEParseCommandArgs (void);
+Clean (BEParseCommandArgs :: BackEnd -> (Int, BackEnd))
+
+int BEGenerateStatesAndOptimise (void);
+Clean (BEGenerateStatesAndOptimise :: BackEnd -> (Bool, BackEnd))
+
 int BEGenerateCode (CleanString outputFile);
 Clean (BEGenerateCode :: String BackEnd -> (Bool, BackEnd))
 

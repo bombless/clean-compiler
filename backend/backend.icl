@@ -666,6 +666,18 @@ BEDefineRules a0 a1 = code {
 }
 // void BEDefineRules (BEImpRuleP rules);
 
+BEParseCommandArgs :: !BackEnd -> (!Int,!BackEnd);
+BEParseCommandArgs a0 = code {
+	ccall BEParseCommandArgs ":I:p"
+}
+// int BEParseCommandArgs (void);
+
+BEGenerateStatesAndOptimise :: !BackEnd -> (!Bool,!BackEnd);
+BEGenerateStatesAndOptimise a0 = code {
+	ccall BEGenerateStatesAndOptimise ":I:p"
+}
+// int BEGenerateStatesAndOptimise (void);
+
 BEGenerateCode :: !String !BackEnd -> (!Bool,!BackEnd);
 BEGenerateCode a0 a1 = code {
 	ccall BEGenerateCode "S:I:p"

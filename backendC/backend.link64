@@ -101,6 +101,8 @@
 /EXPORT:BEDeclareDclModule
 /EXPORT:BEDeclarePredefinedModule
 /EXPORT:BEDefineRules
+/EXPORT:BEParseCommandArgs
+/EXPORT:BEGenerateStatesAndOptimise
 /EXPORT:BEGenerateCode
 /EXPORT:BEExportType
 /EXPORT:BEExportConstructor

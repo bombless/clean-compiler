@@ -105,6 +105,8 @@ EXPORTS
  BEDeclareDclModule
  BEDeclarePredefinedModule
  BEDefineRules
+ BEParseCommandArgs
+ BEGenerateStatesAndOptimise
  BEGenerateCode
  BEGetError
  BEExportType

@@ -71,7 +71,7 @@ static FILE *freopen_with_file_name_conversion (char *file_name,char *mode,FILE 
 # define freopen freopen_with_file_name_conversion
 #endif
 
-Bool ParseCommandArgs (int argc, char **argv)
+int ParseCommandArgs (int argc, char **argv)
 {
 	int i;
 
@@ -180,10 +180,8 @@ Bool ParseCommandArgs (int argc, char **argv)
 				OptimizeInstanceCalls=True;
 #endif
 			else if (strncmp (argv_i, "-sa", 3) == 0){
-				if (!SetStrictOption (argv[i]+3)){
-					CmdError ("unknown flag ", argv[i]);
-					return False;
-				}
+				if (!SetStrictOption (argv[i]+3))
+					return ~i;
 			} else if (strcmp (argv_i, "-RE") == 0){
 				if (++i < argc){
 # if defined (_MSC_VER) || defined (_SUN_)
@@ -198,10 +196,8 @@ Bool ParseCommandArgs (int argc, char **argv)
 					StdErrorReopened	= True;
 # endif
 #endif
-				} else {
-					CmdError ("file name expected after -RE",NULL);
-					return False;
-				}
+				} else
+					return ~i;
 			} else if (strcmp (argv_i, "-RAE") == 0){
 				if (++i < argc){
 #if defined (_MSC_VER) || defined (_SUN_)
@@ -216,10 +212,8 @@ Bool ParseCommandArgs (int argc, char **argv)
 					StdErrorReopened	= True;
 # endif
 #endif
-				} else {
-					CmdError ("file name expected after -RAE",NULL);
-					return False;
-				}
+				} else
+					return ~i;
 			} else if (strcmp (argv_i, "-RO") == 0){
 				if (++i < argc){
 #if defined (_MSC_VER) || defined (_SUN_)
@@ -234,10 +228,8 @@ Bool ParseCommandArgs (int argc, char **argv)
 					StdOutReopened	= True;
 # endif
 #endif
-				} else {
-					CmdError ("file name expected after -RO",NULL);
-					return False;
-				}
+				} else
+					return ~i;
 			} else if (strcmp (argv_i, "-RAO") == 0){
 				if (++i < argc){
 #if defined (_MSC_VER) || defined (_SUN_)
@@ -252,14 +244,10 @@ Bool ParseCommandArgs (int argc, char **argv)
 					StdOutReopened	= True;
 # endif
 #endif
-				} else {
-					CmdError ("file name expected after -RAO",NULL);
-					return False;
-				}
-			} else {
-				CmdError ("unknown flag %s", argv_i);
-				return False;
-			}
+				} else
+					return ~i;
+			} else
+				return ~i;
 		} else {
 			/* process (non-flag) argument, not used anymore */
 		}
@@ -271,5 +259,5 @@ Bool ParseCommandArgs (int argc, char **argv)
 
 	InitCompiler();
 
-	return True;
+	return 1;
 }

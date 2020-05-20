@@ -41,14 +41,3 @@ int FPutS (char *s, File f)
 {
 	return fputs (s, (FILE *) f);
 } /* FPutS */
-
-/* Error Handling */
-
-void CmdError (char *errormsg1,char *errormsg2)
-{
-	fputs ("Command line error: ", stdout);
-	fputs (errormsg1, stdout);
-	if (errormsg2!=NULL)
-		fputs (errormsg2, stdout);
-	fputc ('\n', stdout); 
-}

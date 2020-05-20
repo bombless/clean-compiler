@@ -1122,7 +1122,7 @@ static void CodeRule (ImpRuleP rule)
 		GenPE();
 }
 
-static void GenerateStatesAndOptimise (ImpMod imod)
+void GenerateStatesAndOptimise (ImpMod imod)
 {
 	if (! CompilerError){
 		int DoStrictnessAnalysis_and_init_ok;
@@ -1180,8 +1180,6 @@ static void GenerateStatesAndOptimise (ImpMod imod)
 
 void CodeGeneration (ImpMod imod, char *fname)
 {
-	GenerateStatesAndOptimise (imod);
-
 	if (DoCode && !CompilerError){
 		ImpRuleS *rule;
 

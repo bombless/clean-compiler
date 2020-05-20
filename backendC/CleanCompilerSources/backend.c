@@ -3063,16 +3063,21 @@ BENoCodeParameters (void)
 	return (NULL);
 } /* BENoCodeParameters */
 
+extern int ParseCommandArgs (int argc, char **argv);
+
+int BEParseCommandArgs (void)
+{
+	return ParseCommandArgs (gBEState.be_argc, gBEState.be_argv);
+}
+
 #if 0
 File rules_file;
 #endif
 
 struct clean_string_128 { size_t length; char chars[128]; } clean_error_string;
 
-int
-BEGenerateCode (CleanString outputFile)
+int BEGenerateStatesAndOptimise (void)
 {
-	char	*outputFileName;
 	ImpRule	rule;
 
 	clean_error_string.length=0;
@@ -3096,7 +3101,27 @@ BEGenerateCode (CleanString outputFile)
 	rule->rule_next	= gBEState.be_icl.beicl_module->im_rules;
 	gBEState.be_icl.beicl_module->im_rules	=	rule;
 
-	outputFileName	= ConvertCleanString (outputFile);
+	GenerateStatesAndOptimise (gBEState.be_icl.beicl_module);
+
+	ExitEnv_valid=0;
+
+	return !CompilerError;
+}
+
+int
+BEGenerateCode (CleanString outputFile)
+{
+	char	*outputFileName;
+
+	if (CompilerError)
+		return False;
+
+	if (setjmp (ExitEnv)!=0){
+		ExitEnv_valid=0;
+		return False;
+	}
+
+	ExitEnv_valid=1;
 
 #if 0
 	{
@@ -3120,6 +3145,8 @@ BEGenerateCode (CleanString outputFile)
 #if 0
 	rules_file=fopen ("Rules","w");
 #endif
+
+	outputFileName	= ConvertCleanString (outputFile);
 
 	CodeGeneration (gBEState.be_icl.beicl_module, outputFileName);
 
@@ -3394,20 +3421,12 @@ CheckBEEnumTypes (void)
 	Assert (SELECTOR_N	== BESelector_N);
 } /* CheckBEEnumTypes */
 
-extern Bool ParseCommandArgs (int argc, char **argv);
-
 void
 BEArg (CleanString arg)
 {
 	Assert (gBEState.be_argi < gBEState.be_argc);
 
 	gBEState.be_argv [gBEState.be_argi++]	= ConvertCleanString (arg);
-
-	// +++ ugly
-	if (gBEState.be_argi == gBEState.be_argc){
-		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv))
-			FatalCompError ("backend", "BEInit", "compilation aborted");
-	}
 } /* BEArg */
 
 #if STRICT_LISTS
@@ -3542,12 +3561,6 @@ BEInit (int argc)
 
 	special_types[0]=NULL;
 	special_types[1]=NULL;
-
-	if (argc==0){
-		/* ParseCommandArgs is called in BEArg if argc>0 */
-		if (!ParseCommandArgs (gBEState.be_argc, gBEState.be_argv))
-			FatalCompError ("backend", "BEInit", "compilation aborted");
-	}
 
 	return ((BackEnd) &gBEState);
 } /* BEInit */
