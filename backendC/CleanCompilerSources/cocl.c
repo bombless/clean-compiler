@@ -253,10 +253,6 @@ int ParseCommandArgs (int argc, char **argv)
 		}
 	}
 
-#ifdef _MAC_
-	GetInitialPathList();
-#endif
-
 	InitCompiler();
 
 	return 1;
