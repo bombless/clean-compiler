@@ -1,6 +1,4 @@
 /*
-	module owner: Ronny Wichers Schreur
-
 	This module contains some file functions that are not in StdEnv
 	It uses the object file from Directory 1.1, but with a different
 	(stripped down) interface.
@@ -48,10 +46,16 @@ M_NotEnoughSpace	:== -4
 M_AlreadyExists		:== -5
 M_NoPermission		:== -6
 
+fremoveC :: !String  !*env -> (!ErrCode, !*env)
+fremoveC _ _
+	= code {
+		ccall fremoveC "S:I:A"
+	}
+
 // END copied from Directory.icl
 
 // return last modified time (local time) as "yyyymmddhhmmss" or "" on error
-fmodificationtime :: {#Char} !*env -> (!{#Char}, !*env) | FileSystem env
+fmodificationtime :: !{#Char} !*env -> (!{#Char}, !*env) | FileSystem env
 fmodificationtime path env
 	# (result, env)
 		= findSingleFileC (path+++"\0") env
@@ -79,6 +83,7 @@ dateTimeTupleToString ((year, month, day, _), (hours, minutes, seconds))
 						=	createArray n '0'
 					// otherwise
 						=	""
+
 ensureDirectoryExists :: !{#Char} !*env -> (!Bool, !*env) | FileSystem env
 // returned bool: now there is such a subfolder
 ensureDirectoryExists path env
@@ -86,4 +91,7 @@ ensureDirectoryExists path env
 	  (err_code, env) = createDirectoryC path_c_string env
 	= (err_code==M_NoDirError || err_code==M_AlreadyExists, env)
 
-
+fremove :: !{#Char} !*env -> (!Bool, !*env) | FileSystem env
+fremove path env
+	# (err_code, env) = fremoveC (path+++"\0") env
+	= (err_code==M_NoDirError || err_code==M_DoesntExist, env)
