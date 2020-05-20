@@ -102,6 +102,8 @@ BEDeclareIclModule
 BEDeclareDclModule
 BEDeclarePredefinedModule
 BEDefineRules
+BEParseCommandArgs
+BEGenerateStatesAndOptimise
 BEGenerateCode
 BEExportType
 BEExportConstructor
