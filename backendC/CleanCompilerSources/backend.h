@@ -486,9 +486,6 @@ Clean (BEGenerateStatesAndOptimise :: BackEnd -> (Bool, BackEnd))
 int BEGenerateCode (CleanString outputFile);
 Clean (BEGenerateCode :: String BackEnd -> (Bool, BackEnd))
 
-CleanString BEGetError (void);
-Clean (CleanString :: BackEnd -> (String, BackEnd))
-
 void BEExportType (int isDictionary, int typeIndex);
 Clean (BEExportType :: Bool Int BackEnd -> BackEnd)
 

@@ -108,7 +108,6 @@ EXPORTS
  BEParseCommandArgs
  BEGenerateStatesAndOptimise
  BEGenerateCode
- BEGetError
  BEExportType
  BEExportConstructor
  BEExportField

@@ -3074,13 +3074,9 @@ int BEParseCommandArgs (void)
 File rules_file;
 #endif
 
-struct clean_string_128 { size_t length; char chars[128]; } clean_error_string;
-
 int BEGenerateStatesAndOptimise (void)
 {
 	ImpRule	rule;
-
-	clean_error_string.length=0;
 
 	if (CompilerError)
 		return False;
@@ -3158,11 +3154,6 @@ BEGenerateCode (CleanString outputFile)
 
 	return (!CompilerError);
 } /* BEGenerateCode */
-
-CleanString BEGetError (void)
-{
-	return (CleanString)&clean_error_string;
-}
 
 void
 BEExportType (int isDictionary, int typeIndex)

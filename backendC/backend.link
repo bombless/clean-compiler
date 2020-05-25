@@ -107,7 +107,6 @@
 /EXPORT: BEParseCommandArgs
 /EXPORT: BEGenerateStatesAndOptimise
 /EXPORT: BEGenerateCode
-/EXPORT: BEGetError
 /EXPORT: BEExportType
 /EXPORT: BEExportConstructor
 /EXPORT: BEExportField

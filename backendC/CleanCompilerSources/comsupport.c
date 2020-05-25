@@ -355,7 +355,7 @@ static void write_compiler_generated_function_name_to_std_error (char *name, cha
 {
 	char *parsed_digits;
 
-	FPutS (name,StdError);
+	PutSStdError (name);
 	
 	parsed_digits=NULL;
 	if (name_end[0]==';' && isdigit (name_end[1])){
@@ -624,10 +624,6 @@ void ExitCompiler (void)
 	CompFree();
 }
 
-#ifdef CLEAN2
-extern struct clean_string_128 { size_t length; char chars[128]; } clean_error_string;
-#endif
-
 #ifdef _DEBUG_
 
 void ErrorInCompiler (char *mod, char *proc, char *msg)
@@ -645,22 +641,6 @@ void ErrorInCompiler (char *mod, char *proc, char *msg)
 	PutSStdError (", \"");
 	PutSStdError (msg);
 	PutSStdError ("\"\n");
-
-	strcpy (clean_error_string.chars,"Error in compiler");
-	if (CurrentModule!=NULL){
-		strcat (clean_error_string.chars," while compiling ");
-		strcat (clean_error_string.chars,CurrentModule);
-		strcat (clean_error_string.chars,".icl");
-	}
-	strcat (clean_error_string.chars,": Module ");
-	strcat (clean_error_string.chars,mod);
-	strcat (clean_error_string.chars,", Function ");
-	strcat (clean_error_string.chars,proc);
-	strcat (clean_error_string.chars,", \"");
-	strcat (clean_error_string.chars,msg);
-	strcat (clean_error_string.chars,"\"\n");
-
-	clean_error_string.length = strlen (clean_error_string.chars);
 
 	if (ExitEnv_valid)
 		longjmp (ExitEnv, 1);

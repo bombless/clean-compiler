@@ -247,8 +247,6 @@ BEGenerateStatesAndOptimise :: !BackEnd -> (!Bool,!BackEnd);
 // int BEGenerateStatesAndOptimise (void);
 BEGenerateCode :: !String !BackEnd -> (!Bool,!BackEnd);
 // int BEGenerateCode (CleanString outputFile);
-BEGetError :: {#Char};
-// CleanString BEGetError ();
 BEExportType :: !Bool !Int !BackEnd -> BackEnd;
 // void BEExportType (int isDictionary,int typeIndex);
 BEExportConstructor :: !Int !BackEnd -> BackEnd;

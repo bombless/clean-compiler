@@ -684,12 +684,6 @@ BEGenerateCode a0 a1 = code {
 }
 // int BEGenerateCode (CleanString outputFile);
 
-BEGetError :: {#Char};
-BEGetError  = code {
-	ccall BEGetError ":S"
-}
-// CleanString BEGetError ();
-
 BEExportType :: !Bool !Int !BackEnd -> BackEnd;
 BEExportType a0 a1 a2 = code {
 	ccall BEExportType "II:V:p"
