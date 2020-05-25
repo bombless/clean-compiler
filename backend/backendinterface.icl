@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 implementation module backendinterface
 
 import StdEnv
@@ -8,48 +5,14 @@ import StdEnv
 import frontend
 import backend
 import backendpreprocess, backendsupport, backendconvert
-import Version
 import partition
-
-checkVersion :: VersionsCompatability *File -> (!Bool, !*File)
-checkVersion VersionsAreCompatible errorFile
-	=	(True, errorFile)
-checkVersion VersionObservedIsTooNew errorFile
-	#	errorFile
-			=	fwrites "Error: the back end library is too new\n" errorFile
-	=	(False, errorFile)
-checkVersion VersionObservedIsTooOld errorFile
-	#	errorFile
-			=	fwrites "Error: the back end library is too old\n" errorFile
-	=	(False, errorFile)
+from filesystem import fremove
 
 backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int
 							  !*VarHeap !*TypeVarHeap !*AttrVarHeap !*File !*File
 					-> (!Bool,!*VarHeap,!*TypeVarHeap,!*AttrVarHeap,!*File,!*File)
 backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n
 		var_heap type_var_heap attrHeap errorFile outFile
-	# (observedCurrent, observedOldestDefinition, observedOldestImplementation)
-		=	BEGetVersion
-	  observedVersion =
-		{	versionCurrent
-				=	observedCurrent
-		,	versionOldestDefinition
-				=	observedOldestDefinition
-		,	versionOldestImplementation
-				=	observedOldestImplementation
-		}
-	  expectedVersion =
-		{	versionCurrent
-				=	kBEVersionCurrent
-		,	versionOldestDefinition
-				=	kBEVersionOldestDefinition
-		,	versionOldestImplementation
-				=	kBEVersionOldestImplementation
-		}
-	# (compatible, errorFile)
-		=	checkVersion (versionCompare expectedVersion observedVersion) errorFile
-	| not compatible
-		=	(False, var_heap, type_var_heap, attrHeap, errorFile, outFile)
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
@@ -66,12 +29,10 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 				= [member : function_indices2 members i components]
 			function_indices2 NoComponentMembers i components
 				= function_indices (i+1) components
-	# backEndFiles
-		=	0
+	# backEndFiles = 0
 	# (backEnd, backEndFiles)
 		=	BEInit (length commandLineArgs) backEndFiles
-	# backEnd
-		=	foldState BEArg commandLineArgs backEnd
+	# backEnd = foldState BEArg commandLineArgs backEnd
 	# (be_parse_command_args_result, backEnd) = BEParseCommandArgs backEnd
 	| be_parse_command_args_result<0
 		# error_arg_n = -1-be_parse_command_args_result
