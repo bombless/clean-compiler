@@ -1,4 +1,6 @@
 
+#include <ctype.h>
+
 #include "compiledefines.h"
 #include "types.t"
 #include "system.h"

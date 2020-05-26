@@ -1,18 +1,11 @@
 /*
-	(Concurrent) Clean Compiler:	Support			
-	========================================		
-														
 	This module contains all the compiler supporting routines,
 	such as: the storage administration and the error handling
 	routines and some global variables containing the compiler
-	settings. 											
-	At the end of this module the version number of the compiler
-	is administered.									
-														
-	Author:	Sjaak Smetsers 								
-	At:		University of Nijmegen, department of computing science
-	Version:	1.0
+	settings.
 */
+
+#include <ctype.h>
 
 #include "compiledefines.h"
 #include "types.t"

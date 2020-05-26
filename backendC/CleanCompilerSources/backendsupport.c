@@ -5,18 +5,11 @@
 # include "comsupport.h"
 # include "backendsupport.h"
 
-
 /*
 	Utilities
 	=========
 */
-# ifdef _WINDOWS_
-# undef _WINDOWS_
-# include <windows.h>
-# define	Debugger()	DebugBreak();
-# else
-# define	Debugger()	{ * (int *) NULL = 0; }
-# endif
+#define Debugger() { * (int *) NULL = 0; }
 
 void
 AssertionFailed (char *conditionString, char *file, int line)
@@ -28,25 +21,6 @@ AssertionFailed (char *conditionString, char *file, int line)
 	PutSStdError (" (");
 	PutSStdError (conditionString);
 	PutSStdError (")\n");
-
-# ifdef _WINDOWS_
-	{
-		static char error[200];
-
-		strcpy (error,"Error in backend: File ");
-		strcat (error,file);
-		strcat (error,", Line ");
-		int_to_string (&error[strlen (error)],line);
-		strcat (error," (");
-		strcat (error,conditionString);
-		strcat (error,")\nDebug ?");
-	
-		if (MessageBox (NULL,error,"AssertionFailed",MB_YESNO)==IDYES)
-			Debugger ();
-	}
-#else
-	Debugger ();
-#endif
 } /* AssertionFailed */
 
 void

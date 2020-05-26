@@ -22,23 +22,4 @@ typedef unsigned Bool;
 		False = 0, True, MightBeTrue
 	};
 
-#define FileNameMax		256
-
-#ifdef _WINDOWS_
-# ifdef _WIN64
-#  undef _WINDOWS_
-#  include <windows.h>
-# else
-#  ifdef __MWERKS__
-#      include <x86_prefix.h>
-#  else
-#   ifndef _X86_
-#    define _X86_
-#   endif
-#  endif
-#  include <windef.h>
-#  include <winbase.h>
-# endif
-#endif
-
 #endif
