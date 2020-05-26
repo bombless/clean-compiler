@@ -3101,7 +3101,11 @@ int BEGenerateStatesAndOptimise (void)
 
 	ExitEnv_valid=0;
 
+#ifndef CLEAN_FILE_IO
 	return !CompilerError;
+#else
+	return CompilerError ? 0 : 2;
+#endif
 }
 
 int

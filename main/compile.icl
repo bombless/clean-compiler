@@ -332,9 +332,9 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 				# functions_and_macros = syntaxTree.fe_icl.icl_functions
 				# (Yes path) = mbModPath
 				# (csf_dir_exists,abc_file_path,error,files) = abc_file_name_in_clean_system_files_folder path options.moduleName error files
-				# (success, var_heap, type_var_heap, attrHeap, error, out)
-				 	 = backEndInterface abc_file_path (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n
-				 	 					var_heap type_var_heap attrHeap error out
+				# (success,var_heap,type_var_heap,attrHeap,error,out,files)
+					= backEndInterface abc_file_path (map appendRedirection backendArgs) options.listTypes options.outPath predef_symbols syntaxTree main_dcl_module_n
+						   var_heap type_var_heap attrHeap error out files
 				-> (success,functions_and_macros,var_heap,type_var_heap,attrHeap,error,out,files)
 				with
 					appendRedirection arg

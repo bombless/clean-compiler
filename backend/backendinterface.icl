@@ -9,10 +9,10 @@ import partition
 from filesystem import fremove
 
 backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymbols !FrontEndSyntaxTree !Int
-							  !*VarHeap !*TypeVarHeap !*AttrVarHeap !*File !*File
-					-> (!Bool,!*VarHeap,!*TypeVarHeap,!*AttrVarHeap,!*File,!*File)
+							  !*VarHeap !*TypeVarHeap !*AttrVarHeap !*File !*File !*Files
+					-> (!Bool,!*VarHeap,!*TypeVarHeap,!*AttrVarHeap,!*File,!*File,!*Files)
 backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n
-		var_heap type_var_heap attrHeap errorFile outFile
+		var_heap type_var_heap attrHeap errorFile outFile files
 	# varHeap
 		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
 		with
@@ -32,6 +32,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 	# backEndFiles = 0
 	# (backEnd, backEndFiles)
 		=	BEInit (length commandLineArgs) backEndFiles
+	  (errorFile,backEnd) = set_backend_std_error_file errorFile backEnd
 	# backEnd = foldState BEArg commandLineArgs backEnd
 	# (be_parse_command_args_result, backEnd) = BEParseCommandArgs backEnd
 	| be_parse_command_args_result<0
@@ -43,23 +44,61 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 				(errorFile <<< "file name expected after : " <<< (commandLineArgs !! (error_arg_n-1)))
 		  errorFile = errorFile <<< '\n'
 		  backEndFiles = BEFree backEnd backEndFiles
-		=	(backEndFiles == 0 && False, var_heap, type_var_heap, attrHeap, errorFile, outFile)
-		
+		=	(backEndFiles == 0 && False, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
+
 	# (type_var_heap,var_heap,attrHeap,backEnd)
 		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n type_var_heap varHeap attrHeap backEnd
-	# (success, backEnd)
+	# (fail_success_or_use_clean_file_io, backEnd)
 		=	BEGenerateStatesAndOptimise backEnd
-	# (success, backEnd)
-		=	if success
-				(BEGenerateCode outputFileName backEnd)
-				(False, backEnd)
-	# backEnd
-		=	BECloseFiles backEnd
-	# (attrHeap, outFile, backEnd)
-		=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
-	# backEndFiles
-		=	BEFree backEnd backEndFiles
-	=	(backEndFiles == 0 && success, var_heap, type_var_heap, attrHeap, errorFile, outFile)
+	| fail_success_or_use_clean_file_io==2
+		# (fopen_ok,abc_file,files) = fopen outputFileName FWriteText files
+		| fopen_ok
+			# (abc_file,backEnd) = set_backend_abc_file abc_file backEnd
+			  (success, backEnd) = BEGenerateCode outputFileName backEnd
+			  backEnd = BECloseFiles backEnd
+			  (attrHeap, outFile, backEnd)
+				= optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
+			  backEndFiles = BEFree backEnd backEndFiles
+			| backEndFiles==0
+				# (fclose_ok,files) = fclose abc_file files
+				// to do: error message if not fclose_ok
+				= (success, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
+				# (_,files) = fclose abc_file files
+				# (_,files) = fremove outputFileName files
+				= (False, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
+			# backEnd = BECloseFiles backEnd
+			  (attrHeap, outFile, backEnd)
+				= optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
+			  backEndFiles = BEFree backEnd backEndFiles
+			= (backEndFiles==0, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
+		# (success, backEnd)
+			=	if (fail_success_or_use_clean_file_io==1)
+					(BEGenerateCode outputFileName backEnd)
+					(False, backEnd)
+		# backEnd
+			=	BECloseFiles backEnd
+		# (attrHeap, outFile, backEnd)
+			=	optionallyPrintFunctionTypes listTypes typesPath (DictionaryToClassInfo main_dcl_module_n fe_icl fe_dcls) fe_components fe_icl.icl_functions attrHeap outFile backEnd
+		# backEndFiles
+			=	BEFree backEnd backEndFiles
+		=	(backEndFiles == 0 && success, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
+
+set_backend_abc_file :: !*File !BackEnd -> (!*File,!BackEnd)
+set_backend_abc_file file back_end
+	#! file_pointer = file_pointer_from_file file
+	# back_end = BESetABCFile file_pointer back_end
+	= (file,back_end)
+
+set_backend_std_error_file :: !*File !BackEnd -> (!*File,!BackEnd)
+set_backend_std_error_file file back_end
+	#! file_pointer = file_pointer_from_file file
+	# back_end = BESetStdErrorFile file_pointer back_end
+	= (file,back_end)
+
+file_pointer_from_file :: !File -> Int;
+file_pointer_from_file file = code {
+	updatepop_b 0 1
+}
 
 :: DictionaryToClassInfo =
 	{	dtci_iclModuleIndex :: Int

@@ -243,7 +243,7 @@ BEDefineRules :: !BEImpRuleP !BackEnd -> BackEnd;
 // void BEDefineRules (BEImpRuleP rules);
 BEParseCommandArgs :: !BackEnd -> (!Int,!BackEnd);
 // int BEParseCommandArgs (void);
-BEGenerateStatesAndOptimise :: !BackEnd -> (!Bool,!BackEnd);
+BEGenerateStatesAndOptimise :: !BackEnd -> (!Int,!BackEnd);
 // int BEGenerateStatesAndOptimise (void);
 BEGenerateCode :: !String !BackEnd -> (!Bool,!BackEnd);
 // int BEGenerateCode (CleanString outputFile);

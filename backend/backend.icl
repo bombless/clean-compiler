@@ -672,7 +672,7 @@ BEParseCommandArgs a0 = code {
 }
 // int BEParseCommandArgs (void);
 
-BEGenerateStatesAndOptimise :: !BackEnd -> (!Bool,!BackEnd);
+BEGenerateStatesAndOptimise :: !BackEnd -> (!Int,!BackEnd);
 BEGenerateStatesAndOptimise a0 = code {
 	ccall BEGenerateStatesAndOptimise ":I:p"
 }
