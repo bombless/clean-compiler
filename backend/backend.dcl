@@ -347,3 +347,7 @@ BELhsNodeId:==0;
 BERhsNodeId:==1;
 BEIsNotACaf:==0;
 BEIsACaf:==1;
+BESetABCFile :: !Int !BackEnd -> BackEnd;
+// void BESetABCFile (void *a0);
+BESetStdErrorFile :: !Int !BackEnd -> BackEnd;
+// void BESetStdErrorFile (void *a0);

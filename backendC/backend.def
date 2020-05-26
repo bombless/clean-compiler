@@ -119,3 +119,5 @@ EXPORTS
  BEDeclareDynamicTypeSymbol
  BEDynamicTempTypeSymbol
  BEInsertForeignExport
+ BESetABCFile
+ BESetStdErrorFile

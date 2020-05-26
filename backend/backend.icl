@@ -827,3 +827,15 @@ BELhsNodeId:==0;
 BERhsNodeId:==1;
 BEIsNotACaf:==0;
 BEIsACaf:==1;
+
+BESetABCFile :: !Int !BackEnd -> BackEnd;
+BESetABCFile a0 a1 = code {
+	ccall BESetABCFile "p:V:p"
+}
+// void BESetABCFile (void *a0);
+
+BESetStdErrorFile :: !Int !BackEnd -> BackEnd;
+BESetStdErrorFile a0 a1 = code {
+	ccall BESetStdErrorFile "p:V:p"
+}
+// void BESetStdErrorFile (void *a0);

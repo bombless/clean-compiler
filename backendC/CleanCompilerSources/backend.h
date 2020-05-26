@@ -518,3 +518,9 @@ Clean (BEDeclareDynamicTypeSymbol :: Int Int BackEnd -> BackEnd)
 
 BETypeSymbolP BEDynamicTempTypeSymbol (void);
 Clean (BEDynamicTempTypeSymbol :: BackEnd -> (BETypeSymbolP, BackEnd))
+
+void BESetABCFile (void *a0);
+Clean (BESetABCFile :: Int BackEnd -> BackEnd);
+
+void BESetStdErrorFile (void *a0);
+Clean (BESetStdErrorFile :: Int BackEnd -> BackEnd);

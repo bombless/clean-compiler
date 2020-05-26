@@ -3608,3 +3608,11 @@ BEDynamicTempTypeSymbol (void)
 {
 	return (BETypeSymbol (gBEState.be_dynamicTypeIndex, gBEState.be_dynamicModuleIndex));
 } /* BEDynamicTemp */
+
+void BESetABCFile (void *clean_file)
+{
+}
+
+void BESetStdErrorFile (void *a0)
+{
+}

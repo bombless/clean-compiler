@@ -116,3 +116,5 @@ BEGetIntFromArray
 BEDeclareDynamicTypeSymbol
 BEDynamicTempTypeSymbol
 BEInsertForeignExport
+BESetABCFile
+BESetStdErrorFile

@@ -115,3 +115,5 @@
 /EXPORT:BEDeclareDynamicTypeSymbol
 /EXPORT:BEDynamicTempTypeSymbol
 /EXPORT:BEInsertForeignExport
+/EXPORT:BESetABCFile
+/EXPORT:BESetStdErrorFile
