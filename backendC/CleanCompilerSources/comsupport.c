@@ -64,7 +64,7 @@ void InitStorage (void)
 		char **newblock;
 		
 		if ((newblock = (char **) malloc ((unsigned long) (MemBlockSize + (SizeT) (SizeOf (char *)))))!=NULL){
-			*newblock = (char *) NIL;
+			*newblock = NULL;
 			StartStorage = LastBlock = FirstBlock = (char *) newblock;
 			NextFreeMem = SizeOf(char*)+(char*)newblock;
 			InitStorageFlag = False;
@@ -122,7 +122,7 @@ void *CompAlloc (SizeT size)
 			*((char **) LastBlock) = (char *) newblock;
 			LastBlock = (char *) newblock;
 		
-			*newblock = (char *) NIL;
+			*newblock = NULL;
 			new_block=LastBlock+SizeOf(char*);
 		
 			NrOfBytes += (unsigned long) (MemBlockSize + (SizeT) (SizeOf (char *)));
@@ -262,7 +262,7 @@ void FatalCompError (char *mod, char *proc, char *mess)
 			CloseABCFile (ABCFileName);
 		} else
 			FClose (OpenedFile);
-		OpenedFile = (File) NIL;
+		OpenedFile = NULL;
 	}
 
 	if (!ExitEnv_valid)
@@ -599,7 +599,7 @@ File OpenedFile;
 
 void InitCompiler (void)
 {
-	OpenedFile     = (File) NIL;
+	OpenedFile     = NULL;
 	CompilerError	= False;
 	/* Call all the initialization functions */
 	/* InitStorage has to be called first */

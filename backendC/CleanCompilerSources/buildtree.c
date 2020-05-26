@@ -43,7 +43,7 @@ NewArgument (NodeP node)
 
 	newarg->arg_node		= node;
 	newarg->arg_occurrence	= 0;
-	newarg->arg_next		= NIL;
+	newarg->arg_next		= NULL;
 
 	return (newarg);
 } /* NewArgument */
@@ -58,9 +58,9 @@ NewNodeId (void)
 	newnid->nid_name		= NULL;
 	newnid->nid_refcount	= 0;
 	newnid->nid_ref_count_copy	= 0;
-	newnid->nid_forward_node_id		= NIL;
-	newnid->nid_node_def	= NIL;
-	newnid->nid_node		= NIL;
+	newnid->nid_forward_node_id		= NULL;
+	newnid->nid_node_def	= NULL;
+	newnid->nid_node		= NULL;
 	newnid->nid_scope		= 0;
 	newnid->nid_mark		= 0;
 	newnid->nid_mark2		= 0;
@@ -92,7 +92,7 @@ NewNodeIdNode (NodeIdP node_id)
 	node->node_number		= 0;
 	node->node_kind			= NodeIdNode;
 	node->node_node_id		= node_id;
-	node->node_arguments	= NIL;
+	node->node_arguments	= NULL;
 	node->node_arity		= 0;
 	
 	return (node);

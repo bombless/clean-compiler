@@ -10,8 +10,6 @@
 # define POWER 1
 #endif
 
-#define NIL			0L
-
 #define REALSIZE	2 /*1*/
 #define FILESIZE	2
 

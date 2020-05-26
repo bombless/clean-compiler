@@ -136,7 +136,7 @@ void CloseABCFile (char *fname)
 		}
 		if (CompilerError)
 			FDelete (fname);
-		OpenedFile = (File) NIL;
+		OpenedFile = NULL;
 	}
 }
 
