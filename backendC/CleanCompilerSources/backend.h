@@ -481,7 +481,7 @@ int BEParseCommandArgs (void);
 Clean (BEParseCommandArgs :: BackEnd -> (Int, BackEnd))
 
 int BEGenerateStatesAndOptimise (void);
-Clean (BEGenerateStatesAndOptimise :: BackEnd -> (Bool, BackEnd))
+Clean (BEGenerateStatesAndOptimise :: BackEnd -> (Int, BackEnd))
 
 int BEGenerateCode (CleanString outputFile);
 Clean (BEGenerateCode :: String BackEnd -> (Bool, BackEnd))
