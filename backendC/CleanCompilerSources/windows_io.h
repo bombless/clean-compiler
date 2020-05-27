@@ -3,7 +3,6 @@
 #define SizeOf(A)	((SizeT) sizeof (A))
 
 #include <limits.h>
-#define MAXUNSIGNED	ULONG_MAX
 
 #define _VARARGS_
 

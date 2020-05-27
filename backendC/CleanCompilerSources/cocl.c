@@ -1,5 +1,7 @@
 
 #include "compiledefines.h"
+#include "types.t"
+#include "system.h"
 #include "comsupport.h"
 #include "settings.h"
 #include <ctype.h>

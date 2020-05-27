@@ -2,6 +2,7 @@
 # include "compiledefines.h"
 # include "types.t"
 # include "syntaxtr.t"
+# include "system.h"
 # include "comsupport.h"
 # include "sizes.h"
 # include "buildtree.h"

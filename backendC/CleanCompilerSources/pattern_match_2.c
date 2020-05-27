@@ -5,10 +5,6 @@
 
 #define DEBUG_OUTPUT 0
 
-#if defined (applec) || defined (__MWERKS__) || defined (__MRC__)
-# define __ppc__
-#endif
-
 #include <stdio.h>
 
 #include "compiledefines.h"
@@ -16,6 +12,7 @@
 #include "syntaxtr.t"
 #include "pattern_match.h"
 #include "buildtree.h"
+#include "system.h"
 #include "comsupport.h"
 #include "statesgen.h"
 #include "settings.h"

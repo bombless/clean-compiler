@@ -4,6 +4,8 @@
 */
 
 #include "compiledefines.h"
+#include "types.t"
+#include "system.h"
 #include "comsupport.h"
 
 #include <ctype.h>
@@ -37,7 +39,7 @@ void PutSOutFile (char *s)
 	file_write_characters ((unsigned char*)s,strlen (s),clean_abc_file);
 }
 
-void PutIOutFile (size_t i)
+void PutIOutFile (long i)
 {
 	file_write_int (i,clean_abc_file);
 }
@@ -138,9 +140,7 @@ Bool OpenABCFile (char *fname)
 	OutFile = FOpen (fname, "w");
 
 	if (OutFile!=NULL){
-#if defined (POWER)
-		setvbuf ((FILE*) OutFile, NULL, _IOFBF, 8192);
-#endif
+		/* setvbuf ((FILE*) OutFile, NULL, _IOFBF, 8192); */
 		OpenedFile = OutFile;
 		ABCFileName = fname;
 		return True;

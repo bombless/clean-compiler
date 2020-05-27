@@ -1,15 +1,4 @@
 
-#ifndef _COMSUPPORT_
-#define _COMSUPPORT_
-
-#ifndef _THE__TYPES_
-#include "types.t"
-#endif
-
-#ifndef _SYSTEM_
-#include "system.h"
-#endif
-
 #define MINIMUM(a,b)	(((a)<(b)) ? (a) : (b))
 #define MAXIMUM(a,b)	(((a)>(b)) ? (a) : (b))
 
@@ -39,8 +28,6 @@ extern int ExitEnv_valid;
 extern File OpenedFile;
 
 extern jmp_buf ExitEnv;
-
-#endif
 
 #define CompAllocType(t) ((t*)CompAlloc (SizeOf (t)))
 #define CompAllocArray(s,t) ((t*)CompAlloc ((s)*SizeOf (t)))

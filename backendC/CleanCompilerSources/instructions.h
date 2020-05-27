@@ -14,7 +14,7 @@ extern File OutFile;
 # define PutSOutFile(s) FPutS ((s),OutFile)
 # define PutCOutFile(s) FPutC ((s),OutFile)
 #endif
-extern void PutIOutFile (size_t i);
+extern void PutIOutFile (long i);
 
 extern void WriteSymbolToOutFile (Symbol symbol);
 

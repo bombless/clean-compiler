@@ -4,10 +4,6 @@
 	At:		University of Nijmegen
 */
 
-#if defined (applec) || defined (__MWERKS__) || defined (__MRC__)
-# define __ppc__
-#endif
-
 #include <stdio.h>
 
 #include "compiledefines.h"
