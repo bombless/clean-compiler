@@ -9,6 +9,7 @@
 #include "compiledefines.h"
 #include "types.t"
 #include "syntaxtr.t"
+#include "system.h"
 #include "comsupport.h"
 #include "result_state_database.h"
 
