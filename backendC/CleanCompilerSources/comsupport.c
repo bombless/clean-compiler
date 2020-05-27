@@ -236,6 +236,24 @@ void int_to_string (char *s,long i)
 	*s='\0';
 }
 
+#ifdef CLEAN_FILE_IO
+struct clean_file *clean_std_error_file = NULL;
+
+void PutCStdError (char c)
+{
+	file_write_char (c,clean_std_error_file);
+}
+
+void PutSStdError (char *s)
+{
+	file_write_characters ((unsigned char*)s,strlen (s),clean_std_error_file);
+}
+
+void PutIStdError (long i)
+{
+	file_write_int (i,clean_std_error_file);
+}
+#else
 #define PutSStdError(s) FPutS ((s),StdError)
 #define PutCStdError(s) FPutC ((s),StdError)
 
@@ -243,6 +261,7 @@ void PutIStdError (long i)
 {
 	fprintf (StdError,"%ld",i);
 }
+#endif
 
 /* The environment to leave the compiler if a fatal error occurs */
 
@@ -256,6 +275,7 @@ void FatalCompError (char *mod, char *proc, char *mess)
 	PutSStdError (mess);
 	PutSStdError ("\"\n");
 
+#ifndef CLEAN_FILE_IO
 	if (OpenedFile){
 		if (ABCFileName){
 			CompilerError = True;
@@ -264,6 +284,7 @@ void FatalCompError (char *mod, char *proc, char *mess)
 			FClose (OpenedFile);
 		OpenedFile = NULL;
 	}
+#endif
 
 	if (!ExitEnv_valid)
 		exit (1);

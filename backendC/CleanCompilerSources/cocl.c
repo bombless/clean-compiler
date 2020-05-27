@@ -4,8 +4,10 @@
 #include "settings.h"
 #include <ctype.h>
 
-#if defined (_MSC_VER) || defined (_SUN_)
+#ifndef CLEAN_FILE_IO
+# if defined (_MSC_VER) || defined (_SUN_)
 FILE *std_out_file_p,*std_error_file_p;
+# endif
 #endif
 
 static Bool GetInt (char *s, int *i)
@@ -75,10 +77,12 @@ int ParseCommandArgs (int argc, char **argv)
 {
 	int i;
 
+#ifndef CLEAN_FILE_IO
 # if defined (_MSC_VER) || defined (_SUN_)
 	std_out_file_p = stdout;
 	std_error_file_p = stderr;
 # endif
+#endif
 
 #ifdef _SUN_
 	use_clean_system_files=0;
@@ -184,15 +188,15 @@ int ParseCommandArgs (int argc, char **argv)
 					return ~i;
 			} else if (strcmp (argv_i, "-RE") == 0){
 				if (++i < argc){
+#ifndef CLEAN_FILE_IO
 # if defined (_MSC_VER) || defined (_SUN_)
 					std_error_file_p = fopen (argv[i],"w");
 					if (std_error_file_p!=NULL)
 						StdErrorReopened = True;
 					else
 						std_error_file_p = stderr;
-#else
+# else
 					freopen (argv[i],"w",StdError);
-# ifdef CLEAN2
 					StdErrorReopened	= True;
 # endif
 #endif
@@ -200,15 +204,15 @@ int ParseCommandArgs (int argc, char **argv)
 					return ~i;
 			} else if (strcmp (argv_i, "-RAE") == 0){
 				if (++i < argc){
-#if defined (_MSC_VER) || defined (_SUN_)
+#ifndef CLEAN_FILE_IO
+# if defined (_MSC_VER) || defined (_SUN_)
 					std_error_file_p = fopen (argv[i],"a");
 					if (std_error_file_p!=NULL)
 						StdErrorReopened = True;
 					else
 						std_error_file_p = stderr;
-#else
+# else
 					freopen (argv[i],"a",StdError);
-# ifdef CLEAN2
 					StdErrorReopened	= True;
 # endif
 #endif
@@ -216,15 +220,15 @@ int ParseCommandArgs (int argc, char **argv)
 					return ~i;
 			} else if (strcmp (argv_i, "-RO") == 0){
 				if (++i < argc){
-#if defined (_MSC_VER) || defined (_SUN_)
+#ifndef CLEAN_FILE_IO
+# if defined (_MSC_VER) || defined (_SUN_)
 					std_out_file_p = fopen (argv[i],"w");
 					if (std_out_file_p!=NULL)
 						StdOutReopened = True;
 					else
 						std_out_file_p = stdout;
-#else
+# else
 					freopen (argv[i],"w",StdOut);
-# ifdef CLEAN2
 					StdOutReopened	= True;
 # endif
 #endif
@@ -232,15 +236,15 @@ int ParseCommandArgs (int argc, char **argv)
 					return ~i;
 			} else if (strcmp (argv_i, "-RAO") == 0){
 				if (++i < argc){
-#if defined (_MSC_VER) || defined (_SUN_)
+#ifndef CLEAN_FILE_IO
+# if defined (_MSC_VER) || defined (_SUN_)
 					std_out_file_p = fopen (argv[i],"a");
 					if (std_out_file_p!=NULL)
 						StdOutReopened = True;
 					else
 						std_out_file_p = stdout;
-#else
+# else
 					freopen (argv[i],"a",StdOut);
-# ifdef CLEAN2
 					StdOutReopened	= True;
 # endif
 #endif

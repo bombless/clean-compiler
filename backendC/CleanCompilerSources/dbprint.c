@@ -2,6 +2,9 @@
 #include <ctype.h>
 
 #include "compiledefines.h"
+
+#ifndef CLEAN_FILE_IO
+
 #include "types.t"
 #include "system.h"
 #include "syntaxtr.t"
@@ -793,3 +796,5 @@ void PrintRules (ImpRules rules,File file)
 			FPutC ('\n',file);
 	}
 }
+
+#endif

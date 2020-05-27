@@ -3563,24 +3563,26 @@ BEInit (int argc)
 void
 BECloseFiles (void)
 {
+#ifndef CLEAN_FILE_IO
 	if (StdErrorReopened){
-#ifdef _SUN_
+# ifdef _SUN_
 		fclose (std_error_file_p);
 		std_error_file_p = stderr;
-#else
+# else
 		fclose (StdError);
-#endif
+# endif
 		StdErrorReopened = False;
 	}
 	if (StdOutReopened){
-#ifdef _SUN_
+# ifdef _SUN_
 		fclose (std_out_file_p);
 		std_out_file_p = stdout;
-#else
+# else
 		fclose (StdOut);
-#endif
+# endif
 		StdOutReopened = False;
 	}
+#endif
 } /* BECloseFiles */
 
 void
@@ -3613,10 +3615,21 @@ BEDynamicTempTypeSymbol (void)
 	return (BETypeSymbol (gBEState.be_dynamicTypeIndex, gBEState.be_dynamicModuleIndex));
 } /* BEDynamicTemp */
 
+#ifdef CLEAN_FILE_IO
+extern struct clean_file *clean_abc_file;
+extern struct clean_file *clean_std_error_file;
+#endif
+
 void BESetABCFile (void *clean_file)
 {
+#ifdef CLEAN_FILE_IO
+	clean_abc_file=clean_file;
+#endif
 }
 
 void BESetStdErrorFile (void *a0)
 {
+#ifdef CLEAN_FILE_IO
+	clean_std_error_file=a0;
+#endif
 }

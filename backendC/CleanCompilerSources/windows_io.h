@@ -20,13 +20,15 @@
 
 typedef FILE *File;
 
-#ifdef _MSC_VER
+#ifndef CLEAN_FILE_IO
+# ifdef _MSC_VER
 extern FILE *std_out_file_p,*std_error_file_p;
-# define StdOut std_out_file_p 
-# define StdError std_error_file_p
-#else
-# define StdOut stdout
-# define StdError stderr
-#endif
+#  define StdOut std_out_file_p
+#  define StdError std_error_file_p
+# else
+#  define StdOut stdout
+#  define StdError stderr
+# endif
 
-#define FPutC(c,f) fputc(c,f)
+# define FPutC(c,f) fputc(c,f)
+#endif

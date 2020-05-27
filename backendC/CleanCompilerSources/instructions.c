@@ -23,6 +23,26 @@
 #define BINARY_ABC 0
 #undef MEMORY_PROFILING_WITH_N_STRING
 
+#ifdef CLEAN_FILE_IO
+
+struct clean_file *clean_abc_file = NULL;
+
+void PutCOutFile (char c)
+{
+	file_write_char (c,clean_abc_file);
+}
+
+void PutSOutFile (char *s)
+{
+	file_write_characters ((unsigned char*)s,strlen (s),clean_abc_file);
+}
+
+void PutIOutFile (size_t i)
+{
+	file_write_int (i,clean_abc_file);
+}
+
+#else
 File OutFile;
 
 #define PutSOutFile(s) FPutS ((s),OutFile)
@@ -32,6 +52,7 @@ void PutIOutFile (long i)
 {
 	fprintf (OutFile,"%ld",i);
 }
+#endif
 
 static void error_in_function (char *m)
 {
@@ -107,6 +128,13 @@ char *ABCFileName;
 
 Bool OpenABCFile (char *fname)
 {
+#ifdef CLEAN_FILE_IO
+	if (clean_abc_file!=NULL){
+		ABCFileName = fname;
+		return True;
+	} else
+		return False;
+#else
 	OutFile = FOpen (fname, "w");
 
 	if (OutFile!=NULL){
@@ -118,6 +146,7 @@ Bool OpenABCFile (char *fname)
 		return True;
 	} else
 		return False;
+#endif
 }
 
 void WriteLastNewlineToABCFile (void)
@@ -127,6 +156,9 @@ void WriteLastNewlineToABCFile (void)
 
 void CloseABCFile (char *fname)
 {
+#ifdef CLEAN_FILE_IO
+	clean_abc_file=NULL;
+#else
 	if (OutFile){
 		if (FClose (OutFile) != 0){
 			CompilerError = True;
@@ -138,6 +170,7 @@ void CloseABCFile (char *fname)
 			FDelete (fname);
 		OpenedFile = NULL;
 	}
+#endif
 }
 
 static Bool DescriptorNeeded (SymbDef sdef)

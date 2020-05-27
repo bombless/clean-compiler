@@ -6,10 +6,15 @@ Bool OpenABCFile (char *fname);
 
 void CloseABCFile (char *fname);
 
+#ifdef CLEAN_FILE_IO
+extern void PutSOutFile (char *s);
+extern void PutCOutFile (char c);
+#else
 extern File OutFile;
-#define PutSOutFile(s) FPutS ((s),OutFile)
-#define PutCOutFile(s) FPutC ((s),OutFile)
-extern void PutIOutFile (long i);
+# define PutSOutFile(s) FPutS ((s),OutFile)
+# define PutCOutFile(s) FPutC ((s),OutFile)
+#endif
+extern void PutIOutFile (size_t i);
 
 extern void WriteSymbolToOutFile (Symbol symbol);
 

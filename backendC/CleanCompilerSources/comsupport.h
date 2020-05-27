@@ -48,8 +48,16 @@ extern void *CompAlloc (SizeT size);
 extern void InitStorage (void);
 extern void CompFree (void);
 
-#define PutSStdError(s) FPutS ((s),StdError)
-#define PutCStdError(s) FPutC ((s),StdError)
+#ifdef CLEAN_FILE_IO
+extern void file_write_char (int c,struct clean_file *f);
+extern void file_write_characters (unsigned char *p,size_t length,struct clean_file *f);
+extern void file_write_int (size_t i,struct clean_file *f);
+extern void PutSStdError (char *s);
+extern void PutCStdError (char c);
+#else
+# define PutSStdError(s) FPutS ((s),StdError)
+# define PutCStdError(s) FPutC ((s),StdError)
+#endif
 extern void PutIStdError (long i);
 
 extern void int_to_string (char *s,long i);
