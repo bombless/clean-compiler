@@ -1,4 +1,6 @@
 #!/bin/sh
+set -e
+
 CLM=clm
 
 (cd backendC/CleanCompilerSources; make)
