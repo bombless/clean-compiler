@@ -19,3 +19,23 @@
 #define NEW_APPLY
 
 #define LIFT_PARTIAL_APPLICATIONS_WITH_ZERO_ARITY_ARGS
+
+#ifdef NO_CLIB
+
+#include <stdlib.h>
+#include "clib_functions.h"
+
+# ifndef DEFINE_MEMCPY
+#  define memcpy clean_compiler_memcpy
+# endif
+#define strcpy clean_compiler_strcpy
+#define strcat clean_compiler_strcat
+#define strncpy clean_compiler_strncpy
+#define strcmp clean_compiler_strcmp
+#define strncmp clean_compiler_strncmp
+#define strlen clean_compiler_strlen
+
+#define clean_compiler_isdigit(c) (((unsigned int)(c)-48u)<=9u)
+#define clean_compiler_isspace(c) ((c)==' ' || (((unsigned int)(c)-9u)<=4u))
+
+#endif

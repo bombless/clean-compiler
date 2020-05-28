@@ -20,6 +20,11 @@
 #include "instructions.h"
 #include "statesgen.h"
 
+#ifdef NO_CLIB
+# define isdigit clean_compiler_isdigit
+# define isspace clean_compiler_isspace
+#endif
+
 #define for_l(v,l,n) for(v=(l);v!=NULL;v=v->n)
 
 #define BINARY_ABC 0

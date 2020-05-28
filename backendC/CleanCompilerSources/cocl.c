@@ -6,6 +6,10 @@
 #include "settings.h"
 #include <ctype.h>
 
+#ifdef NO_CLIB
+# define isdigit clean_compiler_isdigit
+#endif
+
 #ifndef CLEAN_FILE_IO
 # if defined (_MSC_VER) || defined (_SUN_)
 FILE *std_out_file_p,*std_error_file_p;

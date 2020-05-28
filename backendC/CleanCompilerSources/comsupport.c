@@ -22,6 +22,10 @@
 #include "codegen2.h"
 #include "instructions.h"
 
+#ifdef NO_CLIB
+# define isdigit clean_compiler_isdigit
+#endif
+
 /* 'CurrentModule' contains the name of the module that is currently under examination. */
 
 char *CurrentModule;
