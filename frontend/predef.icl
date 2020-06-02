@@ -249,6 +249,8 @@ predefined_idents
 					
 					[PD_Start] = i "Start",
 
+					[PD__SystemEnumStrict] = i "_SystemEnumStrict",
+
 					[PD_FromS]= i "_from_s",
 					[PD_FromTS]= i "_from_ts",
 					[PD_FromSTS]= i "_from_sts",
@@ -376,6 +378,7 @@ where
 					<<- (local_predefined_idents, IC_Expression, PD_UnqArraySizeFun)
 
 					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdStrictLists)
+					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD__SystemEnumStrict)
 					<<- (local_predefined_idents, IC_Module NoQualifiedIdents, PD_StdStrictMaybes)
 		# hash_table = put_predefined_idents_in_hash_table PD_cons PD_nil_uts IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents, IC_Class, PD_ListClass)

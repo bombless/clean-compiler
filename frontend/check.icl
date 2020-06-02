@@ -3096,35 +3096,29 @@ check_dynamics_used_without_support_dynamics support_dynamics mod_ident cs
 		= cs
 
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
-	# cs = case x_needed_modules bitand cNeedStdGeneric of
-			0 -> cs
-			_ -> check_it PD_StdGeneric mod_ident "" extension cs
-	# cs = case x_needed_modules bitand cNeedStdDynamic of
-			0 -> cs
-			_ -> check_it PD_StdDynamic mod_ident "" extension cs
+	# cs = check_if_imported (x_needed_modules bitand cNeedStdGeneric) PD_StdGeneric mod_ident "" extension cs
+	# cs = check_if_imported (x_needed_modules bitand cNeedStdDynamic) PD_StdDynamic mod_ident "" extension cs
 	# cs = case x_needed_modules bitand cStdArrayImportMissing of
 			0 -> cs
 			_ -> missing_import_error PD_StdArray mod_ident " (needed for array denotations)" extension cs
 	# cs = case x_needed_modules bitand cStdEnumImportMissing of
 			0 -> cs
 			_ -> missing_import_error PD_StdEnum mod_ident " (needed for [..] expressions)" extension cs
-	# cs = case x_needed_modules bitand cNeedStdStrictLists of
+	# cs = check_if_imported (x_needed_modules bitand cNeedStdStrictLists)
+								PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
+	# cs = case x_needed_modules bitand c_SystemEnumStrictImportMissing of
 			0 -> cs
-			_ -> check_it PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
-	# cs = case x_needed_modules bitand cNeedStdStrictMaybes of
-			0 -> cs
-			_ -> check_it PD_StdStrictMaybes mod_ident " (needed for strict maybe types)" extension cs
+			_ -> missing_import_error PD__SystemEnumStrict mod_ident " (needed for strict list generators)" extension cs
+	# cs = check_if_imported (x_needed_modules bitand cNeedStdStrictMaybes)
+								PD_StdStrictMaybes mod_ident " (needed for strict maybe types)" extension cs
 	= cs
   where
-	check_it pd mod_ident explanation extension cs=:{cs_symbol_table}
- 		# pds_ident = predefined_idents.[pd]
-		# ({ste_kind}, cs_symbol_table) = readPtr pds_ident.id_info cs_symbol_table
-		  cs = { cs & cs_symbol_table = cs_symbol_table }
-		= case ste_kind of
-			STE_ClosedModule
-				-> cs
-			_
-				-> missing_import_error pd mod_ident explanation extension cs
+	check_if_imported 0 pd mod_ident explanation extension cs
+		= cs
+	check_if_imported _ pd mod_ident explanation extension cs
+		| (sreadPtr predefined_idents.[pd].id_info cs.cs_symbol_table).ste_kind=:STE_ClosedModule
+			= cs
+			= missing_import_error pd mod_ident explanation extension cs
 
 	missing_import_error pd mod_ident explanation extension cs
 		# pds_ident = predefined_idents.[pd]

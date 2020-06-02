@@ -1374,7 +1374,6 @@ where
 		  from_then_ident = local_predefined_idents.[PD_FromThen]
 		  from_to_ident = local_predefined_idents.[PD_FromTo]
 		  from_then_to_ident = local_predefined_idents.[PD_FromThenTo]
-
 		| id==from_ident || id==from_then_ident || id==from_to_ident || id==from_then_to_ident
 			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cStdEnumImportMissing})
 				// instead of giving an error message remember that StdEnum should have been imported.
@@ -1387,7 +1386,7 @@ where
 		|| id==local_predefined_idents.[PD_FromToU] || id==local_predefined_idents.[PD_FromToUTS] || id==local_predefined_idents.[PD_FromToO]
 		|| id==local_predefined_idents.[PD_FromThenToS] || id==local_predefined_idents.[PD_FromThenToTS] || id==local_predefined_idents.[PD_FromThenToSTS]
 		|| id==local_predefined_idents.[PD_FromThenToU] || id==local_predefined_idents.[PD_FromThenToUTS] || id==local_predefined_idents.[PD_FromThenToO]
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictLists})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor c_SystemEnumStrictImportMissing})
 		# createArray_ident = local_predefined_idents.[PD__CreateArrayFun]
 		  uselect_ident = local_predefined_idents.[PD_UnqArraySelectFun]
 		  update_ident = local_predefined_idents.[PD_ArrayUpdateFun]
