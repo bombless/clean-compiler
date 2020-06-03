@@ -870,7 +870,7 @@ where
 			| old_var.av_info_ptr == new_var.av_info_ptr
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table })
 				= (TA_Var old_var, oti, { cs &  cs_symbol_table = cs_symbol_table,
-						cs_error = checkError new_var.av_ident "inconsistently attributed (3)" cs_error })
+						cs_error = checkError var_ident "inconsistently attributed (3)" cs_error })
 		check_var_attribute var_attr=:(TA_Var old_var) TA_Anonymous oti cs
 			= (var_attr, oti, cs)
 		check_var_attribute TA_Unique new_attr oti cs
