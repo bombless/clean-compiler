@@ -4188,7 +4188,8 @@ static void MarkDependentNodeDefs (NodeP node)
 			ExamineSymbolApplication (node);
 			break;
 		case MatchNode:
-			ExamineSymbolApplication (node);
+			if (!IsOverloadedConsOrJust (node->node_symbol->symb_kind))
+				ExamineSymbolApplication (node);
 			break;
 		case SelectorNode:
 			if (node->node_symbol->symb_kind==definition){
