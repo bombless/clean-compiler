@@ -3914,7 +3914,7 @@ static void ExamineSymbolApplication (struct node *node)
 	symbol=node->node_symbol;
 
 	if (symbol->symb_kind!=definition){
-		if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness==4){
+		if (symbol->symb_kind==cons_symb && symbol->symb_head_strictness==UNBOXED_CONS){
 			if (node->node_arity<2)
 				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
 			else {
@@ -3935,8 +3935,8 @@ static void ExamineSymbolApplication (struct node *node)
 					unboxed_cons_array_mark |= mark;
 				}
 			}
-		} else if (symbol->symb_kind==just_symb && symbol->symb_head_strictness==4){
-			if (node->node_arity<2)
+		} else if (symbol->symb_kind==just_symb && symbol->symb_head_strictness==UNBOXED_CONS){
+			if (node->node_arity<1)
 				symbol->symb_unboxed_cons_sdef_p->sdef_mark |= SDEF_USED_CURRIED_MASK;
 			else {
 				StateP unboxed_cons_state_p;

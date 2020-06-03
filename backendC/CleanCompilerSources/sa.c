@@ -2561,8 +2561,8 @@ static Exp ConvertNode (Node node, NodeId nid)
 			Symbol symbol;
 
 			symbol=node->node_symbol;
-			if	(symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR &&
-				 symbol->symb_def->sdef_arity==1)
+			if ((symbol->symb_kind==definition && symbol->symb_def->sdef_kind==CONSTRUCTOR && symbol->symb_def->sdef_arity==1) ||
+				 symbol->symb_kind==just_symb)
 			{
 				Exp selexp;
 				

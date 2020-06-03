@@ -2923,15 +2923,6 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 				constructor_arg_state_p=head_and_tail_states;
 			} else
 #endif
-			if (constructor_symbol->symb_kind==just_symb && constructor_symbol->symb_head_strictness>OVERLOADED_CONS){
-				if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
-					head_and_tail_states[0]=*constructor_symbol->symb_state_p;
-				else
-					head_and_tail_states[0]=StrictState;
-				
-				constructor_arg_state_p=head_and_tail_states;
-			} else
-
 			constructor_arg_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p;
 		}
 
@@ -3152,9 +3143,15 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	lhs_function_arg=NewArgument (NewNodeIdNode (constructor_node_node_id));
 	lhs_function_arg->arg_state=StrictState;
 
-	if (strict_constructor)
-		node_id->nid_lhs_state_p_=&constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries];
-	else
+	if (strict_constructor){
+		if (constructor_symbol->symb_kind==just_symb){
+			if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
+				node_id->nid_lhs_state_p_=constructor_symbol->symb_state_p;
+			else
+				node_id->nid_lhs_state_p_=&StrictState;
+		} else
+			node_id->nid_lhs_state_p_=&constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries];
+	} else
 		node_id->nid_lhs_state_p_=&LazyState;
 	
 	rhs_root=push_node;
@@ -3195,26 +3192,38 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	{
 		TypeNode type_node;
 		StateP lhs_type_root_state_p;
-			
-		if (n_dictionaries==0)
-			type_node=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments->type_arg_node;
-		else {
-			struct type_arg *type_arg;
-			int n;
-			
-			type_arg=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments;
-			for (n=0; n<n_dictionaries; ++n)
-				type_arg=type_arg->type_arg_next;
-			type_node=type_arg->type_arg_node;			
-		}
 		
 		lhs_type_root_state_p=&match_imp_rule->rule_state_p[-1];
-		if (!(type_node->type_node_is_var || type_node->type_node_symbol->ts_kind==apply_type_symb)
-			&& !IsLazyState (constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries]))
-		{
-			*lhs_type_root_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries];
-		} else
-			lhs_type_root_state_p->state_kind=StrictRedirection;
+
+		if (constructor_symbol->symb_kind==just_symb){
+			if (strict_constructor){
+				if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
+					*lhs_type_root_state_p=*constructor_symbol->symb_state_p;
+				else
+					*lhs_type_root_state_p=StrictState;
+			} else
+				lhs_type_root_state_p->state_kind=StrictRedirection;
+		} else {
+			if (n_dictionaries==0)
+				type_node=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments->type_arg_node;
+			else {
+				struct type_arg *type_arg;
+				int n;
+
+				type_arg=constructor_symbol->symb_def->sdef_constructor->cl_constructor_arguments;
+				for (n=0; n<n_dictionaries; ++n)
+					type_arg=type_arg->type_arg_next;
+				type_node=type_arg->type_arg_node;
+			}
+
+			if (!(type_node->type_node_is_var || type_node->type_node_symbol->ts_kind==apply_type_symb)
+				&& !IsLazyState (constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries]))
+			{
+				*lhs_type_root_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p[n_dictionaries];
+			} else
+				lhs_type_root_state_p->state_kind=StrictRedirection;
+		}
+
 		lhs_root->node_state=*lhs_type_root_state_p;
 		
 		if (IsSimpleState (*lhs_type_root_state_p)){

@@ -3397,7 +3397,7 @@ static int lazy_fill_for_cons_in_lazy_context (Node node)
 		NodeP arg_node_p;
 		StateP element_state_p;
 
-		if (symb->symb_head_strictness==4)
+		if (symb->symb_head_strictness==UNBOXED_CONS)
 			element_state_p=symb->symb_unboxed_cons_state_p;
 		else
 			element_state_p=&StrictState;
@@ -3440,7 +3440,7 @@ static int lazy_fill_for_just_in_lazy_context (Node node)
 			if (IsLazyState (arg_node_p->node_node_id->nid_state))
 				return 1;
 
-		if (symb->symb_head_strictness==4)
+		if (symb->symb_head_strictness==UNBOXED_CONS)
 			element_state_p=symb->symb_unboxed_cons_state_p;
 		else
 			element_state_p=&StrictState;
@@ -3501,7 +3501,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 		case cons_symb:
 #if STRICT_LISTS
 			if (symb->symb_head_strictness>1 || symb->symb_tail_strictness){
-				if (symb->symb_head_strictness==4 && node->node_arity<2){
+				if (symb->symb_head_strictness==UNBOXED_CONS && node->node_arity<2){
 					FillSymbol (node,symb->symb_unboxed_cons_sdef_p,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
 					return;
 				} else {
@@ -3516,7 +3516,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
-					if (symb->symb_head_strictness==4){
+					if (symb->symb_head_strictness==UNBOXED_CONS){
 						if (lazy_fill){
 							MakeSymbolLabel (&strict_cons_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
 							strict_cons_lab_p=&strict_cons_lab;
@@ -3553,12 +3553,12 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					} else {
 						if (update_node_id==NULL){
 							*asp_p+=1-a_size;
-							if (symb->symb_head_strictness==4)
+							if (symb->symb_head_strictness==UNBOXED_CONS)
 								GenBuildhr (strict_cons_lab_p,a_size,b_size);
 							else
 								GenBuildh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size);
 						} else {
-							if (symb->symb_head_strictness==4)
+							if (symb->symb_head_strictness==UNBOXED_CONS)
 								GenFillR (strict_cons_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
 							else
 								GenFillh (node->node_arity==2 ? &cons_lab : strict_cons_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
@@ -3597,7 +3597,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			return;
 		case just_symb:
 			if (symb->symb_head_strictness>1){
-				if (symb->symb_head_strictness==4 && node->node_arity<1){
+				if (symb->symb_head_strictness==UNBOXED_CONS && node->node_arity<1){
 					FillSymbol (node,symb->symb_unboxed_cons_sdef_p,asp_p,bsp_p,update_node_id,code_gen_node_ids_p);
 					return;
 				} else {
@@ -3612,7 +3612,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 
 					BuildArgs (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 
-					if (symb->symb_head_strictness==4){
+					if (symb->symb_head_strictness==UNBOXED_CONS){
 						if (lazy_fill){
 							MakeSymbolLabel (&strict_just_lab,symb->symb_unboxed_cons_sdef_p->sdef_module,d_pref,symb->symb_unboxed_cons_sdef_p,0);
 							strict_just_lab_p=&strict_just_lab;
@@ -3643,12 +3643,12 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 					} else {
 						if (update_node_id==NULL){
 							*asp_p+=1-a_size;
-							if (symb->symb_head_strictness==4)
+							if (symb->symb_head_strictness==UNBOXED_CONS)
 								GenBuildhr (strict_just_lab_p,a_size,b_size);
 							else
 								GenBuildh (node->node_arity==1 ? &just_lab : strict_just_lab_p,a_size);
 						} else {
-							if (symb->symb_head_strictness==4)
+							if (symb->symb_head_strictness==UNBOXED_CONS)
 								GenFillR (strict_just_lab_p,a_size,b_size,*asp_p-update_node_id->nid_a_index,0,0,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill,True);
 							else
 								GenFillh (node->node_arity==1 ? &just_lab : strict_just_lab_p,a_size,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind==SemiStrict ? ReleaseAndFill : NormalFill);
@@ -4663,7 +4663,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 #endif
 			new_match_sdef=create_match_function (symbol,node->node_arity,n_dictionaries,strict_constructor);
 		} else {
-			if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>1)
+			if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>OVERLOADED_CONS)
 				strict_constructor=1;
 			new_match_sdef=create_select_and_match_function (symbol,n_dictionaries,strict_constructor);
 		}
@@ -4700,7 +4700,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 		switch (symbol->symb_kind){
 			case cons_symb:
 #if STRICT_LISTS
-				if (symbol->symb_head_strictness==1 || symbol->symb_head_strictness>=3){
+				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
 					GenEqDesc (&nil_lab,0,0);
 					GenNotB();
 				} else
@@ -4708,7 +4708,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				GenEqDesc (&cons_lab,2,0);
 				break;
 			case just_symb:
-				if (symbol->symb_head_strictness==1){
+				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
 					GenEqDesc (&nothing_lab,0,0);
 					GenNotB();
 				} else
@@ -4797,11 +4797,11 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			AdjustTuple (a_size,b_size,asp_p,bsp_p,arity,demanded_state_array,constructor_args_state_p,a_size,b_size);
 		} else
 #if STRICT_LISTS
-		if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness)){
+		if (symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>OVERLOADED_CONS || symbol->symb_tail_strictness)){
 			StateS head_and_tail_states[2];
 			
-			if (symbol->symb_head_strictness>1){
-				if (symbol->symb_head_strictness==4)
+			if (symbol->symb_head_strictness>OVERLOADED_CONS){
+				if (symbol->symb_head_strictness==UNBOXED_CONS)
 					head_and_tail_states[0]=*symbol->symb_state_p;
 				else
 					head_and_tail_states[0]=StrictState;
@@ -4813,7 +4813,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			else
 				head_and_tail_states[1]=LazyState;
 			
-			if (symbol->symb_head_strictness==4){
+			if (symbol->symb_head_strictness==UNBOXED_CONS){
 				DetermineSizeOfState (head_and_tail_states[0],&a_size,&b_size);
 				++a_size;
 
@@ -4830,20 +4830,21 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 			}
 		} else
 #endif
-		if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>1){
+		if (symbol->symb_kind==just_symb && symbol->symb_head_strictness>OVERLOADED_CONS){
 			StateS value_state;
 
-			if (symbol->symb_head_strictness==4){
+			if (symbol->symb_head_strictness==UNBOXED_CONS){
 				value_state=*symbol->symb_state_p;
 				DetermineSizeOfState (value_state,&a_size,&b_size);
 
 				GenReplRArgs (a_size,b_size);
-				*asp_p += a_size;
+				*asp_p += a_size-1;
 				*bsp_p += b_size;
 
 				AdjustTuple (a_size,b_size,asp_p,bsp_p,1,demanded_state_array,&value_state,a_size,b_size);
 			} else {
-				GenReplArg (1,0);
+				GenReplArg (1,1);
+				*asp_p -= 1;
 
 				value_state=StrictState;
 				AdjustTuple (1,0,asp_p,bsp_p,1,demanded_state_array,&value_state,1,0);

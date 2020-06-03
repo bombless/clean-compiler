@@ -2233,10 +2233,10 @@ where
 
 	requirements ti (MatchExpr {glob_object={ds_arity,ds_index,ds_ident},glob_module} expr) reqs_ts=:(reqs, ts)
 		| glob_module==cPredefinedModuleIndex
-			&& (let
-					pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
-				in
-					pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol)
+			&& (let pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex in
+				pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol ||
+				pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_OverloadedJustSymbol)
+			// expr is a decons or from_just
 			= requirements ti expr reqs_ts
 			# cp = CP_Expression expr
 			  ({tst_result,tst_args,tst_attr_env}, ts) = standardLhsConstructorType cp ds_index glob_module ti ts

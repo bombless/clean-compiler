@@ -111,18 +111,18 @@ make_overloaded_list expr_heap cs
 	# overloaded_list=OverloadedList stdStrictLists_index decons_index nil_index
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
-get_unboxed_maybe_indices_and_decons_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_unboxed_maybe_indices_and_decons_u_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_maybe_indices_and_from_just_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
+get_unboxed_maybe_indices_and_from_just_u_symb_ident cs=:{cs_predef_symbols,cs_x}
 	# (stdStrictMaybes_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictMaybes].pds_def
 	  (nothing_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nothing_u].pds_def
 	  (from_just_u_index,cs_predef_symbols)=cs_predef_symbols![PD_from_just_u].pds_def
-	  decons_u_ident = predefined_idents.[PD_from_just_u]
-	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
+	  from_just_u_ident = predefined_idents.[PD_from_just_u]
+	  app_symb = {symb_ident=from_just_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
 	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictMaybes
 	= (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs)
 
 make_unboxed_maybe expr_heap cs
-	# (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs) = get_unboxed_maybe_indices_and_decons_u_symb_ident cs
+	# (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs) = get_unboxed_maybe_indices_and_from_just_u_symb_ident cs
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
 	# unboxed_maybe=UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index
@@ -2247,6 +2247,7 @@ transfromPatternIntoBind mod_index def_level (AP_Algebraic cons_symbol=:{glob_mo
 							record_var record_bind position var_store expr_heap e_info cs
 			_
 				| ds_arity == 1
+					# (src_expr,expr_heap,cs) = add_from_just_call_for_overloaded_maybe glob_module ds_index src_expr expr_heap cs
 		  			# (binds, var_store, expr_heap, e_info, cs)
 						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr cons_symbol src_expr)
 								position var_store expr_heap e_info cs
@@ -2292,6 +2293,7 @@ transfromPatternIntoStrictBind mod_index def_level (AP_Algebraic cons_symbol=:{g
 				-> (lazy_binds,src_bind,var_store,expr_heap,e_info,cs)
 			_
 				| ds_arity == 1
+					# (src_expr,expr_heap,cs) = add_from_just_call_for_overloaded_maybe glob_module ds_index src_expr expr_heap cs
 		  			# (binds, var_store, expr_heap, e_info, cs)
 						= transfromPatternIntoBind mod_index def_level (hd args) (MatchExpr cons_symbol src_expr)
 								position var_store expr_heap e_info cs
@@ -2388,6 +2390,7 @@ adjust_match_expression (Var var) expr_heap
 adjust_match_expression match_expr expr_heap
 	= (match_expr, expr_heap)
 
+add_decons_call_for_overloaded_lists :: !Int !Int !Expression !*ExpressionHeap !*CheckState -> (!Expression,!*ExpressionHeap,!*CheckState)
 add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
 	| glob_module==cPredefinedModuleIndex
 		# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
@@ -2406,8 +2409,15 @@ add_decons_call_for_overloaded_lists glob_module ds_index src_expr expr_heap cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 			# decons_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_expr,expr_heap,cs)
+			= (src_expr,expr_heap,cs)
+		= (src_expr,expr_heap,cs)
+
+add_from_just_call_for_overloaded_maybe :: !Int !Int !Expression !*ExpressionHeap !*CheckState -> (!Expression,!*ExpressionHeap,!*CheckState)
+add_from_just_call_for_overloaded_maybe glob_module ds_index src_expr expr_heap cs
+	| glob_module==cPredefinedModuleIndex
+		# pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
 		| pd_cons_index==PD_UnboxedJustSymbol
-			# (_,_,_,app_symb,cs) = get_unboxed_maybe_indices_and_decons_u_symb_ident cs
+			# (_,_,_,app_symb,cs) = get_unboxed_maybe_indices_and_from_just_u_symb_ident cs
 			# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 			# decons_u_expr = App {app_symb=app_symb,app_args=[src_expr],app_info_ptr=new_info_ptr}
 			= (decons_u_expr,expr_heap,cs)

@@ -2236,10 +2236,9 @@ where
 		=	beTupleSelectNode ds_arity n (convertExpr expr)
 	convertExpr (MatchExpr {glob_module, glob_object={ds_index,ds_arity}} expr)
 		| glob_module==cPredefinedModuleIndex
-			&& (let
-					pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex
-				in
-					pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol)
+			&& (let pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex in
+				pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_OverloadedConsSymbol ||
+				pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_OverloadedJustSymbol)
 			= case expr of
 				App {app_args=[src_expr],app_symb={symb_kind=SK_Function {glob_module=decons_module,glob_object=deconsindex}}}
 					->	beMatchNode ds_arity (beOverloadedConsSymbol glob_module ds_index decons_module deconsindex) (convertExpr src_expr)
