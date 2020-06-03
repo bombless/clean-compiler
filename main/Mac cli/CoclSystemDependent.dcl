@@ -1,22 +1,11 @@
-// this is for Windows
+// this is for MacOS
 definition module CoclSystemDependent
 
-//1.3
-from StdString import String
-from StdFile import Files
-//3.1
-/*2.0
 from StdFile import ::Files
-0.2*/
-
-// RWS split
-// from deltaIOSystem import DeviceSystem
-// from deltaEventIO import InitialIO, IOState
+import DirectorySeparator
 
 PathSeparator
 	:==	','
-DirectorySeparator
-	:== ':'
 
 SystemDependentDevices :: [a]
 SystemDependentInitialIO :: [a]

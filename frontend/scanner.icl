@@ -3,7 +3,7 @@ implementation module scanner
 import	StdEnv, compare_constructor, general
 
 from utilities import revCharListToString, isSpecialChar
-from CoclSystemDependent import DirectorySeparator
+import DirectorySeparator
 
 :: SearchPaths = 
 	{ sp_locations   :: [(String, String)]       // (module, path)

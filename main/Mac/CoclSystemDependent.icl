@@ -8,11 +8,10 @@ import StdEnv
 import Clean2AppleEventHandler,compile,docommand,cache_variable
 
 from Clean2AppleEventHandler import get_apple_event_string;
+import DirectorySeparator
 
 PathSeparator
 	:==	','
-DirectorySeparator
-	:==	':'
 
 script_handler :: !{#Char} *Files -> (!Int,!*Files);
 script_handler script files

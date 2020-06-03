@@ -3,6 +3,7 @@ implementation module CoclSystemDependent
 
 import StdEnv
 import ArgEnv
+import DirectorySeparator
 
 // import for filesystem
 import code from "cDirectory." // Windows
@@ -10,8 +11,6 @@ from filesystem import ensureDirectoryExists
 
 PathSeparator
 	:==	';'
-DirectorySeparator
-	:== '\\'
 
 SystemDependentDevices :: [a]
 SystemDependentDevices

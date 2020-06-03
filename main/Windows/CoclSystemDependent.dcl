@@ -2,15 +2,10 @@
 definition module CoclSystemDependent
 
 from StdFile import ::Files
-
-// RWS split
-// from deltaIOSystem import DeviceSystem
-// from deltaEventIO import InitialIO, IOState
+import DirectorySeparator
 
 PathSeparator
 	:==	';'
-DirectorySeparator
-	:== '\\'
 
 SystemDependentDevices :: [a]
 SystemDependentInitialIO :: [a]

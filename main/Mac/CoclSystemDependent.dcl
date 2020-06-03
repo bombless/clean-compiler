@@ -1,18 +1,11 @@
 // this is for the PowerMac
 definition module CoclSystemDependent
 
-//1.3
-from StdString import String
-from StdFile import Files
-//3.1
-/*2.0
 from StdFile import :: Files
-0.2*/
+import DirectorySeparator
 
 PathSeparator
 	:==	','
-DirectorySeparator
-	:==	':'
 
 script_handler :: !{#Char} *Files -> (!Int,!*Files);
 
