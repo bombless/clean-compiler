@@ -1,6 +1,8 @@
 // this is for Windows
 implementation module CoclSystemDependent
 
+import code from library "backend_library"
+
 import StdEnv
 import ArgEnv
 import DirectorySeparator

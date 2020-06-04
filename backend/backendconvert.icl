@@ -1,7 +1,5 @@
 implementation module backendconvert
 
-import code from library "backend_library"
-
 import StdEnv, compare_types
 from StdFunc import return
 import frontend
