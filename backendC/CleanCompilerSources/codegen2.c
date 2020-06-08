@@ -4844,7 +4844,6 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				AdjustTuple (a_size,b_size,asp_p,bsp_p,1,demanded_state_array,&value_state,a_size,b_size);
 			} else {
 				GenReplArg (1,1);
-				*asp_p -= 1;
 
 				value_state=StrictState;
 				AdjustTuple (1,0,asp_p,bsp_p,1,demanded_state_array,&value_state,1,0);
