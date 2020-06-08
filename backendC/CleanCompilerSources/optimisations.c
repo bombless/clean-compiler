@@ -1347,6 +1347,27 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					break;
 				}
 #endif
+#ifdef THUNK_LIFT_0_CONSTRUCTORS
+				case nil_symb:
+				case nothing_symb:
+					if (arg_node->node_arity==0){
+						NodeP function_node;
+						ArgP new_arg;
+						
+						function_node=NewNode (arg_node->node_symbol,NULL,0);
+						function_node->node_state=LazyState;
+						function_node->node_number=0;
+						
+						new_arg=NewArgument (function_node);
+						new_arg->arg_state=LazyState;
+						*rhs_arg_p=new_arg;
+						rhs_arg_p=&new_arg->arg_next;
+						
+						++arg_state_p;
+						continue;
+					}
+					break;
+#endif
 #ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
 				case apply_symb:
 					if (arg_node->node_arity==2){
