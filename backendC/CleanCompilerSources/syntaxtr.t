@@ -122,7 +122,9 @@ struct unboxed_cons {
 };
 #endif
 
+#define LAZY_CONS 0
 #define OVERLOADED_CONS 1
+#define STRICT_CONS 2
 #define UNBOXED_OVERLOADED_CONS 3
 #define UNBOXED_CONS 4
 

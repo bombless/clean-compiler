@@ -1593,6 +1593,8 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 			} else if (arg_node->node_kind==NormalNode){
 #ifdef STRICT_STATE_FOR_LAZY_TUPLE_CONSTRUCTORS
 				if (BETWEEN (tuple_symb,nothing_symb,arg_node->node_symbol->symb_kind)
+					&& !(arg_node->node_symbol->symb_kind==cons_symb && (arg_node->node_symbol->symb_head_strictness>LAZY_CONS || arg_node->node_symbol->symb_tail_strictness))
+					&& !(arg_node->node_symbol->symb_kind==just_symb && arg_node->node_symbol->symb_head_strictness>LAZY_CONS)
 					&& arg_node->node_state.state_type==SimpleState && arg_node->node_state.state_kind==OnA)
 				{
 					call_state_p=&StrictState;
@@ -2292,8 +2294,37 @@ static void optimise_normal_node (Node node)
 				init_apply_symb_function_state_p();
 			function_state_p=apply_symb_function_state_p;
 		} else
-#endif		
-		return;
+#endif
+		{
+			if (symbol->symb_kind==just_symb && (symbol->symb_head_strictness==STRICT_CONS || symbol->symb_head_strictness==UNBOXED_CONS) &&
+				node->node_arity==1)
+			{
+				function_state_p = symbol->symb_head_strictness==STRICT_CONS ? &StrictState : symbol->symb_unboxed_cons_state_p;
+				
+				if (has_optimisable_argument (node,function_state_p)
+					&& !can_build_strict_constructor_or_record_in_lazy_context (node,function_state_p))
+					create_new_local_function (node,function_state_p);
+			}
+
+			if (symbol->symb_kind==cons_symb && node->node_arity==2){
+				StateS function_state[2];
+				
+				if (symbol->symb_head_strictness==STRICT_CONS || symbol->symb_head_strictness==UNBOXED_CONS){
+					function_state[0] = symbol->symb_head_strictness==STRICT_CONS ? StrictState : *symbol->symb_unboxed_cons_state_p;
+					function_state[1] = symbol->symb_tail_strictness ? StrictState : LazyState;
+				} else if (symbol->symb_tail_strictness){
+					function_state[0] = LazyState;
+					function_state[1] = StrictState;
+				} else
+					return;
+
+				if (has_optimisable_argument (node,function_state)
+					&& !can_build_strict_constructor_or_record_in_lazy_context (node,function_state))
+					create_new_local_function (node,function_state);
+			}
+
+			return;
+		}
 	}
 #ifdef MOVE_APPLY_NODES_IN_LAZY_CONTEXT_TO_NEW_FUNCTION
 	else
@@ -3122,6 +3153,25 @@ static void optimise_strict_constructor_in_lazy_context (NodeP node,FreeUniqueNo
 				}
 			}
 		}
+	} else if (symbol->symb_kind==just_symb){
+		if (node->node_state.state_type==SimpleState && node->node_state.state_kind==OnA && node->node_arity==1){
+			if (symbol->symb_head_strictness==LAZY_CONS){
+				node->node_state.state_kind=StrictOnA;
+			} else if (
+				(symbol->symb_head_strictness==STRICT_CONS && ChangeArgumentNodeStatesIfStricter (node,&StrictState)) ||
+				(symbol->symb_head_strictness==UNBOXED_CONS && ChangeArgumentNodeStatesIfStricter (node,symbol->symb_unboxed_cons_state_p))
+			){
+				node->node_state.state_kind=StrictOnA;
+#ifdef REUSE_UNIQUE_NODES
+				if (*f_node_ids_l!=NULL)
+					try_insert_constructor_update_node (node,f_node_ids_l);
+#endif
+			}
+		}
+	} else if (symbol->symb_kind==nothing_symb){
+		if (node->node_state.state_type==SimpleState && node->node_state.state_kind==OnA && node->node_arity==0)
+			if ((symbol->symb_head_strictness & 1)==0)
+				node->node_state.state_kind=StrictOnA;
 	}
 }
 
