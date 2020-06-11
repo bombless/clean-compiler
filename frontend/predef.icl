@@ -384,7 +384,7 @@ where
 					<<- (local_predefined_idents, IC_Class, PD_ListClass)
 					<<- (local_predefined_idents, IC_Class, PD_UListClass)
 					<<- (local_predefined_idents, IC_Class, PD_UTSListClass)
-		# hash_table = put_predefined_idents_in_hash_table PD_just PD_nothing_u IC_Expression local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_just_u PD_from_just IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents, IC_Class, PD_MaybeClass)
 					<<- (local_predefined_idents, IC_Class, PD_UMaybeClass)
 					<<- (local_predefined_idents, IC_Expression, PD_SmallerFun)
@@ -529,8 +529,8 @@ buildPredefinedModule support_dynamics pre_def_symbols
 
 	  array_and_unit_type_defs
 		= [array_def,strict_def,unboxed_def,packed_def,maybe_def,strict_maybe_def,unboxed_maybe_def,overloaded_maybe_def,unit_type_def]
-	  cons_defs = [just_def,strict_just_def,unboxed_just_def,overloaded_just_def,
-				   nothing_def,strict_nothing_def,unboxed_nothing_def,overloaded_nothing_def,unit_cons_def]
+	  cons_defs = [just_def,nothing_def,strict_just_def,strict_nothing_def,
+	  			   unboxed_just_def,unboxed_nothing_def,overloaded_just_def,overloaded_nothing_def,unit_cons_def]
 	  (type_defs, cons_defs, pre_def_symbols)
 		= add_tuple_defs pre_mod_ident MaxTupleArity array_and_unit_type_defs cons_defs pre_def_symbols
 

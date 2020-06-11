@@ -3231,6 +3231,10 @@ trySimpleTypeT CurlyOpenToken attr pState
 trySimpleTypeT StringTypeToken attr pState
 	# type = makeStringType
 	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
+trySimpleTypeT (MaybeIdentToken maybe_token) attr pState
+	| maybe_token>=8
+		#! maybe_type_ident = predefined_idents.[PD_MaybeType+(maybe_token bitand 7)]
+		= (ParseOk,{at_attribute=attr,at_type=TA (MakeNewTypeSymbIdent maybe_type_ident 0) []},pState)
 trySimpleTypeT (QualifiedIdentToken module_name ident_name) attr pState
 	| not (isLowerCaseName ident_name)
 		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Type pState
@@ -3629,6 +3633,12 @@ where
 					  (pattern_args,pState) = parse_wild_cards pState
 					  pattern = if (isEmpty pattern_args) (PE_Ident id) (PE_List [PE_Ident id:pattern_args])
 					-> matches_expression exp pattern pState
+			MaybeIdentToken maybe_token
+				| maybe_token<8
+					#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+					# (pattern_args,pState) = parse_wild_cards pState
+					  pattern = if (pattern_args=:[]) (PE_Ident just_or_none_ident) (PE_List [PE_Ident just_or_none_ident:pattern_args])
+					-> matches_expression exp pattern pState
 			// to do: qualified ident
 			_
 				# (succ, pattern, pState) = trySimplePatternWithoutDefinitionsT token pState
@@ -3774,6 +3784,10 @@ trySimplePatternT (CharToken char) pState
 	= (True, PE_Basic (BVC char), pState)
 trySimplePatternT (RealToken real) pState
 	= (True, PE_Basic (BVR real), pState)
+trySimplePatternT (MaybeIdentToken maybe_token) pState
+	| maybe_token<8
+		#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+		= (True,PE_Ident just_or_none_ident,pState)
 trySimplePatternT (QualifiedIdentToken module_name ident_name) pState
 	| not (isLowerCaseName ident_name)
 		# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
@@ -3898,6 +3912,13 @@ trySimpleExpressionT (CharToken char) pState
 	= (True, PE_Basic (BVC char), pState)
 trySimpleExpressionT (RealToken real) pState
 	= (True, PE_Basic (BVR real), pState)
+trySimpleExpressionT (MaybeIdentToken maybe_token) pState
+	| maybe_token<8
+		| maybe_token<4
+			#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+			= (True,PE_Ident just_or_none_ident,pState)
+			#! just_or_none_ident = predefined_idents.[PD_just_u+(maybe_token bitand 3)]
+			= (True,PE_Ident just_or_none_ident,pState)
 trySimpleExpressionT (QualifiedIdentToken module_name ident_name) pState
 	# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
 	= (True, PE_QualifiedIdent module_id ident_name, pState)

@@ -47,6 +47,7 @@ PD_StrictArrayType			:== 41
 PD_UnboxedArrayType			:== 42
 PD_PackedArrayType			:== 43
 
+// same order as in MaybeIdentToken
 PD_MaybeType :== 44
 PD_StrictMaybeType :== 45
 PD_UnboxedMaybeType :== 46
@@ -77,13 +78,14 @@ PD_OverloadedNilSymbol :== 62
 PD_Arity2TupleSymbol		:== 63
 PD_Arity32TupleSymbol		:== 93
 
+// same order as in MaybeIdentToken
 PD_JustSymbol :== 94
-PD_StrictJustSymbol :== 95
-PD_UnboxedJustSymbol :== 96
-PD_OverloadedJustSymbol :== 97
-PD_NothingSymbol :== 98
-PD_StrictNothingSymbol :== 99
-PD_UnboxedNothingSymbol :== 100
+PD_NothingSymbol :== 95
+PD_StrictJustSymbol :== 96
+PD_StrictNothingSymbol :== 97
+PD_UnboxedJustSymbol :== 98
+PD_UnboxedNothingSymbol :== 99
+PD_OverloadedJustSymbol :== 100
 PD_OverloadedNothingSymbol :== 101
 
 PD_UnitConsSymbol :== 102
@@ -158,13 +160,14 @@ PD_UTSListClass :== 174
 // StdStrictMaybes
 PD_StdStrictMaybes:==175
 
-PD_just:==176
-PD_from_just:==177
-PD_just_u:==178
-PD_from_just_u:==179
+// same order as in MaybeIdentToken
+PD_just_u:==176
+PD_nothing_u:==177
+PD_just:==178
+PD_nothing:==179
 
-PD_nothing:==180
-PD_nothing_u:==181
+PD_from_just_u:==180
+PD_from_just:==181
 
 PD_MaybeClass :== 182
 PD_UMaybeClass :== 183

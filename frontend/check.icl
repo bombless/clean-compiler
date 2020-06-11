@@ -3617,8 +3617,12 @@ where
 				<=< adjust_predef_symbols PD_ListClass PD_UTSListClass mod_index STE_Class
 		| mod_index==cs_predef_symbols.[PD_StdStrictMaybes].pds_def
 			= cs
-				<=< adjust_predef_symbols PD_just PD_from_just_u mod_index STE_Member
-				<=< adjust_predef_symbols PD_nothing PD_nothing_u mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_just_u mod_index STE_Member
+				<=< adjustPredefSymbol PD_just mod_index STE_Member
+				<=< adjustPredefSymbol PD_from_just_u mod_index STE_Member
+				<=< adjustPredefSymbol PD_from_just mod_index STE_Member
+				<=< adjustPredefSymbol PD_nothing_u mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_nothing mod_index STE_DclFunction
 				<=< adjust_predef_symbols PD_MaybeClass PD_UMaybeClass mod_index STE_Class
 		| mod_index==cs_predef_symbols.[PD_StdDynamic].pds_def
 			= cs

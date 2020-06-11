@@ -20,6 +20,7 @@ instance <<< FilePosition
 	= 	IdentToken !.String		//		an identifier
 	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
 	| 	QualifiedIdentToken !String !.String	//	a qualified identifier
+	|	MaybeIdentToken !Int
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string
@@ -110,6 +111,18 @@ instance <<< FilePosition
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
+
+LazyJustToken :== 0
+LazyNoneToken :== 1
+StrictJustToken :== 2
+StrictNoneToken :== 3
+UnboxedJustToken :== 4
+UnboxedNoneToken :== 5
+OverloadedJustToken :== 6
+OverloadedNoneToken :== 7
+LazyMaybeToken :== 8
+StrictMaybeToken :== 9
+UnboxedMaybeToken :== 10
 
 :: ScanContext
 	=	GeneralContext

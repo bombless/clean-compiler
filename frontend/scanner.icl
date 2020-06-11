@@ -109,6 +109,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	= 	IdentToken ! .String	//		an identifier
 	| 	UnderscoreIdentToken !.String//	an identifier that starts with a '_'
 	| 	QualifiedIdentToken !String !.String	//	a qualified identifier
+	|	MaybeIdentToken !Int
 	|	IntToken !.String		//		an integer
 	|	RealToken !.String		//		a real
 	|	StringToken !.String	//		a string
@@ -199,6 +200,18 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 
 	|	ExistsToken				//		E.
 	|	ForAllToken				//		A.
+
+LazyJustToken :== 0
+LazyNoneToken :== 1
+StrictJustToken :== 2
+StrictNoneToken :== 3
+UnboxedJustToken :== 4
+UnboxedNoneToken :== 5
+OverloadedJustToken :== 6
+OverloadedNoneToken :== 7
+LazyMaybeToken :== 8
+StrictMaybeToken :== 9
+UnboxedMaybeToken :== 10
 
 ::	ScanContext
 	=	GeneralContext
@@ -732,7 +745,8 @@ Scan c0=:':' input co
 							= (ColonToken, charBack input)
 Scan '\'' input co			= ScanChar input
 Scan c0=:'\"' input co		= ScanString 0 [c0] input
-
+Scan '?' input co
+	= ScanQuestionMark input co
 Scan 'E' input TypeContext
 	# (eof,c1,input)		= ReadNormalChar input
 	| eof					= (IdentToken "E", input)
@@ -749,6 +763,84 @@ Scan c    input co
 		= ScanIdentFast 1 input co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
+
+ScanQuestionMark :: !Input !ScanContext -> (!Token, !Input)
+ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,inp_tabsize} co=:FunctionContext
+	| i+3>size line
+		= ScanOperator 0 input ['?'] co
+	| line.[i]=='J' && line.[i+1]=='u' && line.[i+2]=='s' && line.[i+3]=='t'
+		&& (i+4==size line || not (IsIdentChar line.[i+4] FunctionContext))
+		# inp_pos & fp_col = inp_pos.fp_col + 4
+		  input = {inp_stream = OldLine (i+4) line stream, inp_pos = inp_pos,
+				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+		= (MaybeIdentToken StrictJustToken, input)
+	| line.[i]=='N' && line.[i+1]=='o' && line.[i+2]=='n' && line.[i+3]=='e'
+		&& (i+4==size line || not (IsIdentChar line.[i+4] FunctionContext))
+		# inp_pos & fp_col = inp_pos.fp_col + 4
+		  input = {inp_stream = OldLine (i+4) line stream, inp_pos = inp_pos,
+				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+		= (MaybeIdentToken StrictNoneToken, input)
+	| i+4>size line
+		= ScanOperator 0 input ['?'] co
+	| line.[i]=='#'
+		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken UnboxedJustToken, input)
+		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken UnboxedNoneToken, input)
+			= ScanOperator 0 input ['?'] co
+	| line.[i]=='|'
+		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken OverloadedJustToken, input)
+		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken OverloadedNoneToken, input)
+			= ScanOperator 0 input ['?'] co
+	| line.[i]=='^'
+		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken LazyJustToken, input)
+		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
+			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			# inp_pos & fp_col = inp_pos.fp_col + 5
+			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
+					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+			= (MaybeIdentToken LazyNoneToken, input)
+			= ScanOperator 0 input ['?'] co
+		= ScanOperator 0 input ['?'] co
+ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,inp_tabsize} co=:TypeContext
+	| i==size line || not (isSpecialChar line.[i])
+		= (MaybeIdentToken StrictMaybeToken, input)
+	| line.[i]=='#' && (i+1==size line || not (isSpecialChar line.[i+1]))
+		# inp_pos & fp_col = inp_pos.fp_col + 1
+		  input = {inp_stream = OldLine (i+1) line stream, inp_pos = inp_pos,
+				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+		= (MaybeIdentToken UnboxedMaybeToken, input)
+	| line.[i]=='^' && (i+1==size line || not (isSpecialChar line.[i+1]))
+		# inp_pos & fp_col = inp_pos.fp_col + 1
+		  input = {inp_stream = OldLine (i+1) line stream, inp_pos = inp_pos,
+				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
+		= (MaybeIdentToken LazyMaybeToken, input)
+		= ScanOperator 0 input ['?'] co
+ScanQuestionMark input co
+	= ScanOperator 0 input ['?'] co
 
 possibleKeyToken :: !Token ![Char] !ScanContext !Input -> (!Token, !Input)
 possibleKeyToken token reversedPrefix context input
@@ -1530,8 +1622,6 @@ GetPreviousChar input=:{inp_stream=OldLine i line stream}
 GetPreviousChar input
 	= (NewLineChar,input)
 
-qw s :== "\"" + s + "\""
-
 instance <<< Token
 where
 	(<<<) f t = f <<< (toString t)
@@ -1544,10 +1634,20 @@ instance <<< FilePosition
 where
 	(<<<) f {fp_line,fp_col} = f <<< fp_line <<< ";" <<< fp_col
 
+maybeIdentString LazyJustToken = "?^Just"
+maybeIdentString LazyNoneToken = "?^None"
+maybeIdentString StrictJustToken = "?Just"
+maybeIdentString StrictNoneToken = "?None"
+maybeIdentString UnboxedJustToken = "?#Just"
+maybeIdentString UnboxedNoneToken = "?#None"
+maybeIdentString OverloadedJustToken = "?|Just"
+maybeIdentString OverloadedNoneToken = "?|None"
+
 instance toString Token
 where
-	toString (IdentToken id)			= id // qw id
-	toString (UnderscoreIdentToken id)	= id // qw id
+	toString (IdentToken id)			= id
+	toString (MaybeIdentToken id)		= maybeIdentString id
+	toString (UnderscoreIdentToken id)	= id
 	toString (IntToken id)				= id
 	toString (RealToken id)				= id
 	toString (StringToken id)			= id
@@ -1658,6 +1758,7 @@ where
 		equal_args_of_tokens (LetToken l1)			(LetToken l2)			= l1 == l2
 		equal_args_of_tokens (SeqLetToken l1)		(SeqLetToken l2)		= l1 == l2
 		equal_args_of_tokens (ErrorToken id1)		(ErrorToken id2)		= id1 == id2
+		equal_args_of_tokens (MaybeIdentToken id1)	(MaybeIdentToken id2)	= id1 == id2
 		equal_args_of_tokens (QualifiedIdentToken module_name1 ident_name1) (QualifiedIdentToken module_name2 ident_name2)
 			= ident_name1==ident_name2 && module_name1==module_name2
 		equal_args_of_tokens _						_						= True
