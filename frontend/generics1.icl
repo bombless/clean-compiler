@@ -229,7 +229,7 @@ where
 
 clearGenericDefs :: !*{#CommonDefs} !*Heaps -> (!*{#CommonDefs},!*Heaps)
 clearGenericDefs modules heaps
-	= clear_module 0 modules  heaps
+	= clear_module 0 modules heaps
 where
 	initial_gen_classes
 		= createArray 32 []
@@ -243,16 +243,14 @@ where
 		| n == size modules
 			= (modules, heaps)
 			#! ({com_generic_defs}, modules) = modules![n]
-			#! (com_generic_defs, heaps) = updateArraySt clear_generic_def {x\\x<-:com_generic_defs} heaps 			
-			#! modules = {modules & [n].com_generic_defs = com_generic_defs}
+			#! heaps & hp_generic_heap = foldArraySt clear_generic_def com_generic_defs heaps.hp_generic_heap
 			= clear_module (inc n) modules heaps
 
-	clear_generic_def generic_def=:{gen_info_ptr} heaps=:{hp_generic_heap}
-		#! (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
+	clear_generic_def {gen_info_ptr} hp_generic_heap
+		# (gen_info, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
 		# gen_info & gen_classes = initial_gen_classes, gen_rep_conses = initial_gen_rep_conses
-		#! hp_generic_heap = writePtr gen_info_ptr gen_info hp_generic_heap
-		= (generic_def, {heaps & hp_generic_heap = hp_generic_heap})
-		
+		= writePtr gen_info_ptr gen_info hp_generic_heap
+
 //	generic type representation
 
 // generic representation is built for each type argument of
