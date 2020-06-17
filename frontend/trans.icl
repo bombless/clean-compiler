@@ -3684,7 +3684,7 @@ where
 		| isNilPtr app_info_ptr
 			= determineProducer app EI_Empty consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit new_args prod_index producers ro ti
 		# (app_info, ti_symbol_heap) = readPtr app_info_ptr ti.ti_symbol_heap
-		# ti = { ti & ti_symbol_heap = ti_symbol_heap }
+		# ti & ti_symbol_heap = ti_symbol_heap
 		= determineProducer app app_info consumer_properties consumer_is_curried ok_non_rec_consumer linear_bit new_args prod_index producers ro ti
 	determine_producer _ _ _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
@@ -4007,23 +4007,24 @@ determineProducer app=:{app_symb = symb=:{symb_kind}, app_args} _ consumer_prope
 		| glob_module==ro.ro_main_dcl_module_n && glob_object<size ti.ti_cons_args &&
 			ti.ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsNonRecursive == 0 && ro.ro_transform_fusion>=NoRecProdFusion
 			= (producers, [App app : new_args], ti)
-		# (fun_arity, ti) = get_fun_arity glob_module glob_object ro ti
-		  n_app_args = length app_args
-		| n_app_args<>fun_arity
+		# n_app_args = length app_args
+		| n_app_args <> get_fun_arity glob_module glob_object ro ti.ti_fun_defs
 			| consumer_properties bitand FI_IsMacroFun <> 0
 				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			# ({cc_producer},ti) = ti!ti_cons_args.[glob_object]
 			| SwitchCurriedFusion (ro.ro_transform_fusion>=FullFusion) cc_producer False
+				| glob_module<>ro.ro_main_dcl_module_n
+					= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 				# ({fun_body,fun_type,fun_info}, ti) = ti!ti_fun_defs.[glob_object]
 				# (is_good_producer,ti)
 					= SwitchFunctionFusion
 						(function_is_good_producer fun_body fun_type linear_bit ro ti)
 						(False,ti)
 				#! max_index = size ti.ti_cons_args
-				| glob_module==ro.ro_main_dcl_module_n && glob_object < max_index &&
+				| glob_object < max_index &&
 				  is_good_producer && cc_producer && not consumer_is_curried
 					= ({producers & [prod_index] = PR_CurriedFunction symb n_app_args glob_object}, app_args ++ new_args, ti)
-				= ({ producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
+				= ({producers & [prod_index] = PR_Curried symb n_app_args}, app_args ++ new_args, ti)
 			= (producers, [App app : new_args], ti)
 		#! max_index = size ti.ti_cons_args
 		| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index /* Sjaak, to skip array functions */
@@ -4061,13 +4062,13 @@ where
 		#! (max_index, ti_cons_args)	= usize ti_cons_args
 		= (max_index, {ti & ti_cons_args = ti_cons_args})
 
-	get_fun_arity glob_module glob_object ro ti
+	get_fun_arity glob_module glob_object ro ti_fun_defs
 		| glob_module <> ro.ro_main_dcl_module_n
 			# {st_arity, st_context} = ro.ro_imported_funs.[glob_module].[glob_object].ft_type
-			= (st_arity+length st_context, ti)
+			= st_arity+length st_context
 		// for imported functions you have to add ft_arity and length st_context, but for unimported
 		// functions fun_arity alone is sufficient
-		= ti!ti_fun_defs.[glob_object].fun_arity
+		= ti_fun_defs.[glob_object].fun_arity
 
 function_is_good_producer (Expanding _) fun_type linear_bit ro ti
 	= (False,ti)
