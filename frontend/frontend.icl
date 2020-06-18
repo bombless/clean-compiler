@@ -53,7 +53,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
   	# (ok, icl_mod, dcl_mods, groups, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
   	  	= checkModule mod global_fun_range mod_functions support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols symbol_table error heaps
 
-	  hash_table = { hash_table & hte_symbol_heap = symbol_table}
+	  hash_table & hte_symbol_heap = symbol_table
 
 	| not ok
 		= (No,{},dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
@@ -123,14 +123,15 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
       type_heaps = { type_heaps & th_vars = th_vars }
 
-	# heaps = { heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap }
+	# heaps & hp_type_heaps = type_heaps, hp_expression_heap = hp_expression_heap, hp_generic_heap = gen_heap, hp_var_heap=hp_var_heap
 
 	| not error_admin.ea_ok
 		= (No,{},dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error_admin.ea_file, io, out, tcl_file, heaps)
 
 	#! start_index_generic_classes = size icl_common.com_class_defs;
 
-	# (saved_main_dcl_common, ti_common_defs) = replace {#dcl_common \\ {dcl_common}<-:dcl_mods} main_dcl_module_n icl_common
+	# (ti_common_defs,dcl_mods) = copy_common_defs_from_dcl_modules dcl_mods
+	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
 	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 		= case options.feo_generics of
@@ -140,9 +141,9 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 			False
 				-> (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
 
-	# (icl_common, ti_common_defs) = replace {#x \\ x<-:ti_common_defs} main_dcl_module_n saved_main_dcl_common		
+	# (icl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n saved_main_dcl_common
 
-	# dcl_mods = { {dcl_mod & dcl_common = common} \\ dcl_mod <-: dcl_mods & common <-: ti_common_defs }
+	# dcl_mods & [module_n].dcl_common = common \\ common <-: ti_common_defs & module_n<-[0..]
 
 	# icl_mod = {icl_mod & icl_common = icl_common} 
 		
@@ -305,6 +306,22 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		copy_dcl_modules dcl_mods
 			#! nr_of_dcl_mods = size dcl_mods
 			= arrayCopyBegin dcl_mods nr_of_dcl_mods
+
+		copy_common_defs_from_dcl_modules :: !*{#DclModule} -> (!*{#CommonDefs},!*{#DclModule})
+		copy_common_defs_from_dcl_modules dcl_mods
+			# (n_dcl_mods,dcl_mods) = usize dcl_mods
+			| n_dcl_mods==0
+				= ({#},dcl_mods)
+				# (common_defs_0,dcl_mods) = dcl_mods![0].dcl_common
+				= copy_common_defs 1 (createArray n_dcl_mods common_defs_0) dcl_mods
+
+		copy_common_defs :: !Int !*{#CommonDefs} !*{#DclModule} -> (!*{#CommonDefs},!*{#DclModule})
+		copy_common_defs module_n common_defs dcl_mods
+			| module_n<size dcl_mods
+				# (common_def,dcl_mods) = dcl_mods![module_n].dcl_common
+				# common_defs & [module_n] = common_def
+				= copy_common_defs (module_n+1) common_defs dcl_mods
+				= (common_defs,dcl_mods)
 
 		clear_group_indices_of_macros :: !*{#*{#FunDef}} -> *{#*{#FunDef}}
 		clear_group_indices_of_macros cached_dcl_macros

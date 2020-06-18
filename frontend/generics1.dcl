@@ -6,24 +6,24 @@ from transform import ::Group
 convertGenerics :: 
 		!Int 
 		!NumberSet
-		!{#CommonDefs} 
+		!*{#CommonDefs}
 		!{!Group} 
 		!*{# FunDef} 
 		!*TypeDefInfos 
 		!*Heaps 
 		!*HashTable 
 		!*PredefinedSymbols 
-		!u:{# DclModule}
+		!*{# DclModule}
 		!*{#*{#FunDef}}
 		!*ErrorAdmin
-	-> (  !{#CommonDefs}
+	-> (  !*{#CommonDefs}
 		, !{!Group}
 		, !*{# FunDef}
 		, !*TypeDefInfos
 		, !*Heaps
 		, !*HashTable
 		, !*PredefinedSymbols
-		, !u:{# DclModule}
+		, !*{# DclModule}
 		, !*{#*{#FunDef}}
 		, !*ErrorAdmin
 		)

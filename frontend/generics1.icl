@@ -106,30 +106,28 @@ FIELD_NewType_Mask:==8;
 convertGenerics :: 
 		!Int 					// index of the main dcl module
 		!NumberSet				// set of used modules
-		!{#CommonDefs} 			// common definitions of all modules
+		!*{#CommonDefs} 		// common definitions of all modules
 		!{!Group} 				// groups of functions
 		!*{# FunDef} 			// functions
 		!*TypeDefInfos 			// type definition information of all modules
 		!*Heaps 				// all heaps
 		!*HashTable 			// needed for what creating class dictionaries
 		!*PredefinedSymbols 	// predefined symbols
-		!u:{# DclModule}		// dcl modules
+		!*{# DclModule}			// dcl modules
 		!*{#*{#FunDef}}			// dcl macros
 		!*ErrorAdmin 			// to report errors
-	->  ( !{#CommonDefs}		// common definitions of all modules
+	->  ( !*{#CommonDefs}		// common definitions of all modules
 		, !{!Group}				// groups of functions
 		, !*{# FunDef}			// function definitions
 		, !*TypeDefInfos		// type definition infos
 		, !*Heaps				// all heaps
 		, !*HashTable			// needed for creating class dictinaries
 		, !*PredefinedSymbols	// predefined symbols	
-		, !u:{# DclModule}		// dcl modules
+		, !*{# DclModule}		// dcl modules
 		, !*{#*{#FunDef}}		// dcl macros
 		, !*ErrorAdmin			// to report errors
 		)
 convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_infos heaps hash_table u_predefs dcl_modules dcl_macros error
-	#! modules = {x \\ x <-: modules} 			// unique copy
-	#! dcl_modules = { x \\ x <-: dcl_modules } 	// unique copy
 	#! size_predefs = size u_predefs
 	#! (predefs, u_predefs) = arrayCopyBegin u_predefs size_predefs // non-unique copy
 
@@ -2006,8 +2004,7 @@ where
 			, ds_arity = 0 
 			, ds_index = NoIndex/*index in the type def table, filled in later*/ 
 			}
-		#! class_def = { 
-			class_ident = class_ident, 
+		= { class_ident = class_ident,
 			class_arity = 1,  
 			class_args = [class_var],
 		    class_context = [], 
@@ -2017,7 +2014,6 @@ where
 		    class_cons_vars = 0, // dotted class variables
 		    class_dictionary = class_dictionary
 		    }
-		= class_def
 
 // Convert generic cases
 
@@ -5104,8 +5100,7 @@ where
 	clear_type (CV tv :@: _) th = clear_type_var tv th
 	clear_type (TFA atvs type) th
 		#! th = foldSt clear_attr [atv_attribute \\ {atv_attribute} <- atvs] th
-		#! th = foldSt clear_type_var [atv_variable \\ {atv_variable} <- atvs] th
-		= th
+		= foldSt clear_type_var [atv_variable \\ {atv_variable} <- atvs] th
 	clear_type _ th = th
 
 	clear_atype {at_attribute} th 
@@ -5114,7 +5109,7 @@ where
 	clear_attr (TA_Var av) th = clear_attr_var av th
 	clear_attr (TA_RootVar av) th = clear_attr_var av th
 	clear_attr _ th = th
-		
+
 	clear_type_var {tv_info_ptr} th=:{th_vars} 
 		= {th & th_vars = writePtr tv_info_ptr TVI_Empty th_vars} 
 
