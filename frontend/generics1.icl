@@ -21,11 +21,11 @@ import genericsupport,transform,utilities
 	| GTSRecord !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
 	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
 	| GTSObject !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
-	| GTSE
-	| GTSPair !GenTypeStruct !GenTypeStruct
 	| GTSEither !GenTypeStruct !GenTypeStruct
+	| GTSPair !GenTypeStruct !GenTypeStruct
 	| GTSUnit
 	| GTSArrow GenTypeStruct GenTypeStruct
+	| GTSE
 
 :: BimapGenTypeStruct
 	= BGTSAppCons TypeKind [BimapGenTypeStruct]
@@ -255,11 +255,9 @@ where
 // generic cases of the current module
 buildGenericRepresentations :: !*GenericState -> (!BimapFunctions,!*GenericState)
 buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
-	#! (size_funs, gs_funs) = usize gs_funs
+	#! size_funs = size gs_funs
 	#! size_groups = size gs_groups
-	#! ({com_gencase_defs}, gs_modules) = gs_modules![gs_main_module]
-	
-	#! gs = { gs & gs_modules = gs_modules, gs_funs = gs_funs, gs_groups = gs_groups }
+	#! ({com_gencase_defs}, gs) = gs!gs_modules.[gs_main_module]
 	
 	# undefined_function_and_ident = {fii_index = -1,fii_ident = undef}
 	  bimap_functions = {
@@ -282,8 +280,6 @@ where
 	build_generic_representation
 			{gc_type_cons=TypeConsSymb {type_index={glob_module,glob_object}, type_ident},gc_gcf,gc_pos}
 			(funs_and_groups, gs)
-		# (type_def,gs) = gs!gs_modules.[glob_module].com_type_defs.[glob_object]
-		# (td_info, gs) = gs!gs_td_infos.[glob_module,glob_object]
 		= case gc_gcf of
 			GCF gc_ident {gcf_body=GCB_FunIndex fun_index,gcf_generic}
 				-> case gs.gs_funs.[fun_index].fun_body of
@@ -294,60 +290,63 @@ where
 						// needs a generic representation
 						# generic_bimap = gs.gs_predefs.psd_predefs_a.[PD_GenericBimap]
 						#! is_generic_bimap = gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
-						-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object (not is_generic_bimap) is_generic_bimap td_info gc_ident.id_name gc_pos funs_and_groups gs
+						-> build_generic_type_rep glob_module glob_object (not is_generic_bimap) is_generic_bimap gc_ident.id_name gc_pos funs_and_groups gs
 			GCFS gcfs
 				# ({pds_module=generic_bimap_module,pds_def=generic_bimap_index},gs) = gs!gs_predefs.psd_predefs_a.[PD_GenericBimap]
 				#! build_type_rep = Any (\ {gcf_generic={gi_module,gi_index}} -> not (gi_module==generic_bimap_module && gi_index==generic_bimap_index)) gcfs
 				#! build_bimap_type_rep = Any (\ {gcf_generic={gi_module,gi_index}} -> gi_module==generic_bimap_module && gi_index==generic_bimap_index) gcfs
-				-> build_generic_type_rep type_def.td_rhs type_def.td_ident glob_module glob_object build_type_rep build_bimap_type_rep td_info "derive generic superclass" gc_pos funs_and_groups gs
+				-> build_generic_type_rep glob_module glob_object build_type_rep build_bimap_type_rep "derive generic superclass" gc_pos funs_and_groups gs
 	build_generic_representation _ st
 		= st
 
-	build_generic_type_rep td_rhs type_def_ident glob_module glob_object build_type_rep build_bimap_type_rep td_info g_ident_name gc_pos funs_and_groups gs
-		= case td_rhs of
-			SynType _
-				#  gs_error = report_derive_error g_ident_name gc_pos "a synonym type " type_def_ident.id_name gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})
-			AbstractType _
-				#  gs_error = report_derive_error g_ident_name gc_pos "an abstract type " type_def_ident.id_name gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})
-			ExtensibleAlgType _
-				#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " type_def_ident.id_name gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})
-			AlgConses _ _
-				#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " type_def_ident.id_name gs.gs_error
-				-> (funs_and_groups, {gs & gs_error = gs_error})
-			_
-				# type_def_gi = {gi_module=glob_module,gi_index=glob_object}
-				-> case td_info.tdi_gen_rep of
-					GenericTypeRepAndBimapTypeRep _ _
+build_generic_type_rep :: !Int !Int !Bool !Bool {#Char} Position !FunsAndGroups !*GenericState -> *(!FunsAndGroups,!*GenericState)
+build_generic_type_rep glob_module glob_object build_type_rep build_bimap_type_rep g_ident_name gc_pos funs_and_groups gs
+	# ({td_rhs,td_ident},gs) = gs!gs_modules.[glob_module].com_type_defs.[glob_object]
+	# (td_info, gs) = gs!gs_td_infos.[glob_module,glob_object]
+	= case td_rhs of
+		SynType _
+			#  gs_error = report_derive_error g_ident_name gc_pos "a synonym type " td_ident.id_name gs.gs_error
+			-> (funs_and_groups, {gs & gs_error = gs_error})
+		AbstractType _
+			#  gs_error = report_derive_error g_ident_name gc_pos "an abstract type " td_ident.id_name gs.gs_error
+			-> (funs_and_groups, {gs & gs_error = gs_error})
+		ExtensibleAlgType _
+			#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " td_ident.id_name gs.gs_error
+			-> (funs_and_groups, {gs & gs_error = gs_error})
+		AlgConses _ _
+			#  gs_error = report_derive_error g_ident_name gc_pos "an extensible algebraic type " td_ident.id_name gs.gs_error
+			-> (funs_and_groups, {gs & gs_error = gs_error})
+		_
+			# type_def_gi = {gi_module=glob_module,gi_index=glob_object}
+			-> case td_info.tdi_gen_rep of
+				GenericTypeRepAndBimapTypeRep _ _
+					-> (funs_and_groups, gs)
+				GenericTypeRep gen_type_rep
+					| not build_bimap_type_rep
 						-> (funs_and_groups, gs)
-					GenericTypeRep gen_type_rep
-						| not build_bimap_type_rep
-							-> (funs_and_groups, gs)
+						# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
+						# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRepAndBimapTypeRep gen_type_rep gen_bimap_type_rep
+						-> (funs_and_groups, gs)
+				GenericBimapTypeRep gen_bimap_type_rep
+					| not build_type_rep
+						-> (funs_and_groups, gs)
+						# (gen_type_rep, funs_and_groups, gs) = buildGenericTypeRep type_def_gi funs_and_groups gs
+						# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRepAndBimapTypeRep gen_type_rep gen_bimap_type_rep
+						-> (funs_and_groups, gs)
+				NoGenericTypeReps
+					| build_type_rep
+						# (gen_type_rep, funs_and_groups, gs) = buildGenericTypeRep type_def_gi funs_and_groups gs
+						| build_bimap_type_rep
 							# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
 							# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRepAndBimapTypeRep gen_type_rep gen_bimap_type_rep
 							-> (funs_and_groups, gs)
-					GenericBimapTypeRep gen_bimap_type_rep
-						| not build_type_rep
+							# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRep gen_type_rep
 							-> (funs_and_groups, gs)
-							# (gen_type_rep, funs_and_groups, gs) = buildGenericTypeRep type_def_gi funs_and_groups gs
-							# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRepAndBimapTypeRep gen_type_rep gen_bimap_type_rep
+						| build_bimap_type_rep
+							# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
+							# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericBimapTypeRep gen_bimap_type_rep
 							-> (funs_and_groups, gs)
-					NoGenericTypeReps
-						| build_type_rep
-							# (gen_type_rep, funs_and_groups, gs) = buildGenericTypeRep type_def_gi funs_and_groups gs
-							| build_bimap_type_rep
-								# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
-								# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRepAndBimapTypeRep gen_type_rep gen_bimap_type_rep
-								-> (funs_and_groups, gs)
-								# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericTypeRep gen_type_rep
-								-> (funs_and_groups, gs)
-							| build_bimap_type_rep
-								# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
-								# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericBimapTypeRep gen_bimap_type_rep
-								-> (funs_and_groups, gs)
-
+where
 	report_derive_error g_ident_name gc_pos kind_of_type_string type_def_ident_name gs_error
 		= reportError g_ident_name gc_pos ("cannot derive a generic instance for "+++kind_of_type_string+++type_def_ident_name) gs_error
 
@@ -2028,6 +2027,11 @@ where
 		ss_error :: !*ErrorAdmin
 	}
 
+getGenericTypeRep :: !GenericTypeReps -> GenericTypeRep
+getGenericTypeRep (GenericTypeRep gen_type_rep) = gen_type_rep
+getGenericTypeRep (GenericTypeRepAndBimapTypeRep gen_type_rep _) = gen_type_rep
+getGenericTypeRep _ = abort "getGenericTypeRep: no generic representation\n"
+
 convertGenericCases :: !BimapFunctions !*DclMacros !*GenericState -> (!*DclMacros, !*GenericState)
 convertGenericCases bimap_functions dcl_macros
 		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_groups, gs_modules, gs_dcl_modules, gs_td_infos, 
@@ -2183,7 +2187,7 @@ where
 		#! (dcl_functions,dcl_modules) = dcl_modules![gs_main_module].dcl_functions
 		#! (dcl_functions, st1, st2)
 			= foldArraySt (build_main_instance gs_main_module) com_gencase_defs ({x\\x<-:dcl_functions}, st1, st2)
-		#! dcl_modules = {dcl_modules & [gs_main_module].dcl_functions = dcl_functions}
+		#! dcl_modules & [gs_main_module].dcl_functions = dcl_functions
 		= (dcl_modules,st1,st2)
 	where
 		build_main_instance :: !Index !GenericCaseDef
@@ -2760,107 +2764,105 @@ is_gen_cons_without_instances _ predefs
 	| TVI_BimapArgExprs !Expression !Expression
 	| TVI_BimapCopiedArgExprs !Bool !Expression !Bool !Expression
 
-buildGenericCaseBody :: 
+buildGenericCaseBody ::
 		!Index					// current icl module
 		!Position !TypeCons !Ident !Int !GlobalIndex
 		!PredefinedSymbolsData
 		!*SpecializeState
 	-> (!FunctionBody,
 		!*SpecializeState)
-buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_ident,type_index}) gc_ident generic_info_index gcf_generic predefs=:{psd_predefs_a}
-					st=:{ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps}
+buildGenericCaseBody main_module_index gc_pos (TypeConsSymb {type_index}) gc_ident generic_info_index gcf_generic predefs=:{psd_predefs_a} st
 	# generic_bimap = psd_predefs_a.[PD_GenericBimap]
 	| gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
-		#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
+		= buildGenericBimapCaseBody main_module_index gc_pos type_index gc_ident generic_info_index gcf_generic predefs st
+		#! ({tdi_gen_rep},st) = st!ss_td_infos.[type_index.glob_module, type_index.glob_object]
+		# gen_type_rep = getGenericTypeRep tdi_gen_rep
+		= buildGenericCaseBody_ gen_type_rep main_module_index gc_pos type_index gc_ident generic_info_index gcf_generic predefs st
+buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident generic_info_index gcf_generic predefs st
+	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" st.ss_error
+	= (TransformedBody {tb_args=[], tb_rhs=EE}, {st & ss_error=error})
 
-		#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
-		#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
-			= build_arg_vars gen_def gcf_generic td_args heaps
+buildGenericBimapCaseBody ::
+		!Index					// current icl module
+		!Position !(Global Index) !Ident !Int !GlobalIndex
+		!PredefinedSymbolsData
+		!*SpecializeState
+	-> (!FunctionBody, !*SpecializeState)
+buildGenericBimapCaseBody main_module_index gc_pos type_index gc_ident generic_info_index gcf_generic predefs
+					st=:{ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps}
+	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
 
-		# (is_simple_bimap,modules,heaps)
-			= test_if_simple_bimap td_args td_rhs type_index.glob_module modules heaps
-		| is_simple_bimap
-			# (body_expr,modules,heaps) = build_simple_bimap td_args td_rhs type_index generated_arg_exprss original_arg_exprs modules heaps
-			# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
-			= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
+	#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+	#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
+		= build_arg_vars gen_def gcf_generic td_args heaps
 
-		#! ({tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
-		# gtr_type = case tdi_gen_rep of
-			GenericTypeRepAndBimapTypeRep _ bimap_gen_type_rep 
-				-> bimap_gen_type_rep
-			GenericBimapTypeRep bimap_gen_type_rep
-				-> bimap_gen_type_rep
-			_ -> abort "sanity check: no generic representation\n"
-
+	# (is_simple_bimap,modules,heaps)
+		= test_if_simple_bimap td_args td_rhs type_index.glob_module modules heaps
+	| is_simple_bimap
+		# (body_expr,modules,heaps) = build_simple_bimap td_args td_rhs type_index generated_arg_exprss original_arg_exprs modules heaps
 		# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
-
-		# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type st.ss_heaps
-		# st & ss_heaps = heaps
-
-		#! bimap_spec_env = [(atv_variable, TVI_BimapArgExprs bimap_a_b_expr bimap_b_a_expr) \\ {atv_variable} <- td_args & [bimap_a_b_expr,bimap_b_a_expr] <- generated_arg_exprss]
-
-		# {ss_modules=modules,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error} = st
-		# heaps = set_tvs bimap_spec_env heaps
-
-		# (body_expr,funs_and_groups,modules,heaps,error)
-			= build_bimap td_rhs gtr_type type_index original_arg_exprs gc_ident gc_pos gcf_generic bimap_spec_env main_module_index predefs
-				funs_and_groups modules heaps error
-
-		# heaps = clear_tvs bimap_spec_env heaps
-		# st & ss_modules=modules,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error
-
 		= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
 
-		#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
-		#! ({tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
-		# (gen_type_rep=:{gtr_type}) = case tdi_gen_rep of
-			GenericTypeRepAndBimapTypeRep gen_type_rep _ 
-				-> gen_type_rep
-			GenericTypeRep gen_type_rep
-				-> gen_type_rep
-			_ -> abort "sanity check: no generic representation\n"
+	#! ({tdi_gen_rep}, td_infos) = td_infos![type_index.glob_module, type_index.glob_object]
+	# gtr_type = case tdi_gen_rep of
+		GenericTypeRepAndBimapTypeRep _ bimap_gen_type_rep
+			-> bimap_gen_type_rep
+		GenericBimapTypeRep bimap_gen_type_rep
+			-> bimap_gen_type_rep
+		_ -> abort "sanity check: no generic representation\n"
 
-		#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
-		#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
-			= build_arg_vars gen_def gcf_generic td_args heaps
+	# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
+	# (gtr_type, heaps) = simplify_bimap_GenTypeStruct [atv_variable \\ {atv_variable} <- td_args] gtr_type st.ss_heaps
+	# st & ss_heaps = heaps
 
-		# (arg_vars,heaps)
-			= if (generic_info_index>=0)
-				(let
-					(generic_info_var, heaps_) = build_generic_info_arg heaps
-					arg_vars = [generic_info_var:arg_vars]
-				 in (arg_vars,heaps_))
-				(arg_vars,heaps)
+	#! bimap_spec_env = [(atv_variable, TVI_BimapArgExprs bimap_a_b_expr bimap_b_a_expr) \\ {atv_variable} <- td_args & [bimap_a_b_expr,bimap_b_a_expr] <- generated_arg_exprss]
 
-		# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
-		#! (specialized_expr, st)
-			= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gen_def.gen_vars gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr st
+	# {ss_modules=modules,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error} = st
+	# heaps = set_tvs bimap_spec_env heaps
 
-		# {ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error} = st
-		#! (body_expr, funs_and_groups, modules, td_infos, heaps, error)
-			= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr funs_and_groups modules td_infos heaps error
-		# st & ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error
+	# (body_expr,funs_and_groups,modules,heaps,error)
+		= build_bimap td_rhs gtr_type type_index original_arg_exprs gc_ident gc_pos gcf_generic bimap_spec_env main_module_index predefs
+			funs_and_groups modules heaps error
 
-		= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
+	# heaps = clear_tvs bimap_spec_env heaps
+	# st & ss_modules=modules,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error
+
+	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
+
+buildGenericCaseBody_ ::
+		!GenericTypeRep
+		!Index					// current icl module
+		!Position !(Global Index) !Ident !Int !GlobalIndex
+		!PredefinedSymbolsData
+		!*SpecializeState
+	-> (!FunctionBody, !*SpecializeState)
+buildGenericCaseBody_ gen_type_rep=:{gtr_type} main_module_index gc_pos type_index gc_ident generic_info_index gcf_generic predefs
+					st=:{ss_modules=modules,ss_heaps=heaps}
+	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
+	#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+	#! (generated_arg_exprss, original_arg_exprs, arg_vars, heaps)
+		= build_arg_vars gen_def gcf_generic td_args heaps
+
+	# (arg_vars,heaps)
+		= if (generic_info_index>=0)
+			(let
+				(generic_info_var, heaps_) = build_generic_info_arg heaps
+				arg_vars = [generic_info_var:arg_vars]
+			 in (arg_vars,heaps_))
+			(arg_vars,heaps)
+
+	# st & ss_modules=modules,ss_heaps=heaps
+	#! (specialized_expr, st)
+		= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gen_def.gen_vars gtr_type td_args generated_arg_exprss gen_def.gen_info_ptr st
+
+	# {ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error} = st
+	#! (body_expr,funs_and_groups,modules,td_infos,heaps,error)
+		= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr main_module_index predefs
+				  funs_and_groups modules td_infos heaps error
+	# st & ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error
+
+	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
 where
-	build_arg_vars :: GenericDef GlobalIndex [ATypeVar] *Heaps -> (![[Expression]],![Expression],![FreeVar],!*Heaps)
-	build_arg_vars {gen_ident, gen_vars, gen_type, gen_deps} gcf_generic td_args heaps 
-		# dep_names = [(gen_ident, gen_vars, gcf_generic) : [(ident, gd_vars, gd_index) \\ {gd_ident=Ident ident, gd_vars, gd_index} <- gen_deps]]
-		#! (generated_arg_exprss, generated_arg_vars, heaps) 
-			= mapY2St buildVarExprs
-				[[mkDepName dep_name atv_variable \\ dep_name <- dep_names] \\ {atv_variable} <- td_args]
-				heaps
-		#! (original_arg_exprs, original_arg_vars, heaps) 
-			= buildVarExprs
-				[ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]]
-				heaps
-		= (generated_arg_exprss, original_arg_exprs, flatten generated_arg_vars ++ original_arg_vars, heaps)
-		where 
-			mkDepName (ident, gvars, index) atv 
-				# gvarsName = foldl (\vs v -> vs +++ "_" +++ v.tv_ident.id_name) "" gvars
-				# indexName = "_" +++ toString index.gi_module +++ "-" +++ toString index.gi_index
-				= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
-
 	build_generic_info_arg heaps=:{hp_var_heap}
 		// generic arg is never referenced in the generated body
 		#! (fv_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
@@ -2879,69 +2881,83 @@ where
 		  st & ss_heaps = {heaps & hp_generic_heap=generic_heap}
 		= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_rep_conses gen_info_ptr g_nums main_module_index predefs st
 
-	// adaptor that converts a function for the generic representation into a 
-	// function for the type itself
-	adapt_specialized_expr :: Position GenericDef GenericTypeRep [Expression] Expression
-						!FunsAndGroups !*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
-		-> (!Expression,!FunsAndGroups,!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
-	adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_to,gtr_from} original_arg_exprs specialized_expr
-			funs_and_groups modules td_infos heaps error
-		#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps		
-		#! non_gen_var_kinds = drop (length gen_vars) var_kinds  
-		
-		#! non_gen_vars = gen_type.st_vars -- gen_vars	
-		#! (gen_env, heaps) 
-			= build_gen_env gtr_to gtr_from gen_vars heaps
-		#! (non_gen_env, funs_and_groups, heaps)
-			= build_non_gen_env non_gen_vars non_gen_var_kinds funs_and_groups heaps
-		#! spec_env = gen_env ++ non_gen_env	
-		#! curried_gen_type = curry_symbol_type gen_type
-
-		#! (struct_gen_type, (modules, td_infos, heaps, error))
-			= convert_generic_function_type_to_BimapGenTypeStruct curried_gen_type gc_pos predefs (modules, td_infos, heaps, error)  
-
-		#! (struct_gen_type, heaps) = simplify_bimap_GenTypeStruct gen_vars struct_gen_type heaps
-
-		# bimap_gi = {gi_module=bimap_module,gi_index=bimap_index}
-		#! (body_expr, funs_and_groups, modules, heaps, error)
-			= adapt_with_specialized_generic_bimap bimap_gi struct_gen_type spec_env bimap_ident gc_pos original_arg_exprs specialized_expr main_module_index predefs 
-						funs_and_groups modules heaps error
-
-		= (body_expr, funs_and_groups, modules, td_infos, heaps, error)
+build_arg_vars :: GenericDef GlobalIndex [ATypeVar] *Heaps -> (![[Expression]],![Expression],![FreeVar],!*Heaps)
+build_arg_vars {gen_ident, gen_vars, gen_type, gen_deps} gcf_generic td_args heaps
+	# dep_names = [(gen_ident, gen_vars, gcf_generic) : [(ident, gd_vars, gd_index) \\ {gd_ident=Ident ident, gd_vars, gd_index} <- gen_deps]]
+	#! (generated_arg_exprss, generated_arg_vars, heaps)
+		= mapY2St buildVarExprs
+			[[mkDepName dep_name atv_variable \\ dep_name <- dep_names] \\ {atv_variable} <- td_args]
+			heaps
+	#! (original_arg_exprs, original_arg_vars, heaps)
+		= buildVarExprs
+			[ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]]
+			heaps
+	= (generated_arg_exprss, original_arg_exprs, flatten generated_arg_vars ++ original_arg_vars, heaps)
 	where
-		{pds_module = bimap_module, pds_def=bimap_index} = psd_predefs_a.[PD_GenericBimap]
-		bimap_ident = predefined_idents.[PD_GenericBimap]
-		
-		get_var_kinds gen_info_ptr heaps=:{hp_generic_heap}
-			#! ({gen_var_kinds}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
-			= (gen_var_kinds, {heaps & hp_generic_heap = hp_generic_heap})
-		
-		curry_symbol_type {st_args, st_result}
-			= foldr (\x y -> makeAType (x --> y) TA_Multi) st_result st_args 	
-	
-		build_gen_env :: !DefinedSymbol !DefinedSymbol ![TypeVar] !*Heaps -> (![(TypeVar, TypeVarInfo)], !*Heaps)
-		build_gen_env gtr_to gtr_from gen_vars heaps 
-			= mapSt build_iso_expr gen_vars heaps
-		where
-			build_iso_expr gen_var heaps 
-				= ((gen_var, TVI_Iso gtr_to gtr_from), heaps)
+		mkDepName (ident, gvars, index) atv
+			# gvarsName = foldl (\vs v -> vs +++ "_" +++ v.tv_ident.id_name) "" gvars
+			# indexName = "_" +++ toString index.gi_module +++ "-" +++ toString index.gi_index
+			= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
 
-		build_non_gen_env :: ![TypeVar] ![TypeKind] FunsAndGroups !*Heaps -> (![(TypeVar, TypeVarInfo)], !FunsAndGroups, !*Heaps)
-		build_non_gen_env non_gen_vars kinds funs_and_groups heaps
-			= zipWithSt2 build_bimap_expr non_gen_vars kinds funs_and_groups heaps
-		where
-			// build application of generic bimap for a specific kind
-			build_bimap_expr non_gen_var KindConst funs_and_groups heaps
-				# (expr, funs_and_groups, heaps)
-					= bimap_id_expression main_module_index predefs funs_and_groups heaps
-				= ((non_gen_var, TVI_BimapExpr True expr), funs_and_groups, heaps)
-			build_bimap_expr non_gen_var kind funs_and_groups heaps
-				#! (expr, heaps)
-					= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps
-				= ((non_gen_var, TVI_BimapExpr False expr), funs_and_groups, heaps)
-buildGenericCaseBody main_module_index gc_pos gc_type_cons gc_ident generic_info_index gcf_generic predefs st
-	# error = reportError gc_ident.id_name gc_pos "cannot specialize to this type" st.ss_error
-	= (TransformedBody {tb_args=[], tb_rhs=EE}, {st & ss_error=error})
+// adaptor that converts a function for the generic representation into a function for the type itself
+adapt_specialized_expr :: Position GenericDef GenericTypeRep [Expression] Expression Index PredefinedSymbolsData
+					!FunsAndGroups !*Modules !*TypeDefInfos !*Heaps !*ErrorAdmin
+	-> (!Expression,!FunsAndGroups,!*Modules,!*TypeDefInfos,!*Heaps,!*ErrorAdmin)
+adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_to,gtr_from} original_arg_exprs specialized_expr main_module_index predefs=:{psd_predefs_a}
+		funs_and_groups modules td_infos heaps error
+	#! (var_kinds, heaps) = get_var_kinds gen_info_ptr heaps
+	#! non_gen_var_kinds = drop (length gen_vars) var_kinds
+	
+	#! non_gen_vars = gen_type.st_vars -- gen_vars
+	#! (gen_env, heaps)
+		= build_gen_env gtr_to gtr_from gen_vars heaps
+	#! (non_gen_env, funs_and_groups, heaps)
+		= build_non_gen_env non_gen_vars non_gen_var_kinds funs_and_groups heaps
+	#! spec_env = gen_env ++ non_gen_env
+	#! curried_gen_type = curry_symbol_type gen_type
+
+	#! (struct_gen_type, (modules, td_infos, heaps, error))
+		= convert_generic_function_type_to_BimapGenTypeStruct curried_gen_type gc_pos predefs (modules, td_infos, heaps, error)  
+
+	#! (struct_gen_type, heaps) = simplify_bimap_GenTypeStruct gen_vars struct_gen_type heaps
+
+	# bimap_gi = {gi_module=bimap_module,gi_index=bimap_index}
+	#! (body_expr, funs_and_groups, modules, heaps, error)
+		= adapt_with_specialized_generic_bimap bimap_gi struct_gen_type spec_env bimap_ident gc_pos original_arg_exprs specialized_expr main_module_index predefs 
+					funs_and_groups modules heaps error
+
+	= (body_expr, funs_and_groups, modules, td_infos, heaps, error)
+where
+	{pds_module = bimap_module, pds_def=bimap_index} = psd_predefs_a.[PD_GenericBimap]
+	bimap_ident = predefined_idents.[PD_GenericBimap]
+	
+	get_var_kinds gen_info_ptr heaps=:{hp_generic_heap}
+		#! ({gen_var_kinds}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap
+		= (gen_var_kinds, {heaps & hp_generic_heap = hp_generic_heap})
+	
+	curry_symbol_type {st_args, st_result}
+		= foldr (\x y -> makeAType (x --> y) TA_Multi) st_result st_args
+
+	build_gen_env :: !DefinedSymbol !DefinedSymbol ![TypeVar] !*Heaps -> (![(TypeVar, TypeVarInfo)], !*Heaps)
+	build_gen_env gtr_to gtr_from gen_vars heaps
+		= mapSt build_iso_expr gen_vars heaps
+	where
+		build_iso_expr gen_var heaps
+			= ((gen_var, TVI_Iso gtr_to gtr_from), heaps)
+
+	build_non_gen_env :: ![TypeVar] ![TypeKind] FunsAndGroups !*Heaps -> (![(TypeVar, TypeVarInfo)], !FunsAndGroups, !*Heaps)
+	build_non_gen_env non_gen_vars kinds funs_and_groups heaps
+		= zipWithSt2 build_bimap_expr non_gen_vars kinds funs_and_groups heaps
+	where
+		// build application of generic bimap for a specific kind
+		build_bimap_expr non_gen_var KindConst funs_and_groups heaps
+			# (expr, funs_and_groups, heaps)
+				= bimap_id_expression main_module_index predefs funs_and_groups heaps
+			= ((non_gen_var, TVI_BimapExpr True expr), funs_and_groups, heaps)
+		build_bimap_expr non_gen_var kind funs_and_groups heaps
+			#! (expr, heaps)
+				= buildGenericApp bimap_module bimap_index bimap_ident kind [] heaps
+			= ((non_gen_var, TVI_BimapExpr False expr), funs_and_groups, heaps)
 
 test_if_simple_bimap :: [ATypeVar] TypeRhs Int !*Modules !*Heaps -> (!Bool,!*Modules,!*Heaps)
 test_if_simple_bimap td_args (AlgType alts) type_module modules heaps
@@ -3183,7 +3199,7 @@ where
 				# member_def={member_def & me_type = me_type}
 				= (member_def, st) 	
 				= (member_def, st) 	
-									
+
 		convert_instance ins=:{ins_type=ins_type=:{it_context}, ins_ident, ins_pos} st
 			# (ok, it_context, st) = convert_contexts ins_ident ins_pos it_context st
 			| ok 
