@@ -365,9 +365,13 @@ where
 		# (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
 		= (Var { var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = var_expr_ptr }, result_expr, expr_heap)
 
-checkFunctionBodies  GeneratedBody function_ident_for_errors e_input e_state e_info cs
+checkFunctionBodies GeneratedBody function_ident_for_errors e_input e_state e_info cs
 	= (GeneratedBody, [], e_state, e_info, cs)
 		//---> ("checkFunctionBodies: function to derive ", function_ident_for_errors)
+checkFunctionBodies (GenerateInstanceBodyChecked generic_ident generic_index) function_ident_for_errors e_input e_state e_info cs
+	= (GenerateInstanceBodyChecked generic_ident generic_index, [], e_state, e_info, cs)
+checkFunctionBodies (GenerateInstanceBody generic_ident) function_ident_for_errors e_input e_state e_info cs
+	= (GenerateInstanceBody generic_ident, [], e_state, e_info, cs)
 checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
 	= abort ("checkFunctionBodies " +++ toString function_ident_for_errors +++ "\n")
 

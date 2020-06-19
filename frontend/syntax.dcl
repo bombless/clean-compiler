@@ -271,6 +271,7 @@ cIsNotAFunction :== False
 	|	PD_Generic GenericDef
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
+	|	PD_DeriveInstanceMember Position Ident Ident
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -719,6 +720,8 @@ FI_FusedMember :== 512			// used in module trans to mark fused versions of insta
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| GeneratedBody // the body will be generated automatically - for generics
+					| GenerateInstanceBody !Ident
+					| GenerateInstanceBodyChecked !Ident !GlobalIndex
 					| NoBody
 
 ::	FunDef =
@@ -1004,7 +1007,7 @@ cNotVarNumber :== -1
 	,	ct_result_type	:: !AType
 	,	ct_cons_types 	:: ![[AType]]
 	}
-		
+
 ::	SymbIdent =
 	{	symb_ident		:: !Ident
 	,	symb_kind		:: !SymbKind

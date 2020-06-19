@@ -376,6 +376,8 @@ instance collectFunctions FunDef where
 	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca
 		# (bodies, ca) = collectFunctions bodies icl_module ca
 		= ({fun_def & fun_body = ParsedBody bodies}, ca)
+	collectFunctions fun_def=:{fun_body = GenerateInstanceBody _} icl_module ca
+		= (fun_def, ca)
 
 instance collectFunctions ParsedBody where
 	collectFunctions pb=:{pb_rhs} icl_module ca
@@ -1658,6 +1660,12 @@ where
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
+	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident : defs] ca
+		# fun_body = GenerateInstanceBody generic_ident
+		  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = (FK_Function False),
+					 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
+		  (fun_defs, ca) = collect_member_instances defs ca
+		= ([fun_def : fun_defs], ca)
 	collect_member_instances [] ca
 	    = ([], ca)	
 

@@ -453,10 +453,13 @@ where
 	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
 	   		= (True, gendef, pState)
 	try_definition parseContext DeriveToken pos pState
-		| ~(isGlobalContext parseContext)
+		| isGlobalContext parseContext
+			# (gendef, pState) = wantDeriveDefinition parseContext pos pState
+			= (True, gendef, pState)
+		| isInstanceDefsContext parseContext
+			# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
+			= (True, derive_instance_def, pState)
 			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
-	   		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
-	   		= (True, gendef, pState)
 	try_definition parseContext InstanceToken pos pState
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
@@ -1676,10 +1679,22 @@ wantInstanceDeclaration parseContext pi_pos pState
 		| isIclContext parseContext
 			# (begin_members, pState) = begin_member_group token pState
 			| not begin_members
+				# pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
+						pi_specials = SP_None, pi_pos = pi_pos}
+				| token=:DeriveToken
+					# (token, pState) = nextToken FunctionContext pState
+					= case token of
+						IdentToken generic_function_name
+							# (member_ident, pState) = stringToIdent class_name IC_Expression pState
+							# (generic_ident, pState) = stringToIdent generic_function_name IC_Generic pState
+							# pState = wantEndOfDefinition "derive instance" pState
+							-> (PD_Instance {pim_pi = pi, pim_members = [PD_DeriveInstanceMember pi_pos member_ident generic_ident]}, pState)
+						_
+							# pState = parseError "derive instance member" (Yes token) "generic function name" pState
+							-> (PD_Instance {pim_pi = pi, pim_members = []}, pState)
+				
 				# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
-				= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
-										  pi_specials = SP_None, pi_pos = pi_pos},
-								pim_members = []}, pState)
+				= (PD_Instance {pim_pi = pi, pim_members = []}, pState)
 				# (pi_members, pState) = wantDefinitions (SetInstanceDefsContext parseContext) pState
 				  pState = wantEndGroup "instance" pState
 				= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
@@ -2195,6 +2210,25 @@ get_type_cons (TQualifiedIdent module_id ident_name []) pState
 get_type_cons type pState
 	# pState = parseError "generic type" No "type constructor" pState
 	= (abort "no TypeCons", pState)
+
+wantDeriveInstanceDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
+wantDeriveInstanceDefinition parseContext pos pState
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		IdentToken member_name
+			# (member_ident, pState) = stringToIdent member_name IC_Expression pState
+			# (token, pState) = nextToken FunctionContext pState
+			-> case token of
+				IdentToken generic_function_name
+					# (generic_ident, pState) = stringToIdent generic_function_name IC_Generic pState
+					# pState = wantEndOfDefinition "derive instance" pState
+					-> (PD_DeriveInstanceMember pos member_ident generic_ident,pState)
+				_
+					# pState = parseError "derive instance member" (Yes token) "generic function name" pState
+					-> (PD_Erroneous,pState)
+		_
+			# pState = parseError "derive instance member" (Yes token) "member name" pState
+			-> (PD_Erroneous,pState)
 
 /*
 	Type definitions
@@ -4480,8 +4514,6 @@ where
 				= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs, calt_position=LinePos fname linenr }, pState)
 				= (False, abort "no case alt", pState)
 			= (False, abort "no case alt", tokenBack pState)
-
-//	caseSeperator t = t == EqualToken || t == ArrowToken // to enable Clean 1.3.x case expressions
 
 	// FIXME: it would be better if this would use (tryExpression cIsNotPattern)
 	// but there's no function tryExpression available yet

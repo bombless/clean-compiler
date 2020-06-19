@@ -17,6 +17,7 @@ import genericsupport,transform,utilities
 	= GTSAppCons TypeKind [GenTypeStruct]
 	| GTSAppVar TypeVar [GenTypeStruct]
 	| GTSVar TypeVar
+	| GTSArrow GenTypeStruct GenTypeStruct
 	| GTSCons !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
 	| GTSRecord !DefinedSymbol !GlobalIndex !DefinedSymbol !DefinedSymbol !GenTypeStruct
 	| GTSField !DefinedSymbol !GlobalIndex !DefinedSymbol !GenTypeStruct
@@ -24,7 +25,7 @@ import genericsupport,transform,utilities
 	| GTSEither !GenTypeStruct !GenTypeStruct
 	| GTSPair !GenTypeStruct !GenTypeStruct
 	| GTSUnit
-	| GTSArrow GenTypeStruct GenTypeStruct
+	| GTSMemberCall !SymbIdent
 	| GTSE
 
 :: BimapGenTypeStruct
@@ -251,13 +252,46 @@ where
 
 //	generic type representation
 
+build_generic_representations_for_derived_instances :: !Int !{#ClassInstance} !FunsAndGroups !*GenericState -> *(!FunsAndGroups,!*GenericState)
+build_generic_representations_for_derived_instances instance_i instance_defs funs_and_groups gs
+	| instance_i<size instance_defs
+		# {ins_members,ins_type,ins_class_ident,ins_pos} = instance_defs.[instance_i]
+		| instance_has_derived_member 0 ins_members gs.gs_funs
+			# class_name = case ins_class_ident.ci_ident of
+								Ident {id_name} -> id_name
+								QualifiedIdent _ id_name -> id_name
+			= case ins_type.it_types of
+				[TA {type_index={glob_module,glob_object}} _]
+					# (funs_and_groups,gs)
+						= build_generic_type_rep glob_module glob_object True False class_name ins_pos funs_and_groups gs
+					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
+				[_]
+					# gs & gs_error
+						= reportError class_name ins_pos "cannot derive an instance for this type" gs.gs_error
+					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
+				_
+					# gs & gs_error
+						= reportError class_name ins_pos "cannot derive an instance for a multiparameter type class" gs.gs_error
+					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
+			= build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
+		= (funs_and_groups, gs)
+
+instance_has_derived_member :: !Int !{#ClassInstanceMember} !{#FunDef} -> Bool
+instance_has_derived_member member_i ins_members gs_funs
+	| member_i<size ins_members
+		# {cim_index} = ins_members.[member_i]
+		| cim_index>=0 && gs_funs.[cim_index].fun_body=:GenerateInstanceBodyChecked _ _
+			= True
+			= instance_has_derived_member (member_i+1) ins_members gs_funs
+		= False
+
 // generic representation is built for each type argument of
 // generic cases of the current module
 buildGenericRepresentations :: !*GenericState -> (!BimapFunctions,!*GenericState)
 buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 	#! size_funs = size gs_funs
 	#! size_groups = size gs_groups
-	#! ({com_gencase_defs}, gs) = gs!gs_modules.[gs_main_module]
+	#! ({com_gencase_defs,com_instance_defs}, gs) = gs!gs_modules.[gs_main_module]
 	
 	# undefined_function_and_ident = {fii_index = -1,fii_ident = undef}
 	  bimap_functions = {
@@ -269,6 +303,8 @@ buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 	  funs_and_groups = {fg_fun_index=size_funs, fg_group_index=size_groups, fg_funs=[], fg_groups=[],fg_bimap_functions=bimap_functions}
 	#! (funs_and_groups, gs)
 		= foldArraySt build_generic_representation com_gencase_defs (funs_and_groups, gs)
+
+	# (funs_and_groups, gs) = build_generic_representations_for_derived_instances 0 com_instance_defs funs_and_groups gs
 
 	# {fg_funs=new_funs,fg_groups=new_groups,fg_bimap_functions} = funs_and_groups 
 	# {gs_funs, gs_groups} = gs
@@ -777,7 +813,8 @@ where
 		# (tv_info, th_vars) = readPtr tv_info_ptr th_vars
 		= case tv_info of
 			TVI_Empty = writePtr tv_info_ptr TVI_Used th_vars
-			_ = abort "type var is not empty"
+			TVI_Used = abort "type var is not empty"
+			_ = writePtr tv_info_ptr TVI_Used th_vars
 
 	clear_type_var {tv_info_ptr} th_vars
 		= writePtr tv_info_ptr TVI_Empty th_vars 
@@ -2032,6 +2069,88 @@ getGenericTypeRep (GenericTypeRep gen_type_rep) = gen_type_rep
 getGenericTypeRep (GenericTypeRepAndBimapTypeRep gen_type_rep _) = gen_type_rep
 getGenericTypeRep _ = abort "getGenericTypeRep: no generic representation\n"
 
+generate_derived_instances :: !Int !{#ClassInstance} !Int PredefinedSymbolsData !*SpecializeState -> *SpecializeState
+generate_derived_instances instance_i instance_defs main_module_n predefs ss
+	| instance_i<size instance_defs
+		# {ins_members,ins_type,ins_class_ident,ins_pos,ins_class_index} = instance_defs.[instance_i]
+		# ss = generate_derived_instance 0 ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		= generate_derived_instances (instance_i+1) instance_defs main_module_n predefs ss
+		= ss
+
+generate_derived_instance :: !Int !{#ClassInstanceMember} InstanceType Position GlobalIndex Int PredefinedSymbolsData !*SpecializeState -> *SpecializeState
+generate_derived_instance member_i ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	| member_i<size ins_members
+		# {cim_index,cim_ident} = ins_members.[member_i]
+		| cim_index>=0 && ss.ss_funs.[cim_index].fun_body=:GenerateInstanceBodyChecked _ _
+			# (GenerateInstanceBodyChecked generic_ident generic_index,ss) = ss!ss_funs.[cim_index].fun_body
+			# ({gen_type,gen_deps},ss) = ss!ss_modules.[generic_index.gi_module].com_generic_defs.[generic_index.gi_index]
+			| ss.ss_funs.[cim_index].fun_arity<>gen_type.st_arity
+				# ss & ss_error = reportError generic_ident.id_name ins_pos "arity of generic function and member not equal" ss.ss_error
+				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+			| not gen_deps=:[]
+				# ss & ss_error = reportError generic_ident.id_name ins_pos "deriving instances from generic with dependencies not implemented" ss.ss_error
+				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+
+			= case ins_type.it_types of
+				[TA {type_index} _]
+					# ({tdi_gen_rep},ss) = ss!ss_td_infos.[type_index.glob_module, type_index.glob_object]
+					# gen_type_rep = getGenericTypeRep tdi_gen_rep
+
+					# ({class_ident,class_members},ss) = ss!ss_modules.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+					# {ds_ident,ds_index} = class_members.[member_i]
+					# member_symb_ident = {symb_ident=ds_ident,
+										   symb_kind=SK_OverloadedFunction {glob_module=ins_class_index.gi_module,glob_object=ds_index}}
+
+					# gen_type_rep & gtr_type = add_instance_calls_to_GenTypeStruct gen_type_rep.gtr_type member_symb_ident
+
+					# (TransformedBody {tb_args, tb_rhs}, ss)
+						= buildDerivedInstanceCaseBody gen_type_rep main_module_n ins_pos type_index generic_ident generic_index predefs ss
+
+					#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
+					| not free_vars=:[]
+						-> abort "generate_derived_instance: free_vars is not empty\n"
+
+					# (fun=:{fun_info},ss) = ss!ss_funs.[cim_index]
+					# fun &
+						fun_arity = length arg_vars,
+						fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
+						fun_info = {fun_info &
+										fi_calls = collectCalls main_module_n tb_rhs,
+										fi_free_vars = [],
+										fi_local_vars = local_vars,
+										fi_properties = fun_info.fi_properties bitor FI_GenericFun
+									}
+
+					  (ss_funs_and_groups,ss) = ss!ss_funs_and_groups
+					  group = {group_members = [cim_index]}
+					  ss_funs_and_groups & fg_group_index=ss_funs_and_groups.fg_group_index+1,
+										   fg_groups=[group:ss_funs_and_groups.fg_groups]
+					  ss & ss_funs.[cim_index] = fun, ss_funs_and_groups = ss_funs_and_groups
+
+					-> generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+				_
+					-> generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+			= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		= ss
+
+add_instance_calls_to_GenTypeStruct :: !GenTypeStruct SymbIdent -> GenTypeStruct
+add_instance_calls_to_GenTypeStruct (GTSPair gts1 gts2) member_symb_ident
+	= GTSPair (add_instance_calls_to_GenTypeStruct gts1 member_symb_ident) (add_instance_calls_to_GenTypeStruct gts2 member_symb_ident)
+add_instance_calls_to_GenTypeStruct (GTSCons a1 a2 a3 a4 gts) member_symb_ident
+	= GTSCons a1 a2 a3 a4 (add_instance_calls_to_GenTypeStruct gts member_symb_ident)
+add_instance_calls_to_GenTypeStruct (GTSField a1 a2 a3 gts) member_symb_ident
+	= GTSField a1 a2 a3 (add_instance_calls_to_GenTypeStruct gts member_symb_ident)
+add_instance_calls_to_GenTypeStruct (GTSEither gts1 gts2) member_symb_ident
+	= GTSEither (add_instance_calls_to_GenTypeStruct gts1 member_symb_ident) (add_instance_calls_to_GenTypeStruct gts2 member_symb_ident)
+add_instance_calls_to_GenTypeStruct (GTSRecord a1 a2 a3 a4 gts) member_symb_ident
+	= GTSRecord a1 a2 a3 a4 (add_instance_calls_to_GenTypeStruct gts member_symb_ident)
+add_instance_calls_to_GenTypeStruct (GTSObject a1 a2 a3 gts) member_symb_ident
+	= GTSObject a1 a2 a3 (add_instance_calls_to_GenTypeStruct gts member_symb_ident)
+add_instance_calls_to_GenTypeStruct GTSUnit member_symb_ident
+	= GTSUnit
+add_instance_calls_to_GenTypeStruct _ member_symb_ident
+	= GTSMemberCall member_symb_ident
+
 convertGenericCases :: !BimapFunctions !*DclMacros !*GenericState -> (!*DclMacros, !*GenericState)
 convertGenericCases bimap_functions dcl_macros
 		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_groups, gs_modules, gs_dcl_modules, gs_td_infos, 
@@ -2181,7 +2300,8 @@ where
 			!*{#DclModule} !(!Index, ![ClassInstance])  !*SpecializeState
 		-> (!*{#DclModule},!(!Index, ![ClassInstance]), !*SpecializeState)
 	build_main_instances_in_main_module gs_main_module dcl_modules st1 st2
-		#! (com_gencase_defs,st2) = st2!ss_modules.[gs_main_module].com_gencase_defs
+		#! ({com_gencase_defs,com_instance_defs},st2) = st2!ss_modules.[gs_main_module]
+		# st2 = generate_derived_instances 0 com_instance_defs gs_main_module gs_predefs st2
 		| size com_gencase_defs==0
 			= (dcl_modules,st1,st2)
 		#! (dcl_functions,dcl_modules) = dcl_modules![gs_main_module].dcl_functions
@@ -2829,6 +2949,41 @@ buildGenericBimapCaseBody main_module_index gc_pos type_index gc_ident generic_i
 
 	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
 
+buildDerivedInstanceCaseBody ::
+		!GenericTypeRep
+		!Index					// current icl module
+		!Position !(Global Index) !Ident !GlobalIndex
+		!PredefinedSymbolsData
+		!*SpecializeState
+	-> (!FunctionBody,!*SpecializeState)
+buildDerivedInstanceCaseBody gen_type_rep=:{gtr_type} main_module_index gc_pos type_index gc_ident gcf_generic predefs
+				st=:{ss_modules=modules,ss_heaps=heaps}
+	#! (gen_def, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
+	#! (type_def=:{td_args,td_arity,td_rhs}, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+
+	# (original_arg_exprs, arg_vars, heaps) = build_original_arg_vars gen_def heaps
+
+	# st & ss_modules=modules,ss_heaps=heaps
+	#! (specialized_expr, st)
+		= build_specialized_expr gc_pos gc_ident gcf_generic gen_def.gen_deps gen_def.gen_vars gtr_type td_args gen_def.gen_info_ptr st
+
+	# {ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error} = st
+	#! (body_expr,funs_and_groups,modules,td_infos,heaps,error)
+		= adapt_specialized_expr gc_pos gen_def gen_type_rep original_arg_exprs specialized_expr main_module_index predefs
+				  funs_and_groups modules td_infos heaps error
+	# st & ss_modules=modules,ss_td_infos=td_infos,ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_error=error
+
+	= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
+where
+	// generic function specialized to the generic representation of the type
+	build_specialized_expr :: Position Ident GlobalIndex [GenericDependency] [a] GenTypeStruct [ATypeVar] GenericInfoPtr *SpecializeState -> *(Expression,*SpecializeState)
+	build_specialized_expr gc_pos gc_ident gcf_generic gen_deps gen_vars gtr_type td_args gen_info_ptr st=:{ss_heaps}
+		# g_nums = [i \\ _<-gen_vars & i<-[0..]]
+		  spec_env = []
+		  ({gen_rep_conses},generic_heap) = readPtr gen_info_ptr ss_heaps.hp_generic_heap
+		  st & ss_heaps = {ss_heaps & hp_generic_heap=generic_heap}
+		= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_rep_conses gen_info_ptr g_nums main_module_index predefs st
+
 buildGenericCaseBody_ ::
 		!GenericTypeRep
 		!Index					// current icl module
@@ -2881,23 +3036,29 @@ where
 		  st & ss_heaps = {heaps & hp_generic_heap=generic_heap}
 		= specializeGeneric gcf_generic gtr_type spec_env gc_ident gc_pos gen_deps gen_rep_conses gen_info_ptr g_nums main_module_index predefs st
 
-build_arg_vars :: GenericDef GlobalIndex [ATypeVar] *Heaps -> (![[Expression]],![Expression],![FreeVar],!*Heaps)
-build_arg_vars {gen_ident, gen_vars, gen_type, gen_deps} gcf_generic td_args heaps
+build_original_arg_vars :: GenericDef *Heaps -> (![Expression],![FreeVar],!*Heaps)
+build_original_arg_vars {gen_type} heaps
+	= buildVarExprs [ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]] heaps
+
+build_generic_arg_vars :: GenericDef GlobalIndex [ATypeVar] *Heaps -> (![[Expression]],![FreeVar],!*Heaps)
+build_generic_arg_vars {gen_ident, gen_vars, gen_deps} gcf_generic td_args heaps
 	# dep_names = [(gen_ident, gen_vars, gcf_generic) : [(ident, gd_vars, gd_index) \\ {gd_ident=Ident ident, gd_vars, gd_index} <- gen_deps]]
-	#! (generated_arg_exprss, generated_arg_vars, heaps)
+	#! (generic_arg_exprss, generic_vars, heaps)
 		= mapY2St buildVarExprs
 			[[mkDepName dep_name atv_variable \\ dep_name <- dep_names] \\ {atv_variable} <- td_args]
 			heaps
-	#! (original_arg_exprs, original_arg_vars, heaps)
-		= buildVarExprs
-			[ "x" +++ toString n \\ n <- [1 .. gen_type.st_arity]]
-			heaps
-	= (generated_arg_exprss, original_arg_exprs, flatten generated_arg_vars ++ original_arg_vars, heaps)
+	= (generic_arg_exprss, flatten generic_vars, heaps)
 	where
 		mkDepName (ident, gvars, index) atv
 			# gvarsName = foldl (\vs v -> vs +++ "_" +++ v.tv_ident.id_name) "" gvars
 			# indexName = "_" +++ toString index.gi_module +++ "-" +++ toString index.gi_index
 			= ident.id_name +++ gvarsName +++ indexName +++ "_" +++ atv.tv_ident.id_name
+
+build_arg_vars :: GenericDef GlobalIndex [ATypeVar] *Heaps -> (![[Expression]],![Expression],![FreeVar],!*Heaps)
+build_arg_vars gen_def gcf_generic td_args heaps
+	# (original_arg_exprs, original_arg_vars, heaps) = build_original_arg_vars gen_def heaps
+	# (generic_arg_exprss, generic_arg_vars, heaps) = build_generic_arg_vars gen_def gcf_generic td_args heaps
+	= (generic_arg_exprss, original_arg_exprs, generic_arg_vars ++ original_arg_vars, heaps)
 
 // adaptor that converts a function for the generic representation into a function for the type itself
 adapt_specialized_expr :: Position GenericDef GenericTypeRep [Expression] Expression Index PredefinedSymbolsData
@@ -3450,6 +3611,12 @@ where
 			= specialize_with_partial_or_all_deps gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr [] grc_generic_instance_deps g_nums st
 		#! (expr, heaps)
 			= buildFunApp2 fun_module_index fun_index grc_ident arg_exprs st.ss_heaps
+		= (expr, {st & ss_heaps=heaps})
+	specialize (GTSMemberCall symb_ident) gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr g_nums st
+		# heaps=:{hp_expression_heap}=st.ss_heaps
+		# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty hp_expression_heap
+		# expr = App {app_symb = symb_ident, app_args = []/*arg_exprs*/, app_info_ptr = expr_info_ptr}
+		# heaps & hp_expression_heap = hp_expression_heap
 		= (expr, {st & ss_heaps=heaps})
 	specialize type gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr g_nums st
 		#! error = reportError gen_ident.id_name gen_pos "cannot specialize " st.ss_error

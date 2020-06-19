@@ -15,3 +15,5 @@ convert_generic_instances :: !Int !Int !*{#GenericCaseDef} !*{#ClassDef} !*Symbo
 
 create_gencase_funtypes :: !Index !*{#GenericCaseDef} !*Heaps
 			-> (!Index,![FunType],!*{#GenericCaseDef},!*Heaps)
+
+get_generic_index :: !Ident !Index !*CheckState -> (!GlobalIndex, !*CheckState)

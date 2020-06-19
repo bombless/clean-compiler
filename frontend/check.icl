@@ -5,7 +5,7 @@ import StdEnv, compare_types
 import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, typesupport
 import typereify
-from checkgenerics import checkGenericDefs,checkGenericCaseDefs,convert_generic_instances,create_gencase_funtypes
+from checkgenerics import checkGenericDefs,checkGenericCaseDefs,convert_generic_instances,create_gencase_funtypes,get_generic_index
 
 cUndef :== (-1)
 cDummyArray :== {}
@@ -310,6 +310,21 @@ where
 					= check_icl_instance_members (class_member_n+1) instance_member_n member_mod_index ins_members class_members class_ident ins_pos ins_type
 												instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 				| ins_member.cim_ident == class_member.ds_ident
+					| icl_functions.[ins_member.cim_index].fun_body=:GenerateInstanceBody _
+						# ({fun_body=GenerateInstanceBody generic_ident},icl_functions) = icl_functions![ins_member.cim_index]
+						#! main_module_n = cs.cs_x.x_main_dcl_module_n
+						# (generic_index,cs) = get_generic_index generic_ident main_module_n cs
+
+						# ({me_type,me_class_vars,me_priority}, member_defs, modules)
+							= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
+						  (fun,icl_functions) = icl_functions![ins_member.cim_index];
+						  fun & fun_body = GenerateInstanceBodyChecked generic_ident generic_index, fun_arity = class_member.ds_arity, fun_priority = me_priority
+						  icl_functions & [ins_member.cim_index] = fun
+						  (instance_type,type_defs,modules,var_heap,type_heaps,cs)
+							= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
+						  instance_types = [(ins_member.cim_index, instance_type) : instance_types]
+						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
+													instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 					#! instance_member_arity=icl_functions.[ins_member.cim_index].fun_arity
 					| instance_member_arity <> class_member.ds_arity
 						# cs & cs_error = checkError class_member.ds_ident ("defined with wrong arity ("+++toString instance_member_arity+++" instead of "+++toString class_member.ds_arity+++")") cs.cs_error
@@ -2376,16 +2391,16 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					| icl_mem_index < size icl_members
 						# icl_member = icl_members.[icl_mem_index]
 						| icl_member.cim_ident.id_name==dcl_member.cim_ident.id_name
-							# new_table = {new_table & [dcl_member.cim_index] = icl_member.cim_index}
+							# new_table & [dcl_member.cim_index] = icl_member.cim_index
 							= build_conversion_table_for_instances_of_members_with_default_instances (dcl_mem_index+1) (icl_mem_index+1) dcl_members icl_members new_table n_icl_functions icl_instance error
 						| icl_member.cim_ident.id_name<dcl_member.cim_ident.id_name
 							# error = checkErrorWithPosition icl_instance.ins_ident icl_instance.ins_pos (icl_member.cim_ident.id_name+++" is not a member of this class") error
 							= build_conversion_table_for_instances_of_members_with_default_instances dcl_mem_index (icl_mem_index+1) dcl_members icl_members new_table n_icl_functions icl_instance error
 							# icl_members = add_possible_default_instance dcl_member icl_mem_index n_icl_functions icl_members
-							# new_table = {new_table & [dcl_member.cim_index] = n_icl_functions}
+							# new_table & [dcl_member.cim_index] = n_icl_functions
 							= build_conversion_table_for_instances_of_members_with_default_instances (dcl_mem_index+1) (icl_mem_index+1) dcl_members icl_members new_table (n_icl_functions+1) icl_instance error
 						# icl_members = add_possible_default_instance dcl_member icl_mem_index n_icl_functions icl_members
-						# new_table = {new_table & [dcl_member.cim_index] = n_icl_functions}
+						# new_table & [dcl_member.cim_index] = n_icl_functions
 						= build_conversion_table_for_instances_of_members_with_default_instances (dcl_mem_index+1) (icl_mem_index+1) dcl_members icl_members new_table (n_icl_functions+1) icl_instance error
 					| icl_mem_index < size icl_members
 						# error = checkErrorWithPosition icl_instance.ins_ident icl_instance.ins_pos (icl_members.[icl_mem_index].cim_ident.id_name+++" is not a member of this class") error
@@ -2406,7 +2421,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				| mem_index < size dcl_members
 					# dcl_member = dcl_members.[mem_index]
 					# icl_member = icl_members.[mem_index]
-					# new_table = {new_table & [dcl_member.cim_index] = icl_member.cim_index}
+					# new_table & [dcl_member.cim_index] = icl_member.cim_index
 					= build_conversion_table_for_instances_of_members (inc mem_index) dcl_members icl_members new_table
 					= new_table
 

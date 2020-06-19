@@ -1291,7 +1291,10 @@ partitionate_function mod_index max_fun_nr fun_index pi ps
 						)
 				-> (max_fun_nr, ps)
 		GeneratedBody
-			// do not allocate a group, it will be allocated during generic phase
+			// do not allocate a group, it will be allocated during the generic phase
+			-> (max_fun_nr, ps)
+		GenerateInstanceBodyChecked _ _
+			// do not allocate a group, it will be allocated during the generic phase
 			-> (max_fun_nr, ps)
 
 partitionate_called_function :: Int Int !Int PartitioningInfo !*PartitioningState -> (!Int,!*PartitioningState)
@@ -1322,7 +1325,10 @@ partitionate_called_function mod_index max_fun_nr fun_index pi ps
 						)
 				-> (max_fun_nr, ps)
 		GeneratedBody
-			// do not allocate a group, it will be allocated during generic phase
+			// do not allocate a group, it will be allocated during the generic phase
+			-> (max_fun_nr, ps)
+		GenerateInstanceBodyChecked _ _
+			// do not allocate a group, it will be allocated during the generic phase
 			-> (max_fun_nr, ps)
 
 index_in_ranges index [!{ir_from, ir_to}:ranges!]
