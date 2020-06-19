@@ -3427,7 +3427,7 @@ BEArg (CleanString arg)
 #if STRICT_LISTS
 static void init_unboxed_list_symbols (void)
 {
-	StateP array_state_p,strict_array_state_p,unboxed_array_state_p;
+	StateP array_state_p,strict_array_state_p,unboxed_array_state_p,packed_array_state_p;
 	int i;
 	
 	for (i=0; i<Nr_Of_Predef_Types; ++i){
@@ -3483,6 +3483,17 @@ static void init_unboxed_list_symbols (void)
 	unboxed_list_symbols[unboxed_array_type][0].symb_state_p=unboxed_array_state_p;
 	unboxed_list_symbols[unboxed_array_type][1].symb_state_p=unboxed_array_state_p;
 	unboxed_maybe_symbols[unboxed_array_type].symb_state_p=unboxed_array_state_p;
+
+	packed_array_state_p=ConvertAllocType (StateS);
+	packed_array_state_p->state_type = ArrayState;
+	packed_array_state_p->state_arity = 1;
+	packed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
+	packed_array_state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
+	packed_array_state_p->state_array_arguments [0] = StrictState;
+
+	unboxed_list_symbols[packed_array_type][0].symb_state_p=packed_array_state_p;
+	unboxed_list_symbols[packed_array_type][1].symb_state_p=packed_array_state_p;
+	unboxed_maybe_symbols[packed_array_type].symb_state_p=packed_array_state_p;
 }
 #endif
 
