@@ -265,6 +265,10 @@ build_generic_representations_for_derived_instances instance_i instance_defs fun
 					# (funs_and_groups,gs)
 						= build_generic_type_rep glob_module glob_object True False class_name ins_pos funs_and_groups gs
 					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
+				[TAS {type_index={glob_module,glob_object}} _ _]
+					# (funs_and_groups,gs)
+						= build_generic_type_rep glob_module glob_object True False class_name ins_pos funs_and_groups gs
+					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
 				[_]
 					# gs & gs_error
 						= reportError class_name ins_pos "cannot derive an instance for this type" gs.gs_error
@@ -2090,46 +2094,47 @@ generate_derived_instance member_i ins_members ins_type ins_pos ins_class_index 
 			| not gen_deps=:[]
 				# ss & ss_error = reportError generic_ident.id_name ins_pos "deriving instances from generic with dependencies not implemented" ss.ss_error
 				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+			# type_index = case ins_type.it_types of
+									[TA {type_index} _] -> type_index
+									[TAS {type_index} _ _] -> type_index
+									_ -> {glob_module= -1,glob_object= -1}
+			| type_index.glob_module>=0
+				# ({tdi_gen_rep},ss) = ss!ss_td_infos.[type_index.glob_module, type_index.glob_object]
+				# gen_type_rep = getGenericTypeRep tdi_gen_rep
 
-			= case ins_type.it_types of
-				[TA {type_index} _]
-					# ({tdi_gen_rep},ss) = ss!ss_td_infos.[type_index.glob_module, type_index.glob_object]
-					# gen_type_rep = getGenericTypeRep tdi_gen_rep
+				# ({class_ident,class_members},ss) = ss!ss_modules.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+				# {ds_ident,ds_index} = class_members.[member_i]
+				# member_symb_ident = {symb_ident=ds_ident,
+									   symb_kind=SK_OverloadedFunction {glob_module=ins_class_index.gi_module,glob_object=ds_index}}
 
-					# ({class_ident,class_members},ss) = ss!ss_modules.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-					# {ds_ident,ds_index} = class_members.[member_i]
-					# member_symb_ident = {symb_ident=ds_ident,
-										   symb_kind=SK_OverloadedFunction {glob_module=ins_class_index.gi_module,glob_object=ds_index}}
+				# gen_type_rep & gtr_type = add_instance_calls_to_GenTypeStruct gen_type_rep.gtr_type member_symb_ident
 
-					# gen_type_rep & gtr_type = add_instance_calls_to_GenTypeStruct gen_type_rep.gtr_type member_symb_ident
+				# (TransformedBody {tb_args, tb_rhs}, ss)
+					= buildDerivedInstanceCaseBody gen_type_rep main_module_n ins_pos type_index generic_ident generic_index predefs ss
 
-					# (TransformedBody {tb_args, tb_rhs}, ss)
-						= buildDerivedInstanceCaseBody gen_type_rep main_module_n ins_pos type_index generic_ident generic_index predefs ss
+				#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
+				| not free_vars=:[]
+					= abort "generate_derived_instance: free_vars is not empty\n"
 
-					#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
-					| not free_vars=:[]
-						-> abort "generate_derived_instance: free_vars is not empty\n"
+				# (fun=:{fun_info},ss) = ss!ss_funs.[cim_index]
+				# fun &
+					fun_arity = length arg_vars,
+					fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
+					fun_info = {fun_info &
+									fi_calls = collectCalls main_module_n tb_rhs,
+									fi_free_vars = [],
+									fi_local_vars = local_vars,
+									fi_properties = fun_info.fi_properties bitor FI_GenericFun
+								}
 
-					# (fun=:{fun_info},ss) = ss!ss_funs.[cim_index]
-					# fun &
-						fun_arity = length arg_vars,
-						fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
-						fun_info = {fun_info &
-										fi_calls = collectCalls main_module_n tb_rhs,
-										fi_free_vars = [],
-										fi_local_vars = local_vars,
-										fi_properties = fun_info.fi_properties bitor FI_GenericFun
-									}
+				  (ss_funs_and_groups,ss) = ss!ss_funs_and_groups
+				  group = {group_members = [cim_index]}
+				  ss_funs_and_groups & fg_group_index=ss_funs_and_groups.fg_group_index+1,
+									   fg_groups=[group:ss_funs_and_groups.fg_groups]
+				  ss & ss_funs.[cim_index] = fun, ss_funs_and_groups = ss_funs_and_groups
 
-					  (ss_funs_and_groups,ss) = ss!ss_funs_and_groups
-					  group = {group_members = [cim_index]}
-					  ss_funs_and_groups & fg_group_index=ss_funs_and_groups.fg_group_index+1,
-										   fg_groups=[group:ss_funs_and_groups.fg_groups]
-					  ss & ss_funs.[cim_index] = fun, ss_funs_and_groups = ss_funs_and_groups
-
-					-> generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-				_
-					-> generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
 			= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
 		= ss
 
