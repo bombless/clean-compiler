@@ -1153,6 +1153,8 @@ where
 					= has_no_curried_macro_Expression bp_expr && has_no_curried_macro_BasicPatterns patterns
 				has_no_curried_macro_BasicPatterns []
 					= True
+			has_no_curried_macro_CasePatterns (OverloadedListPatterns type decons_expr patterns)
+				= has_no_curried_macro_AlgebraicPatterns patterns
 			has_no_curried_macro_CasePatterns (NewTypePatterns type patterns)
 				= has_no_curried_macro_AlgebraicPatterns patterns
 			has_no_curried_macro_CasePatterns (DynamicPatterns patterns)
