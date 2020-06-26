@@ -401,7 +401,7 @@ cNameLocationDependent :== True
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
-::	MemberDefault = NoMemberDefault | MacroMemberDefault !MacroMember
+::	MemberDefault = NoMemberDefault | MacroMemberDefault !MacroMember | DeriveDefault !Ident !GlobalIndex
 
 ::	MemberDef =
 	{	me_ident		:: !Ident

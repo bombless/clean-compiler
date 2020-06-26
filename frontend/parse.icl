@@ -268,9 +268,9 @@ isGlobalContext	parseContext	:== parseContext bitand cGlobalContext <> 0 // not 
 isDclContext	parseContext	:== parseContext bitand cICLContext == 0
 isIclContext	parseContext	:== parseContext bitand cICLContext <> 0	// not (isDclContext parseContext)
 
-isNotClassOrInstanceDefsContext parseContext		:== parseContext bitand ClassOrInstanceDefsContext == 0
-isGlobalOrClassDefsContext parseContext				:== parseContext bitand GlobalOrClassDefsContext <> 0
-isInstanceDefsContext parseContext					:== parseContext bitand InstanceDefsContext <> 0
+isClassOrInstanceDefsContext parseContext	:== parseContext bitand ClassOrInstanceDefsContext <> 0
+isGlobalOrClassDefsContext parseContext		:== parseContext bitand GlobalOrClassDefsContext <> 0
+isInstanceDefsContext parseContext			:== parseContext bitand InstanceDefsContext <> 0
 isNotClassDefsContext parseContext	:== parseContext bitand ClassDefsContext == 0
 
 cWantIclFile :== True
@@ -456,7 +456,7 @@ where
 		| isGlobalContext parseContext
 			# (gendef, pState) = wantDeriveDefinition parseContext pos pState
 			= (True, gendef, pState)
-		| isInstanceDefsContext parseContext
+		| isClassOrInstanceDefsContext parseContext
 			# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
 			= (True, derive_instance_def, pState)
 			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
@@ -547,7 +547,7 @@ where
 		  localsExpected	= ~ ss_useLayout
 		  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext (isNotEmpty args)) (tokenBack pState)
 		| isLocalContext parseContext
-			| isNotClassOrInstanceDefsContext parseContext
+			| not (isClassOrInstanceDefsContext parseContext)
  				= (PD_NodeDef pos (combine_args args) rhs, pState)
 	 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<class or instance definition>" pState)
 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
@@ -560,7 +560,7 @@ where
 	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
 		# code_allowed  = definingToken == EqualToken
 		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || (definingToken == DefinesColonToken && isGlobalContext parseContext)) &&
-		/* PK isLowerCaseName name.id_name && */ isNotClassOrInstanceDefsContext parseContext
+				not (isClassOrInstanceDefsContext parseContext)
 		  	# (token, pState) = nextToken FunctionContext pState
 			| code_allowed && token == CodeToken
 				# (rhs, pState) = wantCodeRhs pState

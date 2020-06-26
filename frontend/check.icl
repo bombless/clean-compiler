@@ -172,22 +172,29 @@ checkMemberTypes module_index opt_icl_info member_defs type_defs class_defs modu
 	= (mds,tds,cds,modules,{heaps & hp_type_heaps = hp_type_heaps,hp_var_heap = hp_var_heap},cs) 
 where
 	check_class_member module_index opt_icl_info member_index (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
-		# (member_def=:{me_ident,me_type,me_pos,me_class}, member_defs) = member_defs![member_index]
+		# (member_def=:{me_ident,me_type,me_pos,me_class,me_default_implementation}, member_defs) = member_defs![member_index]
 		| has_to_be_checked opt_icl_info me_class
 			# position = newPosition me_ident me_pos
-			  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
+			  cs & cs_error = setErrorAdmin position cs.cs_error
 			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
 			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
+			  (me_default_implementation,cs) = check_generic_default me_default_implementation module_index cs
 			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
-			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap		   
-			= ({ member_defs & [member_index] = { member_def & me_type = me_type, me_class_vars = me_class_vars, me_type_ptr = me_type_ptr }},
-					type_defs, class_defs, modules, type_heaps, var_heap, cs)
+			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap
+			  member_def & me_type=me_type, me_class_vars=me_class_vars, me_type_ptr=me_type_ptr, me_default_implementation=me_default_implementation
+			= ({member_defs & [member_index] = member_def}, type_defs, class_defs, modules, type_heaps, var_heap, cs)
 			= (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
 
 	has_to_be_checked No glob_class_index
 		= True
 	has_to_be_checked (Yes ({copied_class_defs}, n_cached_dcl_mods)) {glob_module,glob_object}
 		= not (glob_module < n_cached_dcl_mods && glob_object < size copied_class_defs && copied_class_defs.[glob_object])
+
+	check_generic_default (DeriveDefault generic_ident _) module_index cs
+		# (generic_index,cs) = get_generic_index generic_ident module_index cs
+		= (DeriveDefault generic_ident generic_index,cs)
+	check_generic_default me_default_implementation module_index cs
+		= (me_default_implementation,cs)
 
 ::	InstanceSymbols =
 	{	is_type_defs		:: !.{# CheckedTypeDef}
@@ -311,18 +318,8 @@ where
 												instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 				| ins_member.cim_ident == class_member.ds_ident
 					| icl_functions.[ins_member.cim_index].fun_body=:GenerateInstanceBody _
-						# ({fun_body=GenerateInstanceBody generic_ident},icl_functions) = icl_functions![ins_member.cim_index]
-						#! main_module_n = cs.cs_x.x_main_dcl_module_n
-						# (generic_index,cs) = get_generic_index generic_ident main_module_n cs
-
-						# ({me_type,me_class_vars,me_priority}, member_defs, modules)
-							= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
-						  (fun,icl_functions) = icl_functions![ins_member.cim_index];
-						  fun & fun_body = GenerateInstanceBodyChecked generic_ident generic_index, fun_arity = class_member.ds_arity, fun_priority = me_priority
-						  icl_functions & [ins_member.cim_index] = fun
-						  (instance_type,type_defs,modules,var_heap,type_heaps,cs)
-							= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
-						  instance_types = [(ins_member.cim_index, instance_type) : instance_types]
+						# (instance_types,icl_functions,member_defs,type_defs,modules,var_heap,type_heaps,cs)
+							= add_generated_instance ins_member.cim_index class_member member_mod_index ins_type instance_types icl_functions member_defs type_defs modules var_heap type_heaps cs
 						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members class_members class_ident ins_pos ins_type
 													instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 					#! instance_member_arity=icl_functions.[ins_member.cim_index].fun_arity
@@ -366,42 +363,59 @@ where
 			instance_member_n ins_members function_n instance_types member_defs type_defs icl_functions modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# ({me_default_implementation,me_class_vars,me_type,me_priority,me_pos},member_defs,modules)
 			= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
-		= case me_default_implementation of
-			MacroMemberDefault {mm_ident}
-				# (new_instance_member_ds,new_instance_member,instance_types,type_defs,modules,var_heap,type_heaps,cs)
-					= make_default_instance mm_ident me_type me_class_vars me_priority ins_pos
-											class_member ins_type function_n instance_types type_defs modules var_heap type_heaps cs
-				  icl_functions = {icl_functions & [function_n] = new_instance_member}
-				  ins_members = { if (i<>instance_member_n)
-				  					ins_members.[i]
-				  					new_instance_member_ds
-				  				  \\ i<-[0..size ins_members-1] }
-				= (instance_member_n+1,ins_members,instance_types,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
-			NoMemberDefault
-				# cs = { cs & cs_error = checkError class_member.ds_ident "instance of class member expected" cs.cs_error}
-				= (instance_member_n+1,ins_members,instance_types,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
+		| not me_default_implementation=:NoMemberDefault
+			# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
+				= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
+			  (new_instance_member_ds,new_instance_member,cs)
+				= case me_default_implementation of
+					MacroMemberDefault {mm_ident}
+						-> make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member function_n cs
+					DeriveDefault generic_ident generic_index
+						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+						-> make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member function_n cs
+			  icl_functions & [function_n] = new_instance_member
+			  ins_members = { if (i<>instance_member_n) ins_members.[i] new_instance_member_ds \\ i<-[0..size ins_members-1] }
+			  instance_types = [(function_n,instance_type) : instance_types]
+			= (instance_member_n+1,ins_members,instance_types,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
+			# cs & cs_error = checkError class_member.ds_ident "instance of class member expected" cs.cs_error
+			= (instance_member_n+1,ins_members,instance_types,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
 
 	add_default_instance_or_report_error class_member member_mod_index ins_type ins_pos
 			instance_member_n ins_members n_icl_functions new_instance_members instance_types member_defs type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# ({me_default_implementation,me_class_vars,me_type,me_priority,me_pos},member_defs,modules)
 			= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
-		= case me_default_implementation of
-			MacroMemberDefault {mm_ident}
-				# (new_instance_member_ds,new_instance_member,instance_types,type_defs,modules,var_heap,type_heaps,cs)
-					= make_default_instance mm_ident me_type me_class_vars me_priority ins_pos
-											class_member ins_type n_icl_functions instance_types type_defs modules var_heap type_heaps cs
-				  new_instance_members = [! new_instance_member : new_instance_members !] 
-				  ins_members = { if (i<instance_member_n)
-				  					ins_members.[i]
-				  					(if (i==instance_member_n)
-				  						new_instance_member_ds
-				  						ins_members.[i-1]
-				  					)
-				  				  \\ i<-[0..size ins_members] }
-				= (instance_member_n+1,ins_members,n_icl_functions+1,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
-			NoMemberDefault
-				# cs = { cs & cs_error = checkErrorWithPosition class_member.ds_ident ins_pos "instance of class member expected" cs.cs_error}
-				= (instance_member_n,ins_members,n_icl_functions,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
+		| not me_default_implementation=:NoMemberDefault
+			# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
+				= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
+			  (new_instance_member_ds,new_instance_member,cs)
+				= case me_default_implementation of
+					MacroMemberDefault {mm_ident}
+						-> make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member n_icl_functions cs
+					DeriveDefault generic_ident generic_index
+						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+						-> make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member n_icl_functions cs
+			  new_instance_members = [! new_instance_member : new_instance_members !]
+			  ins_members
+				= { if (i<instance_member_n) ins_members.[i] (if (i==instance_member_n) new_instance_member_ds ins_members.[i-1])
+					\\ i<-[0..size ins_members] }
+			  instance_types = [(n_icl_functions,instance_type) : instance_types]
+			= (instance_member_n+1,ins_members,n_icl_functions+1,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
+			# cs & cs_error = checkErrorWithPosition class_member.ds_ident ins_pos "instance of class member expected" cs.cs_error
+			= (instance_member_n,ins_members,n_icl_functions,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
+
+	add_generated_instance ins_member_index class_member member_mod_index ins_type instance_types icl_functions member_defs type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
+		# ({me_type,me_class_vars,me_priority}, member_defs, modules)
+			= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
+		  (instance_type,type_defs,modules,var_heap,type_heaps,cs)
+			= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
+		  ({fun_body=GenerateInstanceBody generic_ident},icl_functions) = icl_functions![ins_member_index]
+		  (generic_index,cs) = get_generic_index generic_ident x_main_dcl_module_n cs
+		  fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+		  (fun,icl_functions) = icl_functions![ins_member_index];
+		  fun & fun_body = fun_body, fun_arity = class_member.ds_arity, fun_priority = me_priority
+		  icl_functions & [ins_member_index] = fun
+		  instance_types = [(ins_member_index, instance_type) : instance_types]
+		= (instance_types,icl_functions,member_defs,type_defs,modules,var_heap,type_heaps,cs)
 
 	make_class_member_instance_type :: InstanceType SymbolType [TypeVar] z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
 													   -> *(!SymbolType,!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
@@ -419,15 +433,10 @@ where
 			= (icl_functions,{cs & cs_error = checkErrorWithPosition fun_ident fun_pos (ins_member.cim_ident.id_name+++" is not a member of this class") cs.cs_error})
 			= (icl_functions,{cs & cs_error = checkError ins_member.cim_ident "not a member of this class" cs.cs_error})
 
-	make_default_instance :: Ident SymbolType [TypeVar] Priority Position DefinedSymbol InstanceType Int
-										 ![(Int,SymbolType)] !z:{#CheckedTypeDef} !u:{#DclModule} !*VarHeap !*TypeHeaps !*CheckState
-		-> (!ClassInstanceMember,!FunDef,![(Int,SymbolType)],!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
-	make_default_instance default_class_member_ident me_type me_class_vars me_priority ins_pos
-			class_member ins_type function_n instance_types type_defs modules var_heap type_heaps cs
-		# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
-			= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
-		  arity = instance_type.st_arity
-		  new_instance_ident = {id_name=class_member.ds_ident.id_name,id_info=nilPtr}
+	make_default_instance :: !Int Ident Priority Position DefinedSymbol Int !*CheckState
+		-> (!ClassInstanceMember,!FunDef,!*CheckState)
+	make_default_instance arity default_class_member_ident me_priority ins_pos class_member function_n cs
+		# new_instance_ident = {id_name=class_member.ds_ident.id_name,id_info=nilPtr}
 		  new_instance_member_ds = {cim_ident = new_instance_ident, cim_arity = arity, cim_index = function_n}
 		  
 		  (argument_pointers,symbol_table) = make_argument_pointers arity [] cs.cs_symbol_table
@@ -455,9 +464,19 @@ where
 		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
 		  							fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
 		  							fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
+		= (new_instance_member_ds,new_instance_member,cs)
 
-		  instance_types = [(function_n,instance_type) : instance_types]
-		= (new_instance_member_ds,new_instance_member,instance_types,type_defs,modules,var_heap,type_heaps,cs)
+	make_derived_default_instance :: !Int FunctionBody Priority Position DefinedSymbol Int !*CheckState
+		-> (!ClassInstanceMember,!FunDef,!*CheckState)
+	make_derived_default_instance arity fun_body me_priority ins_pos class_member function_n cs
+		# new_instance_ident = {id_name=class_member.ds_ident.id_name,id_info=nilPtr}
+		  new_instance_member_ds = {cim_ident = new_instance_ident, cim_arity = arity, cim_index = function_n}
+		  (argument_pointers,symbol_table) = make_argument_pointers arity [] cs.cs_symbol_table
+		  cs & cs_symbol_table=symbol_table
+		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
+									fun_body = fun_body, fun_type = No, fun_pos = ins_pos,
+									fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
+		= (new_instance_member_ds,new_instance_member,cs)
 
 	make_argument_pointers :: !Int ![SymbolPtr] !*SymbolTable -> (![SymbolPtr],!*SymbolTable)
 	make_argument_pointers n argument_pointers symbol_table

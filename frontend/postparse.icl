@@ -1542,12 +1542,23 @@ where
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context macro_count ca
 		# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 		| bodies=:[]
-			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
-							me_default_implementation = NoMemberDefault,
-							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
-			  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
-					= check_symbols_of_class_members defs type_context macro_count ca
-			= ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+			# type & st_context = [type_context : st_context]
+			= case defs of
+				[PD_DeriveInstanceMember pos member_ident generic_ident:defs]
+				  | member_ident.id_name==name.id_name
+					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
+									me_default_implementation = DeriveDefault generic_ident {gi_module=NoIndex,gi_index=NoIndex},
+									me_offset = NoIndex, me_class_vars = [], me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+							= check_symbols_of_class_members defs type_context macro_count ca
+					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+				_
+					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
+									me_default_implementation = NoMemberDefault,
+									me_offset = NoIndex, me_class_vars = [], me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
+							= check_symbols_of_class_members defs type_context macro_count ca
+					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 		= case fun_kind of
 		   FK_Macro
 			# macro = MakeNewImpOrDefFunction name st_arity bodies FK_Macro prio opt_type pos
@@ -1598,6 +1609,8 @@ where
 				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
 				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
+	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ : defs] type_context macro_count ca
+		= check_symbols_of_class_members defs type_context macro_count (postParseError pos "member type missing" ca)
 	check_symbols_of_class_members [def : _] type_context macro_count ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
 	check_symbols_of_class_members [] type_context macro_count ca

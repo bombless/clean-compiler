@@ -233,6 +233,8 @@ where
 
 	compare_default_implementations NoMemberDefault NoMemberDefault = True
 	compare_default_implementations (MacroMemberDefault _) (MacroMemberDefault _) = True
+	compare_default_implementations (DeriveDefault generic_ident1 generic_index1) (DeriveDefault generic_ident2 generic_index2)
+		= generic_index1==generic_index2 && generic_ident1==generic_ident2
 	compare_default_implementations _ _ = False
 
 	sort_clas_macro_members class_macro_members

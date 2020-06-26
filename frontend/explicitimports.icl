@@ -294,19 +294,20 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				-> ([Declaration { decl_ident = ds_ident, decl_pos = position,
 						decl_kind = STE_Imported STE_Member def_mod_index,
 						decl_index = ds_index } : decls_accu], dcl_modules)
-			BS_MembersAndMacros class_members macro_members default_member_indexes default_macros
+			BS_MembersAndMacros class_members macro_members _ default_macros
 				| belong_nr<size class_members
 					# {ds_ident, ds_index} = class_members.[belong_nr]
 					# decl = Declaration { decl_ident = ds_ident, decl_pos = position,
 										   decl_kind = STE_Imported STE_Member def_mod_index,
 										   decl_index = ds_index }
 					-> ([decl : decls_accu], dcl_modules)
-				| belong_nr<size class_members+size macro_members
-					# {mm_ident,mm_index} = macro_members.[belong_nr-size class_members]
+				# belong_nr=belong_nr-size class_members
+				| belong_nr<size macro_members
+					# {mm_ident,mm_index} = macro_members.[belong_nr]
 					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
 							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
 							decl_index = mm_index } : decls_accu], dcl_modules)
-					# {mm_ident,mm_index} = default_macros.[belong_nr-(size class_members+size macro_members)]
+					# {mm_ident,mm_index} = default_macros.[belong_nr-size macro_members]
 					-> ([Declaration { decl_ident = mm_ident, decl_pos = position,
 							decl_kind = STE_Imported (STE_DclMacroOrLocalMacroFunction []) def_mod_index,
 							decl_index = mm_index } : decls_accu], dcl_modules)
@@ -838,8 +839,14 @@ instance check_completeness Let where
   		  ) ccs
 
 instance check_completeness MemberDef where
-  	check_completeness {me_type} cci ccs 
-  		= check_completeness me_type cci ccs
+	check_completeness {me_type,me_default_implementation} cci ccs
+		= check_completeness me_default_implementation cci (check_completeness me_type cci ccs)
+
+instance check_completeness MemberDefault where
+	check_completeness (DeriveDefault generic_ident {gi_module,gi_index}) cci ccs
+		= check_whether_ident_is_imported generic_ident gi_module gi_index STE_Generic cci ccs
+	check_completeness _ _ ccs
+		= ccs
 
 instance check_completeness (Optional x) | check_completeness x where
 	check_completeness (Yes x) cci ccs
