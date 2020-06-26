@@ -2029,7 +2029,7 @@ where
 			me_class_vars = [class_var], 		// the same variable as in the class
 			me_pos = gen_pos,
 			me_priority = NoPrio,
-			me_default_implementation = No
+			me_default_implementation = NoMemberDefault
 			}
 		= (member_def, gs)
 

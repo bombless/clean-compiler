@@ -231,8 +231,8 @@ where
 				= (False, icl_member_defs, comp_st)
 			= (False, icl_member_defs, comp_st)
 
-	compare_default_implementations No No = True
-	compare_default_implementations (Yes _) (Yes _) = True
+	compare_default_implementations NoMemberDefault NoMemberDefault = True
+	compare_default_implementations (MacroMemberDefault _) (MacroMemberDefault _) = True
 	compare_default_implementations _ _ = False
 
 	sort_clas_macro_members class_macro_members
@@ -538,7 +538,7 @@ FirstHasMoreStrictness:==2;
 CompareGenericCaseMacro:==4; // only used from ec_tc_state
 
 :: TypesCorrespondMonad
-		:==	*TypesCorrespondState -> *(!Bool, !*TypesCorrespondState)
+		:==	*TypesCorrespondState -> *(Bool, *TypesCorrespondState)
 
 :: ExpressionsCorrespondState =
 		{	ec_icl_correspondences ::	!.{# Int },

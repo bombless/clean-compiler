@@ -1541,9 +1541,9 @@ where
 									-> (![MemberDef],![FunDef],![(Ident,MacroMember,Position)],[!MacroMember!],!Int,!*CollectAdmin)
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context macro_count ca
 		# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
-		| isEmpty bodies
+		| bodies=:[]
 			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
-							me_default_implementation = No,
+							me_default_implementation = NoMemberDefault,
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 					= check_symbols_of_class_members defs type_context macro_count ca
@@ -1562,7 +1562,7 @@ where
 			# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
 			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
 							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
-			 				me_default_implementation = Yes {mm_ident=macro_ident,mm_index=macro_count}, me_type_ptr = nilPtr }
+							me_default_implementation = MacroMemberDefault {mm_ident=macro_ident,mm_index=macro_count}, me_type_ptr = nilPtr }
 			  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 					= check_symbols_of_class_members defs type_context (macro_count+1) ca
 			= ([mem_def : mem_defs],[macro : mem_macros],default_members_without_type,macro_members,macro_count,ca)
@@ -1609,8 +1609,8 @@ where
 		= add_default_members_without_type default_members_without_type mem_defs ca
 	where
 		add_default_member [mem_def:mem_defs] name ca
-			| mem_def.me_ident==name && case mem_def.me_default_implementation of No -> True; _ -> False
-				# mem_def = {mem_def & me_default_implementation = Yes macro_member}
+			| mem_def.me_ident==name && mem_def.me_default_implementation=:NoMemberDefault
+				# mem_def & me_default_implementation = MacroMemberDefault macro_member
 				= ([mem_def:mem_defs],ca)
 				# (mem_defs,ca) = add_default_member mem_defs name ca
 				= ([mem_def:mem_defs],ca)
@@ -1662,7 +1662,7 @@ where
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
 	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident : defs] ca
 		# fun_body = GenerateInstanceBody generic_ident
-		  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = (FK_Function False),
+		  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
 					 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 		  (fun_defs, ca) = collect_member_instances defs ca
 		= ([fun_def : fun_defs], ca)

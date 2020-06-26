@@ -582,7 +582,7 @@ where
 						   				tc_types = [ TV class_var ], tc_var = nilPtr}],
 						  st_attr_vars = [], st_attr_env = [] }
 
-			  tc_member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio, me_default_implementation = No,
+			  tc_member_def = { me_ident = tc_member_name, me_type = me_type, me_pos = NoPos, me_priority = NoPrio, me_default_implementation = NoMemberDefault,
 								me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 			
 			  tc_class_def = { class_ident = tc_class_name, class_arity = 1, class_args = [class_var], class_context = [],

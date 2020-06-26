@@ -401,6 +401,8 @@ cNameLocationDependent :== True
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
+::	MemberDefault = NoMemberDefault | MacroMemberDefault !MacroMember
+
 ::	MemberDef =
 	{	me_ident		:: !Ident
 	,	me_class		:: !Global Index
@@ -408,7 +410,7 @@ cNameLocationDependent :== True
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
 	,	me_class_vars	:: ![TypeVar]
-	,	me_default_implementation :: !Optional MacroMember
+	,	me_default_implementation :: !MemberDefault
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}

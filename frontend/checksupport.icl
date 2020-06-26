@@ -155,12 +155,11 @@ getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index
 		add_default_class_member_macros class_member_n dcl_modules
 			| class_member_n<size class_members
 				# member_index=class_members.[class_member_n].ds_index
-				  ({me_default_implementation},dcl_modules)
-					= dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
+				  ({me_default_implementation},dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
 				= case me_default_implementation of
-					No
+					NoMemberDefault
 						-> add_default_class_member_macros (class_member_n+1) dcl_modules
-					Yes default_class_member_macro_ident_and_index
+					MacroMemberDefault default_class_member_macro_ident_and_index
 						#! n_members = size class_members
 						# default_member_indexes = createArray n_members -1
 						  default_member_indexes & [class_member_n] = 0
@@ -172,12 +171,11 @@ getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index
 		add_more_default_class_member_macros class_member_n default_class_members default_member_n default_member_indexes dcl_modules
 			| class_member_n<size class_members
 				# member_index=class_members.[class_member_n].ds_index
-				  ({me_default_implementation}, dcl_modules)
-					= dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
+				  ({me_default_implementation}, dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_member_defs.[member_index]
 				= case me_default_implementation of
-					No
+					NoMemberDefault
 						-> add_more_default_class_member_macros (class_member_n+1) default_class_members default_member_n default_member_indexes dcl_modules
-					Yes default_class_member_macro_ident_and_index
+					MacroMemberDefault default_class_member_macro_ident_and_index
 						# default_class_members = [|default_class_member_macro_ident_and_index:default_class_members]
   						  default_member_indexes & [class_member_n] = default_member_n
 						-> add_more_default_class_member_macros (class_member_n+1) default_class_members (default_member_n+1) default_member_indexes dcl_modules
