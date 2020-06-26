@@ -2579,14 +2579,14 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		   	  (cs_symbol_table, cs_error) = addDefToSymbolTable cGlobalScope mod_index mod.mod_ident (STE_Module mod) cs_symbol_table cs_error
 		   	= ((mod,sizes,defs),dcl_macro_defs,{ cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error })
 		where
-			convert_dcl_class_instances :: ![ScannedInstanceAndMembersR a] -> [ClassInstance]
+			convert_dcl_class_instances :: ![ScannedInstanceAndMembers] -> [ClassInstance]
 			convert_dcl_class_instances [{sim_pi,sim_member_types} : pins]
 				# member_types_and_functions = [{dim_type=fun_type,dim_function_index = -1} \\ fun_type<-sim_member_types]
 				= [ParsedInstanceToClassInstance sim_pi member_types_and_functions {} : convert_dcl_class_instances pins]
 			convert_dcl_class_instances []
 				= []
 
-		convert_icl_class_instances1 :: .[ScannedInstanceAndMembersR a] -> .[ClassInstanceR a]
+		convert_icl_class_instances1 :: .[ScannedInstanceAndMembers] -> .[ClassInstanceR FunDef]
 		convert_icl_class_instances1 insams
 			= [ParsedInstanceToClassInstance sim_pi sim_members {} \\ {sim_pi,sim_members}<-insams]
 

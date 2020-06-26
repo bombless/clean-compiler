@@ -358,7 +358,7 @@ where
 	collectFunctions e icl_module ca
 		= (e, ca)
 
-instance collectFunctions (ScannedInstanceAndMembersR FunDef) where
+instance collectFunctions ScannedInstanceAndMembers where
 	collectFunctions inst=:{sim_members} icl_module ca
 		# (sim_members, ca) = collectFunctions sim_members icl_module ca
 		= ({inst & sim_members = sim_members }, ca)
@@ -1400,7 +1400,7 @@ where
 	macro_count	:: !Int
    }
 
-reorganiseDefinitions :: Bool [ParsedDefinition] !DefCounts *CollectAdmin -> (![FunDef],!CollectedDefinitions (ScannedInstanceAndMembersR FunDef), ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
+reorganiseDefinitions :: Bool [ParsedDefinition] !DefCounts *CollectAdmin -> (![FunDef],!CollectedDefinitions ScannedInstanceAndMembers, ![ParsedImport], ![ImportedObject],![ParsedForeignExport],!*CollectAdmin)
 reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kind : defs] def_counts=:{macro_count} ca
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args

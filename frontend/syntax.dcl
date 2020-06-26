@@ -118,7 +118,7 @@ instance == FunctionOrMacroIndex
 	}
 
 ::	ParsedModule	:== Module  [ParsedDefinition]
-::	ScannedModule 	:== Module  (CollectedDefinitions (ScannedInstanceAndMembersR FunDef))
+::	ScannedModule 	:== Module  (CollectedDefinitions ScannedInstanceAndMembers)
 	
 ::	ModuleKind		= MK_Main | MK_Module | MK_System | MK_None | MK_NoMainDcl
 
@@ -315,9 +315,9 @@ cNameLocationDependent :== True
 	,	pim_members	:: ![ParsedDefinition]
 	}
 
-::	ScannedInstanceAndMembersR icl_member =
+::	ScannedInstanceAndMembers =
 	{	sim_pi 				:: !ParsedInstance
-	,	sim_members			:: ![icl_member]	// for .icl
+	,	sim_members			:: ![FunDef]	// for .icl
 	,	sim_member_types	:: ![FunType]	// for .dcl
 	}
 
