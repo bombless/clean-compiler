@@ -1121,7 +1121,7 @@ where
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
-		|	token =: LetToken True
+		|	token =: (LetToken True)
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
 			=	root_expression token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantExpressionT token pState
@@ -1194,7 +1194,7 @@ where
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
-		|	token =: LetToken True
+		|	token =: (LetToken True)
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
 			=	root_expression True token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantExpressionT token pState
@@ -1428,7 +1428,7 @@ where
 instance want ImportedObject where
 	want pState
 		# (token, pState) = nextToken GeneralContext pState
-		| token =: IdentToken "library"
+		| token =: (IdentToken "library")
 	  		# (token, pState) = nextToken GeneralContext pState
 			= want_import_string token cIsImportedLibrary pState
 			= want_import_string token cIsImportedObject pState
@@ -3244,7 +3244,7 @@ trySimpleTypeT CurlyOpenToken attr pState
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
-	| token =: IntToken "32"
+	| token =: (IntToken "32")
 		# pState = wantToken TypeContext "packed array type" HashToken pState
 		# (token, pState) = nextToken TypeContext pState
 		| token =: CurlyCloseToken
