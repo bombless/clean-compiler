@@ -320,24 +320,24 @@ where
 	try_module_header is_icl_mod scanState
 		# (token, scanState) = nextToken GeneralContext scanState
 		| is_icl_mod
-			| token == ModuleToken
+			| token =: ModuleToken
 				# (token, scanState) = nextToken ModuleNameContext scanState
 				= try_module_name token MK_Main scanState
-			| token == ImpModuleToken 
+			| token =: ImpModuleToken
 				= try_module_token MK_Module scanState
-			| token == SysModuleToken
+			| token =: SysModuleToken
 				= try_module_token MK_System scanState
 				= (False, MK_None, "", tokenBack scanState)
-		| token == DefModuleToken
+		| token =: DefModuleToken
 		  	= try_module_token MK_Module scanState
-		| token == SysModuleToken
+		| token =: SysModuleToken
 		  	= try_module_token MK_System scanState
 			= (False, MK_None, "", tokenBack scanState)
 
 	try_module_token :: !ModuleKind !ScanState -> (!Bool,!ModuleKind,!String,!ScanState)
 	try_module_token mod_type scanState
 		# (token, scanState) = nextToken GeneralContext scanState
-		| token == ModuleToken
+		| token =: ModuleToken
 			# (token, scanState) = nextToken ModuleNameContext scanState
  			= try_module_name token mod_type scanState
 			= (False, mod_type, "", tokenBack scanState)
@@ -380,7 +380,7 @@ where
 			  acc				= acc ++ defs
 			  pState			= wantEndModule pState
 			  (token, pState)	= nextToken FunctionContext pState
-			| token == EndOfFileToken
+			| token =: EndOfFileToken
 				= (acc,  pState)
 				# pState		= parseError "want definitions" (Yes token) "End of file" pState
 				  pState		= wantEndOfDefinition "definitions" pState
@@ -431,7 +431,7 @@ where
 		| ~(isGlobalContext parseContext)
 			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
 		# (token, pState) = nextToken FunctionContext pState
-		| token == CodeToken && isIclContext parseContext
+		| token =: CodeToken && isIclContext parseContext
 			# (importedObjects, pState) = wantCodeImports pState
 			= (True, PD_ImportedObjects importedObjects, pState)
 			# pState = tokenBack pState
@@ -500,7 +500,7 @@ where
 			= case token of
 				IdentToken name
 					# (token, pState) = nextToken FunctionContext pState
-					| CloseToken == token
+					| token =: CloseToken
 						# (id, pState) = stringToIdent name IC_Expression pState
 						-> (True, id, True, pState)
 						-> (False, abort "no name", False, tokenBack (tokenBack (tokenBack pState)))
@@ -527,7 +527,7 @@ where
 	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
-		| token == DoubleColonToken
+		| token =: DoubleColonToken
 		  	# (tspec, pState) = wantSymbolType pState
 			| isDclContext parseContext
 				# (specials, pState) = optionalFunSpecials pState
@@ -558,16 +558,16 @@ where
 		combine_args [arg]	= arg
 		combine_args args	= PE_List args
 	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
-		# code_allowed  = definingToken == EqualToken
-		| isIclContext parseContext && isLocalContext parseContext && (definingToken == EqualToken || (definingToken == DefinesColonToken && isGlobalContext parseContext)) &&
+		# code_allowed = definingToken =: EqualToken
+		| isIclContext parseContext && isLocalContext parseContext && (definingToken =: EqualToken || (definingToken =: DefinesColonToken && isGlobalContext parseContext)) &&
 				not (isClassOrInstanceDefsContext parseContext)
 		  	# (token, pState) = nextToken FunctionContext pState
-			| code_allowed && token == CodeToken
+			| code_allowed && token =: CodeToken
 				# (rhs, pState) = wantCodeRhs pState
 				= (PD_Function pos name False [] rhs (FK_Function cNameNotLocationDependent), pState)
 			# pState = tokenBack pState
 			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact definingToken) (tokenBack pState)
-			| token == EqualToken
+			| token =: EqualToken
 				= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
 			// otherwise // token == DefinesColonToken
  				| isGlobalContext parseContext
@@ -575,9 +575,9 @@ where
 				// otherwise
 					= (PD_NodeDef pos (PE_Ident name) rhs, pState)
 	want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
-		# code_allowed  = token == EqualToken || token == DoubleArrowToken
+		# code_allowed = token =: EqualToken || token =: DoubleArrowToken
 		  (token, pState) = nextToken FunctionContext pState
-		| isIclContext parseContext && token == CodeToken
+		| isIclContext parseContext && token =: CodeToken
 			# (rhs, pState) = wantCodeRhs pState
 			| code_allowed
 				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), pState)
@@ -826,7 +826,7 @@ where
 			= case token of
 				IdentToken name
 					# (token, pState) = nextToken FunctionContext pState
-					| CloseToken == token
+					| token =: CloseToken
 						-> (True, name, True, pState)
 						-> (False, abort "no name", False, tokenBack (tokenBack (tokenBack pState)))
 				_
@@ -859,7 +859,7 @@ where
 	want_rhs_of_instance_member_def opt_name (PriorityToken prio) pos pState
 		# (name,_,pState) = check_name_and_fixity opt_name cHasPriority pState
 		  (token, pState) = nextToken TypeContext pState
-		| token == DoubleColonToken
+		| token =: DoubleColonToken
 		  	# (tspec, pState) = wantSymbolType pState
 			  (token, pState) = nextToken TypeContext pState
 			  (fun_specials,pState) = optionalCode token pState
@@ -887,7 +887,7 @@ check_name_and_fixity (Yes (name,is_infix)) hasprio pState
 optionalSpecials :: !ParseState -> (!Specials, !ParseState)
 optionalSpecials pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == SpecialToken
+	| token =: SpecialToken
 		# (specials, pState) = wantSpecials pState
 		= (SP_ParsedSubstitutions specials, pState)
 		= (SP_None, tokenBack pState)
@@ -932,7 +932,7 @@ where
 		# pState = wantToken GeneralContext "specials" EqualToken pState
 		  (type, pState) = want pState
 		  (token, pState) = nextToken GeneralContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (next_type_var, pState) = want pState
 			  (substs, pState) = want_rest_substitutions next_type_var pState
 			= ([{ bind_src = type, bind_dst = type_var } : substs], pState)
@@ -945,12 +945,12 @@ where
 				_				->	(token, pState)
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		| ss_useLayout
-			| token == CurlyOpenToken 
+			| token =: CurlyOpenToken
 				= parseError "substitution" (Yes CurlyOpenToken) "in layout mode the keyword where is" pState
 			// otherwise
 				= tokenBack pState
 		// not ss_useLayout
-			| token == CurlyOpenToken 
+			| token =: CurlyOpenToken
 				= pState
 			// otherwise
 				= tokenBack (parseError "substitution" (Yes token) "{" pState) 
@@ -958,14 +958,14 @@ where
 	end_special_group pState
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		  (token, pState) = nextToken FunctionContext pState
-		| token == EndOfFileToken && ss_useLayout
+		| token =: EndOfFileToken && ss_useLayout
 			= tokenBack pState
 		| ss_useLayout
 			= case token of
 				EndGroupToken	->	pState
 				_				->	parseError "substitution" (Yes token) "end of substitution with layout" pState
 		// ~ ss_useLayout
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			= pState
 		// otherwise // token <> CurlyCloseToken
 			= parseError "substitution" (Yes token) "end of substitution with layout, }," pState
@@ -1022,14 +1022,14 @@ where
 		= case token of
 			IdentToken name
 				#	(token, pState)	= nextToken CodeContext pState
-				|	token == EqualToken
+				|	token =: EqualToken
 					#	(token, pState)	= nextToken CodeContext pState
 					->	case token of
 							IdentToken value
 								#	(ident, pState)	= stringToIdent name IC_Expression pState
 									acc				= [{ bind_dst = ident, bind_src = value }: acc]
 									(token, pState)	= nextToken CodeContext pState
-								|	token == CommaToken
+								|	token =: CommaToken
 									->	want_bindings acc mayBeEmpty pState
 								//	token <> CommaToken
 									->	(reverse acc, tokenBack pState)
@@ -1079,15 +1079,15 @@ isDefiningSymbol :: RhsDefiningSymbol Token -> Bool
 isDefiningSymbol (RhsDefiningSymbolExact wanted) observed
 	=	wanted == observed
 isDefiningSymbol RhsDefiningSymbolCase observed
-	=	observed == EqualToken || observed == ArrowToken
+	=	observed =: EqualToken || observed =: ArrowToken
 isDefiningSymbol RhsDefiningSymbolRule observed
-	=	observed == EqualToken || observed == DoubleArrowToken
+	=	observed =: EqualToken || observed =: DoubleArrowToken
 isDefiningSymbol RhsDefiningSymbolGlobalFunctionOrMacro observed
-	=	observed == EqualToken || observed == ColonDefinesToken || observed == DefinesColonToken || observed == DoubleArrowToken
+	=	observed =: EqualToken || observed =: ColonDefinesToken || observed =: DefinesColonToken || observed =: DoubleArrowToken
 isDefiningSymbol RhsDefiningSymbolRuleOrMacro observed
-	=	observed == EqualToken || observed == ColonDefinesToken || observed == DoubleArrowToken
+	=	observed =: EqualToken || observed =: ColonDefinesToken || observed =: DoubleArrowToken
 isDefiningSymbol RhsDefiningSymbolGlobalFunction observed
-	=	observed == EqualToken || observed == ColonDefinesToken || observed == DefinesColonToken
+	=	observed =: EqualToken || observed =: ColonDefinesToken || observed =: DefinesColonToken
 
 definingSymbolToFunKind :: RhsDefiningSymbol -> FunKind
 definingSymbolToFunKind (RhsDefiningSymbolExact defining_token)
@@ -1117,17 +1117,17 @@ where
 	want_FunctionBody BarToken nodeDefs alts definingSymbol pState
 		#	(file_name, line_nr, pState)= getFileAndLineNr pState
 			(token, pState)				= nextToken FunctionContext pState
-		|	token == OtherwiseToken
+		|	token =: OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
-		|	token == LetToken True
+		|	token =: LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
 			=	root_expression token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantExpressionT token pState
 			(token, pState)				= nextToken FunctionContext pState
 			(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
-		|	token == BarToken // nested guard
+		|	token =: BarToken // nested guard
 			#	(position, pState)			= getPosition pState
 				offside						= position.fp_col
 				(expr, definingSymbol, pState)
@@ -1190,17 +1190,17 @@ where
 //		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
 		#	(file_name, line_nr, pState)= getFileAndLineNr pState
 			(token, pState)				= nextToken FunctionContext pState
-		|	token == OtherwiseToken
+		|	token =: OtherwiseToken
 			#	(token, pState)				= nextToken FunctionContext pState
 				(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
 			= want_FunctionBody token (nodeDefs ++ nodeDefs2) alts definingSymbol pState // to allow | otherwise | c1 = .. | c2 = ..
-		|	token == LetToken True
+		|	token =: LetToken True
 			#	pState	= parseError "RHS" No "No 'let!' in this version of Clean" pState
 			=	root_expression True token nodeDefs (reverse alts) definingSymbol pState
 		#	(guard, pState)				= wantExpressionT token pState
 			(token, pState)				= nextToken FunctionContext pState
 			(nodeDefs2, token, pState)	= want_LetBefores token localsExpected pState
-		|	token == BarToken // nested guard
+		|	token =: BarToken // nested guard
 			#	(position, pState)			= getPosition pState
 				offside						= position.fp_col
 				(expr, definingSymbol, pState)
@@ -1287,7 +1287,7 @@ where
 	opt_End_Group token pState
 	 #	(ss_useLayout, pState) = accScanState UseLayout pState
 	 |	ss_useLayout
-	 	| token == EndGroupToken
+		| token =: EndGroupToken
 	 		= nextToken FunctionContext pState
 	 	// otherwise // token <> EndGroupToken
 	 		= (ErrorToken "End group missing in let befores", parseError "RHS: Let befores" (Yes token) "Generated End Group (due to layout)" pState)
@@ -1302,7 +1302,7 @@ where
 				| isLowerCaseName name
 					# (id, pState) = stringToIdent name IC_Expression pState
 					# (token, pState) = nextToken FunctionContext pState
-					| token == DefinesColonToken
+					| token =: DefinesColonToken
 						# (succ, expr, pState) = trySimplePattern pState
 						| succ
 							# lhs_exp = PE_Bound { bind_dst = id, bind_src = expr }
@@ -1311,7 +1311,7 @@ where
 							  lhs_exp = PE_Empty
 							-> parse_let_rhs lhs_exp pState
 
-					| token == AndToken
+					| token =: AndToken
 						# lhs_exp = PE_Ident id
 						  (file_name, line_nr, pState) = getFileAndLineNr pState
 						  (token, pState) = nextToken FunctionContext pState
@@ -1362,7 +1362,7 @@ optionalLocals dem_token localsExpected pState
 	| dem_token == off_token
 		= wantLocals pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
-	| off_token == CurlyOpenToken && ~ ss_useLayout && localsExpected
+	| off_token =: CurlyOpenToken && ~ ss_useLayout && localsExpected
 		= wantLocals (tokenBack pState)
 	// otherwise
 		= (LocalParsedDefs [], tokenBack pState)
@@ -1391,7 +1391,7 @@ wantModuleImports scanContext ident_class pState
 	  position = LinePos file_name line_nr
 	  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = import_qualified}
 	  (token, pState) = nextToken scanContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# (rest, pState) = wantModuleImports scanContext ident_class pState
 		= ([module_import : rest], pState)
 	= ([module_import], tokenBack pState)
@@ -1420,7 +1420,7 @@ where
 	wantImportDeclarationsT token pState
 		# (first, pState) = wantImportDeclarationT token pState
 		  (token, pState) = nextToken GeneralContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (rest, pState) = wantImportDeclarations pState
 			= ([first : rest], pState)
 			= ([first], tokenBack pState)
@@ -1428,7 +1428,7 @@ where
 instance want ImportedObject where
 	want pState
 		# (token, pState) = nextToken GeneralContext pState
-		| token == IdentToken "library"
+		| token =: IdentToken "library"
 	  		# (token, pState) = nextToken GeneralContext pState
 			= want_import_string token cIsImportedLibrary pState
 			= want_import_string token cIsImportedObject pState
@@ -1457,10 +1457,10 @@ wantImportDeclarationT token pState
 			# (name, pState)				= wantConstructorName "import type" pState
 			  (type_id, pState)				= stringToIdent name IC_Type pState
 			  (token, pState) = nextToken FunctionContext pState
-			| token == OpenToken
+			| token =: OpenToken
 			  	#	(conses, pState)			= want_names (wantConstructorName "import type (..)") IC_Expression CloseToken pState
 			  	->	(ID_Type type_id (IB_Idents conses), pState)
-			| token == CurlyOpenToken
+			| token =: CurlyOpenToken
 			  	#	(fields, pState) = want_names (wantLowerCaseName "import record fields") (IC_Field type_id) CurlyCloseToken pState
 			  	->	(ID_Record type_id (IB_Idents fields), pState)
 			  	->	(ID_Type type_id IB_None, tokenBack pState)
@@ -1468,7 +1468,7 @@ wantImportDeclarationT token pState
 			# (name, pState)				= want pState
 			  (class_id, pState)			= stringToIdent name IC_Class pState
 			  (token, pState) = nextToken FunctionContext pState
-			| token == OpenToken
+			| token =: OpenToken
 				# (members,default_members,pState) = want_class_members want name pState
 				| members=:[] || default_members=:[]
 					->	(ID_Class class_id (IB_Idents members), pState)
@@ -1497,7 +1497,7 @@ wantImportDeclarationT token pState
 where
 	want_names want_fun ident_kind close_token pState
 		# (token, pState) = nextToken FunctionContext pState
-		| token == DotDotToken
+		| token =: DotDotToken
 			= ([], wantToken FunctionContext "import declaration" close_token pState)
 			= want_list_of_names want_fun ident_kind close_token (tokenBack pState)
 
@@ -1505,7 +1505,7 @@ where
 		# (name, pState) = want_fun pState
 		  (name_id, pState)	= stringToIdent name ident_kind pState
 		  (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (names, pState) = want_list_of_names want_fun ident_kind close_token pState
 			= ([name_id : names], pState)
 		| token == close_token
@@ -1542,7 +1542,7 @@ where
 		
 	optional_extension pState
 		# (token, pState) = nextToken FunctionContext pState
-		| token == DotDotToken
+		| token =: DotDotToken
 			= (True, pState)
 			= (False, tokenBack pState)			
 
@@ -1564,7 +1564,7 @@ wantClassDefinition parseContext pos pState
 	  (class_arity, class_args, class_cons_vars) = convert_class_variables class_variables 0 0
 	  (contexts, pState) = optionalContext pState
   	  (token, pState) = nextToken TypeContext pState
-  	| token == DoubleColonToken
+	| token =: DoubleColonToken
 		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_cons_vars contexts pState
 	| might_be_a_class
 		# (begin_members, pState) = begin_member_group token pState
@@ -1598,14 +1598,14 @@ wantClassDefinition parseContext pos pState
 					SemicolonToken	->	nextToken TypeContext pState
 					_				->	(token, pState)
 			# (ss_useLayout, pState) = accScanState UseLayout pState
-			| token == WhereToken
+			| token =: WhereToken
 				# (token, pState) = nextToken TypeContext pState
-				| token == CurlyOpenToken
+				| token =: CurlyOpenToken
 					| ss_useLayout
 						= (True, parseError "class definition" No "No { in layout mode" pState) 
 						= (True, pState)
 					= (True, tokenBack pState)
-			| token == CurlyOpenToken 
+			| token =: CurlyOpenToken
 				| ss_useLayout
 					= (True, parseError "class definition" (Yes CurlyOpenToken) "in layout mode the keyword where is" pState) 
 					= (True, pState)
@@ -1614,7 +1614,7 @@ wantClassDefinition parseContext pos pState
 		want_class_or_member_name pState 
 // PK			# (token, pState) = nextToken TypeContext pState
 			# (token, pState) = nextToken GeneralContext pState
-			| token == OpenToken
+			| token =: OpenToken
 				# (member_name, pState) = want pState
 				  pState = wantToken GeneralContext "class definition" CloseToken pState
 				  (token, pState) = nextToken FunctionContext pState
@@ -1643,7 +1643,7 @@ wantClassDefinition parseContext pos pState
 
 		try_class_variable pState
 			# (token, pState) = nextToken TypeContext pState
-			| token == DotToken
+			| token =: DotToken
 				# (type_var, pState) = wantTypeVar pState
 				= (True, (True, type_var), pState)
 			# (succ, type_var, pState) = tryTypeVarT token pState
@@ -1701,7 +1701,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 										  pi_specials = SP_None, pi_pos = pi_pos},
 								pim_members = pi_members}, pState)
 		// otherwise // ~ (isIclContext parseContext)
-			| token == CommaToken
+			| token =: CommaToken
 				# (pi_types_and_contexts, pState)	= want_instance_types pState
 				  (idents, pState)		= mapSt (\ (type,_) -> stringToIdent class_name (IC_Instance type)) pi_types_and_contexts pState
 				= (PD_Instances
@@ -1752,7 +1752,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 	want_instance_types pState
 		# (type_and_context, pState) = want_instance_type pState
 		  (token, pState) = nextToken TypeContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (types, pState) = want_instance_types pState
 			= ([type_and_context:types], pState)
 		// otherwise // token <> CommaToken
@@ -1760,22 +1760,22 @@ wantInstanceDeclaration parseContext pi_pos pState
 
 	begin_member_group SemicolonToken pState
 		# (token, pState) = nextToken TypeContext pState
-		| token == WhereToken
+		| token =: WhereToken
 			= begin_member_group_where pState
-		| token == CurlyOpenToken
+		| token =: CurlyOpenToken
 			= begin_member_group_curly_open pState
 			= (False, tokenBack pState)
 	begin_member_group token pState
-		| token == WhereToken
+		| token =: WhereToken
 			= begin_member_group_where pState
-		| token == CurlyOpenToken
+		| token =: CurlyOpenToken
 			= begin_member_group_curly_open pState
 			= (False, pState)
 
 	begin_member_group_where pState
 		# (ss_useLayout, pState) = accScanState UseLayout pState
 		# (token, pState) = nextToken TypeContext pState
-		| token == CurlyOpenToken
+		| token =: CurlyOpenToken
 			| ss_useLayout
 				= (True, parseError "instance definition" No "No { in layout mode" pState) 
 				= (True, pState)
@@ -1790,14 +1790,14 @@ wantInstanceDeclaration parseContext pi_pos pState
 optionalContext :: !ParseState -> ([TypeContext],ParseState)
 optionalContext pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == BarToken
+	| token =: BarToken
 		= want_contexts pState
 		= ([], tokenBack pState)
 
 optional_constructor_context :: !ParseState -> ([TypeContext],ParseState)
 optional_constructor_context pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == AndToken
+	| token =: AndToken
 		= want_contexts pState
 		= ([], tokenBack pState)
 
@@ -1805,7 +1805,7 @@ want_contexts :: ParseState -> ([TypeContext],ParseState)
 want_contexts pState
 	# (contexts, pState) = want_context pState
 	  (token, pState) = nextToken TypeContext pState
-	| token == AndToken
+	| token =: AndToken
 		# (more_contexts, pState) = want_contexts pState
 		= (contexts ++ more_contexts, pState)
 		= (contexts, tokenBack pState)
@@ -1841,7 +1841,7 @@ where
 			IdentToken name 
 				# (token, pState) = nextToken GeneralContext pState
 				-> case token of
-					GenericOpenToken 
+					GenericOpenToken
 						# (ident, pState) = stringToIdent name IC_Generic pState			
 						# (kind, pState) = wantKind pState						 
 			 			# generic_global_ds = { glob_object = MakeDefinedSymbol ident NoIndex 1, glob_module = NoIndex }
@@ -1881,9 +1881,9 @@ where
 optionalCoercions :: !ParseState -> ([AttrInequality], ParseState)
 optionalCoercions pState 
 	# (token, pState) = nextToken TypeContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# (token, pState) = nextToken TypeContext pState
-		| token == SquareOpenToken
+		| token =: SquareOpenToken
 			# (inequals, pState) = want_inequalities pState
 			= (inequals, wantToken FunctionContext "coercions" SquareCloseToken pState)
 			= ([], parseError "Function type: coersions" (Yes token) "[" pState)
@@ -1893,7 +1893,7 @@ optionalCoercions pState
 			# (token, pState) = nextToken TypeContext pState
  			  (_, inequals, pState) = want_attr_inequality token pState
 			  (token, pState) = nextToken TypeContext pState
-			| token == CommaToken
+			| token =: CommaToken
 				# (more_inequals, pState) = want_inequalities pState
 				= (inequals ++ more_inequals, pState)
 				= (inequals, tokenBack pState)
@@ -1901,7 +1901,7 @@ optionalCoercions pState
 			| isLowerCaseName var_name
 				# (off_ident, pState) = stringToIdent var_name IC_TypeAttr pState
 				  (token, pState) = nextToken  TypeContext pState
-				| token == LessThanOrEqualToken
+				| token =: LessThanOrEqualToken
 					# (var_name, pState) = wantLowerCaseName "attribute inequality" pState
 					  (dem_ident, pState) = stringToIdent var_name IC_TypeAttr pState
 					  ai_demanded = makeAttributeVar dem_ident
@@ -1924,7 +1924,7 @@ wantGenericDefinition parseContext pos pState
 	# (name, pState) = want_name pState
 	| name == "" 
 		= (PD_Erroneous, pState)
-	# (ident, pState) = stringToIdent name IC_Generic/*IC_Class*/ pState
+	# (ident, pState) = stringToIdent name IC_Generic pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
 	# (gen_deps, pState) = optionalDependencies pState
@@ -2004,7 +2004,7 @@ where
 	want_derive_types :: String !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_types name pState
 		# (derive_def, token, pState) = want_derive_type name pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (derive_defs, pState) = want_derive_types name pState
 			= ([derive_def:derive_defs], pState)
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
@@ -2069,7 +2069,7 @@ where
 	want_derive_class_types class_ident pState
 		# (derive_def, pState) = want_derive_class_type class_ident pState
 		# (token, pState) = nextToken TypeContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (derive_defs, pState) = want_derive_class_types class_ident pState
 			= ([derive_def:derive_defs], pState)
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
@@ -2399,7 +2399,7 @@ where
 	want_constructor_list exi_vars token pState
 		# (cons,pState) = want_constructor exi_vars token pState
 		  (token, pState) = nextToken TypeContext pState
-		| token == BarToken
+		| token =: BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 			  (token, pState) = nextToken GeneralContext pState
 			  (cons_list, extensible_algebraic_type, pState) = want_constructor_list exi_vars token pState
@@ -2410,7 +2410,7 @@ where
 	want_more_constructors exi_vars token pState
 		# (cons,pState) = want_constructor exi_vars token pState
 		  (token, pState) = nextToken TypeContext pState
-		| token == BarToken
+		| token =: BarToken
 			# (exi_vars, pState) = optionalExistentialQuantifiedVariables pState
 			  (token, pState) = nextToken GeneralContext pState
 			  (cons_list, pState) = want_more_constructors exi_vars token pState
@@ -2497,7 +2497,7 @@ makeAttributeVar name :== { av_ident = name, av_info_ptr = nilPtr }
 optionalAnnot :: !ParseState -> (!Bool,!Annotation, !ParseState)
 optionalAnnot pState
    	# (token, pState) = nextToken TypeContext pState
-   	| token == ExclamationToken
+	| token =: ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
@@ -2521,7 +2521,7 @@ warnOptionalAnnot pState
 optionalAnnotWithPosition :: !ParseState -> (!Bool,!AnnotationWithPosition, !ParseState)
 optionalAnnotWithPosition pState
    	# (token, pState) = nextToken TypeContext pState
-   	| token == ExclamationToken
+	| token =: ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
@@ -2547,7 +2547,7 @@ warnOptionalAnnotWithPosition pState
 warnAnnotAndOptionalAttr :: !ParseState -> (!Bool, !TypeAttribute, !ParseState)
 warnAnnotAndOptionalAttr pState
    	# (token, pState) = nextToken TypeContext pState
-   	| token == ExclamationToken
+	| token =: ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
@@ -2561,7 +2561,7 @@ warnAnnotAndOptionalAttr pState
 optionalAnnotAndAttr :: !ParseState -> (!Bool, !Annotation, !TypeAttribute, !ParseState)
 optionalAnnotAndAttr pState
    	# (token, pState) = nextToken TypeContext pState
-   	| token == ExclamationToken
+	| token =: ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
@@ -2575,7 +2575,7 @@ optionalAnnotAndAttr pState
 optionalAnnotAndAttrWithPosition :: !ParseState -> (!Bool, !AnnotationWithPosition, !TypeAttribute, !ParseState)
 optionalAnnotAndAttrWithPosition pState
    	# (token, pState) = nextToken TypeContext pState
-   	| token == ExclamationToken
+	| token =: ExclamationToken
 	  	# (token, pState) = nextToken TypeContext pState
 // JVG added for strict lists:
 		| token==SquareCloseToken
@@ -2595,7 +2595,7 @@ tryAttribute AsteriskToken      pState = (True, TA_Unique, pState)
 tryAttribute (IdentToken name) pState
 	| isLowerCaseName name
   	# (token, pState) = nextToken TypeContext pState
-	| ColonToken == token
+	| token =: ColonToken
 		# (ident, pState) = stringToIdent name IC_TypeAttr pState
 		= (True, TA_Var (makeAttributeVar ident), pState)
 		= (False, TA_None, tokenBack (tokenBack pState))
@@ -2610,7 +2610,7 @@ wantFields :: !Ident !*ParseState -> (![ParsedSelector], !*ParseState)
 wantFields record_type pState
 	# (field, pState) = want_field record_type pState
 	  (token, pState) = nextToken TypeContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# (fields, pState) = wantFields record_type pState
 		= ([field : fields], pState)
 		= ([field], tokenBack pState)
@@ -2895,7 +2895,7 @@ tryAnnotatedAType attr pState
 	| isEmpty types
 		= (False, {at_attribute = attr, at_type = TE}, pState)
 	# (token, pState)		= nextToken TypeContext pState
-	| token == ArrowToken
+	| token =: ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
 		  atype = make_curry_type attr types rtype
 		= ( True, atype, pState)
@@ -3043,7 +3043,7 @@ tryAType pState
 			= (False, {at_attribute = TA_None, at_type = TFA vars TE}
 			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
 	# (token, pState)		= nextToken TypeContext pState
-	| token == ArrowToken
+	| token =: ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
 		  atype = make_curry_type TA_None types rtype
 		| isEmpty vars
@@ -3066,7 +3066,7 @@ tryAType_strictness_ignored attr pState
 			= (False, {at_attribute = attr, at_type = TFA vars TE}
 			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
 	# (token, pState)		= nextToken TypeContext pState
-	| token == ArrowToken
+	| token =: ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
 		  atype = make_curry_type attr types rtype
 		| isEmpty vars
@@ -3185,7 +3185,7 @@ trySimpleTypeT SquareOpenToken attr pState
 				= (HeadUnboxed,token,pState)
 			wantHeadStrictness token pState
 				= (HeadLazy,token,pState)
-	| token == SquareCloseToken
+	| token =: SquareCloseToken
 		| head_strictness==HeadStrict
 			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
 			| tail_strict
@@ -3195,8 +3195,7 @@ trySimpleTypeT SquareOpenToken attr pState
 		  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 		# list_symbol = makeListTypeSymbol head_strictness 0
   		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
-
-	| token==ExclamationToken
+	| token=:ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
 			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
@@ -3205,11 +3204,10 @@ trySimpleTypeT SquareOpenToken attr pState
 
 	# (type, pState)	= wantAType_strictness_ignored (tokenBack pState)
 	  (token, pState)	= nextToken TypeContext pState
-	| token == SquareCloseToken
+	| token =: SquareCloseToken
 		# list_symbol = makeListTypeSymbol head_strictness 1
 		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
-
-	| token==ExclamationToken
+	| token=:ExclamationToken
 		# (token,pState) = nextToken TypeContext pState
 		| token==SquareCloseToken
 			# list_symbol = makeTailStrictListTypeSymbol head_strictness 1
@@ -3223,12 +3221,12 @@ trySimpleTypeT OpenToken attr pState
 	= trySimpleTypeT_after_OpenToken token attr pState
 trySimpleTypeT CurlyOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == CurlyCloseToken
+	| token =: CurlyCloseToken
 		# array_symbol = makeLazyArraySymbol 0
 		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-	| token == HashToken
+	| token =: HashToken
 		# (token, pState) = nextToken TypeContext pState
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
@@ -3236,9 +3234,9 @@ trySimpleTypeT CurlyOpenToken attr pState
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
   			  array_symbol = makeUnboxedArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
-	| token == ExclamationToken
+	| token =: ExclamationToken
 		# (token, pState) = nextToken TypeContext pState
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			# array_symbol = makeStrictArraySymbol 0
 			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
@@ -3246,10 +3244,10 @@ trySimpleTypeT CurlyOpenToken attr pState
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
-	| token == IntToken "32"
+	| token =: IntToken "32"
 		# pState = wantToken TypeContext "packed array type" HashToken pState
 		# (token, pState) = nextToken TypeContext pState
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			# array_symbol =  makePackedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
@@ -3296,14 +3294,14 @@ trySimpleTypeT_after_OpenToken CommaToken attr pState
 	determine_arity_of_tuple :: !Int !ParseState -> (!Int, !ParseState)
 	determine_arity_of_tuple arity pState
 		# (token, pState) = nextToken TypeContext pState
-		| CommaToken == token
+		| token =: CommaToken
   			= determine_arity_of_tuple (inc arity) pState
-		| CloseToken == token
+		| token =: CloseToken
 			= (arity, pState)
 			= (arity, parseError "tuple type" (Yes token) ")" pState)
 trySimpleTypeT_after_OpenToken ArrowToken attr pState
 	# (token, pState) = nextToken TypeContext pState
-	| token == CloseToken
+	| token =: CloseToken
 		= (ParseOk, {at_attribute = attr, at_type = TArrow}, pState)
 		= (ParseFailWithError,{at_attribute = attr, at_type = TE},
 			parseError "arrow type" (Yes token) ")" pState)
@@ -3530,7 +3528,7 @@ wantExpressionT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
 wantExpressionT DynamicToken pState
 	# (dyn_expr, pState) = wantExpression pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == DoubleColonToken
+	| token =: DoubleColonToken
 		# (dyn_type, pState) = wantDynamicTypeInPattern/*wantDynamicTypeInExpression*/ pState
 		= (PE_Dynamic dyn_expr (Yes dyn_type), pState)
 		= (PE_Dynamic dyn_expr No, tokenBack pState)
@@ -3548,7 +3546,7 @@ wantPatternT  :: !Token !ParseState -> (!ParsedExpr, !ParseState)
 wantPatternT token pState
 	# (exp, pState)	= wantPatternT2 token pState
 	# (token, pState)	= nextToken FunctionContext pState
-	| token == DoubleColonToken
+	| token =: DoubleColonToken
 		# (dyn_type, pState) = wantDynamicTypeInPattern pState
 		= (PE_DynamicPattern exp dyn_type, pState)
 		= (exp, tokenBack pState)
@@ -3558,7 +3556,7 @@ where
 		| isLowerCaseName name
 			# (id, pState)		= stringToIdent name IC_Expression pState
 			  (token, pState)	= nextToken FunctionContext pState
-			| token == DefinesColonToken 
+			| token =: DefinesColonToken
 				# (token, pState)	= nextToken FunctionContext pState
 				= case token of
 					IdentToken name
@@ -3573,7 +3571,7 @@ where
 							->	(combineExpressions expr1 exprs, pState)
 						// not succ
 							-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
-			| token == DoubleColonToken
+			| token =: DoubleColonToken
 				# (dyn_type, pState) = wantDynamicTypeInPattern pState
 				= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
 			// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
@@ -3700,7 +3698,7 @@ wantSelectors :: Token *ParseState -> *(![ParsedSelection], !Token, !*ParseState
 wantSelectors token pState
 	# (selector, pState) = want_selector token pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == DotToken
+	| token =: DotToken
 		# (token, pState) = nextToken FunctionContext pState
 		  (selectors, token, pState) = wantSelectors token pState
 		= (selector ++ selectors, token, pState)
@@ -3716,7 +3714,7 @@ where
 	  			# (index_expr, pState) = wantExpression pState
 				  selector = PS_Array index_expr
 	  			  (token, pState) = nextToken  FunctionContext pState
-				| token == CommaToken
+				| token =: CommaToken
 					# (selectors, pState) = want_array_selectors pState
 					= ([selector : selectors], pState)
 					= ([selector], tokenBack pState)
@@ -3756,7 +3754,7 @@ trySimplePatternT (IdentToken name) pState
 	# (id, pState) = stringToIdent name IC_Expression pState
 	| isLowerCaseName name
 		# (token, pState) = nextToken FunctionContext pState
-		| token == DefinesColonToken
+		| token =: DefinesColonToken
 			# (succ, expr, pState) = trySimplePattern pState
 			| succ
 				= (True, PE_Bound { bind_dst = id, bind_src = expr }, pState)
@@ -3798,7 +3796,7 @@ where
 
 	want_pattern_list_rest expr pState
 		# (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (exprs, pState) = want_pattern_list pState
 			= ([expr : exprs], pState)
 			= ([expr], tokenBack pState)
@@ -3853,7 +3851,7 @@ where
 	want_pattern_list pState
 		# (expr, pState) = wantPatternWithoutDefinitions pState
 		  (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (exprs, pState) = want_pattern_list pState
 			= ([expr : exprs], pState)
 			= ([expr], tokenBack pState)
@@ -3886,7 +3884,7 @@ trySimpleExpressionT :: !Token !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimpleExpressionT (IdentToken name) pState
 	# (id, pState) = stringToIdent name IC_Expression pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == GenericOpenToken
+	| token =: GenericOpenToken
 		# (kind, pState) = wantKind pState	
 		= (True, PE_Generic id kind, pState)
 		= (True, PE_Ident id, tokenBack pState)
@@ -3926,7 +3924,7 @@ where
 
 	want_expression_list_rest expr pState
 		# (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (exprs, pState) = want_expression_list pState
 			= ([expr : exprs], pState)
 			= ([expr], tokenBack pState)
@@ -4036,12 +4034,12 @@ wantListPatternWithoutDefinitions pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
+	| token=:ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness cIsAPattern,pState)
 			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| token==SquareCloseToken
+	| token=:SquareCloseToken
 		| head_strictness==HeadUnboxedAndTailStrict
 			= (makeTailStrictNilExpression HeadUnboxed cIsAPattern,pState)
 		| head_strictness==HeadStrict
@@ -4133,12 +4131,12 @@ wantListExp is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token==ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
+	| token=:ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness is_pattern,pState)
 			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| token==SquareCloseToken
+	| token=:SquareCloseToken
 		| head_strictness==HeadUnboxedAndTailStrict
 			= (makeTailStrictNilExpression HeadUnboxed is_pattern,pState)
 		| head_strictness==HeadStrict
@@ -4413,7 +4411,7 @@ wantQualifiers :: !ParseState -> (![Qualifier], !ParseState)
 wantQualifiers pState
 	# (qual, pState) = want_qualifier pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# (quals, pState) = wantQualifiers pState
 		= ([qual : quals], pState)
 		= ([qual], tokenBack pState)
@@ -4424,11 +4422,11 @@ where
 		  (qual_filename, pState) = accScanState getFilename pState
 		  (lhs_expr, pState) = wantPattern pState
 		  (token, pState) = nextToken FunctionContext pState
-		| token == LeftArrowToken
+		| token =: LeftArrowToken
 			= want_generators IsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
-		| token == LeftArrowColonToken
+		| token =: LeftArrowColonToken
 			= want_generators IsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
-		| token == LeftArrowWithBarToken
+		| token =: LeftArrowWithBarToken
 			= want_generators IsOverloadedListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
 			= ({qual_generators = [], qual_let_defs=LocalParsedDefs [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)
@@ -4440,7 +4438,7 @@ where
 		  (token, pState) = nextToken FunctionContext pState
 		  generator = { gen_kind = gen_kind, gen_expr = gen_expr, gen_pattern = pattern_exp,
 						gen_position = toLineAndColumn gen_position }
-		| token == AndToken
+		| token =: AndToken
 			# (qualifier, pState) = want_qualifier pState
 			= ({qualifier & qual_generators = [ generator : qualifier.qual_generators] }, pState)
 			# (let_defs,filter,pState)= parse_optional_lets_and_filter token pState
@@ -4505,7 +4503,7 @@ where
 			  pState			= tokenBack pState
 			  (rhs, _, pState) = wantRhs True definingSymbol pState
 			= (True, { calt_pattern = PE_WildCard, calt_rhs = rhs, calt_position=LinePos fname linenr }, pState)
-		| token == OtherwiseToken
+		| token =: OtherwiseToken
 			# (token, pState)	= nextToken FunctionContext pState
 			  (fname,linenr,pState) = getFileAndLineNr pState
 			  pState			= tokenBack pState
@@ -4526,7 +4524,7 @@ where
 				# (exprs, pState) = parseList trySimplePattern pState
 				# list = PE_List [expr,expr2 : exprs]
 				# (token, pState)	= nextToken FunctionContext pState
-				| token == DoubleColonToken
+				| token =: DoubleColonToken
 					# (dyn_type, pState) = wantDynamicTypeInPattern pState
 					= (True, PE_DynamicPattern list dyn_type, pState)
 					= (True, list, tokenBack pState)
@@ -4566,10 +4564,10 @@ wantRecordOrArrayExp :: !Bool !ParseState -> (ParsedExpr, !ParseState)
 wantRecordOrArrayExp is_pattern pState
 	| is_pattern
 		# (token, pState) = nextToken FunctionContext pState
-		| token == SquareOpenToken
+		| token =: SquareOpenToken
 			# (elems, pState) =  want_array_assignments pState
 			= (PE_ArrayPattern elems, wantToken FunctionContext "array selections in pattern" CurlyCloseToken pState)
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			= (PE_Empty, parseError "record or array pattern" No "Array denotation not" pState)
 		// otherwise // is_pattern && token <> SquareOpenToken
 			= want_record_pattern token pState
@@ -4591,11 +4589,11 @@ wantRecordOrArrayExp is_pattern pState
 					# (succ, field, pState) = try_field_assignment token pState
 					| succ
 						# (token, pState) = nextToken FunctionContext pState
-						| token == CommaToken
+						| token =: CommaToken
 							# (token, pState) = nextToken FunctionContext pState
 							  (fields, pState) = want_field_assignments cIsNotAPattern token pState
 							-> (PE_Record PE_Empty NoRecordName [ field : fields ], wantToken FunctionContext "record or array" CurlyCloseToken pState)
-						| token == CurlyCloseToken
+						| token =: CurlyCloseToken
 							-> (PE_Record PE_Empty NoRecordName [ field ], pState)
 							-> (PE_Record PE_Empty NoRecordName [ field ], parseError "record or array" (Yes token) "}" pState)
 					# (is_32_hash,pState)
@@ -4613,10 +4611,10 @@ wantRecordOrArrayExp is_pattern pState
 						-> want_array_elems PackedArray pState
 					# (expr, pState) = wantExpressionT token pState
 					  (token, pState) = nextToken FunctionContext pState
-					| token == AndToken
+					| token =: AndToken
 						# (token, pState) = nextToken FunctionContext pState
 						-> want_record_or_array_update token expr pState
-					| token == DoubleBackSlashToken
+					| token =: DoubleBackSlashToken
 						-> wantArrayComprehension OverloadedArray expr pState
 					# (elems, pState) = want_more_array_elems token pState
 					-> (PE_ArrayDenot OverloadedArray [expr : elems], pState)
@@ -4625,11 +4623,11 @@ wantRecordOrArrayExp is_pattern pState
 where
 	want_array_elems array_kind pState
 		# (token, pState) = nextToken FunctionContext pState
-		| token == CurlyCloseToken
+		| token =: CurlyCloseToken
 			= (PE_ArrayDenot array_kind [], pState)
 			# (expr, pState) = wantExpressionT token pState
 			  (token, pState) = nextToken FunctionContext pState
-			| token == DoubleBackSlashToken
+			| token =: DoubleBackSlashToken
 				= wantArrayComprehension array_kind expr pState
 				# (elems, pState) = want_more_array_elems token pState
 				= (PE_ArrayDenot array_kind [expr:elems], pState)
@@ -4665,7 +4663,7 @@ where
 	try_type_specification (IdentToken type_name) pState
 		| isUpperCaseName type_name || isFunnyIdName type_name
 			# (token, pState) = nextToken FunctionContext pState
-			| token == BarToken
+			| token =: BarToken
 				# (type_id, pState) = stringToIdent type_name IC_Type pState
 				= (RecordNameIdent type_id, pState)
 				= (NoRecordName, tokenBack pState)
@@ -4673,7 +4671,7 @@ where
 	try_type_specification (QualifiedIdentToken module_name record_name) pState
 		| isUpperCaseName record_name || isFunnyIdName record_name
 			# (token, pState) = nextToken FunctionContext pState
-			| token == BarToken
+			| token =: BarToken
 				# (module_ident, pState) = stringToQualifiedModuleIdent module_name record_name IC_Type pState
 				= (RecordNameQualifiedIdent module_ident record_name, pState)
 				= (NoRecordName, tokenBack pState)
@@ -4692,7 +4690,7 @@ where
 	parse_updates token pState
 		# (update, pState) = want_update token pState
 		  (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (token, pState) = nextToken FunctionContext pState
 			  (updates, pState) = parse_updates token pState 
 			= ([update : updates], pState)
@@ -4702,7 +4700,7 @@ where
 	want_update :: Token ParseState -> (NestedUpdate, ParseState)
 	want_update token pState
 		# (selectors, token, pState) = wantSelectors token pState
-		| token == EqualToken
+		| token =: EqualToken
 			# (expr, pState) = wantExpression pState
 			= ({nu_selectors = selectors, nu_update_expr = expr}, pState)
 			= ({nu_selectors = selectors, nu_update_expr = PE_Empty}, parseError "field assignment" (Yes token) "=" pState)
@@ -4899,7 +4897,7 @@ want_more_field_assignments field_name_or_qualified_field_name is_pattern pState
 	# (field_expr, pState) = want_field_expression is_pattern pState
 	  field = { bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
 	#  (token, pState) = nextToken FunctionContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# (token, pState) = nextToken FunctionContext pState
 		  (fields, pState) = want_field_assignments is_pattern token pState 
 		= ([ field : fields ], pState)
@@ -4908,7 +4906,7 @@ want_more_field_assignments field_name_or_qualified_field_name is_pattern pState
 try_field_assignment (IdentToken field_name) pState
 	| isLowerCaseName field_name
 		# (token, pState) = nextToken FunctionContext pState
-		| token == EqualToken
+		| token =: EqualToken
 			# (field_expr, pState) = wantExpression pState
 			  (field_id, pState) = stringToIdent field_name IC_Selector pState
 			= (True, { bind_src = field_expr, bind_dst = FieldName field_id}, pState) 
@@ -4917,7 +4915,7 @@ try_field_assignment (IdentToken field_name) pState
 try_field_assignment (QualifiedIdentToken module_name field_name) pState
 	| isLowerCaseName field_name
 		# (token, pState) = nextToken FunctionContext pState
-		| token == EqualToken
+		| token =: EqualToken
 			# (field_expr, pState) = wantExpression pState
 			  (module_id, pState) = stringToIdent module_name (IC_Module NoQualifiedIdents) pState
 			= (True, { bind_src = field_expr, bind_dst = QualifiedFieldName module_id field_name}, pState) 
@@ -4928,7 +4926,7 @@ try_field_assignment _ pState
 
 want_field_expression is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == EqualToken
+	| token =: EqualToken
 		= wantExpressionOrPattern is_pattern pState
 		= (PE_Empty, tokenBack pState)
 
@@ -4951,7 +4949,7 @@ where
 wantRecordPatternWithoutDefinitions :: !ParseState -> (ParsedExpr, !ParseState)
 wantRecordPatternWithoutDefinitions pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == CurlyCloseToken
+	| token =: CurlyCloseToken
 		= (PE_Empty, parseError "record pattern" No "Array denotation not" pState)
 		= want_record_pattern_without_definitions token pState
 where
@@ -4989,7 +4987,7 @@ where
 		# (field_expr, pState) = wantPattern pState
 		  field = {bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
 		#  (token, pState) = nextToken FunctionContext pState
-		| token == CommaToken
+		| token =: CommaToken
 			# (token, pState) = nextToken FunctionContext pState
 			  (fields, pState) = want_field_assignments_without_definitions token pState 
 			= ([field : fields], pState)
@@ -5013,7 +5011,7 @@ want_update_without_curly_close type expr token pState
 		try_qualifiers :: !ParseState -> (![Qualifier], !ParseState)
 		try_qualifiers pState
 			# (token, pState) = nextToken FunctionContext pState
-			| token == DoubleBackSlashToken
+			| token =: DoubleBackSlashToken
 				= wantQualifiers pState
 				= ([], tokenBack pState)
 
@@ -5037,7 +5035,7 @@ want_record_or_array_update token expr pState
 want_array_assignments pState
 	# (assign, pState) = want_array_assignment pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == CommaToken
+	| token =: CommaToken
 		# pState = wantToken FunctionContext "array assignments" SquareOpenToken pState
 		  (assigns, pState) = want_array_assignments pState 
 		= ([ assign : assigns ], pState)
@@ -5052,7 +5050,7 @@ where
 	want_index_exprs pState
 		# (index_expr,  pState) = wantExpression pState
 		  (token, pState) = nextToken GeneralContext pState
-		| token==CommaToken
+		| token=:CommaToken
 			# (index_exprs, pState) = want_index_exprs pState
 			= ([index_expr:index_exprs], pState)
 		| token==SquareCloseToken
@@ -5078,7 +5076,7 @@ wantEndCodeRhs pState
 	| ss_useLayout
 		= wantEndOfDefinition "code rhs" pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == SemicolonToken
+	| token =: SemicolonToken
 		= pState
 		= tokenBack pState
 
@@ -5160,7 +5158,7 @@ wantEndRootExpression pState
 wantEndGroup :: String !ParseState -> ParseState
 wantEndGroup msg pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == EndOfFileToken
+	| token =: EndOfFileToken
 		= tokenBack pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
 	| ss_useLayout
@@ -5169,9 +5167,9 @@ wantEndGroup msg pState
 			InToken			->	tokenBack pState
 			_				->	parseError msg (Yes token) "end of group with layout" pState
 	// ~ ss_useLayout
-	| token == CurlyCloseToken
+	| token =: CurlyCloseToken
 		# (token, pState) = nextToken FunctionContext pState
-		| token == SemicolonToken
+		| token =: SemicolonToken
 			= pState
 			= tokenBack pState
 		= parseError msg (Yes token) "end of group without layout, }," pState
@@ -5179,10 +5177,10 @@ wantEndGroup msg pState
 wantEndModule :: !ParseState -> ParseState
 wantEndModule pState
 	# (token, pState) = nextToken FunctionContext pState
-	| token == EndOfFileToken
+	| token =: EndOfFileToken
 		= tokenBack pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
-	| ss_useLayout && token == EndGroupToken
+	| ss_useLayout && token =: EndGroupToken
 		= pState
 		= parseError "Definition" (Yes token) "Unexpected token in input: definition" pState
 
@@ -5191,7 +5189,7 @@ wantEndNestedGuard defaultFound offside pState
 	| ~ defaultFound
 		= parseError "nested guards" No "sorry, but for the time being there is a default alternative for nested guards" pState
 	# (token, pState)			= nextToken FunctionContext pState
-	| token == EndOfFileToken
+	| token =: EndOfFileToken
 		= tokenBack pState
 	# (ss_useLayout, pState)	= accScanState UseLayout pState
 	| ss_useLayout
@@ -5201,7 +5199,7 @@ wantEndNestedGuard defaultFound offside pState
 		// otherwise
 			= parseError "nested guards" (Yes token) "=, ->, | or # at offside position, or end of function definition" pState
 	// ~ ss_useLayout
-	| token == SemicolonToken
+	| token =: SemicolonToken
 		= pState
 	| defaultFound
 		= tokenBack pState
@@ -5218,7 +5216,7 @@ wantEndLocals :: !ParseState -> ParseState
 wantEndLocals pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == EndOfFileToken && ss_useLayout
+	| token =: EndOfFileToken && ss_useLayout
 		= tokenBack pState
 	| ss_useLayout
 		= case token of
@@ -5227,9 +5225,9 @@ wantEndLocals pState
 	//		InToken			->	tokenBack pState	// For let expressions with cases
 			_				->	parseError "local definitions" (Yes token) "end of locals with layout" pState
 	// ~ ss_useLayout
-	| token == CurlyCloseToken
+	| token =: CurlyCloseToken
 		# (token, pState) = nextToken FunctionContext pState
-		| token == SemicolonToken
+		| token =: SemicolonToken
 			= pState
 			= tokenBack pState
 	// otherwise // token <> CurlyCloseToken
@@ -5239,7 +5237,7 @@ wantEndCase :: !ParseState -> ParseState
 wantEndCase pState
 	# (ss_useLayout, pState) = accScanState UseLayout pState
 	  (token, pState) = nextToken FunctionContext pState
-	| token == EndOfFileToken
+	| token =: EndOfFileToken
 		= tokenBack pState
 	| ss_useLayout
 		= case token of
@@ -5253,7 +5251,7 @@ wantEndCase pState
 			CurlyCloseToken		->	tokenBack (appScanState dropOffsidePosition pState) // PK
 			_					->	parseError "case expression" (Yes token) "end of case with layout" pState
 	// ~ ss_useLayout
-	| token == CurlyCloseToken
+	| token =: CurlyCloseToken
 		= pState
 	// otherwise // token <> CurlyCloseToken
 		= parseError "case expression" (Yes token) "end of group without layout, }," pState
