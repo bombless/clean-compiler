@@ -1676,6 +1676,18 @@ wantInstanceDeclaration parseContext pi_pos pState
 		# ((pi_types, pi_context), pState) = want_instance_type pState
 		  (pi_ident, pState) = stringToIdent class_name (IC_Instance pi_types) pState
 		# (token, pState) = nextToken TypeContext pState
+		| token =: CommaToken
+			# (pi_types_and_contexts, pState)	= want_instance_types pState
+			  (idents, pState)		= mapSt (\ (type,_) -> stringToIdent class_name (IC_Instance type)) pi_types_and_contexts pState
+			= (PD_Instances
+				[ {	pim_pi = { pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
+							 , pi_specials = SP_None, pi_pos = pi_pos},
+					pim_members = [] }
+				\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
+				&	ident			<- [ pi_ident : idents ]
+				]
+			  , pState
+			  )
 		| isIclContext parseContext
 			# (begin_members, pState) = begin_member_group token pState
 			| not begin_members
@@ -1701,23 +1713,10 @@ wantInstanceDeclaration parseContext pi_pos pState
 										  pi_specials = SP_None, pi_pos = pi_pos},
 								pim_members = pi_members}, pState)
 		// otherwise // ~ (isIclContext parseContext)
-			| token =: CommaToken
-				# (pi_types_and_contexts, pState)	= want_instance_types pState
-				  (idents, pState)		= mapSt (\ (type,_) -> stringToIdent class_name (IC_Instance type)) pi_types_and_contexts pState
-				= (PD_Instances
-					[ {	pim_pi = { pi_class = pi_class, pi_ident = ident, pi_types = type, pi_context = context
-								 , pi_specials = SP_None, pi_pos = pi_pos},
-						pim_members = [] } 
-					\\	(type,context)	<- [ (pi_types, pi_context) : pi_types_and_contexts ]
-					&	ident			<- [ pi_ident : idents ]
-					]
-				  , pState
-				  )
-			// otherwise // token <> CommaToken
-				# (specials, pState) = optionalSpecials (tokenBack pState)
-				# pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types,
-							pi_context = pi_context, pi_specials = specials, pi_pos = pi_pos}
-				= want_optional_member_types pim_pi pState
+			# (specials, pState) = optionalSpecials (tokenBack pState)
+			# pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types,
+						pi_context = pi_context, pi_specials = specials, pi_pos = pi_pos}
+			= want_optional_member_types pim_pi pState
 
 	want_optional_member_types pim_pi pState
 		# (token, pState) = nextToken TypeContext pState
