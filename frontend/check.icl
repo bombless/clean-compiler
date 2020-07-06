@@ -2867,7 +2867,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 		# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
 		  (groups, icl_functions, macro_defs, var_heap, expr_heap, cs_symbol_table, cs_error)
-		  		= partitionateAndLiftFunctions (icl_global_functions_ranges++icl_instances_ranges++icl_generic_ranges++icl_type_fun_ranges)
+				= partitionateAndLiftFunctions (icl_global_functions_ranges++icl_generic_ranges) (icl_instances_ranges++icl_type_fun_ranges)
 		  				main_dcl_module_n predef_symbols_for_transform icl_mod.icl_functions macro_defs
 									  			heaps.hp_var_heap heaps.hp_expression_heap cs_symbol_table cs_error
 

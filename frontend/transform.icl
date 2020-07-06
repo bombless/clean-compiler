@@ -1218,22 +1218,31 @@ combine_consecutive_ranges [range]
 combine_consecutive_ranges []
 	= [!!]
 
-partitionateAndLiftFunctions :: ![IndexRange] !Index !PredefSymbolsForTransform !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
-																-> (!*{!Group}, !*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
-partitionateAndLiftFunctions ranges main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
-	# ranges = [range\\range<-ranges | range.ir_from<>range.ir_to]
-	# combined_ranges = combine_consecutive_ranges (sortBy (\ {ir_from=f1} {ir_from=f2} = f1<f2) ranges)
-	#! max_fun_nr = cMAXINT
-	# partitioning_info = {	ps_var_heap = var_heap, ps_symbol_heap = symbol_heap, ps_symbol_table = symbol_table, ps_fun_defs=fun_defs, ps_macro_defs=macro_defs,
+partitionateAndLiftFunctions :: ![IndexRange] ![IndexRange] !Index !PredefSymbolsForTransform
+											   !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
+								-> (!*{!Group},!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
+partitionateAndLiftFunctions ranges1 ranges2 main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
+	# ranges1 = remove_empty_ranges ranges1
+	  ranges2 = remove_empty_ranges ranges2
+	  combined_ranges = combine_consecutive_ranges (sortBy (\ {ir_from=f1} {ir_from=f2} = f1<f2) (ranges1++ranges2))
+	  max_fun_nr = cMAXINT
+	  partitioning_info = {	ps_var_heap = var_heap, ps_symbol_heap = symbol_heap, ps_symbol_table = symbol_table, ps_fun_defs=fun_defs, ps_macro_defs=macro_defs,
 							ps_error = error, ps_deps = [], ps_next_num = 0, ps_next_group = 0, ps_groups = [],
 							ps_unexpanded_dcl_macros=[] }
-	  {ps_groups, ps_symbol_table, ps_var_heap, ps_symbol_heap, ps_fun_defs, ps_macro_defs, ps_error,ps_unexpanded_dcl_macros}
-			= foldSt (partitionate_functions main_dcl_module_n max_fun_nr combined_ranges) ranges partitioning_info
-	# (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
-	# groups = { {group_members = group} \\ group <- reversed_ps_groups }
-	# macro_defs = restore_unexpanded_dcl_macros ps_unexpanded_dcl_macros ps_macro_defs
+	  partitioning_info	= partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges1 partitioning_info
+	  partitioning_info & ps_next_group = 1000000000
+	  partitioning_info	= partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges2 partitioning_info
+	  {ps_groups,ps_symbol_table,ps_var_heap,ps_symbol_heap,ps_fun_defs,ps_macro_defs,ps_error,ps_unexpanded_dcl_macros} = partitioning_info
+	  (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
+	  groups = {{group_members = group} \\ group <- reversed_ps_groups}
+	  macro_defs = restore_unexpanded_dcl_macros ps_unexpanded_dcl_macros ps_macro_defs
 	= (groups, fun_defs, macro_defs, ps_var_heap, ps_symbol_heap, ps_symbol_table, ps_error)
 where
+	remove_empty_ranges ranges = [range\\range<-ranges | range.ir_from<>range.ir_to]
+
+	partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges partitioning_info
+		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr combined_ranges) ranges partitioning_info
+
 	partitionate_functions mod_index max_fun_nr combined_ranges {ir_from,ir_to} ps
 		= iFoldSt (partitionate_global_function mod_index max_fun_nr combined_ranges) ir_from ir_to ps
 
@@ -1475,9 +1484,9 @@ where
 remove_macros_from_groups_and_reverse :: ![[FunctionOrMacroIndex]] !*{#FunDef} [[Int]] -> (![[Int]],!*{#FunDef})
 remove_macros_from_groups_and_reverse [group:groups] fun_defs result_groups
 	# (group,fun_defs) = remove_macros_from_group group fun_defs
-	= case group of
-		[]	-> remove_macros_from_groups_and_reverse groups fun_defs result_groups
-		_	-> remove_macros_from_groups_and_reverse groups fun_defs [group:result_groups]
+	| group=:[]
+		= remove_macros_from_groups_and_reverse groups fun_defs result_groups
+		= remove_macros_from_groups_and_reverse groups fun_defs [group:result_groups]
 where
 	remove_macros_from_group [FunctionOrIclMacroIndex fun:funs] fun_defs
 		# (funs,fun_defs)=remove_macros_from_group funs fun_defs

@@ -95,7 +95,6 @@ FIELD_NewType_Mask:==8;
 	, gs_dcl_modules :: !*DclModules
 	, gs_td_infos :: !*TypeDefInfos
 	, gs_funs :: !*{#FunDef}
-	, gs_groups :: {!Group}
 	// non-unique, read only
 	, gs_predefs :: !PredefinedSymbolsData
 	, gs_main_module :: !Index
@@ -150,18 +149,16 @@ convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_inf
 		, gs_avarh = th_attrs
 		, gs_error = error
 		, gs_funs = funs
-		, gs_groups = groups
 		, gs_predefs = {psd_predefs_a=predefs,psd_generic_newtypes=generic_newtypes}
 		, gs_main_module = main_dcl_module_n
 		, gs_used_modules = used_module_numbers
 		} 
 
-	# (dcl_macros, gs) = convert_generics dcl_macros gs
+	# (groups, dcl_macros, gs) = convert_generics groups dcl_macros gs
 
 	#	{ 	gs_modules = modules, gs_symtab, gs_dcl_modules = dcl_modules, gs_td_infos = td_infos, 
 			gs_genh = hp_generic_heap, gs_varh = hp_var_heap, gs_tvarh = th_vars, gs_avarh = th_attrs, 
-			gs_exprh = hp_expression_heap,	
-			gs_error = error, gs_funs = funs, gs_groups = groups,
+			gs_exprh = hp_expression_heap, gs_error = error, gs_funs = funs,
 			gs_predefs = predefs, gs_main_module = main_dcl_module_n, gs_used_modules = used_module_numbers} = gs
 	#! hash_table = { hash_table & hte_symbol_heap = gs_symtab }
 	#! heaps = 
@@ -172,20 +169,29 @@ convertGenerics main_dcl_module_n used_module_numbers modules groups funs td_inf
 		}
 	= (modules, groups, funs, td_infos, heaps, hash_table, u_predefs, dcl_modules, dcl_macros, error)
 where
-	convert_generics :: !*DclMacros !*GenericState -> (!*DclMacros, !*GenericState)
-	convert_generics dcl_macros gs
-		# (bimap_functions, gs) = buildGenericRepresentations gs
-		| not gs.gs_error.ea_ok = (dcl_macros, gs)
+	convert_generics :: !{!Group} !*DclMacros !*GenericState -> (!{!Group}, !*DclMacros, !*GenericState)
+	convert_generics groups dcl_macros gs
+		# (bimap_functions,new_groups,group_index,gs) = buildGenericRepresentations 500000000 gs
+		| not gs.gs_error.ea_ok
+			# (groups,gs_funs) = add_groups new_groups groups (group_index-500000000) gs.gs_funs
+			= (groups,dcl_macros, {gs & gs_funs=gs_funs})
 
 		# gs = buildClasses gs
-		| not gs.gs_error.ea_ok = (dcl_macros, gs)
+		| not gs.gs_error.ea_ok
+			# (groups,gs_funs) = add_groups new_groups groups (group_index-500000000) gs.gs_funs
+			= (groups,dcl_macros, {gs & gs_funs=gs_funs})
 
-		# (dcl_macros, gs) = convertGenericCases bimap_functions dcl_macros gs
-		| not gs.gs_error.ea_ok = (dcl_macros, gs)
+		# (new_groups, group_index, dcl_macros, gs) = convertGenericCases bimap_functions new_groups group_index dcl_macros gs
+
+		# (groups,gs_funs) = add_groups new_groups groups (group_index-500000000) gs.gs_funs
+		# gs & gs_funs=gs_funs
+
+		| not gs.gs_error.ea_ok
+			= (groups,dcl_macros, gs)
 
 		#! gs = convertGenericTypeContexts gs
 
-		= (dcl_macros, gs)
+		= (groups, dcl_macros, gs)
 
 determine_generic_newtypes :: !{#PredefinedSymbol} !{#CommonDefs} -> Int
 determine_generic_newtypes predefs_a modules_cd
@@ -289,12 +295,35 @@ instance_has_derived_member member_i ins_members gs_funs
 			= instance_has_derived_member (member_i+1) ins_members gs_funs
 		= False
 
+add_groups :: ![Group] !{!Group} !Int !*{#FunDef} -> (!{!Group},!*{#FunDef})
+add_groups new_groups gs_groups n_new_groups gs_funs
+	| n_new_groups==0
+		= (gs_groups,gs_funs)
+	# groups = createArray (size gs_groups+n_new_groups) {group_members=[]}
+	#! insert_group_i = find_first_group_with_index_ge_1000000000 0 gs_groups gs_funs
+	# groups & [i] = gs_groups.[i] \\ i<-[0..insert_group_i-1]
+	# groups = copy_new_groups new_groups (insert_group_i+n_new_groups-1) groups
+	# groups & [i+n_new_groups] = gs_groups.[i] \\ i<-[insert_group_i..size gs_groups-1]
+	= (groups,gs_funs)
+	where
+		find_first_group_with_index_ge_1000000000 :: !Int !{!Group} !{#FunDef} -> Int
+		find_first_group_with_index_ge_1000000000 i groups funs
+			| i<size groups
+				# [fun_i:_] = groups.[i].group_members
+				| funs.[fun_i].fun_info.fi_group_index>=1000000000
+					= i
+					= find_first_group_with_index_ge_1000000000 (i+1) groups funs
+				= i
+
+		copy_new_groups :: [Group] !Int !*{!Group} -> *{!Group}
+		copy_new_groups [g:gs] group_i groups = copy_new_groups gs (group_i-1) {groups & [group_i]=g}
+		copy_new_groups [] group_i groups = groups
+
 // generic representation is built for each type argument of
 // generic cases of the current module
-buildGenericRepresentations :: !*GenericState -> (!BimapFunctions,!*GenericState)
-buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
+buildGenericRepresentations :: !Int !*GenericState -> (!BimapFunctions,![Group],!Int,!*GenericState)
+buildGenericRepresentations group_index gs=:{gs_main_module, gs_modules, gs_funs}
 	#! size_funs = size gs_funs
-	#! size_groups = size gs_groups
 	#! ({com_gencase_defs,com_instance_defs}, gs) = gs!gs_modules.[gs_main_module]
 	
 	# undefined_function_and_ident = {fii_index = -1,fii_ident = undef}
@@ -304,18 +333,16 @@ buildGenericRepresentations gs=:{gs_main_module, gs_modules, gs_funs, gs_groups}
 				bimap_to_function = undefined_function_and_ident,
 				bimap_from_function = undefined_function_and_ident
 			}
-	  funs_and_groups = {fg_fun_index=size_funs, fg_group_index=size_groups, fg_funs=[], fg_groups=[],fg_bimap_functions=bimap_functions}
+	  funs_and_groups = {fg_fun_index=size_funs, fg_group_index=group_index, fg_funs=[], fg_groups=[],fg_bimap_functions=bimap_functions}
 	#! (funs_and_groups, gs)
 		= foldArraySt build_generic_representation com_gencase_defs (funs_and_groups, gs)
 
 	# (funs_and_groups, gs) = build_generic_representations_for_derived_instances 0 com_instance_defs funs_and_groups gs
 
-	# {fg_funs=new_funs,fg_groups=new_groups,fg_bimap_functions} = funs_and_groups 
-	# {gs_funs, gs_groups} = gs
-	#! gs_funs = arrayPlusRevList gs_funs new_funs
-	#! gs_groups = arrayPlusRevList gs_groups new_groups
+	# {fg_funs=new_funs,fg_groups=new_groups,fg_bimap_functions,fg_group_index} = funs_and_groups
+	# gs & gs_funs = arrayPlusRevList gs.gs_funs new_funs
 
-	= (fg_bimap_functions, {gs & gs_funs = gs_funs, gs_groups = gs_groups})
+	= (fg_bimap_functions,new_groups,fg_group_index,gs)
 where
 	build_generic_representation
 			{gc_type_cons=TypeConsSymb {type_index={glob_module,glob_object}, type_ident},gc_gcf,gc_pos}
@@ -2156,9 +2183,9 @@ add_instance_calls_to_GenTypeStruct GTSUnit member_symb_ident
 add_instance_calls_to_GenTypeStruct _ member_symb_ident
 	= GTSMemberCall member_symb_ident
 
-convertGenericCases :: !BimapFunctions !*DclMacros !*GenericState -> (!*DclMacros, !*GenericState)
-convertGenericCases bimap_functions dcl_macros
-		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_groups, gs_modules, gs_dcl_modules, gs_td_infos, 
+convertGenericCases :: !BimapFunctions ![Group] !Int !*DclMacros !*GenericState -> (![Group], !Int, !*DclMacros, !*GenericState)
+convertGenericCases bimap_functions new_groups group_index dcl_macros
+		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_modules, gs_dcl_modules, gs_td_infos, 
 			 gs_avarh, gs_tvarh, gs_varh, gs_genh, gs_exprh, gs_symtab, gs_error}
 
 	# heaps = 
@@ -2169,8 +2196,7 @@ convertGenericCases bimap_functions dcl_macros
 		}	
 
 	#! (first_fun_index, gs_funs) = usize gs_funs
-	#! first_group_index = size gs_groups
-	#! fun_info = {fg_fun_index=first_fun_index, fg_group_index=first_group_index, fg_funs=[], fg_groups=[], fg_bimap_functions=bimap_functions}
+	#! fun_info = {fg_fun_index=first_fun_index, fg_group_index=group_index, fg_funs=[], fg_groups=new_groups, fg_bimap_functions=bimap_functions}
 
 	#! (main_common_defs, gs_modules) = gs_modules ! [gs_main_module] 	
 	#! main_module_instances = main_common_defs.com_instance_defs
@@ -2191,9 +2217,8 @@ convertGenericCases bimap_functions dcl_macros
 	#! (gs_modules, gs_dcl_modules, (fun_info, instance_info, heaps, gs_error)) 
 		= build_shorthand_instances_in_modules 0 gs_modules gs_dcl_modules (fun_info, instance_info, heaps, gs_error)
 	
-	#! {fg_fun_index, fg_funs=new_funs, fg_groups=new_groups} = fun_info
+	#! {fg_fun_index, fg_funs=new_funs, fg_groups=new_groups,fg_group_index} = fun_info
 	#! gs_funs = arrayPlusRevList gs_funs new_funs
-	#! gs_groups = arrayPlusRevList gs_groups new_groups
 
 	#! (instance_index, new_instances) = instance_info
 	#! com_instance_defs = arrayPlusRevList main_module_instances new_instances
@@ -2202,10 +2227,10 @@ convertGenericCases bimap_functions dcl_macros
 	#! gs_modules = {gs_modules & [gs_main_module] = main_common_defs}
 	
 	# {hp_expression_heap, hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
-	# gs & gs_modules = gs_modules, gs_dcl_modules = gs_dcl_modules, gs_td_infos = gs_td_infos, gs_funs = gs_funs, gs_groups = gs_groups,
+	# gs & gs_modules = gs_modules, gs_dcl_modules = gs_dcl_modules, gs_td_infos = gs_td_infos, gs_funs = gs_funs,
 		   gs_avarh = th_attrs, gs_tvarh = th_vars, gs_varh = hp_var_heap, gs_genh = hp_generic_heap, gs_exprh = hp_expression_heap,
 		   gs_error = gs_error, gs_symtab = gs_symtab
-	= (dcl_macros, gs)
+	= (new_groups, fg_group_index, dcl_macros, gs)
 where
 	build_exported_main_instances_in_modules :: !Index
 			!*{#CommonDefs} !*{#DclModule} !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
