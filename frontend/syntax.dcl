@@ -322,8 +322,7 @@ cNameLocationDependent :== True
 	}
 
 ::	DclInstanceMemberTypeAndFunction = {
-		dim_type			:: !FunType,
-		dim_function_index	:: !MacroIndex // optional, -1 if no function
+		dim_type			:: !FunType
 	  }
 
 ::	IdentOrQualifiedIdent

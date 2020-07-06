@@ -269,7 +269,7 @@ where
 				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
 				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
 			= (icl_functions,comp_st)
-	member_types_equal [{dim_type=instance_member_type,dim_function_index}:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
+	member_types_equal [{dim_type=instance_member_type}:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
 		= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members icl_member_n icl_functions comp_st
 	where
 		member_type_and_types_equal instance_member_type=:{ft_ident,ft_type,ft_pos} instance_member_types icl_instance_members icl_member_n icl_functions comp_st
