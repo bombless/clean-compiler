@@ -190,11 +190,28 @@ where
 	has_to_be_checked (Yes ({copied_class_defs}, n_cached_dcl_mods)) {glob_module,glob_object}
 		= not (glob_module < n_cached_dcl_mods && glob_object < size copied_class_defs && copied_class_defs.[glob_object])
 
-	check_generic_default (DeriveDefault generic_ident _) module_index cs
+	check_generic_default (DeriveDefault generic_ident _ No) module_index cs
 		# (generic_index,cs) = get_generic_index generic_ident module_index cs
-		= (DeriveDefault generic_ident generic_index,cs)
+		= (DeriveDefault generic_ident generic_index No,cs)
+	check_generic_default (DeriveDefault generic_ident _ (Yes {igi_ident})) module_index cs
+		# (generic_index,cs) = get_generic_index generic_ident module_index cs
+		# (member_index,cs) = get_member_index igi_ident module_index cs
+		= (DeriveDefault generic_ident generic_index (Yes {igi_ident=igi_ident,igi_g_index=member_index}),cs)
 	check_generic_default me_default_implementation module_index cs
 		= (me_default_implementation,cs)
+
+	get_member_index :: !Ident !Index !*CheckState -> (!GlobalIndex, !*CheckState)
+	get_member_index {id_name,id_info} mod_index cs=:{cs_symbol_table}
+		# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
+		# cs & cs_symbol_table = cs_symbol_table
+		= case ste.ste_kind of
+			STE_Member
+				-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs)
+			STE_Imported STE_Member mod_index
+				-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs)
+			_
+				# cs & cs_error = checkError id_name "undefined class member" cs.cs_error
+				->	({gi_module=NoIndex,gi_index = NoIndex}, cs)
 
 ::	InstanceSymbols =
 	{	is_type_defs		:: !.{# CheckedTypeDef}
@@ -318,7 +335,7 @@ where
 					= check_icl_instance_members (class_member_n+1) instance_member_n member_mod_index ins_members ins_member_types_and_functions class_members class_ident ins_pos ins_type
 												instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 				| ins_member.cim_ident == class_member.ds_ident
-					| icl_functions.[ins_member.cim_index].fun_body=:GenerateInstanceBody _
+					| icl_functions.[ins_member.cim_index].fun_body=:GenerateInstanceBody _ _
 						# ins_member_types_and_functions = GenerateInstanceMember class_member_n ins_member.cim_index ins_member_types_and_functions
 						# (instance_types,icl_functions,member_defs,type_defs,modules,var_heap,type_heaps,cs)
 							= add_generated_instance ins_member.cim_index class_member member_mod_index ins_type instance_types icl_functions member_defs type_defs modules var_heap type_heaps cs
@@ -374,9 +391,9 @@ where
 						# (new_instance_member_ds,new_instance_member,cs)
 							= make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member function_n cs
 						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-					DeriveDefault generic_ident generic_index
+					DeriveDefault generic_ident generic_index optional_member_ident_global_index
 						# ins_member_types_and_functions = GenerateInstanceMember instance_member_n function_n ins_member_types_and_functions
-						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
 						# (new_instance_member_ds,new_instance_member,cs)
 							= make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member function_n cs
 						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
@@ -400,9 +417,9 @@ where
 						# (new_instance_member_ds,new_instance_member,cs)
 							= make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member n_icl_functions cs
 						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-					DeriveDefault generic_ident generic_index
+					DeriveDefault generic_ident generic_index optional_member_ident_global_index
 						# ins_member_types_and_functions = GenerateInstanceMember instance_member_n n_icl_functions ins_member_types_and_functions
-						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
 						# (new_instance_member_ds,new_instance_member,cs)
 							= make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member n_icl_functions cs
 						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
@@ -420,9 +437,13 @@ where
 			= getMemberDef member_mod_index class_member.ds_index x_main_dcl_module_n member_defs modules
 		  (instance_type,type_defs,modules,var_heap,type_heaps,cs)
 			= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
-		  ({fun_body=GenerateInstanceBody generic_ident},icl_functions) = icl_functions![ins_member_index]
+		  ({fun_body=GenerateInstanceBody generic_ident optional_member_ident},icl_functions) = icl_functions![ins_member_index]
 		  (generic_index,cs) = get_generic_index generic_ident x_main_dcl_module_n cs
-		  fun_body = GenerateInstanceBodyChecked generic_ident generic_index
+		  optional_member_ident_global_index
+			= case optional_member_ident of
+				No -> No
+				Yes member_ident -> Yes {igi_ident=member_ident,igi_g_index={gi_module=0,gi_index=0}}
+		  fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
 		  (fun,icl_functions) = icl_functions![ins_member_index];
 		  fun & fun_body = fun_body, fun_arity = class_member.ds_arity, fun_priority = me_priority
 		  icl_functions & [ins_member_index] = fun

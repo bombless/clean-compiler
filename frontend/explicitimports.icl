@@ -843,8 +843,11 @@ instance check_completeness MemberDef where
 		= check_completeness me_default_implementation cci (check_completeness me_type cci ccs)
 
 instance check_completeness MemberDefault where
-	check_completeness (DeriveDefault generic_ident {gi_module,gi_index}) cci ccs
+	check_completeness (DeriveDefault generic_ident {gi_module,gi_index} No) cci ccs
 		= check_whether_ident_is_imported generic_ident gi_module gi_index STE_Generic cci ccs
+	check_completeness (DeriveDefault generic_ident {gi_module,gi_index} (Yes {igi_ident,igi_g_index})) cci ccs
+		# ccs = check_whether_ident_is_imported generic_ident gi_module gi_index STE_Generic cci ccs
+		= check_whether_ident_is_imported igi_ident igi_g_index.gi_module igi_g_index.gi_index STE_Member cci ccs
 	check_completeness _ _ ccs
 		= ccs
 

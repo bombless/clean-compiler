@@ -271,7 +271,7 @@ cIsNotAFunction :== False
 	|	PD_Generic GenericDef
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
-	|	PD_DeriveInstanceMember Position Ident Ident
+	|	PD_DeriveInstanceMember Position Ident Ident (Optional Ident)
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -401,7 +401,10 @@ cNameLocationDependent :== True
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
-::	MemberDefault = NoMemberDefault | MacroMemberDefault !MacroMember | DeriveDefault !Ident !GlobalIndex
+::	MemberDefault
+	= NoMemberDefault
+	| MacroMemberDefault !MacroMember
+	| DeriveDefault !Ident !GlobalIndex !(Optional IdentGlobalIndex)
 
 ::	MemberDef =
 	{	me_ident		:: !Ident
@@ -722,9 +725,11 @@ FI_FusedMember :== 512			// used in module trans to mark fused versions of insta
 					| TransformedBody !TransformedBody
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| GeneratedBody // the body will be generated automatically - for generics
-					| GenerateInstanceBody !Ident
-					| GenerateInstanceBodyChecked !Ident !GlobalIndex
+					| GenerateInstanceBody !Ident !(Optional Ident)
+					| GenerateInstanceBodyChecked !Ident !GlobalIndex !(Optional IdentGlobalIndex)
 					| NoBody
+
+:: IdentGlobalIndex = { igi_ident :: !Ident, igi_g_index :: !GlobalIndex }
 
 ::	FunDef =
 	{	fun_ident		:: !Ident

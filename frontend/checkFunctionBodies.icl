@@ -368,10 +368,27 @@ where
 checkFunctionBodies GeneratedBody function_ident_for_errors e_input e_state e_info cs
 	= (GeneratedBody, [], e_state, e_info, cs)
 		//---> ("checkFunctionBodies: function to derive ", function_ident_for_errors)
-checkFunctionBodies (GenerateInstanceBodyChecked generic_ident generic_index) function_ident_for_errors e_input e_state e_info cs
-	= (GenerateInstanceBodyChecked generic_ident generic_index, [], e_state, e_info, cs)
-checkFunctionBodies (GenerateInstanceBody generic_ident) function_ident_for_errors e_input e_state e_info cs
-	= (GenerateInstanceBody generic_ident, [], e_state, e_info, cs)
+checkFunctionBodies (GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index) function_ident_for_errors e_input e_state e_info cs
+	# (optional_member_ident_global_index,cs)
+		= case optional_member_ident_global_index of
+			No
+				-> (No,cs)
+			Yes member_ident_global_index=:{igi_ident={id_info}}
+				# (entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
+				  cs & cs_symbol_table=cs_symbol_table
+				-> case entry of
+					{ste_kind=STE_Member,ste_index}
+						# member_ident_global_index & igi_g_index = {gi_module=e_input.ei_mod_index,gi_index=ste_index}
+						-> (Yes member_ident_global_index,cs)
+					{ste_kind=STE_Imported STE_Member mod_index,ste_index}
+						# member_ident_global_index & igi_g_index = {gi_module=mod_index,gi_index=ste_index}
+						-> (Yes member_ident_global_index,cs)
+					_
+						# cs & cs_error = checkError member_ident_global_index.igi_ident "undefined class member" cs.cs_error
+						-> (Yes member_ident_global_index,cs)
+	= (GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index, [], e_state, e_info, cs)
+checkFunctionBodies (GenerateInstanceBody generic_ident optional_member_ident) function_ident_for_errors e_input e_state e_info cs
+	= (GenerateInstanceBody generic_ident optional_member_ident, [], e_state, e_info, cs)
 checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
 	= abort ("checkFunctionBodies " +++ toString function_ident_for_errors +++ "\n")
 

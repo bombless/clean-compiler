@@ -376,7 +376,7 @@ instance collectFunctions FunDef where
 	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca
 		# (bodies, ca) = collectFunctions bodies icl_module ca
 		= ({fun_def & fun_body = ParsedBody bodies}, ca)
-	collectFunctions fun_def=:{fun_body = GenerateInstanceBody _} icl_module ca
+	collectFunctions fun_def=:{fun_body = GenerateInstanceBody _ _} icl_module ca
 		= (fun_def, ca)
 
 instance collectFunctions ParsedBody where
@@ -1544,10 +1544,17 @@ where
 		| bodies=:[]
 			# type & st_context = [type_context : st_context]
 			= case defs of
-				[PD_DeriveInstanceMember pos member_ident generic_ident:defs]
+				[PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident:defs]
 				  | member_ident.id_name==name.id_name
+					# default_implementation
+						= case optional_member_ident of
+							No
+								-> DeriveDefault generic_ident {gi_module=NoIndex,gi_index=NoIndex} No
+							Yes member_ident
+								# no_index = {gi_module=NoIndex,gi_index=NoIndex}
+								-> DeriveDefault generic_ident no_index (Yes {igi_ident=member_ident,igi_g_index=no_index})
 					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
-									me_default_implementation = DeriveDefault generic_ident {gi_module=NoIndex,gi_index=NoIndex},
+									me_default_implementation = default_implementation,
 									me_offset = NoIndex, me_class_vars = [], me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
@@ -1609,7 +1616,7 @@ where
 				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
 				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
-	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ : defs] type_context macro_count ca
+	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ _ : defs] type_context macro_count ca
 		= check_symbols_of_class_members defs type_context macro_count (postParseError pos "member type missing" ca)
 	check_symbols_of_class_members [def : _] type_context macro_count ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
@@ -1673,8 +1680,8 @@ where
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
-	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident : defs] ca
-		# fun_body = GenerateInstanceBody generic_ident
+	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident : defs] ca
+		# fun_body = GenerateInstanceBody generic_ident optional_member_ident
 		  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
 					 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 		  (fun_defs, ca) = collect_member_instances defs ca

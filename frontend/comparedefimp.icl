@@ -233,9 +233,14 @@ where
 
 	compare_default_implementations NoMemberDefault NoMemberDefault = True
 	compare_default_implementations (MacroMemberDefault _) (MacroMemberDefault _) = True
-	compare_default_implementations (DeriveDefault generic_ident1 generic_index1) (DeriveDefault generic_ident2 generic_index2)
-		= generic_index1==generic_index2 && generic_ident1==generic_ident2
+	compare_default_implementations (DeriveDefault generic_ident1 generic_index1 optional_member_ident1) (DeriveDefault generic_ident2 generic_index2 optional_member_ident2)
+		= generic_index1==generic_index2 && generic_ident1==generic_ident2 && compare_optional_member_ident optional_member_ident1 optional_member_ident2
 	compare_default_implementations _ _ = False
+
+	compare_optional_member_ident No No = True
+	compare_optional_member_ident (Yes member_ident1) (Yes member_ident2)
+		= member_ident1.igi_ident==member_ident2.igi_ident && member_ident1.igi_g_index==member_ident2.igi_g_index
+	compare_optional_member_ident _ _ = False
 
 	sort_clas_macro_members class_macro_members
 		= sort [id_name \\ {mm_ident={id_name}}<-:class_macro_members]
