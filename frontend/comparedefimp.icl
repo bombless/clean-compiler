@@ -259,17 +259,17 @@ where
 			= member_types_equal dcl_instance_def.ins_member_types_and_functions icl_instance_def.ins_members 0 icl_functions comp_st
 		= (icl_instance_defs,icl_functions,comp_st)
 
-	member_types_equal :: [DclInstanceMemberTypeAndFunction] {#ClassInstanceMember} Int *{#FunDef} *CompareState -> (!*{#FunDef},!*CompareState)
-	member_types_equal [] icl_instance_members icl_member_n icl_functions comp_st
+	member_types_equal :: DclInstanceMemberTypeAndFunctions {#ClassInstanceMember} Int *{#FunDef} *CompareState -> (!*{#FunDef},!*CompareState)
+	member_types_equal NoDclInstanceMemberTypes icl_instance_members icl_member_n icl_functions comp_st
 		| icl_member_n<size icl_instance_members
 			# function_index = icl_instance_members.[icl_member_n].cim_index
 			| icl_functions.[function_index].fun_info.fi_properties bitand FI_MemberInstanceRequiresTypeInDefMod<>0
 			  	# ({fun_ident,fun_pos},icl_functions) = icl_functions![function_index]
 				# comp_st = instance_def_conflicts_error fun_ident fun_pos comp_st
-				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
-				= member_types_equal [] icl_instance_members (icl_member_n+1) icl_functions comp_st
+				= member_types_equal NoDclInstanceMemberTypes icl_instance_members (icl_member_n+1) icl_functions comp_st
+				= member_types_equal NoDclInstanceMemberTypes icl_instance_members (icl_member_n+1) icl_functions comp_st
 			= (icl_functions,comp_st)
-	member_types_equal [{dim_type=instance_member_type}:instance_member_types] icl_instance_members icl_member_n icl_functions comp_st
+	member_types_equal (DclInstanceMemberTypes instance_member_type instance_member_types) icl_instance_members icl_member_n icl_functions comp_st
 		= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members icl_member_n icl_functions comp_st
 	where
 		member_type_and_types_equal instance_member_type=:{ft_ident,ft_type,ft_pos} instance_member_types icl_instance_members icl_member_n icl_functions comp_st

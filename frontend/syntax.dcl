@@ -203,7 +203,7 @@ instance == FunctionOrMacroIndex
 	, 	def_generic_cases 	:: ![GenericCaseDef]
 	}
 
-::	CommonDefs :== CommonDefsR DclInstanceMemberTypeAndFunction
+::	CommonDefs :== CommonDefsR DclInstanceMemberTypeAndFunctions
 
 ::	CommonDefsR member_types_and_functions =
 	{	com_type_defs 		:: !.{# CheckedTypeDef}
@@ -321,9 +321,9 @@ cNameLocationDependent :== True
 	,	sim_member_types	:: ![FunType]	// for .dcl
 	}
 
-::	DclInstanceMemberTypeAndFunction = {
-		dim_type			:: !FunType
-	  }
+::	DclInstanceMemberTypeAndFunctions
+	= DclInstanceMemberTypes !FunType !DclInstanceMemberTypeAndFunctions
+	| NoDclInstanceMemberTypes
 
 ::	IdentOrQualifiedIdent
 	= Ident !Ident
@@ -511,14 +511,14 @@ instance == GenericDependency
 	,	it_context		:: ![TypeContext]
 	}
 
-::	ClassInstance :== ClassInstanceR DclInstanceMemberTypeAndFunction
+::	ClassInstance :== ClassInstanceR DclInstanceMemberTypeAndFunctions
 
 ::	ClassInstanceR member_types_and_functions =
  	{	ins_class_index	:: !GlobalIndex
 	,	ins_class_ident	:: !ClassIdent
 	,	ins_ident		:: !Ident
 	,	ins_type		:: !InstanceType
-	,	ins_member_types_and_functions	:: ![member_types_and_functions]
+	,	ins_member_types_and_functions	:: !member_types_and_functions
 	,	ins_members		:: !{#ClassInstanceMember}
 	,	ins_specials	:: !Specials
 	,	ins_pos			:: !Position

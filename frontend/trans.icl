@@ -1,6 +1,6 @@
 implementation module trans
 
-import StdEnv, StdStrictLists
+import StdEnv
 
 import syntax, transform, checksupport, compare_types, utilities, expand_types, unitype, type
 import classify, partition
@@ -4384,7 +4384,7 @@ mark_fused_members_of_specialized_instances {dcl_module_kind=MK_None} main_dcl_m
 mark_fused_members_of_specialized_instances {dcl_common={com_instance_defs},dcl_sizes} main_dcl_module_n instances common_defs fun_heap fun_defs
 	= mark_fused_members_of_instances dcl_sizes.[cInstanceDefs] com_instance_defs instances common_defs fun_heap fun_defs
 where
-	mark_fused_members_of_instances :: !Int !{#ClassInstanceR .DclInstanceMemberTypeAndFunction} !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
+	mark_fused_members_of_instances :: !Int !{#ClassInstance} !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
 	mark_fused_members_of_instances instance_i instance_defs instances common_defs fun_heap fun_defs
 		| instance_i<size instance_defs
 			# instance_def=:{ins_specials} = instance_defs.[instance_i]

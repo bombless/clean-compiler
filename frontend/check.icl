@@ -104,13 +104,13 @@ where
 			# (instance_def, instance_defs) = instance_defs![inst_index]
 			  (ins_member_types, type_defs, class_defs, modules, heaps, cs)
 				= check_function_types instance_def.ins_member_types_and_functions module_index type_defs class_defs modules heaps cs
-			  instance_defs & [inst_index].ins_member_types_and_functions = sort ins_member_types
+			  instance_defs & [inst_index].ins_member_types_and_functions = toDclInstanceMemberTypes (sort ins_member_types)
 			= check_instance_member_types (inc inst_index) instance_defs module_index type_defs class_defs modules heaps cs
 			= (instance_defs,type_defs,class_defs,modules,heaps,cs)
 
-	check_function_types :: ![DclInstanceMemberTypeAndFunction] !ModuleIndex !v:{#CheckedTypeDef} !w:{#ClassDef} !v:{#DclModule} !*Heaps !*CheckState
-									 -> (![DclInstanceMemberTypeAndFunction],!v:{#CheckedTypeDef},!w:{#ClassDef},!v:{#DclModule},!*Heaps,!*CheckState)
-	check_function_types [dim=:{dim_type=fun_type=:{ft_ident,ft_type,ft_pos,ft_specials}} : fun_types] module_index type_defs class_defs modules heaps cs
+	check_function_types :: !DclInstanceMemberTypeAndFunctions !ModuleIndex !v:{#CheckedTypeDef} !w:{#ClassDef} !v:{#DclModule} !*Heaps !*CheckState
+															 -> (![FunType],!v:{#CheckedTypeDef},!w:{#ClassDef},!v:{#DclModule},!*Heaps,!*CheckState)
+	check_function_types (DclInstanceMemberTypes fun_type=:{ft_ident,ft_type,ft_pos,ft_specials} fun_types) module_index type_defs class_defs modules heaps cs
 		# position = newPosition ft_ident ft_pos
 		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
 		  (ft_type, ft_specials, type_defs,  class_defs, modules, hp_type_heaps, cs)
@@ -120,8 +120,8 @@ where
 		  fun_type = { fun_type & ft_type = ft_type, ft_specials = ft_specials, ft_type_ptr = new_info_ptr }
 		  (fun_types, type_defs, class_defs, modules, heaps, cs)
 			= check_function_types fun_types module_index type_defs class_defs modules heaps cs
-		= ([{dim & dim_type=fun_type}:fun_types], type_defs, class_defs, modules, heaps, cs)
-	check_function_types [] module_index type_defs class_defs modules heaps cs
+		= ([fun_type:fun_types], type_defs, class_defs, modules, heaps, cs)
+	check_function_types NoDclInstanceMemberTypes module_index type_defs class_defs modules heaps cs
 		= ( [], type_defs, class_defs, modules, heaps, cs)
 
 checkSpecialsOfInstances :: !Index !Index ![ClassInstance] !Index ![ClassInstance] ![FunType] {# FunType} *{! [Special] } !*Heaps !*PredefinedSymbols !*ErrorAdmin
@@ -722,7 +722,7 @@ where
 			= (memb_inst_defs1 ++ memb_inst_defs2, next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
 			= ([], next_mem_inst_index, all_class_specials, class_defs, member_defs, modules, instance_defs, type_heaps, var_heap, predef_symbols,error)
 
-	determine_dcl_instance_symbols_and_types :: !Index ![DclInstanceMemberTypeAndFunction] !Index !Index !Index !Index !Int !{#DefinedSymbol} !InstanceType !Specials Ident !Position
+	determine_dcl_instance_symbols_and_types :: !Index !DclInstanceMemberTypeAndFunctions !Index !Index !Index !Index !Int !{#DefinedSymbol} !InstanceType !Specials Ident !Position
 															!w:{#MemberDef} !u:{#DclModule} !*TypeHeaps !*VarHeap !*ErrorAdmin
 					-> (![ClassInstanceMember], ![FunType], !w:{#MemberDef},!u:{#DclModule},!*TypeHeaps,!*VarHeap,!.ErrorAdmin)
 	determine_dcl_instance_symbols_and_types mem_offset member_types x_main_dcl_module_n first_inst_index module_index member_mod_index class_size class_members
@@ -748,11 +748,11 @@ where
 			  class_member = {cim_ident=class_member.ds_ident, cim_arity=class_member.ds_arity, cim_index = first_inst_index +  mem_offset}
 			= ([class_member : inst_symbols], [inst_def : memb_inst_defs], member_defs, modules, type_heaps, var_heap, cs_error)
 	where
-		if_instance_member_type_specified_compare_and_use :: [DclInstanceMemberTypeAndFunction] SymbolType FunSpecials Ident !u:{#DclModule} !*TypeHeaps !*ErrorAdmin
-															-> (!SymbolType,!FunSpecials,![DclInstanceMemberTypeAndFunction],!u:{#DclModule},!*TypeHeaps,!*ErrorAdmin)
-		if_instance_member_type_specified_compare_and_use member_types=:[] instance_type specials me_ident modules type_heaps cs_error
+		if_instance_member_type_specified_compare_and_use :: DclInstanceMemberTypeAndFunctions SymbolType FunSpecials Ident !u:{#DclModule} !*TypeHeaps !*ErrorAdmin
+															-> (!SymbolType,!FunSpecials,!DclInstanceMemberTypeAndFunctions,!u:{#DclModule},!*TypeHeaps,!*ErrorAdmin)
+		if_instance_member_type_specified_compare_and_use member_types=:NoDclInstanceMemberTypes instance_type specials me_ident modules type_heaps cs_error
 			= (instance_type, specials, member_types, modules, type_heaps, cs_error)
-		if_instance_member_type_specified_compare_and_use member_types=:[{dim_type={ft_ident,ft_type,ft_arity,ft_specials}}:tl_member_types] instance_type specials me_ident modules type_heaps cs_error
+		if_instance_member_type_specified_compare_and_use member_types=:(DclInstanceMemberTypes {ft_ident,ft_type,ft_arity,ft_specials} tl_member_types) instance_type specials me_ident modules type_heaps cs_error
 			| ft_ident.id_name<me_ident.id_name
 				= if_instance_member_type_specified_compare_and_use tl_member_types instance_type specials me_ident modules type_heaps cs_error
 			| ft_ident.id_name<>me_ident.id_name
@@ -1118,9 +1118,6 @@ where
 instance < FunType
 where
 	(<) fd1 fd2 = fd1.ft_ident.id_name < fd2.ft_ident.id_name
-
-instance < DclInstanceMemberTypeAndFunction where
-	(<) dim1 dim2 = dim1.dim_type < dim2.dim_type
 
 collectCommonDefinitions :: !(CollectedDefinitions (ClassInstanceR member_types_and_functions)) -> (!*{# Int}, ![Declaration])
 collectCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generic_cases, def_generics}
@@ -2493,6 +2490,9 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 			renumber_gcfs [!!] function_conversion_table
 				= [!!]
 
+toDclInstanceMemberTypes [fun_type:fun_types] = DclInstanceMemberTypes fun_type (toDclInstanceMemberTypes fun_types)
+toDclInstanceMemberTypes [] = NoDclInstanceMemberTypes
+
 checkModule :: !ScannedModule !IndexRange ![FunDef] !Bool !Bool !Int !(Optional ScannedModule) ![ScannedModule]
 				!{#DclModule} !*{#*{#FunDef}} !*PredefinedSymbols !*SymbolTable !*File !*Heaps
 	-> (!Bool, *IclModule, *{#DclModule}, *{!Group}, !*{#*{#FunDef}},!Int, !*Heaps, !*PredefinedSymbols, !*SymbolTable, *File, [String])
@@ -2601,12 +2601,12 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		where
 			convert_dcl_class_instances :: ![ScannedInstanceAndMembers] -> [ClassInstance]
 			convert_dcl_class_instances [{sim_pi,sim_member_types} : pins]
-				# member_types_and_functions = [{dim_type=fun_type} \\ fun_type<-sim_member_types]
+				# member_types_and_functions = toDclInstanceMemberTypes sim_member_types
 				= [ParsedInstanceToClassInstance sim_pi member_types_and_functions {} : convert_dcl_class_instances pins]
 			convert_dcl_class_instances []
 				= []
 
-		convert_icl_class_instances1 :: .[ScannedInstanceAndMembers] -> .[ClassInstanceR FunDef]
+		convert_icl_class_instances1 :: .[ScannedInstanceAndMembers] -> .[ClassInstanceR [FunDef]]
 		convert_icl_class_instances1 insams
 			= [ParsedInstanceToClassInstance sim_pi sim_members {} \\ {sim_pi,sim_members}<-insams]
 
@@ -2638,7 +2638,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 	  			= fill_macro_def_array (i+1) macro_defs {a & [i]=dcl_macro_defs}
 
 check_module2 :: Ident {#Char} [.ImportedObject] .[Import] [ParsedForeignExport] .ModuleKind !.IndexRange !Int
-				(Optional (Module a)) [Declaration] [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions (ClassInstanceR FunDef))
+				(Optional (Module a)) [Declaration] [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions (ClassInstanceR [FunDef]))
 				*{#.Int} *Heaps *CheckState
 			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
 check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range nr_of_cached_modules
@@ -2719,7 +2719,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	#! first_inst_index = size icl_functions
 	# com_instance_defs = icl_common.com_instance_defs
-	  new_instance_defs = {{class_instance & ins_member_types_and_functions=[]} \\ class_instance<-:com_instance_defs}
+	  new_instance_defs = {{class_instance & ins_member_types_and_functions=NoDclInstanceMemberTypes} \\ class_instance<-:com_instance_defs}
 	  (inst_fun_defs, com_instance_defs) = convert_icl_class_instances2 0 first_inst_index com_instance_defs new_instance_defs
 	  icl_common = { icl_common & com_instance_defs = com_instance_defs }
 	#! first_gen_inst_index = first_inst_index + length inst_fun_defs
@@ -2928,14 +2928,14 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		check_predefined_module No support_dynamics modules macro_defs heaps cs
 			= (modules, macro_defs, heaps, cs)
 
-		convert_icl_class_instances2 :: Int Int {#ClassInstanceR FunDef} *{#ClassInstance} -> (!.[FunDef],!*{#ClassInstance});
+		convert_icl_class_instances2 :: Int Int {#ClassInstanceR [FunDef]} *{#ClassInstance} -> (!.[FunDef],!*{#ClassInstance});
 		convert_icl_class_instances2 ci_index next_fun_index ci_a_old ci_a
 			| ci_index<size ci_a_old
 				# class_instance=:{ins_member_types_and_functions} = ci_a_old.[ci_index]
 				  ins_members = sort ins_member_types_and_functions
 				  (member_symbols, next_fun_index) = determine_indexes_of_members ins_members next_fun_index
-				  class_instance = {class_instance & ins_member_types_and_functions=[], ins_members = {member \\ member <- member_symbols}}
-				  ci_a = {ci_a & [ci_index]=class_instance}
+				  class_instance & ins_member_types_and_functions=NoDclInstanceMemberTypes, ins_members = {member \\ member <- member_symbols}
+				  ci_a & [ci_index] = class_instance
 				  (next_fun_defs, ci_a) = convert_icl_class_instances2 (ci_index+1) next_fun_index ci_a_old ci_a
 				= (ins_members ++ next_fun_defs, ci_a)
 				= ([],ci_a)

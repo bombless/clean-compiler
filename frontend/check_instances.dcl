@@ -2,7 +2,7 @@ definition module check_instances
 
 from syntax import
 	::Global,::Index,
-	::CommonDefs,::CommonDefsR,::DclInstanceMemberTypeAndFunction,
+	::CommonDefs,::CommonDefsR,::DclInstanceMemberTypeAndFunctions,
 	::TypeVarHeap,::Heap,::TypeVarInfo
 from overloading import ::ClassInstanceInfo,::InstanceTree(..)
 from checksupport import ::ErrorAdmin

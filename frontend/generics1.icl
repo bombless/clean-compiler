@@ -2575,7 +2575,7 @@ where
 			 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 				,	ins_ident 	= class_ident
 				,	ins_type 	= ins_type
-				,	ins_member_types_and_functions = []
+				,	ins_member_types_and_functions = NoDclInstanceMemberTypes
 				,	ins_members	= {{cim_ident=ds_ident,cim_arity=ds_arity,cim_index=ds_index}}
 				,	ins_specials = SP_None
 				,	ins_pos		= gc_pos
@@ -2712,7 +2712,7 @@ where
 		 	,	ins_class_ident = {ci_ident=Ident class_ident, ci_arity=1}
 			,	ins_ident 	= class_ident
 			,	ins_type 	= ins_type
-			,	ins_member_types_and_functions = []
+			,	ins_member_types_and_functions = NoDclInstanceMemberTypes
 			,	ins_members	= {class_instance_member}
 			,	ins_specials = SP_None
 			,	ins_pos		= gc_pos
