@@ -408,114 +408,130 @@ tryDefinition parseContext pState
 	# (token, pState)			= nextToken GeneralContext pState
 	  (fname, linenr, pState)	= getFileAndLineNr pState
 	= try_definition parseContext token (LinePos fname linenr) pState
+
+try_definition :: !ParseContext !Token !Position !ParseState -> (!Bool, ParsedDefinition, !ParseState)
+try_definition parseContext DoubleColonToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(3)",parseError "definition" No "type definitions only at the global level" (tokenBack pState))
+		# (def, pState) = wantTypeDef parseContext pos pState
+		= (True, def, pState)
+try_definition parseContext (IdentToken name) pos pState
+	# (token, pState) = nextToken FunctionContext pState
+	= case token of
+		GenericOpenToken
+			// generic function
+			-> wantGenericFunctionDefinition name parseContext pos pState
+		_   // normal function
+			# pState = tokenBack pState
+			# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
+			  (token, pState) = nextToken FunctionContext pState
+			  (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
+			-> (True, def, pState)
+try_definition parseContext ImportToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
+	# (token, pState) = nextToken FunctionContext pState
+	| token =: CodeToken && isIclContext parseContext
+		# (importedObjects, pState) = wantCodeImports pState
+		= (True, PD_ImportedObjects importedObjects, pState)
+		# pState = tokenBack pState
+		# (imports, pState) = wantImports pState
+		= (True, PD_Import imports, pState)
+try_definition parseContext FromToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
+		# (imp, pState) = wantFromImports pState
+		= (True, PD_Import [imp], pState)
+try_definition parseContext ClassToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
+		# (classdef, pState) = wantClassDefinition parseContext pos pState
+		= (True, classdef, pState)
+try_definition parseContext GenericToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
+		# (gendef, pState) = wantGenericDefinition parseContext pos pState
+		= (True, gendef, pState)
+try_definition parseContext DeriveToken pos pState
+	| isGlobalContext parseContext
+		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
+		= (True, gendef, pState)
+	| isClassOrInstanceDefsContext parseContext
+		# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
+		= (True, derive_instance_def, pState)
+		= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)
+try_definition parseContext InstanceToken pos pState
+	| ~(isGlobalContext parseContext)
+		= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
+		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
+		= (True, instdef, pState)
+try_definition parseContext ForeignToken pos pState
+	| not (isGlobalContext parseContext)
+		= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed at the global level" pState)
+	| isDclContext parseContext
+		= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed in implementation modules" pState)
+		= wantForeignExportDefinition pState
+try_definition parseContext token pos pState
+	| isLhsStartToken token
+		# (lhs, pState) = want_lhs_of_def token pState
+	      (token, pState) = nextToken FunctionContext pState
+	      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
+		= (True, def, pState)
+	= (False, abort "no def(1)", tokenBack pState)
+
+determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
+determine_position lhs           		pos           = pos
+
+want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
+want_lhs_of_def token pState
+	# (succ, fname, is_infix, pState) = try_function_symbol token pState
+	| succ
+		# (args, pState) = parseList trySimplePattern pState
+		= ((Yes (fname, is_infix), args), pState)
+		# (_, exp, pState) = trySimplePattern pState
+		= ((No, [exp]), pState)
 where
-	try_definition :: !ParseContext !Token !Position !ParseState -> (!Bool, ParsedDefinition, !ParseState)
-	try_definition parseContext DoubleColonToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(3)",parseError "definition" No "type definitions only at the global level" (tokenBack pState))
-			# (def, pState) = wantTypeDef parseContext pos pState
-			= (True, def, pState)
-	try_definition parseContext (IdentToken name) pos pState
+	try_function_symbol :: !Token !ParseState -> (!Bool, Ident, !Bool, !ParseState) // (Success, Ident, Infix, ParseState)
+	try_function_symbol (IdentToken name) pState
+		# (id, pState) = stringToIdent name IC_Expression pState
+		= (True, id, False, pState)
+	try_function_symbol OpenToken pState
 		# (token, pState) = nextToken FunctionContext pState
 		= case token of
-			GenericOpenToken
-				// generic function
-				-> wantGenericFunctionDefinition name pos pState
-			_   // normal function
-				# pState = tokenBack pState
-				# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
-			      (token, pState) = nextToken FunctionContext pState
-			      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
-				-> (True, def, pState)
-	try_definition _ ImportToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
-		# (token, pState) = nextToken FunctionContext pState
-		| token =: CodeToken && isIclContext parseContext
-			# (importedObjects, pState) = wantCodeImports pState
-			= (True, PD_ImportedObjects importedObjects, pState)
-			# pState = tokenBack pState
-			# (imports, pState) = wantImports pState
-	   		= (True, PD_Import imports, pState)
-	try_definition _ FromToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(3)",parseError "definition" No "imports only at the global level" pState)
-			# (imp, pState) = wantFromImports pState
-	   		= (True, PD_Import [imp], pState)
-	try_definition parseContext ClassToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "class definitions are only at the global level" pState)
-	   		# (classdef, pState) = wantClassDefinition parseContext pos pState
-	   		= (True, classdef, pState)
-	try_definition parseContext GenericToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "generic definitions are only at the global level" pState)
-	   		# (gendef, pState) = wantGenericDefinition parseContext pos pState
-	   		= (True, gendef, pState)
-	try_definition parseContext DeriveToken pos pState
-		| isGlobalContext parseContext
-			# (gendef, pState) = wantDeriveDefinition parseContext pos pState
-			= (True, gendef, pState)
-		| isClassOrInstanceDefsContext parseContext
-			# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
-			= (True, derive_instance_def, pState)
-			= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)   		
-	try_definition parseContext InstanceToken pos pState
-		| ~(isGlobalContext parseContext)
-			= (False,abort "no def(2)",parseError "definition" No "instance declarations are only at the global level" pState)
-	   		# (instdef, pState) = wantInstanceDeclaration parseContext pos pState
-	   		= (True, instdef, pState)
-	try_definition parseContext ForeignToken pos pState
-		| not (isGlobalContext parseContext)
-			= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed at the global level" pState)
-		| isDclContext parseContext
-			= (False,abort "no def",parseErrorSimple "definition" "foreign export definitions are only allowed in implementation modules" pState)
-			= wantForeignExportDefinition pState
-	try_definition parseContext token pos pState
-		| isLhsStartToken token
-			# (lhs, pState) = want_lhs_of_def token pState
-		      (token, pState) = nextToken FunctionContext pState
-		      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
-			= (True, def, pState)
-		= (False, abort "no def(1)", tokenBack pState)
+			IdentToken name
+				# (token, pState) = nextToken FunctionContext pState
+				| token =: CloseToken
+					# (id, pState) = stringToIdent name IC_Expression pState
+					-> (True, id, True, pState)
+					-> (False, abort "no name", False, tokenBack (tokenBack (tokenBack pState)))
+			_
+				-> (False,  abort "no name", False, tokenBack (tokenBack pState))
+	try_function_symbol token pState
+		= (False, abort "name", False, tokenBack pState)
 
-	determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
-	determine_position lhs           		pos           = pos
-
-	want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
-	want_lhs_of_def token pState
-		# (succ, fname, is_infix, pState) = try_function_symbol token pState
-		| succ
-			# (args, pState) = parseList trySimplePattern pState
-			= ((Yes (fname, is_infix), args), pState)
-			# (_, exp, pState) = trySimplePattern pState
-			= ((No, [exp]), pState)
-	where
-		try_function_symbol :: !Token !ParseState -> (!Bool, Ident, !Bool, !ParseState) // (Success, Ident, Infix, ParseState)
-		try_function_symbol (IdentToken name) pState
-			# (id, pState) = stringToIdent name IC_Expression pState
-			= (True, id, False, pState)
-		try_function_symbol OpenToken pState
-			# (token, pState) = nextToken FunctionContext pState
-			= case token of
-				IdentToken name
-					# (token, pState) = nextToken FunctionContext pState
-					| token =: CloseToken
-						# (id, pState) = stringToIdent name IC_Expression pState
-						-> (True, id, True, pState)
-						-> (False, abort "no name", False, tokenBack (tokenBack (tokenBack pState)))
-				_
-					-> (False,  abort "no name", False, tokenBack (tokenBack pState))
-		try_function_symbol token pState
-			= (False, abort "name", False, tokenBack pState)
-
-	want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
-	want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
-		# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
-		  (tspec, pState) = wantSymbolType pState
+want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
+want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
+	# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
+	  (tspec, pState) = wantSymbolType pState
+	| isDclContext parseContext
+		# (specials, pState) = optionalFunSpecials pState
+		#! def = PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials;
+		| not specials=:FSP_ABCCode _
+			= (def, wantEndOfDefinition "type definition" pState)
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		| ss_useLayout
+			= (def, wantEndOfDefinition "type definition" pState)
+			// } must be at end of line, make ; optional
+			= (def, optional_semicolon_without_layout_rule pState)
+		= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
+	# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
+	  (token, pState) = nextToken TypeContext pState
+	| token =: DoubleColonToken
+		# (tspec, pState) = wantSymbolType pState
 		| isDclContext parseContext
 			# (specials, pState) = optionalFunSpecials pState
-			#! def = PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials;
+			#! def = PD_TypeSpec pos name prio (Yes tspec) specials
 			| not specials=:FSP_ABCCode _
 				= (def, wantEndOfDefinition "type definition" pState)
 			# (ss_useLayout, pState) = accScanState UseLayout pState
@@ -523,194 +539,175 @@ where
 				= (def, wantEndOfDefinition "type definition" pState)
 				// } must be at end of line, make ; optional
 				= (def, optional_semicolon_without_layout_rule pState)
-			= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
-	want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
-		# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
-		  (token, pState) = nextToken TypeContext pState
-		| token =: DoubleColonToken
-		  	# (tspec, pState) = wantSymbolType pState
-			| isDclContext parseContext
-				# (specials, pState) = optionalFunSpecials pState
-				#! def = PD_TypeSpec pos name prio (Yes tspec) specials
-				| not specials=:FSP_ABCCode _
-					= (def, wantEndOfDefinition "type definition" pState)
-				# (ss_useLayout, pState) = accScanState UseLayout pState
-				| ss_useLayout
-					= (def, wantEndOfDefinition "type definition" pState)
-					// } must be at end of line, make ; optional
-					= (def, optional_semicolon_without_layout_rule pState)
-				= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
-			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type definition" (tokenBack pState))
-	want_rhs_of_def parseContext (No, args) token pos pState
-		# pState			= want_node_def_token pState token
-		# (ss_useLayout, pState) = accScanState UseLayout pState
-		  localsExpected	= ~ ss_useLayout
-		  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext (isNotEmpty args)) (tokenBack pState)
-		| isLocalContext parseContext
-			| not (isClassOrInstanceDefsContext parseContext)
- 				= (PD_NodeDef pos (combine_args args) rhs, pState)
-	 			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<class or instance definition>" pState)
-			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
-	where		
-		want_node_def_token s EqualToken		= s
-		want_node_def_token s token				= parseError "RHS" (Yes token) "defines token (=)" s
+			= (PD_TypeSpec pos name prio (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+		= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type definition" (tokenBack pState))
+want_rhs_of_def parseContext (No, args) token pos pState
+	# pState			= want_node_def_token pState token
+	# (ss_useLayout, pState) = accScanState UseLayout pState
+	  localsExpected	= ~ ss_useLayout
+	  (rhs, _, pState)		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext (isNotEmpty args)) (tokenBack pState)
+	| isLocalContext parseContext
+		| not (isClassOrInstanceDefsContext parseContext)
+			= (PD_NodeDef pos (combine_args args) rhs, pState)
+			= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<class or instance definition>" pState)
+		= (PD_NodeDef pos (combine_args args) rhs, parseError "RHS" No "<global definition>" pState)
+where
+	want_node_def_token s EqualToken		= s
+	want_node_def_token s token				= parseError "RHS" (Yes token) "defines token (=)" s
 
-		combine_args [arg]	= arg
-		combine_args args	= PE_List args
-	want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
-		# code_allowed = definingToken =: EqualToken
-		| isIclContext parseContext && isLocalContext parseContext && (definingToken =: EqualToken || (definingToken =: DefinesColonToken && isGlobalContext parseContext)) &&
-				not (isClassOrInstanceDefsContext parseContext)
-		  	# (token, pState) = nextToken FunctionContext pState
-			| code_allowed && token =: CodeToken
-				# (rhs, pState) = wantCodeRhs pState
-				= (PD_Function pos name False [] rhs (FK_Function cNameNotLocationDependent), pState)
-			# pState = tokenBack pState
-			# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact definingToken) (tokenBack pState)
-			| token =: EqualToken
-				= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
-			// otherwise // token == DefinesColonToken
- 				| isGlobalContext parseContext
-					= (PD_Function pos name False [] rhs FK_Caf, pState)
-				// otherwise
-					= (PD_NodeDef pos (PE_Ident name) rhs, pState)
-	want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
-		# code_allowed = token =: EqualToken || token =: DoubleArrowToken
-		  (token, pState) = nextToken FunctionContext pState
-		| isIclContext parseContext && token =: CodeToken
+	combine_args [arg]	= arg
+	combine_args args	= PE_List args
+want_rhs_of_def parseContext (Yes (name, False), []) definingToken pos pState
+	# code_allowed = definingToken =: EqualToken
+	| isIclContext parseContext && isLocalContext parseContext && (definingToken =: EqualToken || (definingToken =: DefinesColonToken && isGlobalContext parseContext)) &&
+			not (isClassOrInstanceDefsContext parseContext)
+		# (token, pState) = nextToken FunctionContext pState
+		| code_allowed && token =: CodeToken
 			# (rhs, pState) = wantCodeRhs pState
-			| code_allowed
-				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), pState)
-			// otherwise // ~ code_allowed
-				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), parseError "rhs of def" No "no code" pState)
-		# pState = tokenBack (tokenBack pState)
-		  (ss_useLayout, pState) = accScanState UseLayout pState
-		  has_args = isNotEmpty args
-		  localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
-		  (rhs, defining_symbol, pState)
-		  		= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
-		  fun_kind = definingSymbolToFunKind defining_symbol
-		= case fun_kind of
-			FK_Function _  | isDclContext parseContext && isNotClassDefsContext parseContext
-				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
-			FK_Caf | isNotEmpty args
-				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
-			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
+			= (PD_Function pos name False [] rhs (FK_Function cNameNotLocationDependent), pState)
+		# pState = tokenBack pState
+		# (rhs, _, pState) = wantRhs False (RhsDefiningSymbolExact definingToken) (tokenBack pState)
+		| token =: EqualToken
+			= (PD_Function pos name False [] rhs FK_NodeDefOrFunction, pState)
+		| isGlobalContext parseContext
+			= (PD_Function pos name False [] rhs FK_Caf, pState)
+			= (PD_NodeDef pos (PE_Ident name) rhs, pState)
+want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
+	# code_allowed = token =: EqualToken || token =: DoubleArrowToken
+	  (token, pState) = nextToken FunctionContext pState
+	| isIclContext parseContext && token =: CodeToken
+		# (rhs, pState) = wantCodeRhs pState
+		| code_allowed
+			= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), pState)
+			= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), parseError "rhs of def" No "no code" pState)
+	# pState = tokenBack (tokenBack pState)
+	  (ss_useLayout, pState) = accScanState UseLayout pState
+	  has_args = isNotEmpty args
+	  localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
+	  (rhs, defining_symbol, pState)
+			= wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
+	  fun_kind = definingSymbolToFunKind defining_symbol
+	= case fun_kind of
+		FK_Function _  | isDclContext parseContext && isNotClassDefsContext parseContext
+			->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
+		FK_Caf | isNotEmpty args
+			->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
+		_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
 
-	wantGenericFunctionDefinition name pos pState
-		//# (type, pState) = wantType pState
-		# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
-		| not ok
-			# pState = parseError "type argument" No "type constructor" pState
-			= (False, abort "no TypeCons", pState)
-		# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
-		# (generic_ident, pState) = stringToIdent name IC_Generic pState
-		# (type_cons, pState) = get_type_cons type pState
-		# (generic_fun_ident, pState) = make_generic_fun_ident type_cons pState
-			with
-				make_generic_fun_ident type_cons pState
-					# generic_fun_ident = genericIdentToFunIdent name type_cons
-					= stringToIdent generic_fun_ident.id_name IC_Expression pState
+wantGenericFunctionDefinition name parseContext pos pState
+	//# (type, pState) = wantType pState
+	# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
+	| not ok
+		# pState = parseError "type argument" No "type constructor" pState
+		= (False, abort "no TypeCons", pState)
+	# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
+	# (generic_ident, pState) = stringToIdent name IC_Generic pState
+	# (type_cons, pState) = get_type_cons type pState
+	# (generic_fun_ident, pState) = make_generic_fun_ident type_cons pState
+		with
+			make_generic_fun_ident type_cons pState
+				# generic_fun_ident = genericIdentToFunIdent name type_cons
+				= stringToIdent generic_fun_ident.id_name IC_Expression pState
 
-		# (token, pState) = nextToken GenericContext pState
-		# (geninfo_arg, gcf_generic_info, pState) = case token of
-			GenericOfToken
-				# (ok, geninfo_arg, pState) = trySimplePattern pState
-				# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-				| ok 
-					-> case type_cons of
-						TypeConsSymb {type_ident=type_ident=:{id_name}}
-							| id_name=="OBJECT"
-								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
-								| type_ident==generic_constructor_type_ident
-									-> (geninfo_arg, generic_info_of_OBJECT_geninfo_arg geninfo_arg, pState)
-									-> (geninfo_arg, 0, pState)
-							| id_name=="CONS"
-								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
-								| type_ident==generic_constructor_type_ident
-									-> (geninfo_arg, generic_info_of_CONS_geninfo_arg geninfo_arg, pState)
-									-> (geninfo_arg, 0, pState)
-							| id_name=="RECORD"
-								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
-								| type_ident==generic_constructor_type_ident
-									-> (geninfo_arg, generic_info_of_RECORD_geninfo_arg geninfo_arg, pState)
-									-> (geninfo_arg, 0, pState)
-							| id_name=="FIELD"
-								# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
-								| type_ident==generic_constructor_type_ident
-									-> (geninfo_arg, generic_info_of_FIELD_geninfo_arg geninfo_arg, pState)
-									-> (geninfo_arg, 0, pState)
-						_
-							-> (geninfo_arg, 0, pState)
-				| otherwise
-					# pState = parseError "generic case" No "simple lhs expression" pState
-					-> (PE_Empty, 0, pState)
-
-			GenericCloseToken
-				-> (PE_WildCard, 0, pState)
-			_ 	
-				# pState = parseError "generic type" (Yes token) "of or |}" pState
-				-> (PE_WildCard, 0, pState)
-
-		//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-		# (args, pState) = parseList trySimplePattern pState
-	  	# has_args = isNotEmpty args || gcf_generic_info<>0
-		# args = [geninfo_arg : args]
-	
-	  	# (ss_useLayout, pState) = accScanState UseLayout pState
-	    # localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
-	    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
-
-		# generic_case =
-			{ gc_pos = pos
-			, gc_type = type
-			, gc_type_cons = type_cons
-			, gc_gcf = GCF ident {
-						gcf_gident = generic_ident,
-						gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
-						gcf_arity = length args,
-						gcf_generic_info = gcf_generic_info,
-						gcf_body = GCB_ParsedBody args rhs,
-						gcf_kind = KindError,
-						gcf_generic_instance_deps = AllGenericInstanceDependencies }
-			}
-		= (True, PD_GenericCase generic_case generic_fun_ident, pState)
-
-	wantForeignExportDefinition pState
-		# (token, pState) = nextToken GeneralContext pState
-		# (file_name,line_nr,pState) = getFileAndLineNr pState
-		= case token of
-			IdentToken "export"
-				# (token, pState) = nextToken FunctionContext pState
-				-> case token of
-					IdentToken function_name
-						| function_name=="ccall"
-							# (token2, pState) = nextToken FunctionContext pState
-							-> case token2 of
-								IdentToken function_name
-									-> accept_foreign_export function_name line_nr False pState
-								_
-									-> accept_foreign_export function_name line_nr False (tokenBack pState)
-						| function_name=="stdcall"
-							# (token2, pState) = nextToken FunctionContext pState
-							-> case token2 of 
-								IdentToken function_name
-									-> accept_foreign_export function_name line_nr True pState
-								_
-									-> accept_foreign_export function_name line_nr False (tokenBack pState)
-							-> accept_foreign_export function_name line_nr False pState
+	# (token, pState) = nextToken GenericContext pState
+	# (geninfo_arg, gcf_generic_info, pState) = case token of
+		GenericOfToken
+			# (ok, geninfo_arg, pState) = trySimplePattern pState
+			# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+			| ok
+				-> case type_cons of
+					TypeConsSymb {type_ident=type_ident=:{id_name}}
+						| id_name=="OBJECT"
+							# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+							| type_ident==generic_constructor_type_ident
+								-> (geninfo_arg, generic_info_of_OBJECT_geninfo_arg geninfo_arg, pState)
+								-> (geninfo_arg, 0, pState)
+						| id_name=="CONS"
+							# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+							| type_ident==generic_constructor_type_ident
+								-> (geninfo_arg, generic_info_of_CONS_geninfo_arg geninfo_arg, pState)
+								-> (geninfo_arg, 0, pState)
+						| id_name=="RECORD"
+							# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+							| type_ident==generic_constructor_type_ident
+								-> (geninfo_arg, generic_info_of_RECORD_geninfo_arg geninfo_arg, pState)
+								-> (geninfo_arg, 0, pState)
+						| id_name=="FIELD"
+							# (generic_constructor_type_ident, pState) = stringToIdent id_name IC_Type pState
+							| type_ident==generic_constructor_type_ident
+								-> (geninfo_arg, generic_info_of_FIELD_geninfo_arg geninfo_arg, pState)
+								-> (geninfo_arg, 0, pState)
 					_
-						-> foreign_export_error "function name" pState
-				where
-					accept_foreign_export function_name line_nr stdcall pState
-						# pState = wantEndOfDefinition "foreign export" pState
-						# (ident,pState) = stringToIdent function_name IC_Expression pState
-						= (True,PD_ForeignExport ident file_name line_nr stdcall,pState)
-			_
-				-> foreign_export_error "export" pState
-		where
-			foreign_export_error s pState
-				= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
+						-> (geninfo_arg, 0, pState)
+			| otherwise
+				# pState = parseError "generic case" No "simple lhs expression" pState
+				-> (PE_Empty, 0, pState)
+
+		GenericCloseToken
+			-> (PE_WildCard, 0, pState)
+		_
+			# pState = parseError "generic type" (Yes token) "of or |}" pState
+			-> (PE_WildCard, 0, pState)
+
+	//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
+	# (args, pState) = parseList trySimplePattern pState
+	# has_args = isNotEmpty args || gcf_generic_info<>0
+	# args = [geninfo_arg : args]
+
+	# (ss_useLayout, pState) = accScanState UseLayout pState
+	# localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
+    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
+
+	# generic_case =
+		{ gc_pos = pos
+		, gc_type = type
+		, gc_type_cons = type_cons
+		, gc_gcf = GCF ident {
+					gcf_gident = generic_ident,
+					gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
+					gcf_arity = length args,
+					gcf_generic_info = gcf_generic_info,
+					gcf_body = GCB_ParsedBody args rhs,
+					gcf_kind = KindError,
+					gcf_generic_instance_deps = AllGenericInstanceDependencies }
+		}
+	= (True, PD_GenericCase generic_case generic_fun_ident, pState)
+
+wantForeignExportDefinition pState
+	# (token, pState) = nextToken GeneralContext pState
+	# (file_name,line_nr,pState) = getFileAndLineNr pState
+	= case token of
+		IdentToken "export"
+			# (token, pState) = nextToken FunctionContext pState
+			-> case token of
+				IdentToken function_name
+					| function_name=="ccall"
+						# (token2, pState) = nextToken FunctionContext pState
+						-> case token2 of
+							IdentToken function_name
+								-> accept_foreign_export function_name line_nr False pState
+							_
+								-> accept_foreign_export function_name line_nr False (tokenBack pState)
+					| function_name=="stdcall"
+						# (token2, pState) = nextToken FunctionContext pState
+						-> case token2 of
+							IdentToken function_name
+								-> accept_foreign_export function_name line_nr True pState
+							_
+								-> accept_foreign_export function_name line_nr False (tokenBack pState)
+						-> accept_foreign_export function_name line_nr False pState
+				_
+					-> foreign_export_error "function name" pState
+			where
+				accept_foreign_export function_name line_nr stdcall pState
+					# pState = wantEndOfDefinition "foreign export" pState
+					# (ident,pState) = stringToIdent function_name IC_Expression pState
+					= (True,PD_ForeignExport ident file_name line_nr stdcall,pState)
+		_
+			-> foreign_export_error "export" pState
+	where
+		foreign_export_error s pState
+			= (True,PD_Erroneous,tokenBack (parseError "foreign export" No s pState))
 
 generic_info_of_RECORD_geninfo_arg (PE_Record PE_Empty NoRecordName field_assignments)
 	= mark_GenericRecordDescriptor_fields field_assignments 0
@@ -872,10 +869,10 @@ where
 				// } must be at end of line, make ; optional
 				= (def, optional_semicolon_without_layout_rule pState)
 			# pState = parseError "type definition" (Yes token) "::" pState
-			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type defenition" pState)
+			= (PD_TypeSpec pos name prio No FSP_None, wantEndOfDefinition "type definition" pState)
 	want_rhs_of_instance_member_def opt_name token pos pState
 		# pState = parseError "type definition" (Yes token) "::" pState
-		= (PD_Erroneous, wantEndOfDefinition "type defenition" pState)
+		= (PD_Erroneous, wantEndOfDefinition "type definition" pState)
 
 check_name_and_fixity No hasprio pState
 	= (erroneousIdent, False, parseError "Definition" No "identifier" pState)
@@ -1175,16 +1172,16 @@ where
 
 wantRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
 wantRhs localsExpected definingSymbol pState
-	# (alts, definingSymbol, pState)	= want_LetsFunctionBody definingSymbol pState
-	  (locals, pState)	= optionalLocals WhereToken localsExpected pState
+	# (alts, definingSymbol, pState) = want_LetsFunctionBody definingSymbol localsExpected pState
+	  (locals, pState) = optionalLocals WhereToken localsExpected pState
 	= ({ rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
-where
-	want_LetsFunctionBody :: !RhsDefiningSymbol  !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState) 
-	want_LetsFunctionBody definingSymbol pState
-		# (token, pState)			= nextToken FunctionContext pState
-		  (nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
-		= want_FunctionBody token nodeDefs [] definingSymbol pState
 
+want_LetsFunctionBody :: !RhsDefiningSymbol !Bool !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState) 
+want_LetsFunctionBody definingSymbol localsExpected pState
+	# (token, pState)			= nextToken FunctionContext pState
+	  (nodeDefs, token, pState)	= want_LetBefores token localsExpected pState
+	= want_FunctionBody token nodeDefs [] definingSymbol pState
+where
 	want_FunctionBody :: !Token ![NodeDefWithLocals] ![GuardedExpr] !RhsDefiningSymbol !ParseState -> (!OptGuardedAlts, !RhsDefiningSymbol, !ParseState)
 	want_FunctionBody BarToken nodeDefs alts definingSymbol pState
 //		#	(lets, pState)				= want_StrictLet pState // removed from 2.0
