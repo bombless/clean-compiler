@@ -324,6 +324,7 @@ cNameLocationDependent :== True
 ::	DclInstanceMemberTypeAndFunctions
 	= DclInstanceMemberTypes !FunType !DclInstanceMemberTypeAndFunctions
 	| NoDclInstanceMemberTypes
+	| GenerateInstanceMember !Int !Int !DclInstanceMemberTypeAndFunctions // member_n function_n
 
 ::	IdentOrQualifiedIdent
 	= Ident !Ident

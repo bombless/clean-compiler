@@ -261,8 +261,8 @@ where
 build_generic_representations_for_derived_instances :: !Int !{#ClassInstance} !FunsAndGroups !*GenericState -> *(!FunsAndGroups,!*GenericState)
 build_generic_representations_for_derived_instances instance_i instance_defs funs_and_groups gs
 	| instance_i<size instance_defs
-		# {ins_members,ins_type,ins_class_ident,ins_pos} = instance_defs.[instance_i]
-		| instance_has_derived_member 0 ins_members gs.gs_funs
+		# {ins_member_types_and_functions,ins_type,ins_class_ident,ins_pos} = instance_defs.[instance_i]
+		| not ins_member_types_and_functions=:NoDclInstanceMemberTypes
 			# class_name = case ins_class_ident.ci_ident of
 								Ident {id_name} -> id_name
 								QualifiedIdent _ id_name -> id_name
@@ -285,15 +285,6 @@ build_generic_representations_for_derived_instances instance_i instance_defs fun
 					-> build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
 			= build_generic_representations_for_derived_instances (instance_i+1) instance_defs funs_and_groups gs
 		= (funs_and_groups, gs)
-
-instance_has_derived_member :: !Int !{#ClassInstanceMember} !{#FunDef} -> Bool
-instance_has_derived_member member_i ins_members gs_funs
-	| member_i<size ins_members
-		# {cim_index} = ins_members.[member_i]
-		| cim_index>=0 && gs_funs.[cim_index].fun_body=:GenerateInstanceBodyChecked _ _
-			= True
-			= instance_has_derived_member (member_i+1) ins_members gs_funs
-		= False
 
 add_groups :: ![Group] !{!Group} !Int !*{#FunDef} -> (!{!Group},!*{#FunDef})
 add_groups new_groups gs_groups n_new_groups gs_funs
@@ -2103,67 +2094,65 @@ getGenericTypeRep _ = abort "getGenericTypeRep: no generic representation\n"
 generate_derived_instances :: !Int !{#ClassInstance} !Int PredefinedSymbolsData !*SpecializeState -> *SpecializeState
 generate_derived_instances instance_i instance_defs main_module_n predefs ss
 	| instance_i<size instance_defs
-		# {ins_members,ins_type,ins_class_ident,ins_pos,ins_class_index} = instance_defs.[instance_i]
-		# ss = generate_derived_instance 0 ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		| instance_defs.[instance_i].ins_member_types_and_functions=:NoDclInstanceMemberTypes
+			= generate_derived_instances (instance_i+1) instance_defs main_module_n predefs ss
+		# {ins_member_types_and_functions,ins_members,ins_type,ins_class_ident,ins_pos,ins_class_index} = instance_defs.[instance_i]
+		# ss = generate_derived_instance ins_member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
 		= generate_derived_instances (instance_i+1) instance_defs main_module_n predefs ss
 		= ss
 
-generate_derived_instance :: !Int !{#ClassInstanceMember} InstanceType Position GlobalIndex Int PredefinedSymbolsData !*SpecializeState -> *SpecializeState
-generate_derived_instance member_i ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-	| member_i<size ins_members
-		# {cim_index,cim_ident} = ins_members.[member_i]
-		| cim_index>=0 && ss.ss_funs.[cim_index].fun_body=:GenerateInstanceBodyChecked _ _
-			# (GenerateInstanceBodyChecked generic_ident generic_index,ss) = ss!ss_funs.[cim_index].fun_body
-			# ({gen_type,gen_deps},ss) = ss!ss_modules.[generic_index.gi_module].com_generic_defs.[generic_index.gi_index]
-			| ss.ss_funs.[cim_index].fun_arity<>gen_type.st_arity
-				# ss & ss_error = reportError generic_ident.id_name ins_pos "arity of generic function and member not equal" ss.ss_error
-				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-			| not gen_deps=:[]
-				# ss & ss_error = reportError generic_ident.id_name ins_pos "deriving instances from generic with dependencies not implemented" ss.ss_error
-				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-			# type_index = case ins_type.it_types of
-									[TA {type_index} _] -> type_index
-									[TAS {type_index} _ _] -> type_index
-									_ -> {glob_module= -1,glob_object= -1}
-			| type_index.glob_module>=0
-				# ({tdi_gen_rep},ss) = ss!ss_td_infos.[type_index.glob_module, type_index.glob_object]
-				# gen_type_rep = getGenericTypeRep tdi_gen_rep
+generate_derived_instance :: !DclInstanceMemberTypeAndFunctions !{#ClassInstanceMember} InstanceType Position GlobalIndex Int PredefinedSymbolsData !*SpecializeState -> *SpecializeState
+generate_derived_instance NoDclInstanceMemberTypes ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	= ss
+generate_derived_instance (GenerateInstanceMember member_i member_fun_i member_types_and_functions) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	# (GenerateInstanceBodyChecked generic_ident generic_index,ss) = ss!ss_funs.[member_fun_i].fun_body
+	# ({gen_type,gen_deps},ss) = ss!ss_modules.[generic_index.gi_module].com_generic_defs.[generic_index.gi_index]
+	| ss.ss_funs.[member_fun_i].fun_arity<>gen_type.st_arity
+		# ss & ss_error = reportError generic_ident.id_name ins_pos "arity of generic function and member not equal" ss.ss_error
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	| not gen_deps=:[]
+		# ss & ss_error = reportError generic_ident.id_name ins_pos "deriving instances from generic with dependencies not implemented" ss.ss_error
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	# type_index = case ins_type.it_types of
+							[TA {type_index} _] -> type_index
+							[TAS {type_index} _ _] -> type_index
+							_ -> {glob_module= -1,glob_object= -1}
+	| type_index.glob_module>=0
+		# ({tdi_gen_rep},ss) = ss!ss_td_infos.[type_index.glob_module, type_index.glob_object]
+		# gen_type_rep = getGenericTypeRep tdi_gen_rep
 
-				# ({class_ident,class_members},ss) = ss!ss_modules.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
-				# {ds_ident,ds_index} = class_members.[member_i]
-				# member_symb_ident = {symb_ident=ds_ident,
-									   symb_kind=SK_OverloadedFunction {glob_module=ins_class_index.gi_module,glob_object=ds_index}}
+		# ({class_ident,class_members},ss) = ss!ss_modules.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
+		# {ds_ident,ds_index} = class_members.[member_i]
+		# member_symb_ident = {symb_ident=ds_ident,
+							   symb_kind=SK_OverloadedFunction {glob_module=ins_class_index.gi_module,glob_object=ds_index}}
 
-				# gen_type_rep & gtr_type = add_instance_calls_to_GenTypeStruct gen_type_rep.gtr_type member_symb_ident
+		# gen_type_rep & gtr_type = add_instance_calls_to_GenTypeStruct gen_type_rep.gtr_type member_symb_ident
 
-				# (TransformedBody {tb_args, tb_rhs}, ss)
-					= buildDerivedInstanceCaseBody gen_type_rep main_module_n ins_pos type_index generic_ident generic_index predefs ss
+		# (TransformedBody {tb_args, tb_rhs}, ss)
+			= buildDerivedInstanceCaseBody gen_type_rep main_module_n ins_pos type_index generic_ident generic_index predefs ss
 
-				#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
-				| not free_vars=:[]
-					= abort "generate_derived_instance: free_vars is not empty\n"
+		#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
+		| not free_vars=:[]
+			= abort "generate_derived_instance: free_vars is not empty\n"
 
-				# (fun=:{fun_info},ss) = ss!ss_funs.[cim_index]
-				# fun &
-					fun_arity = length arg_vars,
-					fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
-					fun_info = {fun_info &
-									fi_calls = collectCalls main_module_n tb_rhs,
-									fi_free_vars = [],
-									fi_local_vars = local_vars,
-									fi_properties = fun_info.fi_properties bitor FI_GenericFun
-								}
+		# (fun=:{fun_info},ss) = ss!ss_funs.[member_fun_i]
+		  (ss_funs_and_groups=:{fg_group_index},ss) = ss!ss_funs_and_groups
+		  fun &
+			fun_arity = length arg_vars,
+			fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
+			fun_info = {fun_info &
+							fi_calls = collectCalls main_module_n tb_rhs,
+							fi_free_vars = [],
+							fi_local_vars = local_vars, fi_group_index = fg_group_index,
+							fi_properties = fun_info.fi_properties bitor FI_GenericFun}
 
-				  (ss_funs_and_groups,ss) = ss!ss_funs_and_groups
-				  group = {group_members = [cim_index]}
-				  ss_funs_and_groups & fg_group_index=ss_funs_and_groups.fg_group_index+1,
-									   fg_groups=[group:ss_funs_and_groups.fg_groups]
-				  ss & ss_funs.[cim_index] = fun, ss_funs_and_groups = ss_funs_and_groups
+		  group = {group_members = [member_fun_i]}
+		  ss_funs_and_groups & fg_group_index=fg_group_index+1,
+							   fg_groups=[group:ss_funs_and_groups.fg_groups]
+		  ss & ss_funs.[member_fun_i] = fun, ss_funs_and_groups = ss_funs_and_groups
 
-				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-				= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-			= generate_derived_instance (member_i+1) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
-		= ss
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
 
 add_instance_calls_to_GenTypeStruct :: !GenTypeStruct SymbIdent -> GenTypeStruct
 add_instance_calls_to_GenTypeStruct (GTSPair gts1 gts2) member_symb_ident
