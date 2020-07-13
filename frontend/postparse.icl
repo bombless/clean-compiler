@@ -289,11 +289,9 @@ where
 		reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			= (fun_defs, [{ nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
-
 		reorganiseLocalDefinitions [PD_Function pos name is_infix [] {rhs_alts, rhs_locals} FK_NodeDefOrFunction : defs] ca
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			= (fun_defs, [{ nd_dst = PE_Ident name, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
-
 		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
 			# prio = if is_infix DefaultPriority NoPrio
 			  fun_arity = length args
@@ -329,6 +327,12 @@ where
 		  where
 			arity (Yes {st_arity}) = st_arity
 			arity No = 2 // it was specified as infix
+		reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident : defs] ca
+			# fun_body = GenerateInstanceBody generic_ident optional_member_ident
+			  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+						 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
+			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			= ([fun_def:fun_defs], node_defs, ca)
 		reorganiseLocalDefinitions [] ca
 			= ([], [], ca)
 

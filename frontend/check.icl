@@ -25,7 +25,7 @@ where
 			  (class_args, class_context, type_defs, class_defs, modules, type_heaps, cs)
 			  		= checkSuperClasses class_args class_context module_index type_defs class_defs modules type_heaps cs
 			  class_defs = { class_defs & [class_index] = { class_def & class_context = class_context, class_args = class_args }}
-			  member_defs = set_classes_in_member_defs 0 class_members {glob_object = class_index, glob_module = module_index} member_defs 
+			  member_defs = set_classes_in_member_defs 0 class_members {glob_object = class_index, glob_module = module_index} member_defs
 			= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
 			= (class_defs, member_defs, type_defs, modules, type_heaps, cs)
 
@@ -38,8 +38,8 @@ where
 		| mem_offset == size class_members
 			= member_defs
 			# {ds_index} = class_members.[mem_offset]
-			# (member_def, member_defs) = member_defs![ds_index]
-			= set_classes_in_member_defs (inc mem_offset) class_members glob_class_index { member_defs & [ds_index] = { member_def & me_class = glob_class_index }}
+			# member_defs & [ds_index].me_class = glob_class_index
+			= set_classes_in_member_defs (inc mem_offset) class_members glob_class_index member_defs
 
 checkSpecial :: !Index !FunType !Index !SpecialSubstitution !(!Index, ![FunType], !*Heaps,!*PredefinedSymbols,!*ErrorAdmin)
 	-> (!Special, !(!Index, ![FunType], !*Heaps,!*PredefinedSymbols, !*ErrorAdmin))
@@ -122,7 +122,7 @@ where
 			= check_function_types fun_types module_index type_defs class_defs modules heaps cs
 		= ([fun_type:fun_types], type_defs, class_defs, modules, heaps, cs)
 	check_function_types NoDclInstanceMemberTypes module_index type_defs class_defs modules heaps cs
-		= ( [], type_defs, class_defs, modules, heaps, cs)
+		= ([], type_defs, class_defs, modules, heaps, cs)
 
 checkSpecialsOfInstances :: !Index !Index ![ClassInstance] !Index ![ClassInstance] ![FunType] {# FunType} *{! [Special] } !*Heaps !*PredefinedSymbols !*ErrorAdmin
 		-> (!Index, ![ClassInstance], ![FunType], !*{! [Special]}, !*Heaps, !*PredefinedSymbols,!*ErrorAdmin)
@@ -281,6 +281,51 @@ where
 			# cs = {cs & cs_error = checkError id_name ("wrong arity: expected "+++toString class_def.class_arity+++" found "+++toString ci_arity) cs.cs_error}
 			= (ins, is, type_heaps, cs)
 
+check_derived_local_functions_in_member :: !Int !Int !Int !DclInstanceMemberTypeAndFunctions !*{#FunDef} !*CheckState
+													  -> (!DclInstanceMemberTypeAndFunctions,!*{#FunDef},!*CheckState)
+check_derived_local_functions_in_member member_function_index class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+	# ({fun_body},icl_functions) = icl_functions![member_function_index]
+	= case fun_body of
+		ParsedBody parsed_bodies
+			-> check_derived_local_functions_in_pbs parsed_bodies class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		_
+			-> (ins_member_types_and_functions,icl_functions,cs)
+where
+	check_derived_local_functions_in_pbs :: ![ParsedBody] !Int !Int !DclInstanceMemberTypeAndFunctions !*{#FunDef} !*CheckState
+																-> (!DclInstanceMemberTypeAndFunctions,!*{#FunDef},!*CheckState)
+	check_derived_local_functions_in_pbs [{pb_rhs={rhs_locals=NoCollectedLocalDefs}}:pbs] class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		= check_derived_local_functions_in_pbs pbs class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+	check_derived_local_functions_in_pbs [{pb_rhs={rhs_locals=CollectedLocalDefs {loc_functions={ir_from,ir_to}}}}:pbs] class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		| ir_from==ir_to
+			= check_derived_local_functions_in_pbs pbs class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+			# (ins_member_types_and_functions,icl_functions,cs) = check_derived_local_functions ir_from ir_to class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+			= check_derived_local_functions_in_pbs pbs class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+	check_derived_local_functions_in_pbs [_:pbs] class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		= check_derived_local_functions_in_pbs pbs class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+	check_derived_local_functions_in_pbs [] class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		= (ins_member_types_and_functions,icl_functions,cs)
+
+	check_derived_local_functions :: !Int !Int !Int !Int !DclInstanceMemberTypeAndFunctions !*{#FunDef} !*CheckState
+													 -> (!DclInstanceMemberTypeAndFunctions,!*{#FunDef},!*CheckState)
+	check_derived_local_functions fun_i fun_end class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+		| fun_i<fun_end
+			| icl_functions.[fun_i].fun_body=:GenerateInstanceBody _ _
+				# ({fun_body=GenerateInstanceBody generic_ident optional_member_ident},icl_functions) = icl_functions![fun_i]
+				#! x_main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
+				# (generic_index,cs) = get_generic_index generic_ident x_main_dcl_module_n cs
+				  optional_member_ident_global_index
+					= case optional_member_ident of
+						No -> No
+						Yes member_ident -> Yes {igi_ident=member_ident,igi_g_index={gi_module=0,gi_index=0}}
+				  fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
+				  ins_member_types_and_functions = GenerateInstanceMember class_member_n fun_i ins_member_types_and_functions
+				  (fun,icl_functions) = icl_functions![fun_i];
+				  fun & fun_body = fun_body, fun_arity = class_member_arity, fun_priority = NoPrio
+				  icl_functions & [fun_i] = fun
+				= check_derived_local_functions (fun_i+1) fun_end class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+				= check_derived_local_functions (fun_i+1) fun_end class_member_arity class_member_n ins_member_types_and_functions icl_functions cs
+			= (ins_member_types_and_functions,icl_functions,cs)
+
 checkIclInstances ::		   ![IndexRange] !*CommonDefs !*{#FunDef} !u:{# DclModule} !*VarHeap !*TypeHeaps !*CheckState
 	-> (![(Index,SymbolType)], ![IndexRange],!*CommonDefs,!*{#FunDef},!u:{# DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
 checkIclInstances icl_instances_ranges icl_common=:{com_instance_defs,com_class_defs,com_member_defs,com_generic_defs,com_type_defs}
@@ -356,6 +401,8 @@ where
 						# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
 							= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
 						  instance_types = [ (ins_member.cim_index, instance_type) : instance_types ]
+						  (ins_member_types_and_functions,icl_functions,cs)
+							= check_derived_local_functions_in_member ins_member.cim_index class_member.ds_arity class_member_n ins_member_types_and_functions icl_functions cs
 						= check_icl_instance_members (class_member_n+1) (instance_member_n+1) member_mod_index ins_members ins_member_types_and_functions class_members class_ident ins_pos ins_type
 													instance_types n_icl_functions new_instance_members member_defs type_defs icl_functions modules var_heap type_heaps cs
 				| ins_member.cim_ident.id_name < class_member.ds_ident.id_name

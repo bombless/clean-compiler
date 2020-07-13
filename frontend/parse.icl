@@ -245,6 +245,8 @@ ClassDefsContext			:== 4
 InstanceDefsContext			:== 8
 GlobalOrClassDefsContext	:== 6 // cGlobalContext bitor ClassDefsContext
 ClassOrInstanceDefsContext	:== 12 // ClassDefsContext bitor InstanceDefsContext
+WhereOfMemberDefsContext	:== 16
+MemberOrWhereOfMemberDefsContext :== 28 // ClassOrInstanceDefsContext bitor WhereOfMemberDefsContext
 /*
 	A cClassOrInstanceDefsContext is a further restriction on a
 	local context, because no local node defs are allowed
@@ -272,6 +274,7 @@ isClassOrInstanceDefsContext parseContext	:== parseContext bitand ClassOrInstanc
 isGlobalOrClassDefsContext parseContext		:== parseContext bitand GlobalOrClassDefsContext <> 0
 isInstanceDefsContext parseContext			:== parseContext bitand InstanceDefsContext <> 0
 isNotClassDefsContext parseContext	:== parseContext bitand ClassDefsContext == 0
+isMemberOrWhereOfMemberDefsContext parseContext	:== parseContext bitand MemberOrWhereOfMemberDefsContext <> 0
 
 cWantIclFile :== True
 cWantDclFile :== False
@@ -456,7 +459,7 @@ try_definition parseContext DeriveToken pos pState
 	| isGlobalContext parseContext
 		# (gendef, pState) = wantDeriveDefinition parseContext pos pState
 		= (True, gendef, pState)
-	| isClassOrInstanceDefsContext parseContext
+	| isMemberOrWhereOfMemberDefsContext parseContext
 		# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
 		= (True, derive_instance_def, pState)
 		= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)
@@ -478,6 +481,84 @@ try_definition parseContext token pos pState
 	      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
 		= (True, def, pState)
 	= (False, abort "no def(1)", tokenBack pState)
+
+wantMemberDefinitions :: !ParseContext !ParseState -> (![ParsedDefinition], !ParseState)
+wantMemberDefinitions parseContext pState
+	= parseList (tryMemberDefinition parseContext) pState
+where
+	tryMemberDefinition :: !ParseContext !ParseState -> (!Bool, ParsedDefinition, !ParseState)
+	tryMemberDefinition parseContext pState
+		# (token, pState)			= nextToken GeneralContext pState
+		  (fname, linenr, pState)	= getFileAndLineNr pState
+		= try_class_or_instance_definition parseContext token (LinePos fname linenr) pState
+
+	try_class_or_instance_definition :: !ParseContext !Token !Position !ParseState -> (!Bool, ParsedDefinition, !ParseState)
+	try_class_or_instance_definition parseContext (IdentToken name) pos pState
+		# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
+	      (token, pState) = nextToken FunctionContext pState
+	      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token (determine_position lhs pos) pState
+		= (True, def, pState)
+	try_class_or_instance_definition parseContext DeriveToken pos pState
+		# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
+		= (True, derive_instance_def, pState)
+	try_class_or_instance_definition parseContext token pos pState
+		| isLhsStartToken token
+			# (lhs, pState) = want_lhs_of_def token pState
+		      (token, pState) = nextToken FunctionContext pState
+		      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token (determine_position lhs pos) pState
+			= (True, def, pState)
+			= try_definition parseContext token pos pState
+
+	want_rhs_of_class_or_instance_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
+	want_rhs_of_class_or_instance_def parseContext lhs definingToken=:DoubleColonToken pos pState
+		= want_rhs_of_def parseContext lhs definingToken pos pState
+	want_rhs_of_class_or_instance_def parseContext lhs definingToken=:(PriorityToken prio) pos pState
+		= want_rhs_of_def parseContext lhs definingToken pos pState
+	want_rhs_of_class_or_instance_def parseContext (Yes (name, is_infix), args) token pos pState
+		# code_allowed  = token =: EqualToken || token =: DoubleArrowToken
+		  (token, pState) = nextToken FunctionContext pState
+		| isIclContext parseContext && token =: CodeToken
+			# (rhs, pState) = wantCodeRhs pState
+			| code_allowed
+				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), pState)
+				= (PD_Function pos name is_infix args rhs (FK_Function cNameNotLocationDependent), parseError "rhs of def" No "no code" pState)
+		# pState = tokenBack (tokenBack pState)
+		  (ss_useLayout, pState) = accScanState UseLayout pState
+		  has_args = isNotEmpty args
+		  localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
+		  (rhs, defining_symbol, pState)
+				= wantMemberRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
+		  fun_kind = definingSymbolToFunKind defining_symbol
+		= case fun_kind of
+			FK_Function _  | isDclContext parseContext && isNotClassDefsContext parseContext
+				->	(PD_Function pos name is_infix args rhs fun_kind, parseError "RHS" No "<type specification>" pState)
+			FK_Caf | isNotEmpty args
+				->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
+			_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
+	want_rhs_of_class_or_instance_def parseContext lhs definingToken pos pState
+		= want_rhs_of_def parseContext lhs definingToken pos pState
+	
+	wantMemberRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
+	wantMemberRhs localsExpected definingSymbol pState
+		# (alts, definingSymbol, pState) = want_LetsFunctionBody definingSymbol localsExpected pState
+		  (locals, pState) = optionalMemberLocals WhereToken localsExpected pState
+		= ({ rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
+	where
+		optionalMemberLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
+		optionalMemberLocals dem_token localsExpected pState
+		    # (off_token, pState) = nextToken FunctionContext pState
+			| dem_token == off_token
+				= wantMemberLocals pState
+			# (ss_useLayout, pState) = accScanState UseLayout pState
+			| off_token =: CurlyOpenToken && ~ ss_useLayout && localsExpected
+				= wantMemberLocals (tokenBack pState)
+				= (LocalParsedDefs [], tokenBack pState)
+		
+		wantMemberLocals :: !ParseState -> (LocalDefs, !ParseState)
+		wantMemberLocals pState
+			# pState			= wantBeginGroup "local definitions" pState
+			  (defs, pState)	= wantDefinitions (cLocalContext bitor WhereOfMemberDefsContext) pState
+			= (LocalParsedDefs defs, wantEndLocals pState)
 
 determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
 determine_position lhs           		pos           = pos
@@ -1552,7 +1633,6 @@ cIsNotAGlobalContext	:== False
 
 cMightBeAClass			:== True
 cIsNotAClass			:== False
-
 		
 wantClassDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantClassDefinition parseContext pos pState
@@ -1704,7 +1784,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 				
 				# pState = wantEndOfDefinition "instance declaration" (tokenBack pState)
 				= (PD_Instance {pim_pi = pi, pim_members = []}, pState)
-				# (pi_members, pState) = wantDefinitions (SetInstanceDefsContext parseContext) pState
+				# (pi_members, pState) = wantMemberDefinitions (SetInstanceDefsContext parseContext) pState
 				  pState = wantEndGroup "instance" pState
 				= (PD_Instance {pim_pi = {pi_class = pi_class, pi_ident = pi_ident, pi_types = pi_types, pi_context = pi_context,
 										  pi_specials = SP_None, pi_pos = pi_pos},
