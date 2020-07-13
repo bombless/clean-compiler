@@ -476,7 +476,6 @@ where
 		  cs & cs_symbol_table=symbol_table
 
 		  arguments = [PE_Ident {id_name="_a"+++toString arg_n,id_info=argument_pointer}\\argument_pointer<-argument_pointers & arg_n<-[1..arity]]
-		  empty_CollectedLocalDefs = CollectedLocalDefs {loc_functions={ir_from=0,ir_to=0},loc_nodes=[],loc_in_icl_module=True}
 		  rhs = case me_priority of
 					NoPrio ->	if (arity==0)
 									(PE_Ident default_class_member_ident)
@@ -488,10 +487,10 @@ where
 		  new_instance_body = ParsedBody
 		  						[{	pb_args = arguments,
 									pb_rhs = {	rhs_alts=UnGuardedExpr
-											{	ewl_expr =	rhs,
-												ewl_nodes = [], ewl_locals= empty_CollectedLocalDefs, ewl_position = ins_pos
-											},
-												rhs_locals=empty_CollectedLocalDefs},
+														{	ewl_expr =	rhs,
+															ewl_nodes = [], ewl_locals = NoCollectedLocalDefs, ewl_position = ins_pos
+														},
+												rhs_locals=NoCollectedLocalDefs},
 									pb_position = ins_pos
 								}]
 		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,

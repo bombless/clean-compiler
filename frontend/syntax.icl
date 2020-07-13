@@ -470,6 +470,7 @@ where
 
 instance <<< LocalDefs
 where
+	(<<<) file NoCollectedLocalDefs = file
 	(<<<) file (LocalParsedDefs defs) = file <<< defs
 	(<<<) file (CollectedLocalDefs defs) = file <<< defs
 

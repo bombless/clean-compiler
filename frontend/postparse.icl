@@ -276,6 +276,8 @@ where
 
 instance collectFunctions LocalDefs
 where
+	collectFunctions (LocalParsedDefs []) icl_module ca
+		= (NoCollectedLocalDefs, ca)
 	collectFunctions (LocalParsedDefs locals) icl_module ca
 		# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions locals ca
 		  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
@@ -383,8 +385,6 @@ instance collectFunctions ParsedBody where
 	collectFunctions pb=:{pb_rhs} icl_module ca
 		# (pb_rhs, ca) = collectFunctions pb_rhs icl_module ca
 		= ({ pb & pb_rhs = pb_rhs }, ca)
-
-NoCollectedLocalDefs :== CollectedLocalDefs { loc_functions = { ir_from = 0, ir_to = 0 }, loc_nodes = [], loc_in_icl_module=True }
 
 transformLambda :: Ident [ParsedExpr] Rhs Position -> FunDef
 transformLambda lam_ident args rhs pos

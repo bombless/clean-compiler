@@ -218,6 +218,7 @@ instance == FunctionOrMacroIndex
 
 ::	LocalDefs	= LocalParsedDefs [ParsedDefinition]
 				| CollectedLocalDefs CollectedLocalDefs
+				| NoCollectedLocalDefs
 
 ::	IndexRange	= { ir_from :: !Index, ir_to :: !Index }
 
