@@ -4,6 +4,7 @@ import StdEnv, compare_types
 import syntax, typesupport, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp
 from check import checkFunctions,checkDclMacros
+from checkgenerics import get_generic_index
 
 cIsInExpressionList		:== True
 cIsNotInExpressionList	:== False
@@ -375,7 +376,13 @@ checkFunctionBodies (GenerateInstanceBodyChecked generic_ident generic_index opt
 			Yes {igi_ident} -> get_optional_member_ident_index igi_ident e_input.ei_mod_index cs
 	= (GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index, [], e_state, e_info, cs)
 checkFunctionBodies (GenerateInstanceBody generic_ident optional_member_ident) function_ident_for_errors e_input e_state e_info cs
-	= (GenerateInstanceBody generic_ident optional_member_ident, [], e_state, e_info, cs)
+	// derive local function in where of default class member
+	# (generic_index,cs) = get_generic_index generic_ident e_input.ei_mod_index cs
+	# (optional_member_ident_global_index,cs)
+		= case optional_member_ident of
+			No -> (No,cs)
+			Yes member_ident -> get_optional_member_ident_index member_ident e_input.ei_mod_index cs
+	= (GenerateInstanceBodyLocalMacro generic_ident generic_index optional_member_ident_global_index, [], e_state, e_info, cs)
 checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
 	= abort ("checkFunctionBodies " +++ toString function_ident_for_errors +++ "\n")
 

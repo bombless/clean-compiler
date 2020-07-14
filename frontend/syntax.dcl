@@ -27,7 +27,11 @@ instance toString Ident
 	,	ste_previous	:: SymbolTableEntry
 	}
 
-:: FunctionOrMacroIndex = FunctionOrIclMacroIndex !Int | DclMacroIndex /*module_n*/ !Int /*macro_n_in_module*/ !Int;
+:: FunctionOrMacroIndex
+	= FunctionOrIclMacroIndex !Int
+	| DclMacroIndex /*module_n*/ !Int /*macro_n_in_module*/ !Int
+	| DeriveInstanceMacroIndex !Int
+	| DeriveInstanceDclMacroIndex !Int !Int
 
 instance == FunctionOrMacroIndex
 
@@ -272,10 +276,11 @@ cIsNotAFunction :== False
 	|	PD_Generic GenericDef
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
-	|	PD_DeriveInstanceMember Position Ident Ident (Optional Ident)
+	|	PD_DeriveInstanceMember Position Ident Ident !Int !(Optional Ident)
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
+			| FK_FunctionWithDerive !Int !Int
 
 ::	StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
 
@@ -326,6 +331,7 @@ cNameLocationDependent :== True
 	= DclInstanceMemberTypes !FunType !DclInstanceMemberTypeAndFunctions
 	| NoDclInstanceMemberTypes
 	| GenerateInstanceMember !Int !Int !DclInstanceMemberTypeAndFunctions // member_n function_n
+	| GenerateInstanceMemberFunction !Int !DclInstanceMemberTypeAndFunctions // member_n
 
 ::	IdentOrQualifiedIdent
 	= Ident !Ident
@@ -406,6 +412,7 @@ cNameLocationDependent :== True
 	= NoMemberDefault
 	| MacroMemberDefault !MacroMember
 	| DeriveDefault !Ident !GlobalIndex !(Optional IdentGlobalIndex)
+	| MacroMemberDefaultWithDerive !MacroMember
 
 ::	MemberDef =
 	{	me_ident		:: !Ident
@@ -683,6 +690,7 @@ FI_Unused :== 64				// used in module trans
 FI_UnusedUsed :== 128			// used in module trans
 FI_HasTypeCodes :== 256
 FI_FusedMember :== 512			// used in module trans to mark fused versions of instance members
+FI_DefaultMemberWithDerive :== 1024
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -728,6 +736,8 @@ FI_FusedMember :== 512			// used in module trans to mark fused versions of insta
 					| GeneratedBody // the body will be generated automatically - for generics
 					| GenerateInstanceBody !Ident !(Optional Ident)
 					| GenerateInstanceBodyChecked !Ident !GlobalIndex !(Optional IdentGlobalIndex)
+					| GenerateInstanceBodyLocalMacro !Ident !GlobalIndex !(Optional IdentGlobalIndex)
+					| PartitioningGenerateInstanceBodyLocalMacro !Ident !GlobalIndex !(Optional IdentGlobalIndex) !Int 
 					| NoBody
 
 :: IdentGlobalIndex = { igi_ident :: !Ident, igi_g_index :: !GlobalIndex }

@@ -1647,7 +1647,7 @@ wantClassDefinition parseContext pos pState
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
 			# (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
-		 	  (members, pState) = wantDefinitions (SetClassDefsContext parseContext) pState
+			  (members, pState) = wantMemberDefinitions (SetClassDefsContext parseContext) pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
 							class_macro_members = {},
@@ -1777,7 +1777,7 @@ wantInstanceDeclaration parseContext pi_pos pState
 							# (member_ident, pState) = stringToIdent class_name IC_Expression pState
 							# (generic_ident, pState) = stringToIdent generic_function_name IC_Generic pState
 							# pState = wantEndOfDefinition "derive instance" pState
-							-> (PD_Instance {pim_pi = pi, pim_members = [PD_DeriveInstanceMember pi_pos member_ident generic_ident No]}, pState)
+							-> (PD_Instance {pim_pi = pi, pim_members = [PD_DeriveInstanceMember pi_pos member_ident generic_ident 0 No]}, pState)
 						_
 							# pState = parseError "derive instance member" (Yes token) "generic function name" pState
 							-> (PD_Instance {pim_pi = pi, pim_members = []}, pState)
@@ -2302,10 +2302,10 @@ wantDeriveInstanceDefinition parseContext pos pState
 						IdentToken member_name2
 							# (member_ident2, pState) = stringToIdent member_name2 IC_Expression pState
 							# pState = wantEndOfDefinition "derive instance" pState
-							-> (PD_DeriveInstanceMember pos member_ident generic_ident (Yes member_ident2),pState)
+							-> (PD_DeriveInstanceMember pos member_ident generic_ident 0 (Yes member_ident2),pState)
 						token
 							# pState = wantEndOfDefinition "derive instance" (tokenBack pState)
-							-> (PD_DeriveInstanceMember pos member_ident generic_ident No,pState)
+							-> (PD_DeriveInstanceMember pos member_ident generic_ident 0 No,pState)
 				_
 					# pState = parseError "derive instance member" (Yes token) "generic function name" pState
 					-> (PD_Erroneous,pState)

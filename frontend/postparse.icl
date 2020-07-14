@@ -327,9 +327,9 @@ where
 		  where
 			arity (Yes {st_arity}) = st_arity
 			arity No = 2 // it was specified as infix
-		reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident : defs] ca
+		reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
 			# fun_body = GenerateInstanceBody generic_ident optional_member_ident
-			  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+			  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
 						 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			= ([fun_def:fun_defs], node_defs, ca)
@@ -1548,7 +1548,7 @@ where
 		| bodies=:[]
 			# type & st_context = [type_context : st_context]
 			= case defs of
-				[PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident:defs]
+				[PD_DeriveInstanceMember pos member_ident generic_ident _ optional_member_ident:defs]
 				  | member_ident.id_name==name.id_name
 					# default_implementation
 						= case optional_member_ident of
@@ -1579,15 +1579,53 @@ where
 			= (mem_defs,[macro : mem_macros],default_members_without_type,[|macro_member : macro_members],new_macro_count,ca)
 		   FK_Function _
 		    # macro_name = class_ident.id_name+++"_"+++name.id_name
-			# ({boxed_ident=macro_ident}, ca_hash_table) = putIdentInHashTable macro_name IC_Expression ca.ca_hash_table
-			# ca = { ca & ca_hash_table = ca_hash_table }
-			# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
-			# mem_def = {	me_ident = name, me_type = { type & st_context = [type_context : st_context ]}, me_pos = pos, me_priority = prio,
-							me_offset = NoIndex, me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
-							me_default_implementation = MacroMemberDefault {mm_ident=macro_ident,mm_index=macro_count}, me_type_ptr = nilPtr }
-			  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
-					= check_symbols_of_class_members defs type_context (macro_count+1) ca
-			= ([mem_def : mem_defs],[macro : mem_macros],default_members_without_type,macro_members,macro_count,ca)
+			  ({boxed_ident=macro_ident}, ca_hash_table) = putIdentInHashTable macro_name IC_Expression ca.ca_hash_table
+			  ca & ca_hash_table = ca_hash_table
+
+			  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
+			  type & st_context = [type_context : st_context]
+
+			| not (has_PD_DeriveInstanceMember_in_where bodies)
+				# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
+				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex, 
+								me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_default_implementation = MacroMemberDefault macro_member, me_type_ptr = nilPtr }
+				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
+						= check_symbols_of_class_members defs type_context (macro_count+1) ca
+				= ([mem_def : mem_defs],[macro : mem_macros],default_members_without_type,macro_members,macro_count,ca)
+
+				# bodies = set_PD_DeriveInstanceMember_arity_in_where st_arity bodies
+				  macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
+				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex,
+								me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_default_implementation = MacroMemberDefaultWithDerive macro_member, me_type_ptr = nilPtr }
+				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
+						= check_symbols_of_class_members defs type_context (macro_count+1) ca
+				= ([mem_def : mem_defs],[macro : mem_macros],default_members_without_type,macro_members,macro_count,ca)
+		where
+			has_PD_DeriveInstanceMember_in_where [{pb_rhs={rhs_locals=LocalParsedDefs local_parsed_defs}}:parsed_bodies]
+				= has_PD_DeriveInstanceMember local_parsed_defs || has_PD_DeriveInstanceMember_in_where parsed_bodies
+			where
+				has_PD_DeriveInstanceMember [PD_DeriveInstanceMember _ _ _ _ _:local_parsed_defs] = True
+				has_PD_DeriveInstanceMember [_:local_parsed_defs] = has_PD_DeriveInstanceMember local_parsed_defs
+				has_PD_DeriveInstanceMember [] = False
+			has_PD_DeriveInstanceMember_in_where []
+				= False
+
+			set_PD_DeriveInstanceMember_arity_in_where arity [rhs=:{pb_rhs={rhs_locals=LocalParsedDefs local_parsed_defs}}:bodies]
+				# local_parsed_defs = set_PD_DeriveInstanceMember_arity arity local_parsed_defs
+				# bodies = set_PD_DeriveInstanceMember_arity_in_where arity bodies
+				= [{rhs & pb_rhs.rhs_locals=LocalParsedDefs local_parsed_defs}:bodies]
+			where
+				set_PD_DeriveInstanceMember_arity arity [PD_DeriveInstanceMember pos member_ident generic_ident _ optional_member_ident:local_parsed_defs]
+					= [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident:set_PD_DeriveInstanceMember_arity arity local_parsed_defs]
+				set_PD_DeriveInstanceMember_arity arity [local_parsed_def:local_parsed_defs]
+					= [local_parsed_def:set_PD_DeriveInstanceMember_arity arity local_parsed_defs]
+				set_PD_DeriveInstanceMember_arity arity []
+					= []
+			set_PD_DeriveInstanceMember_arity_in_where arity []
+				= []
+
 	check_symbols_of_class_members [PD_TypeSpec fun_pos fun_name prio No specials : defs] type_context macro_count ca
 		= case defs of
 			[PD_Function pos name is_infix args rhs fun_kind : defs]
@@ -1620,7 +1658,7 @@ where
 				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
 				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
-	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ _ : defs] type_context macro_count ca
+	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ _ _ : defs] type_context macro_count ca
 		= check_symbols_of_class_members defs type_context macro_count (postParseError pos "member type missing" ca)
 	check_symbols_of_class_members [def : _] type_context macro_count ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
@@ -1684,9 +1722,9 @@ where
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
-	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident optional_member_ident : defs] ca
+	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
 		# fun_body = GenerateInstanceBody generic_ident optional_member_ident
-		  fun_def = {fun_ident = member_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+		  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
 					 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 		  (fun_defs, ca) = collect_member_instances defs ca
 		= ([fun_def : fun_defs], ca)

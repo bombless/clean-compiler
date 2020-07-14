@@ -235,6 +235,7 @@ where
 	compare_default_implementations (MacroMemberDefault _) (MacroMemberDefault _) = True
 	compare_default_implementations (DeriveDefault generic_ident1 generic_index1 optional_member_ident1) (DeriveDefault generic_ident2 generic_index2 optional_member_ident2)
 		= generic_index1==generic_index2 && generic_ident1==generic_ident2 && compare_optional_member_ident optional_member_ident1 optional_member_ident2
+	compare_default_implementations (MacroMemberDefaultWithDerive _) (MacroMemberDefaultWithDerive _) = True
 	compare_default_implementations _ _ = False
 
 	compare_optional_member_ident No No = True

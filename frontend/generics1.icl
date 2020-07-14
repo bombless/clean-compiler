@@ -2145,6 +2145,60 @@ generate_derived_instance (GenerateInstanceMember member_i member_fun_i member_t
 				-> generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
 		No
 			-> generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+generate_derived_instance (GenerateInstanceMemberFunction member_i member_types_and_functions) ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	# {cim_index} = ins_members.[member_i]
+	| cim_index<0
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	# ({fun_kind},ss) = ss!ss_funs.[cim_index]
+	| not fun_kind=:FK_FunctionWithDerive _ _
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		# (FK_FunctionWithDerive first_new_function_n end_new_function_n) = fun_kind
+		# ss = generate_instance_member_functions first_new_function_n end_new_function_n member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		= generate_derived_instance member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+
+generate_instance_member_functions fun_index end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+	| fun_index<end_fun_index
+		| ss.ss_funs.[fun_index].fun_body=:PartitioningGenerateInstanceBodyLocalMacro _ _ _ _
+			# (PartitioningGenerateInstanceBodyLocalMacro generic_ident generic_index optional_member _,ss) = ss!ss_funs.[fun_index].fun_body
+
+			# ({gen_type,gen_deps},ss) = ss!ss_modules.[generic_index.gi_module].com_generic_defs.[generic_index.gi_index]
+			| ss.ss_funs.[fun_index].fun_arity<>gen_type.st_arity
+				# ss & ss_error = reportError generic_ident.id_name ins_pos "arity of generic function and member not equal" ss.ss_error
+				= generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+			| not gen_deps=:[]
+				# ss & ss_error = reportError generic_ident.id_name ins_pos "deriving instances from generic with dependencies not implemented" ss.ss_error
+				= generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+
+			# (opt_member_symb_ident,ss)
+				= make_member_symb_ident optional_member gen_type.st_arity generic_ident member_i ins_class_index ins_pos ss
+
+			= case opt_member_symb_ident of
+				Yes member_symb_ident
+					# type_index = type_index_of_type_constructor ins_type.it_types
+					| type_index.glob_module>=0
+						# (tb_args,tb_rhs,ss)
+							= build_derived_instance_body type_index ins_pos generic_ident generic_index member_symb_ident main_module_n predefs ss
+
+						#! (arg_vars, local_vars, free_vars) = collectVars tb_rhs tb_args
+						| not free_vars=:[]
+							-> abort "generate_instance_member_functions: free_vars is not empty\n"
+
+						# (fun=:{fun_info},ss) = ss!ss_funs.[fun_index]
+						  fun &
+							fun_arity = length arg_vars,
+							fun_body = TransformedBody {tb_args=arg_vars, tb_rhs=tb_rhs},
+							fun_info = {fun_info &
+										fi_calls = collectCalls main_module_n tb_rhs,
+										fi_free_vars = [], fi_local_vars = local_vars,
+										fi_properties = fun_info.fi_properties bitor FI_GenericFun}
+						  ss & ss_funs.[fun_index] = fun
+
+						-> generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+						-> generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+				No
+					-> generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+			= generate_instance_member_functions (fun_index+1) end_fun_index member_i member_types_and_functions ins_members ins_type ins_pos ins_class_index main_module_n predefs ss
+		= ss
 
 type_index_of_type_constructor [TA {type_index} _] = type_index
 type_index_of_type_constructor [TAS {type_index} _ _] = type_index

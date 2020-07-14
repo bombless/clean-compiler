@@ -166,6 +166,11 @@ getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index
 						-> add_more_default_class_member_macros (class_member_n+1) [|default_class_member_macro_ident_and_index] 1 default_member_indexes dcl_modules
 					DeriveDefault generic_ident generic_index _
 						-> add_default_class_member_macros (class_member_n+1) dcl_modules
+					MacroMemberDefaultWithDerive default_class_member_macro_ident_and_index
+						#! n_members = size class_members
+						# default_member_indexes = createArray n_members -1
+						  default_member_indexes & [class_member_n] = 0
+						-> add_more_default_class_member_macros (class_member_n+1) [|default_class_member_macro_ident_and_index] 1 default_member_indexes dcl_modules
 				| size class_macro_members==0
 					= (BS_Members class_members,dcl_modules)
 					= (BS_MembersAndMacros class_members class_macro_members {} {},dcl_modules)
@@ -179,10 +184,14 @@ getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Class def_mod_index
 						-> add_more_default_class_member_macros (class_member_n+1) default_class_members default_member_n default_member_indexes dcl_modules
 					MacroMemberDefault default_class_member_macro_ident_and_index
 						# default_class_members = [|default_class_member_macro_ident_and_index:default_class_members]
-  						  default_member_indexes & [class_member_n] = default_member_n
+						  default_member_indexes & [class_member_n] = default_member_n
 						-> add_more_default_class_member_macros (class_member_n+1) default_class_members (default_member_n+1) default_member_indexes dcl_modules
 					DeriveDefault generic_ident generic_index _
 						-> add_more_default_class_member_macros (class_member_n+1) default_class_members default_member_n default_member_indexes dcl_modules
+					MacroMemberDefaultWithDerive default_class_member_macro_ident_and_index
+						# default_class_members = [|default_class_member_macro_ident_and_index:default_class_members]
+						  default_member_indexes & [class_member_n] = default_member_n
+						-> add_more_default_class_member_macros (class_member_n+1) default_class_members (default_member_n+1) default_member_indexes dcl_modules
 				# default_class_members = {default_class_member\\default_class_member<-reverse default_class_members}
 				= (BS_MembersAndMacros class_members class_macro_members default_member_indexes default_class_members,dcl_modules)
 	= (members,dcl_modules)

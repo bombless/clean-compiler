@@ -475,6 +475,16 @@ where
 		# (new_instance_member_ds,new_instance_member,cs)
 			= make_derived_default_instance arity fun_body me_priority ins_pos class_member function_n cs
 		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
+	make_default_implementation (MacroMemberDefaultWithDerive {mm_ident}) me_priority ins_pos class_member function_n arity instance_member_n ins_member_types_and_functions cs
+		# ins_member_types_and_functions = GenerateInstanceMemberFunction instance_member_n ins_member_types_and_functions
+		  (new_instance_member_ds,new_instance_body,cs)
+			= make_default_instance_body arity mm_ident me_priority ins_pos class_member function_n cs
+		  fun_info = {EmptyFunInfo & fi_properties=FI_DefaultMemberWithDerive}
+		  new_instance_member
+			= {	fun_ident = new_instance_member_ds.cim_ident, fun_arity = arity, fun_priority = me_priority,
+				fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
+				fun_kind = FK_Function False, fun_lifted = 0, fun_info = fun_info }
+		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
 
 	add_generated_instance ins_member_index class_member member_mod_index ins_type instance_types icl_functions member_defs type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# ({me_type,me_class_vars,me_priority}, member_defs, modules)
