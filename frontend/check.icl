@@ -433,17 +433,8 @@ where
 			# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
 				= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
 			  (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-				= case me_default_implementation of
-					MacroMemberDefault {mm_ident}
-						# (new_instance_member_ds,new_instance_member,cs)
-							= make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member function_n cs
-						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-					DeriveDefault generic_ident generic_index optional_member_ident_global_index
-						# ins_member_types_and_functions = GenerateInstanceMember instance_member_n function_n ins_member_types_and_functions
-						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
-						# (new_instance_member_ds,new_instance_member,cs)
-							= make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member function_n cs
-						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
+				= make_default_implementation me_default_implementation me_priority ins_pos class_member function_n instance_type.st_arity
+												instance_member_n ins_member_types_and_functions cs
 			  icl_functions & [function_n] = new_instance_member
 			  ins_members = { if (i<>instance_member_n) ins_members.[i] new_instance_member_ds \\ i<-[0..size ins_members-1] }
 			  instance_types = [(function_n,instance_type) : instance_types]
@@ -459,17 +450,8 @@ where
 			# (instance_type,type_defs,modules,var_heap,type_heaps,cs)
 				= make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
 			  (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-				= case me_default_implementation of
-					MacroMemberDefault {mm_ident}
-						# (new_instance_member_ds,new_instance_member,cs)
-							= make_default_instance instance_type.st_arity mm_ident me_priority ins_pos class_member n_icl_functions cs
-						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
-					DeriveDefault generic_ident generic_index optional_member_ident_global_index
-						# ins_member_types_and_functions = GenerateInstanceMember instance_member_n n_icl_functions ins_member_types_and_functions
-						# fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
-						# (new_instance_member_ds,new_instance_member,cs)
-							= make_derived_default_instance instance_type.st_arity fun_body me_priority ins_pos class_member n_icl_functions cs
-						-> (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
+				= make_default_implementation me_default_implementation me_priority ins_pos class_member n_icl_functions instance_type.st_arity
+												instance_member_n ins_member_types_and_functions cs
 			  new_instance_members = [! new_instance_member : new_instance_members !]
 			  ins_members
 				= { if (i<instance_member_n) ins_members.[i] (if (i==instance_member_n) new_instance_member_ds ins_members.[i-1])
@@ -478,6 +460,21 @@ where
 			= (instance_member_n+1,ins_members,ins_member_types_and_functions,n_icl_functions+1,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
 			# cs & cs_error = checkErrorWithPosition class_member.ds_ident ins_pos "instance of class member expected" cs.cs_error
 			= (instance_member_n,ins_members,ins_member_types_and_functions,n_icl_functions,new_instance_members,instance_types,member_defs,type_defs,modules,var_heap,type_heaps,cs)
+
+	make_default_implementation (MacroMemberDefault {mm_ident}) me_priority ins_pos class_member function_n arity instance_member_n ins_member_types_and_functions cs
+		# (new_instance_member_ds,new_instance_body,cs)
+			= make_default_instance_body arity mm_ident me_priority ins_pos class_member function_n cs
+		  new_instance_member
+			= {	fun_ident = new_instance_member_ds.cim_ident, fun_arity = arity, fun_priority = me_priority,
+				fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
+				fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
+		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
+	make_default_implementation (DeriveDefault generic_ident generic_index optional_member_ident_global_index) me_priority ins_pos class_member function_n arity instance_member_n ins_member_types_and_functions cs
+		# ins_member_types_and_functions = GenerateInstanceMember instance_member_n function_n ins_member_types_and_functions
+		# fun_body = GenerateInstanceBodyChecked generic_ident generic_index optional_member_ident_global_index
+		# (new_instance_member_ds,new_instance_member,cs)
+			= make_derived_default_instance arity fun_body me_priority ins_pos class_member function_n cs
+		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
 
 	add_generated_instance ins_member_index class_member member_mod_index ins_type instance_types icl_functions member_defs type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# ({me_type,me_class_vars,me_priority}, member_defs, modules)
@@ -513,9 +510,9 @@ where
 			= (icl_functions,{cs & cs_error = checkErrorWithPosition fun_ident fun_pos (ins_member.cim_ident.id_name+++" is not a member of this class") cs.cs_error})
 			= (icl_functions,{cs & cs_error = checkError ins_member.cim_ident "not a member of this class" cs.cs_error})
 
-	make_default_instance :: !Int Ident Priority Position DefinedSymbol Int !*CheckState
-		-> (!ClassInstanceMember,!FunDef,!*CheckState)
-	make_default_instance arity default_class_member_ident me_priority ins_pos class_member function_n cs
+	make_default_instance_body :: !Int Ident Priority Position DefinedSymbol Int !*CheckState
+		-> (!ClassInstanceMember,FunctionBody,!*CheckState)
+	make_default_instance_body arity default_class_member_ident me_priority ins_pos class_member function_n cs
 		# new_instance_ident = {id_name=class_member.ds_ident.id_name,id_info=nilPtr}
 		  new_instance_member_ds = {cim_ident = new_instance_ident, cim_arity = arity, cim_index = function_n}
 		  
@@ -523,14 +520,14 @@ where
 		  cs & cs_symbol_table=symbol_table
 
 		  arguments = [PE_Ident {id_name="_a"+++toString arg_n,id_info=argument_pointer}\\argument_pointer<-argument_pointers & arg_n<-[1..arity]]
+		  default_class_member_expr = PE_Ident default_class_member_ident
 		  rhs = case me_priority of
 					NoPrio ->	if (arity==0)
-									(PE_Ident default_class_member_ident)
-									(PE_List [PE_Ident default_class_member_ident:arguments])
+									default_class_member_expr
+									(PE_List [default_class_member_expr:arguments])
 					_ ->		if (arity==0)
-									(PE_List [PE_Ident default_class_member_ident])
-									(PE_List [hd arguments,PE_Ident default_class_member_ident:tl arguments])
-									
+									(PE_List [default_class_member_expr])
+									(PE_List [hd arguments,default_class_member_expr:tl arguments])
 		  new_instance_body = ParsedBody
 		  						[{	pb_args = arguments,
 									pb_rhs = {	rhs_alts=UnGuardedExpr
@@ -540,10 +537,7 @@ where
 												rhs_locals=NoCollectedLocalDefs},
 									pb_position = ins_pos
 								}]
-		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
-		  							fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
-		  							fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
-		= (new_instance_member_ds,new_instance_member,cs)
+		= (new_instance_member_ds,new_instance_body,cs)
 
 	make_derived_default_instance :: !Int FunctionBody Priority Position DefinedSymbol Int !*CheckState
 		-> (!ClassInstanceMember,!FunDef,!*CheckState)

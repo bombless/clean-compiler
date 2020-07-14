@@ -850,6 +850,8 @@ remove_dynamic_expr_info_ptr_copies [dyn_ptr:dyn_ptrs] expr_heap
 remove_dynamic_expr_info_ptr_copies [] expr_heap
 	= expr_heap
 
+::	ExpandInfo :== (![FunCall], !.ExpandState)
+
 unfoldMacro :: !FunDef ![Expression] !*ExpandInfo -> (!Expression, !*ExpandInfo)
 unfoldMacro {fun_body =fun_body=: TransformedBody {tb_args,tb_rhs}, fun_info = {fi_calls},fun_kind,fun_ident} args (calls, es=:{es_var_heap,es_expression_heap,es_fun_defs})
 	# (let_binds, var_heap) = bind_expressions tb_args args [] es_var_heap
@@ -1412,9 +1414,8 @@ try_to_close_group max_fun_nr macro_module_index fun_index fun_number min_dep pi
 where
 	close_group macro_module_index fun_index [index=:FunctionOrIclMacroIndex d:ds] functions_in_group macros_in_group nr_of_fun_defs group_number fun_defs macro_defs
 		# (fun_def, fun_defs) = fun_defs![d]
-		| case fun_def.fun_kind of FK_Macro->True; _ -> False
+		| fun_def.fun_kind=:FK_Macro
 			# fun_defs = { fun_defs & [d] = { fun_def & fun_info.fi_group_index = -2-group_number }}
-//			# fun_defs = { fun_defs & [d] = { fun_def & fun_info.fi_group_index = group_number }}
 			# macros_in_group = [index : macros_in_group]
 			| d == fun_index && macro_module_index==(-1)
 				= (ds, functions_in_group, macros_in_group, fun_defs,macro_defs)
@@ -1426,7 +1427,7 @@ where
 				= close_group macro_module_index fun_index ds functions_in_group macros_in_group nr_of_fun_defs group_number fun_defs macro_defs
 	close_group macro_module_index fun_index [index=:DclMacroIndex module_index d:ds] functions_in_group macros_in_group nr_of_fun_defs group_number fun_defs macro_defs
 		# (fun_def, macro_defs) = macro_defs![module_index,d]
-		| case fun_def.fun_kind of FK_Macro->True; _ -> False
+		| fun_def.fun_kind=:FK_Macro
 			# macro_defs = { macro_defs & [module_index,d] = { fun_def & fun_info.fi_group_index = -2-group_number }}
 			# macros_in_group = [index : macros_in_group]
 			| d == fun_index && macro_module_index==module_index
@@ -1558,8 +1559,6 @@ expandMacrosInBody fi_calls {cb_args,cb_rhs} predef_symbols_for_transform reset_
 expandCheckedAlternative {ca_rhs, ca_position} ei
 	# (ca_rhs, ei) = expand ca_rhs ei
 	= ((ca_rhs, ca_position), ei)
-
-::	ExpandInfo :== (![FunCall], !.ExpandState)
 
 add_new_fun_defs new_functions new_function_index last_function_index es=:{es_fun_defs,es_new_fun_def_numbers}
 	# new_fun_defs = new_fun_defs
