@@ -36,7 +36,6 @@ Conventions:
 	}
 
 PS_SkippingMask :== 1
-PS_SupportGenericsMask :==2
 PS_DynamicTypeUsedMask :== 4
 
 /*
@@ -279,9 +278,9 @@ isMemberOrWhereOfMemberDefsContext parseContext	:== parseContext bitand MemberOr
 cWantIclFile :== True
 cWantDclFile :== False
 
-wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*Files
+wantModule :: !*File !{#Char} !Bool !Ident !Position !*HashTable !*File !*Files
 	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
-wantModule file modification_time iclmodule file_id=:{id_name} import_file_position support_generics hash_table error files
+wantModule file modification_time iclmodule file_id=:{id_name} import_file_position hash_table error files
 	# scanState = openScanner file id_name file_name_extension
 	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
 	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
@@ -298,7 +297,7 @@ where
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
-										, ps_flags = if support_generics PS_SupportGenericsMask 0
+										, ps_flags = 0
 										, ps_hash_table = hash_table
 										}
 			  pState				= verify_name mod_name id_name file_name pState
@@ -1995,8 +1994,6 @@ optionalCoercions pState
 
 wantGenericDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantGenericDefinition parseContext pos pState
-	| pState.ps_flags bitand PS_SupportGenericsMask==0
-		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (name, pState) = want_name pState
 	| name == "" 
 		= (PD_Erroneous, pState)
@@ -2056,8 +2053,6 @@ wantGenericDefinition parseContext pos pState
 
 wantDeriveDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveDefinition parseContext pos pState
-	| pState.ps_flags bitand PS_SupportGenericsMask==0
-		= (PD_Erroneous, parseErrorSimple "generic definition" "to enable generics use the command line flag -generics" pState)
 	# (token, pState) = nextToken TypeContext pState
 	= case token of
 		IdentToken name
@@ -5354,8 +5349,6 @@ wantBeginGroup msg pState
 // AA..
 wantKind :: !ParseState -> (!TypeKind, !ParseState)
 wantKind pState
-	| pState.ps_flags bitand PS_SupportGenericsMask==0
-		= (KindConst, parseErrorSimple "kind" "to enable generics use -generics command line flag" pState)
 	# (token, pState) = nextToken TypeContext pState
 	# (kind, pState) = want_simple_kind token pState
 	# (token, pState) = nextToken TypeContext pState

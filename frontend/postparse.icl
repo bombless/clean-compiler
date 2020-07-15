@@ -1011,25 +1011,25 @@ transformArrayDenot array_kind exprs
 cast_array_kind OverloadedArray array_expr = array_expr
 cast_array_kind array_kind array_expr = PE_TypeSignature array_kind array_expr
 
-scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
-scanModules [] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+scanModules :: [ParsedImport] [ScannedModule] [Ident] SearchPaths Bool (ModTimeFunction *Files) *Files *CollectAdmin -> (Bool, [ScannedModule],*Files, *CollectAdmin)
+scanModules [] parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 	= (True, parsed_modules,files, ca)
-scanModules [{import_module,import_file_position} : mods] parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+scanModules [{import_module,import_file_position} : mods] parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 	| in_cache import_module cached_modules
-		= scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+		= scanModules mods parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 	# (found_module,mod_type) = try_to_find import_module parsed_modules
 	| found_module
 		= case mod_type of
 			MK_NoMainDcl
 				# ca = postParseError import_file_position ("main module \'"+++import_module.id_name+++"\' does not have a definition module") ca
-				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+				# (_,parsed_modules,files,ca) = scanModules mods parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 				-> (False,parsed_modules,files,ca)
 			_
-				-> scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+				-> scanModules mods parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 		# (succ, parsed_modules,files, ca)
-				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+				= parseAndScanDclModule import_module import_file_position parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 		  (mods_succ, parsed_modules,files, ca)
-		  		= scanModules mods parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+				= scanModules mods parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 		= (succ && mods_succ, parsed_modules,files, ca)
 where
 	in_cache mod_id []
@@ -1053,9 +1053,9 @@ MakeEmptyModule name mod_type
 					def_macros=[],def_members = [], def_funtypes = [], def_instances = [], 
 					def_generics = [], def_generic_cases = []} }
 
-parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool Bool (ModTimeFunction *Files) !*Files !*CollectAdmin
+parseAndScanDclModule :: !Ident !Position ![ScannedModule] ![Ident] !SearchPaths !Bool (ModTimeFunction *Files) !*Files !*CollectAdmin
 	-> *(!Bool, ![ScannedModule],!*Files, !*CollectAdmin)
-parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 	# {ca_error, ca_hash_table} = ca
 	# (opt_file_dir_time,files) = fopenInSearchPaths dcl_module.id_name ".dcl" searchPaths FReadData modtimefunction files
 	| case opt_file_dir_time of No -> True; _ -> False
@@ -1064,7 +1064,7 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 		= (False, [MakeEmptyModule dcl_module MK_None: parsed_modules],files, ca)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 	# (parse_ok,dynamic_type_used,mod, ca_hash_table, err_file, files)
-		= wantModule mod_file mod_time cWantDclFile dcl_module import_file_position support_generics ca_hash_table ca_error.pea_file files
+		= wantModule mod_file mod_time cWantDclFile dcl_module import_file_position ca_hash_table ca_error.pea_file files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
 		= scan_dcl_module dcl_module mod parsed_modules searchPaths modtimefunction files ca
@@ -1083,12 +1083,12 @@ where
 		  ca = {ca & ca_rev_fun_defs=[]}
 		  mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = { defs & def_macros=def_macros,def_macro_indices = range }}
 		  (import_ok, parsed_modules,files, ca)
-			= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+			= scanModules imports [mod : parsed_modules] cached_modules searchPaths support_dynamics modtimefunction files ca
 		= (pea_ok && import_ok, parsed_modules,files, ca)
 
-scanModule :: !ParsedModule ![Ident] !Bool !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
+scanModule :: !ParsedModule ![Ident] !Bool !*HashTable !*File !SearchPaths (ModTimeFunction *Files) !*Files
 	-> (!Bool, !ScannedModule, !IndexRange, ![FunDef], !Optional ScannedModule, ![ScannedModule],!Int,!*HashTable, !*File, !*Files)
-scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_generics support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
+scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_dynamics hash_table err_file searchPaths /*predefs*/ modtimefunction files
 	# predefIdents = predefined_idents
 	# ca =	{	ca_error		= {pea_file = err_file, pea_ok = True}
 			,	ca_fun_count	= 0
@@ -1102,7 +1102,7 @@ scanModule mod=:{mod_ident,mod_type,mod_defs = pdefs} cached_modules support_gen
 	  (import_dcl_ok, optional_parsed_dcl_mod,dcl_module_n,parsed_modules, cached_modules,files, ca)
 	  		= scan_main_dcl_module mod_ident mod_type modtimefunction files ca
 	  (import_dcls_ok, parsed_modules, files, ca)
-	  		= scanModules imports parsed_modules cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+			= scanModules imports parsed_modules cached_modules searchPaths support_dynamics modtimefunction files ca
 
 	  (pea_dcl_ok,optional_dcl_mod,ca) = collect_main_dcl_module optional_parsed_dcl_mod dcl_module_n ca
 
@@ -1161,7 +1161,7 @@ where
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 		# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 		# (parse_ok,dynamic_type_used,mod, hash_table, err_file, files)
-			= wantModule mod_file mod_time cWantDclFile mod_ident NoPos support_generics ca_hash_table ca_error.pea_file files
+			= wantModule mod_file mod_time cWantDclFile mod_ident NoPos ca_hash_table ca_error.pea_file files
 		# ca = {ca & ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
@@ -1169,7 +1169,7 @@ where
 			# (_, defs, imports, imported_objects,foreign_exports,ca) = reorganiseDefinitionsAndAddTypes mod_ident support_dynamics False pdefs ca
 			# mod = { mod & mod_imports = imports, mod_imported_objects = imported_objects, mod_defs = defs}
 			# cached_modules = [mod.mod_ident:cached_modules]
-			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_generics support_dynamics modtimefunction files ca
+			# (import_ok, parsed_modules,files, ca) = scanModules imports [] cached_modules searchPaths support_dynamics modtimefunction files ca
 			= (import_ok, Yes mod, NoIndex,parsed_modules, cached_modules,files, ca)
 
 	collect_main_dcl_module (Yes mod=:{mod_defs=defs}) dcl_module_n ca

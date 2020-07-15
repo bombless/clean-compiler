@@ -9,7 +9,6 @@ from partition import ::Component(..),::ComponentMembers
 :: FrontEndOptions
 	=	{	feo_up_to_phase			:: !FrontEndPhase
 		,	feo_fusion	 			:: !FusionOptions
-		,	feo_generics 			:: !Bool
 		}
 
 :: InstanceAndClassInfo

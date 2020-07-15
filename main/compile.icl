@@ -118,7 +118,6 @@ abc_file_name_in_clean_system_files_folder mod_dir mod_name error files
 	,	fusion_options :: !FusionOptions
 	,	compile_for_dynamics	:: !Bool
 	,	dump_core				:: !Bool
-	,	compile_with_generics   :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
@@ -137,7 +136,6 @@ InitialCoclOptions =
 	,	fusion_options = {compile_with_fusion = False, generic_fusion = False, strip_unused = False}
 	,	compile_for_dynamics	= False
 	,	dump_core				= False
-	,	compile_with_generics 	= True 
 	}
 
 :: DclCache = {
@@ -205,7 +203,7 @@ parseCommandLine [arg1=:"-strip":args] options
 	= parseCommandLine args {options & fusion_options.strip_unused = True}
 parseCommandLine ["-generics":args] options
 	// enable generics
-	= parseCommandLine args {options & compile_with_generics = True}
+	= parseCommandLine args options
 parseCommandLine ["-lattr":args] options
 	= parseCommandLine args {options & listTypes.lto_showAttributes = False}
 parseCommandLine ["-lt":args] options
@@ -309,7 +307,6 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
 		= frontEndInterface opt_file_dir_time
 			{feo_up_to_phase=FrontEndPhaseAll
-			,feo_generics=options.compile_with_generics
 			,feo_fusion=options.fusion_options
 			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
 

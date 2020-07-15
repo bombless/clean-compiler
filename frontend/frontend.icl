@@ -22,7 +22,7 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 
 defaultFrontEndOptions :: FrontEndOptions
 defaultFrontEndOptions
-	= { feo_up_to_phase = FrontEndPhaseAll, feo_generics = False,
+	= { feo_up_to_phase = FrontEndPhaseAll,
 		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False } }
 
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
@@ -33,13 +33,13 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
-		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos options.feo_generics hash_table error files
+		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos hash_table error files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
 	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
-		= scanModule mod cached_module_idents options.feo_generics support_dynamics hash_table error search_paths modtimefunction files
+		= scanModule mod cached_module_idents support_dynamics hash_table error search_paths modtimefunction files
 
 //	# hash_table = {hash_table & hte_entries={}}
 	# hash_table = remove_icl_symbols_from_hash_table hash_table
@@ -133,13 +133,9 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# (ti_common_defs,dcl_mods) = copy_common_defs_from_dcl_modules dcl_mods
 	# (saved_main_dcl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n icl_common
 
-	#! (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
-		= case options.feo_generics of
-			True
-				-> convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs groups fun_defs
-									td_infos heaps hash_table predef_symbols dcl_mods cached_dcl_macros error_admin
-			False
-				-> (ti_common_defs, groups, fun_defs, td_infos, heaps, hash_table, predef_symbols, dcl_mods, cached_dcl_macros, error_admin)
+	#! (ti_common_defs,groups,fun_defs,td_infos,heaps,hash_table,predef_symbols,dcl_mods,cached_dcl_macros,error_admin)
+		= convertGenerics main_dcl_module_n icl_used_module_numbers ti_common_defs groups fun_defs
+									   td_infos heaps hash_table predef_symbols dcl_mods cached_dcl_macros error_admin
 
 	# (icl_common, ti_common_defs) = replace ti_common_defs main_dcl_module_n saved_main_dcl_common
 
