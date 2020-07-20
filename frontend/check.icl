@@ -882,13 +882,19 @@ where
 	check_and_collect_context_types_of_special {tc_class=TCClass {glob_object={ds_ident,ds_index},glob_module},tc_types} predef_symbols error
 		| hasNoTypeVariables tc_types
 			= (tc_types, predef_symbols,error)
-		# {pds_def,pds_module} = predef_symbols.[PD_ArrayClass]
-		| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_array tc_types predef_symbols
-			= (tc_types, predef_symbols,error)
-		# {pds_def,pds_module} = predef_symbols.[PD_ListClass]
-		| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_list tc_types predef_symbols
-			= (tc_types, predef_symbols,error)
-			= (tc_types, predef_symbols,checkError ds_ident.id_name "illegal specialization" error)
+		= case tc_types of
+			[TA {type_index} [],TV _]
+				# {pds_def,pds_module} = predef_symbols.[PD_ArrayClass]
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_array type_index predef_symbols
+					-> (tc_types, predef_symbols,error)
+				# {pds_def,pds_module} = predef_symbols.[PD_ListClass]
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_list type_index predef_symbols
+					-> (tc_types, predef_symbols,error)
+				# {pds_module,pds_def} = predef_symbols.[PD_MaybeClass]
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_maybe type_index predef_symbols
+					-> (tc_types, predef_symbols,error)
+			_
+				-> (tc_types, predef_symbols,checkError ds_ident.id_name "illegal specialization" error)
 	check_and_collect_context_types_of_special {tc_class=TCGeneric {gtc_generic},tc_types} predef_symbols error
 		= (tc_types, predef_symbols,checkError gtc_generic.glob_object.ds_ident.id_name "generic specials are illegal" error)
 
@@ -899,7 +905,7 @@ where
 	hasNoTypeVariables [ _ : types]
 		= hasNoTypeVariables types
 	
-	is_lazy_or_strict_array [TA {type_index={glob_module,glob_object}} [],TV var] predef_symbols
+	is_lazy_or_strict_array {glob_module,glob_object} predef_symbols
 		# {pds_def,pds_module} = predef_symbols.[PD_LazyArrayType]
 		| glob_module==pds_module && glob_object==pds_def
 			= True
@@ -907,10 +913,8 @@ where
 		| glob_module==pds_module && glob_object==pds_def
 			= True
 			= False
-	is_lazy_or_strict_array _ predef_symbols
-		= False
 
-	is_lazy_or_strict_list [TA {type_index={glob_module,glob_object}} [],TV var] predef_symbols
+	is_lazy_or_strict_list {glob_module,glob_object} predef_symbols
 		# {pds_def,pds_module} = predef_symbols.[PD_ListType]
 		| glob_module==pds_module && glob_object==pds_def
 			= True
@@ -924,8 +928,15 @@ where
 		| glob_module==pds_module && glob_object==pds_def
 			= True
 			= False
-	is_lazy_or_strict_list _ predef_symbols
-		= False
+
+	is_lazy_or_strict_maybe {glob_module,glob_object} predef_symbols
+		# {pds_def,pds_module} = predef_symbols.[PD_MaybeType]
+		| glob_module==pds_module && glob_object==pds_def
+			= True
+		# {pds_def,pds_module} = predef_symbols.[PD_StrictMaybeType]
+		| glob_module==pds_module && glob_object==pds_def
+			= True
+			= False
 
 initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)
 initializeContextVariables contexts var_heap
