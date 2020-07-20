@@ -316,8 +316,13 @@ where
 			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 		# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
-			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
-			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+			= case type_def.td_rhs of
+				SynType {at_type=TA syn_rhs_type_cons=:{type_index} ta_args}
+					| equal_td_args ta_args type_def.td_args
+						-> check_synonym_rhs_instance_type module_index syn_rhs_type_cons type_defs modules heaps cs
+				_
+					# cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error
+					-> (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 	check_instance_type module_index (TA type_cons=:{type_ident={id_name=PD_UnboxedArray_String,id_info}} [element_type]) type_defs modules heaps cs
 		# (entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
@@ -348,8 +353,13 @@ where
 						= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
 					# type_cons = { type_cons & type_index = { glob_object = type_index, glob_module = type_module }}
 					| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
-						# cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error
-						-> (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+						-> case type_def.td_rhs of
+							SynType {at_type=TA syn_rhs_type_cons=:{type_index} ta_args}
+								| equal_td_args ta_args type_def.td_args
+									-> check_synonym_rhs_instance_type module_index syn_rhs_type_cons type_defs modules heaps cs
+							_
+								# cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error
+								-> (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 						-> (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
 				_
 					# cs_error = checkError ("'"+++module_id.id_name+++"'."+++type_name) "not imported" cs.cs_error
@@ -358,15 +368,37 @@ where
 		# cs_error = checkError {id_name="<>",id_info=nilPtr} "invalid generic type argument" cs_error
 		= (ins_type, TypeConsArrow, type_defs, modules, heaps, {cs & cs_error=cs_error})
 
+	check_synonym_rhs_instance_type module_index type_cons type_defs modules heaps cs
+		# (entry, cs_symbol_table) = readPtr type_cons.type_ident.id_info cs.cs_symbol_table
+		# cs & cs_symbol_table = cs_symbol_table
+		# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type module_index
+		| type_index == NotFound
+			# cs_error = checkError type_cons.type_ident "generic argument type undefined" cs.cs_error
+			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, {cs & cs_error=cs_error})
+		# (type_def, type_defs, modules)
+			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
+		# type_cons & type_index = { glob_object = type_index, glob_module = type_module }
+		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
+			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
+			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+
 type_synonym_with_arguments (SynType _) arity
 	= arity>0
 type_synonym_with_arguments _ _
 	= False
 
+equal_td_args [{at_type=TV tv}:ta_args] [{atv_variable}:td_args]
+	= tv.tv_info_ptr==atv_variable.tv_info_ptr && equal_td_args ta_args td_args
+equal_td_args [] []
+	= True
+equal_td_args _ _
+	= False
+
 get_generic_index :: !Ident !Index !*CheckState -> (!GlobalIndex, !*CheckState)
 get_generic_index {id_name,id_info} mod_index cs=:{cs_symbol_table}
 	# (ste, cs_symbol_table) = readPtr id_info cs_symbol_table
-	# cs = {cs & cs_symbol_table = cs_symbol_table}
+	# cs & cs_symbol_table = cs_symbol_table
 	= case ste.ste_kind of
 		STE_Generic
 			-> ({gi_module=mod_index,gi_index = ste.ste_index}, cs) 
