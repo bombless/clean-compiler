@@ -365,7 +365,7 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
   		{ glob_module = -1
 		, glob_object = {ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = 1, ds_index = -1}
 		}
-	# (generic_index, generic_module) = retrieveGlobalDefinition entry STE_Generic mod_index
+	# (generic_index, generic_module, generic_function_arity) = retrieveGlobalGenericDefinition entry mod_index
 	| generic_index <> NotFound
 		| gtc_generic.glob_object.ds_arity == 1
 			# checked_gen = 

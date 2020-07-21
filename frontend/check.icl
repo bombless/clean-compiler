@@ -1255,9 +1255,9 @@ where
 	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index} : decls])
 
-	generic_def_to_dcl {gen_ident, gen_member_ident, gen_pos} (decl_index, decls)
-		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
-		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic, decl_index = decl_index }
+	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type={st_arity}, gen_pos} (decl_index, decls)
+		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic st_arity, decl_index = decl_index }
+		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic st_arity, decl_index = decl_index }
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
 
 	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)
@@ -1460,7 +1460,7 @@ renumber_icl_definitions_without_functions_as_dcl_definitions (Yes icl_to_dcl_in
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cClassDefs,decl_index]},cdefs)
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Instance, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cInstanceDefs,decl_index]},cdefs)
-					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Generic, decl_index}) cdefs
+					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_Generic _, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericDefs,decl_index]},cdefs)
 					renumber_icl_decl_symbol (Declaration icl_decl_symbol=:{decl_kind = STE_GenericCase, decl_index}) cdefs
 						= (Declaration {icl_decl_symbol & decl_index=icl_to_dcl_index_table.[cGenericCaseDefs,decl_index]},cdefs)
@@ -1583,7 +1583,7 @@ where
 	add_to_conversion_table dcl_common (Declaration {decl_kind=STE_DclMacroOrLocalMacroFunction _})
 			(moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		= (moved_dcl_defs, dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
-	add_to_conversion_table dcl_common decl=:(Declaration dcl=:{decl_kind=decl_kind=:STE_Generic,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
+	add_to_conversion_table dcl_common decl=:(Declaration dcl=:{decl_kind=decl_kind=:STE_Generic _,decl_ident=decl_ident=:{id_info},decl_index,decl_pos})
 			(moved_dcl_defs,dcl_cons_and_member_defs, conversion_table, icl_sizes, icl_defs, cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
@@ -1711,7 +1711,7 @@ where
 						# (members,st) = copy_and_redirect_member_symbols (member_index+1) com_member_defs td_pos (new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs)
 						= ([member:members],st)
 						= ([],(new_member_defs,conversion_table,icl_sizes,icl_decl_symbols,cs))
-	add_dcl_definition {com_generic_defs} dcl=:(Declaration {decl_kind=STE_Generic, decl_index, decl_pos, decl_ident={id_info}}) 
+	add_dcl_definition {com_generic_defs} dcl=:(Declaration {decl_kind=STE_Generic _, decl_index, decl_pos, decl_ident={id_info}}) 
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 		# generic_def = com_generic_defs.[decl_index]		
 		| generic_def.gen_member_ident.id_info==id_info
@@ -3767,7 +3767,7 @@ where
 			= cs
 				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict0 mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsUNIT PD_CGenTypeApp mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
+				<=< adjustPredefSymbol PD_GenericBimap mod_index (STE_Generic -1)
 		| mod_index==cs_predef_symbols.[PD_StdMisc].pds_def
 			= cs
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
