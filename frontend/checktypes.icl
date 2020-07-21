@@ -11,7 +11,7 @@ from explicitimports import search_qualified_ident,qualified_import_for_type,::N
 	,	ts_selector_defs	:: !.{# SelectorDef}
 	,	ts_modules			:: !.{# DclModule}
 	}
-	
+
 ::	TypeInfo =
 	{	ti_var_heap			:: !.VarHeap
 	,	ti_type_heaps		:: !.TypeHeaps
@@ -372,7 +372,13 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 				{ glob_module = generic_module
 				, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
 				}
-			  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[PD_TypeGenericDict]
+			| generic_function_arity<0
+				= abort "error in check_context_class"
+			#! generic_dict_index
+				= if (generic_function_arity==0 && not gtc_kind=:KindArrow _)
+					PD_TypeGenericDict0
+					PD_TypeGenericDict
+			# ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[generic_dict_index]
 			  generic_dict = {gi_module=pds_module, gi_index=pds_def}
 			#! tc_class = TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}
 			| not cs.cs_x.x_check_dynamic_types
@@ -1849,8 +1855,9 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 
 	  rec_type		= makeAttributedType TA_Multi (TA type_symb [makeAttributedType TA_Multi TE \\ i <- [1..class_arity]])
 	  field_type	= makeAttributedType TA_Multi TE
-	  (rev_fields, var_heap, symbol_table)
-  			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] var_heap symbol_table
+	  args_strictness = first_n_strict nr_of_fields
+	  (rev_fields, args_strictness, var_heap, symbol_table)
+			= build_fields 0 nr_of_members class_members rec_type field_type index_type index_selector [] args_strictness var_heap symbol_table
 
 	  (index_selector, rev_fields, rev_field_types, class_defs, modules, var_heap, symbol_table)
   			= build_context_fields mod_index nr_of_members class_context rec_type index_type (index_selector + nr_of_members) rev_fields
@@ -1862,9 +1869,9 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 	  cons_symbol = { ds_ident = rec_cons_id, ds_arity = nr_of_fields, ds_index = index_cons }
 	  (cons_type_ptr, var_heap) = newPtr VI_Empty var_heap
 
-	  cons_def = 	
+	  cons_def =
 		{	cons_ident		= rec_cons_id
-		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = first_n_strict nr_of_fields, st_result = rec_type,
+		,	cons_type		= { st_vars	= [], st_args = reverse rev_field_types, st_args_strictness = args_strictness, st_result = rec_type,
 							    st_arity = nr_of_fields, st_context = [], st_attr_vars = [], st_attr_env = [] }
 		,	cons_priority	= NoPrio
 		,	cons_number		= 0
@@ -1901,15 +1908,21 @@ where
 	new_attributed_type_variable tv type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
 		= ({atv_attribute = TA_Multi, atv_variable = { tv & tv_info_ptr = new_tv_ptr }}, type_var_heap)
-		
-	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields var_heap symbol_table
+
+	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields
+					args_strictness var_heap symbol_table
 		| field_nr < nr_of_fields
-			# field_name = class_members.[field_nr].ds_ident.id_name
+			# {ds_ident,ds_arity} = class_members.[field_nr]
 			# (field, var_heap, symbol_table)
-				= build_field field_nr field_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
-			= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index)
-				 [field : rev_fields] var_heap symbol_table
-			= (rev_fields, var_heap, symbol_table)			
+				= build_field field_nr ds_ident.id_name rec_type_index rec_type field_type next_selector_index var_heap symbol_table
+			# rev_fields = [field : rev_fields]
+			| ds_arity<>0
+				= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index) rev_fields
+								args_strictness var_heap symbol_table
+				# args_strictness = remove_strictness field_nr args_strictness
+				= build_fields (inc field_nr) nr_of_fields class_members rec_type field_type rec_type_index (inc next_selector_index) rev_fields
+								args_strictness var_heap symbol_table
+			= (rev_fields, args_strictness, var_heap, symbol_table)
 
 	build_context_fields mod_index field_nr [{tc_class = TCClass {glob_module, glob_object={ds_index}},tc_types}:tcs] rec_type rec_type_index
 			next_selector_index rev_fields rev_field_types root_class_args class_defs modules var_heap symbol_table

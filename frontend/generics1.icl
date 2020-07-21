@@ -461,7 +461,7 @@ buildBimapGenericTypeRep type_index
 	  gs & gs_modules = gs_modules, gs_td_infos = gs_td_infos, gs_error = gs_error, gs_avarh = th_attrs,
 		   gs_tvarh = th_vars, gs_varh = hp_var_heap, gs_genh = hp_generic_heap, gs_exprh = hp_expression_heap
 	= (atype, gs)
-	
+
 //	the structure type
 
 convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
@@ -3518,7 +3518,7 @@ where
 	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
 		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))
 	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind}} (modules, heaps=:{hp_generic_heap}, error)
-		# ({gen_info_ptr}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
+		# ({gen_info_ptr,gen_type}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
 		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
@@ -3535,9 +3535,11 @@ where
 						}
 					}
 				// AA HACK: dummy dictionary
-				#! {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_TypeGenericDict]
-				# generic_dict = {gi_module=pds_module, gi_index=pds_def}
-				-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict=generic_dict}, error)
+				| gen_type.st_arity==0 && not gtc_kind=:KindArrow _
+					#! {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_TypeGenericDict0]
+					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
+					#! {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_TypeGenericDict]
+					-> (TCGeneric {gtc & gtc_class=clazz, gtc_generic_dict={gi_module=pds_module, gi_index=pds_def}}, error)
 		= (True, {tc & tc_class=tc_class}, (modules, {heaps & hp_generic_heap=hp_generic_heap}, error))
 	convert_context fun_name fun_pos tc st 
 		= (False, tc, st)

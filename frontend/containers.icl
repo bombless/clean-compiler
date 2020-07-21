@@ -386,6 +386,18 @@ remove_first_n n (StrictList s l)
 		= StrictList s (remove_first_n n l)
 		= remove_first_n (n-32) l
 
+remove_strictness :: !Int !StrictnessList -> StrictnessList
+remove_strictness index NotStrict
+	= NotStrict
+remove_strictness index (Strict s)
+	| index<32
+		= Strict (s bitand (bitnot (1<<index)));
+		= StrictList s (remove_strictness (index-32) NotStrict)
+remove_strictness index (StrictList s l)
+	| index<32
+		= StrictList (s bitand (bitnot (1<<index))) l;
+		= StrictList s (remove_strictness (index-32) l)
+
 screw :== 80
 
 :: IntKey :== Int
