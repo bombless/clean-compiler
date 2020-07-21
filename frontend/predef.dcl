@@ -218,96 +218,97 @@ PD_TGenConsAssoc			:== 213
 PD_TGenType					:== 214
 
 PD_TypeGenericDict 			:== 215
+PD_TypeGenericDict0			:== 216
 // Generics expression
-PD_ConsUNIT					:== 216
-PD_ConsLEFT					:== 217
-PD_ConsRIGHT				:== 218
-PD_ConsPAIR					:== 219
+PD_ConsUNIT					:== 217
+PD_ConsLEFT					:== 218
+PD_ConsRIGHT				:== 219
+PD_ConsPAIR					:== 220
 // for constructor info
-PD_ConsCONS					:== 220
-PD_ConsRECORD				:== 221
-PD_ConsFIELD				:== 222
-PD_ConsOBJECT				:== 223
-PD_CGenericConsDescriptor 	:== 224
-PD_CGenericRecordDescriptor	:== 225
-PD_CGenericFieldDescriptor 	:== 226
-PD_CGenericTypeDefDescriptor :== 227
-PD_CGenConsNoPrio			:== 228
-PD_CGenConsPrio				:== 229
-PD_CGenConsAssocNone		:== 230
-PD_CGenConsAssocLeft		:== 231
-PD_CGenConsAssocRight		:== 232
-PD_CGenTypeCons				:== 233
-PD_CGenTypeVar				:== 234
-PD_CGenTypeArrow			:== 235
-PD_CGenTypeApp				:== 236
+PD_ConsCONS					:== 221
+PD_ConsRECORD				:== 222
+PD_ConsFIELD				:== 223
+PD_ConsOBJECT				:== 224
+PD_CGenericConsDescriptor 	:== 225
+PD_CGenericRecordDescriptor	:== 226
+PD_CGenericFieldDescriptor 	:== 227
+PD_CGenericTypeDefDescriptor :== 228
+PD_CGenConsNoPrio			:== 229
+PD_CGenConsPrio				:== 230
+PD_CGenConsAssocNone		:== 231
+PD_CGenConsAssocLeft		:== 232
+PD_CGenConsAssocRight		:== 233
+PD_CGenTypeCons				:== 234
+PD_CGenTypeVar				:== 235
+PD_CGenTypeArrow			:== 236
+PD_CGenTypeApp				:== 237
 
-PD_GenericBimap				:== 237
+PD_GenericBimap				:== 238
 
-PD__SystemEnumStrict:==238
+PD__SystemEnumStrict:==239
 
-PD_FromS					:== 239
-PD_FromTS					:== 240
-PD_FromSTS					:== 241
-PD_FromU					:== 242
-PD_FromUTS					:== 243
-PD_FromO					:== 244
+PD_FromS					:== 240
+PD_FromTS					:== 241
+PD_FromSTS					:== 242
+PD_FromU					:== 243
+PD_FromUTS					:== 244
+PD_FromO					:== 245
 
-PD_FromThenS				:== 245
-PD_FromThenTS				:== 246
-PD_FromThenSTS				:== 247
-PD_FromThenU				:== 248
-PD_FromThenUTS				:== 249
-PD_FromThenO				:== 250
+PD_FromThenS				:== 246
+PD_FromThenTS				:== 247
+PD_FromThenSTS				:== 248
+PD_FromThenU				:== 249
+PD_FromThenUTS				:== 250
+PD_FromThenO				:== 251
 
-PD_FromToS					:== 251
-PD_FromToTS					:== 252
-PD_FromToSTS				:== 253
-PD_FromToU					:== 254
-PD_FromToUTS				:== 255
-PD_FromToO					:== 256
+PD_FromToS					:== 252
+PD_FromToTS					:== 253
+PD_FromToSTS				:== 254
+PD_FromToU					:== 255
+PD_FromToUTS				:== 256
+PD_FromToO					:== 257
 
-PD_FromThenToS				:== 257
-PD_FromThenToTS				:== 258
-PD_FromThenToSTS			:== 259
-PD_FromThenToU				:== 260
-PD_FromThenToUTS			:== 261
-PD_FromThenToO				:== 262
+PD_FromThenToS				:== 258
+PD_FromThenToTS				:== 259
+PD_FromThenToSTS			:== 260
+PD_FromThenToU				:== 261
+PD_FromThenToUTS			:== 262
+PD_FromThenToO				:== 263
 
-PD_Dyn__to_TypeCodeConstructor	:== 263
-PD_TypeCodeConstructor :== 264
+PD_Dyn__to_TypeCodeConstructor	:== 264
+PD_TypeCodeConstructor :== 265
 
-PD_TC_Int			:== 265
-PD_TC_Char			:== 266
-PD_TC_Real			:== 267
-PD_TC_Bool			:== 268
-PD_TC_Dynamic		:== 269
-PD_TC_File			:== 270
-PD_TC_World			:== 271
+PD_TC_Int			:== 266
+PD_TC_Char			:== 267
+PD_TC_Real			:== 268
+PD_TC_Bool			:== 269
+PD_TC_Dynamic		:== 270
+PD_TC_File			:== 271
+PD_TC_World			:== 272
 
-PD_TC__Arrow		:== 272
+PD_TC__Arrow		:== 273
 
-PD_TC__List			:== 273
-PD_TC__StrictList	:== 274
-PD_TC__UnboxedList	:== 275
-PD_TC__TailStrictList	:== 276
-PD_TC__StrictTailStrictList	:== 277
-PD_TC__UnboxedTailStrictList	:== 278
+PD_TC__List			:== 274
+PD_TC__StrictList	:== 275
+PD_TC__UnboxedList	:== 276
+PD_TC__TailStrictList	:== 277
+PD_TC__StrictTailStrictList	:== 278
+PD_TC__UnboxedTailStrictList	:== 279
 
-PD_TC__Tuple2		:== 279
-PD_TC__Tuple32		:== 309
+PD_TC__Tuple2		:== 280
+PD_TC__Tuple32		:== 310
 
-PD_TC__LazyArray	:== 310
-PD_TC__StrictArray	:== 311
-PD_TC__UnboxedArray	:== 312
-PD_TC__PackedArray	:== 313
+PD_TC__LazyArray	:== 311
+PD_TC__StrictArray	:== 312
+PD_TC__UnboxedArray	:== 313
+PD_TC__PackedArray	:== 314
 
-PD_TC__Maybe		:== 314
-PD_TC__StrictMaybe	:== 315
+PD_TC__Maybe		:== 315
+PD_TC__StrictMaybe	:== 316
 
-PD_TC__Unit			:== 316
+PD_TC__Unit			:== 317
 
-PD_NrOfPredefSymbols		:== 317
+PD_NrOfPredefSymbols		:== 318
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

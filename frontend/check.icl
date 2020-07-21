@@ -3765,7 +3765,7 @@ where
 				<=< adjust_predef_symbols PD_TC_Int PD_TC__Unit mod_index STE_Constructor
 		| mod_index==cs_predef_symbols.[PD_StdGeneric].pds_def
 			= cs
-				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict mod_index STE_Type
+				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict0 mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsUNIT PD_CGenTypeApp mod_index STE_Constructor
 				<=< adjustPredefSymbol PD_GenericBimap			mod_index STE_Generic
 		| mod_index==cs_predef_symbols.[PD_StdMisc].pds_def

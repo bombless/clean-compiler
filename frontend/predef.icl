@@ -242,6 +242,7 @@ predefined_idents
 					[PD_GenericBimap] = i "bimap",
 				
 					[PD_TypeGenericDict] = i "GenericDict",
+					[PD_TypeGenericDict0] = i "GenericDict0",
 
 					[PD_StdMisc] = i "StdMisc",
 					[PD_abort] = i "abort",
@@ -412,7 +413,7 @@ where
 					<<- (local_predefined_idents,	IC_Module NoQualifiedIdents, PD_StdGeneric)
 		# hash_table = put_predefined_idents_in_hash_table PD_TC_Int PD_TC__Unit IC_Expression local_predefined_idents hash_table
 
-		# hash_table = put_predefined_idents_in_hash_table PD_TypeUNIT PD_TypeGenericDict IC_Type local_predefined_idents hash_table
+		# hash_table = put_predefined_idents_in_hash_table PD_TypeUNIT PD_TypeGenericDict0 IC_Type local_predefined_idents hash_table
 		# hash_table = put_predefined_idents_in_hash_table PD_ConsUNIT PD_CGenTypeApp IC_Expression local_predefined_idents hash_table
 					<<- (local_predefined_idents,	IC_Generic,		PD_GenericBimap)	
 		# hash_table = hash_table
