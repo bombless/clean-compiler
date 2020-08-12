@@ -3912,6 +3912,10 @@ trySimplePatternWithoutDefinitionsT (IdentToken name) pState
 	| not (isLowerCaseName name)
 		# (id, pState) = stringToIdent name IC_Expression pState
 		= (True, PE_Ident id, pState)
+trySimplePatternWithoutDefinitionsT (MaybeIdentToken maybe_token) pState
+	| maybe_token<8
+		#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+		= (True, PE_Ident just_or_none_ident, pState)
 trySimplePatternWithoutDefinitionsT SquareOpenToken pState
 	# (list_expr, pState) = wantListPatternWithoutDefinitions pState
 	= (True, list_expr, pState)
