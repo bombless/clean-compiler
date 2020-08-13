@@ -1231,9 +1231,9 @@ where
 	specialized_types_in_context_match _ _ type_var_heap
 		= (False,type_var_heap);
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
-tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os dcl_modules
+tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os
 	# (reduced_calls, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts_of_applications_in_function defs instance_info) ocs ([], [], coercion_env, [], os)
 	| os.os_error.ea_ok
 		# (contexts, os_var_heap) = foldSt add_specified_contexts ocs (contexts,os.os_var_heap)
@@ -2037,7 +2037,7 @@ fatal function_name message
 class toTypeCodeExpression type :: type !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin) -> (!TypeCodeExpression, !(!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin))
 
 instance toTypeCodeExpression Type where
-	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_dcl_modules,tci_common_defs},var_heap,error)
+	toTypeCodeExpression type=:(TA cons_id=:{type_index} type_args) (tci=:{tci_common_defs},var_heap,error)
 		# type_heaps = {th_vars = tci.tci_type_var_heap, th_attrs = tci.tci_attr_var_heap}
 		# (expanded, type, type_heaps)
 			=	tryToExpandTypeSyn tci_common_defs type cons_id type_args type_heaps

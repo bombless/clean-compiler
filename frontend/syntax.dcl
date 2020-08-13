@@ -1142,9 +1142,6 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 ::	KindInfo	= KI_Var !KindInfoPtr
 				| KI_Arrow !KindInfo !KindInfo
 				| KI_Const
-				
-				| KI_ConsVar
-				
 				| KI_VarBind !KindInfoPtr
 				| KI_NormVar !Int
 

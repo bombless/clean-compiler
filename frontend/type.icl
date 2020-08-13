@@ -3005,10 +3005,9 @@ where
 		  (over_info, (subst, ts_expr_heap)) = collect_and_expand_overloaded_calls fun_reqs [] (subst, ts_expr_heap)
 		  (contexts, coercion_env, local_pattern_variables, dict_types,
 		  	{os_type_heaps, os_var_heap, os_symbol_heap, os_generic_heap, os_predef_symbols, os_special_instances, os_error})
-		  		= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
-		  			{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
-		  				os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances } dcl_modules
-		  //ts = {ts & ts_generic_heap = os_generic_heap}
+				= tryToSolveOverloading over_info main_dcl_module_n ti_common_defs class_instances coercion_env
+					{	os_type_heaps = ts_type_heaps, os_var_heap = ts_var_heap, os_symbol_heap = ts_expr_heap, os_generic_heap = ts.ts_generic_heap,
+						os_predef_symbols = predef_symbols, os_error = ts_error, os_special_instances = special_instances }
 		| not os_error.ea_ok
 			= (True, os_predef_symbols, os_special_instances, out, create_erroneous_function_types comp { ts & ts_type_heaps = os_type_heaps,
 					ts_error = { os_error & ea_ok = True }, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], 
@@ -3035,7 +3034,7 @@ where
 					{ ts & ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [], ts_error = { ts.ts_error & ea_ok = True }})
 		# ts_type_heaps = ts.ts_type_heaps
 		  type_code_info = {	tci_type_var_heap = ts_type_heaps.th_vars, tci_attr_var_heap = ts_type_heaps.th_attrs,
-								tci_dcl_modules = dcl_modules, tci_common_defs = ti_common_defs } 
+								tci_common_defs = ti_common_defs }
 		  (fun_defs, ts_fun_env, ts_expr_heap, {tci_type_var_heap,tci_attr_var_heap}, ts_var_heap, ts_error, os_predef_symbols)
 		  		= removeOverloadedFunctions comp local_pattern_variables (reverse rev_error_contexts) main_dcl_module_n ts.ts_fun_defs ts.ts_fun_env
 		  								ts.ts_expr_heap type_code_info ts.ts_var_heap ts.ts_error os_predef_symbols

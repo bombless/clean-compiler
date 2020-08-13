@@ -42,13 +42,12 @@ from check_instances import ::SortedInstances
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState !{# DclModule}
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 
 ::	TypeCodeInfo =
 	{	tci_type_var_heap					:: !.TypeVarHeap
 	,	tci_attr_var_heap					:: !.AttrVarHeap
-	,	tci_dcl_modules						:: !{# DclModule}
 	,	tci_common_defs						:: !{# CommonDefs }
 	}
 
