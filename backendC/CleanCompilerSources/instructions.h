@@ -123,6 +123,7 @@ void GenEqD_b (Label symblab,int arity);
 void GenExitFalse (Label to);
 void GenJmpFalse (Label to);
 void GenJmpTrue (Label to);
+void GenJmpD (Label symblab,int arity,SymbolP compare_symbol,SymbolP symbol1,SymbolP symbol2,Label to1,Label to2);
 
 void GenJmp (Label tolab);
 void GenJsr (Label tolab);

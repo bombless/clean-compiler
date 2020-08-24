@@ -2548,6 +2548,32 @@ void GenJmp (Label tolab)
 	GenLabel (tolab);
 }
 
+void GenJmpD (Label symblab,int arity,SymbolP compare_symbol,SymbolP symbol1,SymbolP symbol2,Label to1,Label to2)
+{
+	put_instruction_ ("jmpD");
+
+	if (symbol1==compare_symbol){
+		PutCOutFile ('e');
+		PutCOutFile (symbol2<compare_symbol ? 'b' : 'a');
+	} else if (symbol2==compare_symbol){
+		PutCOutFile (symbol1<compare_symbol ? 'b' : 'a');
+		PutCOutFile ('e');
+	} else if (symbol1<symbol2){
+		PutCOutFile ('b');
+		PutCOutFile ('a');
+	} else {
+		PutCOutFile ('a');
+		PutCOutFile ('b');
+	}
+	PutCOutFile (' ');
+	GenLabel (symblab);
+	put_arguments_n_b (arity);
+	PutCOutFile (' ');
+	GenLabel (to1);
+	PutCOutFile (' ');
+	GenLabel (to2);
+}
+
 void GenJsr (Label tolab)
 {
 	put_instruction_b (jsr);

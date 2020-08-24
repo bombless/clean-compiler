@@ -1508,7 +1508,6 @@ static void GenUnboxedRecordApplyAndNodeEntries (SymbDef fun_def,int *a_size_p,i
 extern PolyList unboxed_record_cons_list,unboxed_record_decons_list;
 extern PolyList unboxed_record_just_list,unboxed_record_from_just_list;
 
-#if STRICT_LISTS
 void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 {
 	PolyList unboxed_record_cons_elem,unboxed_record_decons_elem;
@@ -1548,7 +1547,6 @@ void GenerateCodeForLazyUnboxedRecordListFunctions (void)
 			GenUnboxedRecordDeconsOrFromJust (fun_def);
 	}
 }
-#endif
 
 void GenerateCodeForLazyUnboxedRecordMaybeFunctions (void)
 {
@@ -3792,10 +3790,418 @@ static int generate_int_char_or_bool_match (struct arg *first_arg,int *matches_a
 	return 0;
 }
 
-static int generate_constructor_match (ArgP first_arg,int *matches_always_p)
+#ifdef JMP_D
+static void gen_jmpD_case_labels (SymbolP compare_symbol,SymbolP symbol1,SymbolP symbol2,int label_1_n,int label_2_n)
+{
+	LabDef symbol_label,case_label_1,case_label_2;
+	int symbol_label_arity;
+
+	if (compare_symbol->symb_def->sdef_strict_constructor){
+		symbol_label_arity=0;
+		ConvertSymbolToKLabel (&symbol_label,compare_symbol->symb_def);
+	} else {
+		symbol_label_arity=compare_symbol->symb_def->sdef_arity;
+		ConvertSymbolToConstructorDLabel (&symbol_label,compare_symbol->symb_def);
+	}
+	MakeLabel (&case_label_1,case_symb,label_1_n,no_pref);
+	MakeLabel (&case_label_2,case_symb,label_2_n,no_pref);
+	GenJmpD (&symbol_label,symbol_label_arity,compare_symbol,symbol1,symbol2,&case_label_1,&case_label_2);
+}
+
+static void gen_EqD_b_jmp_true_case_label (SymbolP compare_symbol,int label_n)
+{
+	LabDef symbol_label,case_label;
+	int symbol_label_arity;
+
+	if (compare_symbol->symb_def->sdef_strict_constructor){
+		symbol_label_arity=0;
+		ConvertSymbolToKLabel (&symbol_label,compare_symbol->symb_def);
+	} else {
+		symbol_label_arity=compare_symbol->symb_def->sdef_arity;
+		ConvertSymbolToConstructorDLabel (&symbol_label,compare_symbol->symb_def);
+	}
+	GenEqD_b (&symbol_label,symbol_label_arity);
+
+	MakeLabel (&case_label,case_symb,label_n,no_pref);
+	GenJmpTrue (&case_label);
+}
+
+static void gen_jmp_case_label (int label_n)
+{
+	LabDef case_label;
+
+	MakeLabel (&case_label,case_symb,label_n,no_pref);
+	GenJmp (&case_label);
+}
+
+static int generate_constructor_match_more_than_3_constructors (ArgP first_arg,struct type *type_p,int *matches_always_p)
 {
 	ArgP arg;
 	int case_number;
+	struct symbol *constructor_symbols;
+	int n_constructors,*constructor_case_n_p,constructor_case_a[16];
+	int constructor_n,n_remaining_constructors;
+	int first_unmatched_constructor_n,second_unmatched_constructor_n,last_unmatched_constructor_n,penultimate_unmatched_constructor_n;
+	unsigned int new_label_nr;
+
+	n_constructors=type_p->type_nr_of_constructors;
+	if (n_constructors<=16)
+		constructor_case_n_p=constructor_case_a;
+	else {
+		constructor_case_n_p=malloc (n_constructors*(sizeof(int)));
+		if (constructor_case_n_p==NULL)
+			error_in_function ("generate_constructor_match_more_than_3_constructors");
+	}
+
+	for (constructor_n=0; constructor_n<n_constructors; ++constructor_n)
+		constructor_case_n_p[constructor_n] = -1;
+
+	constructor_symbols=type_p->type_constructors->cl_constructor_symbol;
+
+	for (arg=first_arg,case_number=0; arg!=NULL && arg->arg_node->node_kind==CaseNode; arg=arg->arg_next,++case_number){
+		struct symbol *symbol;
+
+		symbol = arg->arg_node->node_symbol;
+		if (symbol<constructor_symbols || symbol>=&constructor_symbols[n_constructors])
+			error_in_function ("generate_constructor_match_more_than_3_constructors");
+		constructor_case_n_p[symbol - constructor_symbols] = case_number;
+	}
+
+	n_remaining_constructors=n_constructors;
+
+	new_label_nr=NewLabelNr;
+	NewLabelNr=new_label_nr+case_number;
+
+	if (constructor_case_n_p[0]>=0 && constructor_case_n_p[1]>=0){
+		first_unmatched_constructor_n=0;
+		second_unmatched_constructor_n=1;
+	} else {
+		first_unmatched_constructor_n=-1;
+		second_unmatched_constructor_n=-1;
+	}
+
+	if (constructor_case_n_p[n_constructors-1]>=0 && constructor_case_n_p[n_constructors-2]>=0){
+		last_unmatched_constructor_n=n_constructors-1;
+		penultimate_unmatched_constructor_n=n_constructors-2;
+	} else {
+		last_unmatched_constructor_n=-1;
+		penultimate_unmatched_constructor_n=-1;
+	}
+
+	arg=first_arg;
+	case_number=0;
+
+	if (first_unmatched_constructor_n>=0 && last_unmatched_constructor_n>=0){
+		for (; arg!=NULL && arg->arg_node->node_kind==CaseNode; arg=arg->arg_next,++case_number){
+			struct symbol *symbol_p,*symbol0_p,*symbol2_p;
+			int case_number2;
+
+			symbol_p = arg->arg_node->node_symbol;
+			constructor_n = symbol_p-constructor_symbols;
+
+			if (constructor_case_n_p[constructor_n]==-2)
+				continue;
+			constructor_case_n_p[constructor_n]=-2;
+
+			if (constructor_n<=second_unmatched_constructor_n){
+				if (constructor_n==first_unmatched_constructor_n){
+					symbol2_p=&constructor_symbols[second_unmatched_constructor_n];
+					symbol0_p=symbol2_p;
+
+					case_number2=constructor_case_n_p[second_unmatched_constructor_n];
+					constructor_case_n_p[second_unmatched_constructor_n]=-2;
+				} else if (constructor_n==second_unmatched_constructor_n){
+					symbol2_p=&constructor_symbols[first_unmatched_constructor_n];
+					symbol0_p=symbol_p;
+
+					case_number2=constructor_case_n_p[first_unmatched_constructor_n];
+					constructor_case_n_p[first_unmatched_constructor_n]=-2;
+				} else
+					error_in_function ("generate_constructor_match_more_than_3_constructors");
+
+				gen_jmpD_case_labels (symbol0_p,symbol_p,symbol2_p,new_label_nr+case_number,new_label_nr+case_number2);
+
+				n_remaining_constructors-=2;
+
+				first_unmatched_constructor_n=second_unmatched_constructor_n+1;
+				while (first_unmatched_constructor_n<penultimate_unmatched_constructor_n && constructor_case_n_p[first_unmatched_constructor_n]==-2)
+					++first_unmatched_constructor_n;
+				if (first_unmatched_constructor_n>=penultimate_unmatched_constructor_n || constructor_case_n_p[first_unmatched_constructor_n]<0){
+					first_unmatched_constructor_n=-1;
+					break;
+				}
+
+				second_unmatched_constructor_n=first_unmatched_constructor_n+1;
+				while (second_unmatched_constructor_n<penultimate_unmatched_constructor_n && constructor_case_n_p[second_unmatched_constructor_n]==-2)
+					++second_unmatched_constructor_n;
+				if (second_unmatched_constructor_n==penultimate_unmatched_constructor_n)
+					break;
+				if (second_unmatched_constructor_n>=penultimate_unmatched_constructor_n || constructor_case_n_p[second_unmatched_constructor_n]<0){
+					first_unmatched_constructor_n=-1;
+					break;
+				}
+			} else if (constructor_n>=penultimate_unmatched_constructor_n){
+				if (constructor_n==last_unmatched_constructor_n){
+					symbol2_p=&constructor_symbols[penultimate_unmatched_constructor_n];
+					symbol0_p=symbol2_p;
+
+					case_number2=constructor_case_n_p[penultimate_unmatched_constructor_n];
+					constructor_case_n_p[penultimate_unmatched_constructor_n]=-2;
+				} else if (constructor_n==penultimate_unmatched_constructor_n){
+					symbol2_p=&constructor_symbols[last_unmatched_constructor_n];
+					symbol0_p=symbol_p;
+
+					case_number2=constructor_case_n_p[last_unmatched_constructor_n];
+					constructor_case_n_p[last_unmatched_constructor_n]=-2;
+				} else
+					error_in_function ("generate_constructor_match_more_than_3_constructors");
+
+				gen_jmpD_case_labels (symbol0_p,symbol_p,symbol2_p,new_label_nr+case_number,new_label_nr+case_number2);
+
+				n_remaining_constructors-=2;
+
+				last_unmatched_constructor_n=penultimate_unmatched_constructor_n-1;
+				while (last_unmatched_constructor_n>second_unmatched_constructor_n && constructor_case_n_p[last_unmatched_constructor_n]==-2)
+					--last_unmatched_constructor_n;
+				if (last_unmatched_constructor_n<=second_unmatched_constructor_n || constructor_case_n_p[last_unmatched_constructor_n]<0){
+					last_unmatched_constructor_n=-1;
+					break;
+				}
+
+				penultimate_unmatched_constructor_n=last_unmatched_constructor_n-1;
+				while (penultimate_unmatched_constructor_n>=second_unmatched_constructor_n && constructor_case_n_p[penultimate_unmatched_constructor_n]==-2)
+					--penultimate_unmatched_constructor_n;
+				if (penultimate_unmatched_constructor_n==second_unmatched_constructor_n)
+					break;
+				if (penultimate_unmatched_constructor_n<second_unmatched_constructor_n || constructor_case_n_p[penultimate_unmatched_constructor_n]<0){
+					last_unmatched_constructor_n=-1;
+					break;
+				}
+			} else {
+				gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+
+				--n_remaining_constructors;
+			}
+		}
+		if (second_unmatched_constructor_n==penultimate_unmatched_constructor_n){
+			struct symbol *symbol0_p,*symbol1_p;
+			int constructor0_n,constructor1_n;
+
+			if (n_remaining_constructors!=3)
+				error_in_function ("generate_constructor_match_more_than_3_constructors");
+
+			do {
+				symbol0_p = arg->arg_node->node_symbol;
+				constructor0_n = symbol0_p-constructor_symbols;
+
+				arg=arg->arg_next;
+				++case_number;
+			} while (constructor_case_n_p[constructor0_n]==-2);
+
+			do {
+				symbol1_p = arg->arg_node->node_symbol;
+				constructor1_n = symbol1_p-constructor_symbols;
+
+				arg=arg->arg_next;
+				++case_number;
+			} while (constructor_case_n_p[constructor1_n]==-2);
+
+			gen_jmpD_case_labels (&constructor_symbols[second_unmatched_constructor_n],symbol0_p,symbol1_p,
+									new_label_nr+constructor_case_n_p[constructor0_n],new_label_nr+constructor_case_n_p[constructor1_n]);
+
+			n_remaining_constructors-=2;
+
+			constructor_case_n_p[constructor0_n]=-2;
+			constructor_case_n_p[constructor1_n]=-2;
+
+			first_unmatched_constructor_n=-1;
+			last_unmatched_constructor_n=-1;
+		}
+	}
+
+	if (first_unmatched_constructor_n>=0){
+		for (; arg!=NULL && arg->arg_node->node_kind==CaseNode; arg=arg->arg_next,++case_number){
+			struct symbol *symbol_p,*symbol0_p,*symbol2_p;
+			int case_number2;
+
+			symbol_p = arg->arg_node->node_symbol;
+			constructor_n = symbol_p-constructor_symbols;
+
+			if (constructor_case_n_p[constructor_n]==-2)
+				continue;
+			constructor_case_n_p[constructor_n]=-2;
+
+			if (constructor_n==first_unmatched_constructor_n){
+				symbol2_p=&constructor_symbols[second_unmatched_constructor_n];
+				symbol0_p=symbol2_p;
+
+				case_number2=constructor_case_n_p[second_unmatched_constructor_n];
+				constructor_case_n_p[second_unmatched_constructor_n]=-2;
+			} else if (constructor_n==second_unmatched_constructor_n){
+				symbol2_p=&constructor_symbols[first_unmatched_constructor_n];
+				symbol0_p=symbol_p;
+
+				case_number2=constructor_case_n_p[first_unmatched_constructor_n];
+				constructor_case_n_p[first_unmatched_constructor_n]=-2;
+			} else {
+				gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+				--n_remaining_constructors;
+				continue;
+			}
+
+			if (n_remaining_constructors==2){
+				gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+				gen_jmp_case_label (new_label_nr+case_number2);
+				*matches_always_p=1;
+			} else
+				gen_jmpD_case_labels (symbol0_p,symbol_p,symbol2_p,new_label_nr+case_number,new_label_nr+case_number2);
+
+			n_remaining_constructors-=2;
+
+			first_unmatched_constructor_n=second_unmatched_constructor_n+1;
+			while (first_unmatched_constructor_n<n_constructors && constructor_case_n_p[first_unmatched_constructor_n]==-2)
+				++first_unmatched_constructor_n;
+			if (first_unmatched_constructor_n>=n_constructors || constructor_case_n_p[first_unmatched_constructor_n]<0)
+				break;
+
+			second_unmatched_constructor_n=first_unmatched_constructor_n+1;
+			while (second_unmatched_constructor_n<n_constructors && constructor_case_n_p[second_unmatched_constructor_n]==-2)
+				++second_unmatched_constructor_n;
+			if (second_unmatched_constructor_n>=n_constructors || constructor_case_n_p[second_unmatched_constructor_n]<0)
+				break;
+		}
+	}
+
+	if (last_unmatched_constructor_n>=0){
+		for (; arg!=NULL && arg->arg_node->node_kind==CaseNode; arg=arg->arg_next,++case_number){
+			struct symbol *symbol_p,*symbol0_p,*symbol2_p;
+			int case_number2;
+
+			symbol_p = arg->arg_node->node_symbol;
+			constructor_n = symbol_p-constructor_symbols;
+
+			if (constructor_case_n_p[constructor_n]==-2)
+				continue;
+			constructor_case_n_p[constructor_n]=-2;
+
+			if (constructor_n==last_unmatched_constructor_n){
+				symbol2_p=&constructor_symbols[penultimate_unmatched_constructor_n];
+				symbol0_p=symbol2_p;
+
+				case_number2=constructor_case_n_p[penultimate_unmatched_constructor_n];
+				constructor_case_n_p[penultimate_unmatched_constructor_n]=-2;
+			} else if (constructor_n==penultimate_unmatched_constructor_n){
+				symbol2_p=&constructor_symbols[last_unmatched_constructor_n];
+				symbol0_p=symbol_p;
+
+				case_number2=constructor_case_n_p[last_unmatched_constructor_n];
+				constructor_case_n_p[last_unmatched_constructor_n]=-2;
+			} else {
+				gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+				--n_remaining_constructors;
+				continue;
+			}
+
+			if (n_remaining_constructors==2){
+				gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+				gen_jmp_case_label (new_label_nr+case_number2);
+				*matches_always_p=1;
+			} else
+				gen_jmpD_case_labels (symbol0_p,symbol_p,symbol2_p,new_label_nr+case_number,new_label_nr+case_number2);
+
+			n_remaining_constructors-=2;
+
+			last_unmatched_constructor_n=penultimate_unmatched_constructor_n-1;
+			while (last_unmatched_constructor_n>=0 && constructor_case_n_p[last_unmatched_constructor_n]==-2)
+				--last_unmatched_constructor_n;
+			if (last_unmatched_constructor_n<0 || constructor_case_n_p[last_unmatched_constructor_n]<0)
+				break;
+
+			penultimate_unmatched_constructor_n=last_unmatched_constructor_n-1;
+			while (penultimate_unmatched_constructor_n>=0 && constructor_case_n_p[penultimate_unmatched_constructor_n]==-2)
+				--penultimate_unmatched_constructor_n;
+			if (penultimate_unmatched_constructor_n<0 || constructor_case_n_p[penultimate_unmatched_constructor_n]<0)
+				break;
+		}
+	}
+
+	for (; arg!=NULL && arg->arg_node->node_kind==CaseNode; arg=arg->arg_next,++case_number){
+		struct symbol *symbol_p;
+
+		symbol_p = arg->arg_node->node_symbol;
+		constructor_n = symbol_p-constructor_symbols;
+
+		if (constructor_case_n_p[constructor_n]==-2)
+			continue;
+		constructor_case_n_p[constructor_n]=-2;
+
+		if (n_remaining_constructors==1){
+			gen_jmp_case_label (new_label_nr+case_number);
+			*matches_always_p=1;
+		} else
+			gen_EqD_b_jmp_true_case_label (symbol_p,new_label_nr+case_number);
+
+		--n_remaining_constructors;
+	}
+
+	if (n_constructors>16)
+		free (constructor_case_n_p);
+
+	if (arg!=NULL && arg->arg_node->node_kind==DefaultNode)
+		return 1;
+
+	return 0;
+}
+
+static int generate_constructor_match (ArgP first_arg,struct type *type_p,int *matches_always_p)
+#else
+static int generate_constructor_match (ArgP first_arg,int *matches_always_p)
+#endif
+{
+	ArgP arg;
+	int case_number;
+
+#ifdef JMP_D
+	if (type_p->type_nr_of_constructors==3){
+		struct symbol *constructor_symbols;
+		unsigned int new_label_nr;
+		struct symbol *case_symbol_0,*case_symbol_1;
+
+		constructor_symbols=type_p->type_constructors->cl_constructor_symbol;
+
+		arg=first_arg;
+		case_symbol_0=arg->arg_node->node_symbol;
+		arg=arg->arg_next;
+		case_symbol_1=arg->arg_node->node_symbol;
+
+		new_label_nr=NewLabelNr;
+
+		arg=arg->arg_next;
+		if (arg!=NULL && arg->arg_node->node_kind==CaseNode){
+			gen_jmpD_case_labels (&constructor_symbols[1],case_symbol_1,arg->arg_node->node_symbol,new_label_nr+1,new_label_nr+2);
+			new_label_nr+=3;
+
+			arg=arg->arg_next;
+			while (arg!=NULL && arg->arg_node->node_kind==CaseNode){
+				arg=arg->arg_next;
+				++new_label_nr;
+			}
+
+			*matches_always_p=1;
+		} else {
+			gen_jmpD_case_labels (&constructor_symbols[1],case_symbol_0,case_symbol_1,new_label_nr,new_label_nr+1);
+			new_label_nr+=2;
+		}
+
+		NewLabelNr=new_label_nr;
+
+		if (arg!=NULL && arg->arg_node->node_kind==DefaultNode)
+			return 1;
+
+		return 0;
+	} else if (type_p->type_nr_of_constructors>3)
+		return generate_constructor_match_more_than_3_constructors (first_arg,type_p,matches_always_p);
+#endif
 
 	for (arg=first_arg,case_number=0; arg!=NULL; arg=arg->arg_next,++case_number){
 		struct node *case_node;
@@ -4000,6 +4406,20 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 
 				sdef=symbol->symb_def;
 				if (sdef->sdef_kind==CONSTRUCTOR){
+#ifdef JMP_D
+					Symbol next_case_node_symbol;
+
+					if (! (sdef->sdef_type->type_nr_of_constructors==2 &&
+						  (next_case_node_symbol=first_arg->arg_next->arg_node->node_symbol,
+						   next_case_node_symbol->symb_kind==definition && next_case_node_symbol->symb_def->sdef_kind==CONSTRUCTOR))
+					   )
+					{
+						GenPushD_a (asp-a_index);
+						match_b_stack_top_element=1;
+
+						has_default=generate_constructor_match (first_arg,sdef->sdef_type,&matches_always);
+					}
+#else
 					Symbol next_case_node_symbol;
 					SymbDef next_sdef;
 
@@ -4013,6 +4433,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 					
 						has_default=generate_constructor_match (first_arg,&matches_always);
 					}
+#endif
 				}
 			}
 		}
