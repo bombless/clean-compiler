@@ -1055,22 +1055,21 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 					# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol cs
 					-> (OverloadedListPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				AlgebraicPatterns alg_type _
-					| alg_type.gi_module==cPredefinedModuleIndex
-						# index=alg_type.gi_index+FirstTypePredefinedSymbolIndex
-						| index==PD_ListType
+				AlgebraicPatterns alg_type=:{gi_module,gi_index} _
+					| gi_module==cPredefinedModuleIndex
+						| gi_index==PD_ListTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_ConsSymbol PD_NilSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_StrictListType
+						| gi_index==PD_StrictListTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_StrictConsSymbol PD_StrictNilSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_TailStrictListType
+						| gi_index==PD_TailStrictListTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_TailStrictConsSymbol PD_TailStrictNilSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_StrictTailStrictListType
+						| gi_index==PD_StrictTailStrictListTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
@@ -1106,14 +1105,13 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 					# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_UnboxedJustSymbol PD_UnboxedNothingSymbol cs
 					-> (OverloadedListPatterns unboxed_list from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				AlgebraicPatterns alg_type _
-					| alg_type.gi_module==cPredefinedModuleIndex
-						# index=alg_type.gi_index+FirstTypePredefinedSymbolIndex
-						| index==PD_MaybeType
+				AlgebraicPatterns alg_type=:{gi_module,gi_index} _
+					| gi_module==cPredefinedModuleIndex
+						| gi_index==PD_MaybeTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_JustSymbol PD_NothingSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_StrictMaybeType
+						| gi_index==PD_StrictMaybeTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
 							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_StrictJustSymbol PD_StrictNothingSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
@@ -1133,20 +1131,19 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				OverloadedListPatterns (OverloadedList _ _ _) _ _
 					| global_type_index.gi_module==cPredefinedModuleIndex
-						# index=global_type_index.gi_index+FirstTypePredefinedSymbolIndex
-						| index==PD_ListType
+						| global_type_index.gi_index==PD_ListTypeIndex
 							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_ConsSymbol PD_NilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_StrictListType
+						| global_type_index.gi_index==PD_StrictListTypeIndex
 							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_StrictConsSymbol PD_StrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_TailStrictListType
+						| global_type_index.gi_index==PD_TailStrictListTypeIndex
 							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_TailStrictConsSymbol PD_TailStrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-						| index==PD_StrictTailStrictListType
+						| global_type_index.gi_index==PD_StrictTailStrictListTypeIndex
 							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)

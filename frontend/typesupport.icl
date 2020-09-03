@@ -1423,36 +1423,35 @@ where
 		= abort ("<:: (Type) (typesupport.icl)" ---> type)
 
 writeTypeTA :: !*File !(Optional TypeVarBeautifulizer) !Format !TypeSymbIdent !a -> (!*File, !Optional TypeVarBeautifulizer) | writeType a
-writeTypeTA	file opt_beautifulizer form {type_ident,type_index,type_arity} types
-	| type_index.glob_module == cPredefinedModuleIndex
-		# predef_index = type_index.glob_object+FirstTypePredefinedSymbolIndex
+writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob_object},type_arity} types
+	| glob_module == cPredefinedModuleIndex
 		| type_arity == 0
-			| predef_index==PD_StringType
+			| glob_object==PD_StringTypeIndex
 				= (file <<< "String", opt_beautifulizer)
-			| predef_index==PD_UnitType
+			| glob_object==PD_UnitTypeIndex
 				= (file <<< "()", opt_beautifulizer)
 				= (file <<< type_ident, opt_beautifulizer)
-		| predef_index==PD_ListType
+		| glob_object==PD_ListTypeIndex
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_StrictListType
+		| glob_object==PD_StrictListTypeIndex
 			= writeWithinBrackets "[!" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_UnboxedListType
+		| glob_object==PD_UnboxedListTypeIndex
 			= writeWithinBrackets "[#" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_TailStrictListType
+		| glob_object==PD_TailStrictListTypeIndex
 			= writeWithinBrackets "[" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_StrictTailStrictListType
+		| glob_object==PD_StrictTailStrictListTypeIndex
 			= writeWithinBrackets "[!" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_UnboxedTailStrictListType
+		| glob_object==PD_UnboxedTailStrictListTypeIndex
 			= writeWithinBrackets "[#" "!]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_LazyArrayType
+		| glob_object==PD_LazyArrayTypeIndex
 			= writeWithinBrackets "{" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_StrictArrayType
+		| glob_object==PD_StrictArrayTypeIndex
 			= writeWithinBrackets "{!" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_UnboxedArrayType
+		| glob_object==PD_UnboxedArrayTypeIndex
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index==PD_PackedArrayType
+		| glob_object==PD_PackedArrayTypeIndex
 			= writeWithinBrackets "{32#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
-		| predef_index>=PD_Arity2TupleType && predef_index<=PD_Arity32TupleType
+		| glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)

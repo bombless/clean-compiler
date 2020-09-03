@@ -1315,13 +1315,13 @@ where
 	build_expr_for_conses type_def_mod type_def_index cons_def_syms arg_expr heaps error
 		# (case_alts, heaps, error)
 			= build_exprs_for_conses 0 (length cons_def_syms) type_def_mod cons_def_syms  heaps error
-		| type_def_mod==cPredefinedModuleIndex && type_def_index+FirstTypePredefinedSymbolIndex==PD_UnboxedListType
+		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedListTypeIndex
 			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
 			  heaps & hp_expression_heap=expression_heap
 			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
 			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 			= (case_expr, heaps, error)
-		| type_def_mod==cPredefinedModuleIndex && type_def_index+FirstTypePredefinedSymbolIndex==PD_UnboxedTailStrictListType
+		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedTailStrictListTypeIndex
 			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
 			  heaps & hp_expression_heap=expression_heap
 			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts

@@ -572,33 +572,32 @@ where
 		| PD_Arity2TupleTypeIndex <= type_index && type_index <= PD_Arity32TupleTypeIndex
 			= type_code_constructor_expression (type_index + (PD_TC__Tuple2 - PD_Arity2TupleTypeIndex)) ci
 		// otherwise
-			# predef_type_index = type_index + FirstTypePredefinedSymbolIndex
-			= case predef_type_index of
-				PD_ListType
+			= case type_index of
+				PD_ListTypeIndex
 					-> type_code_constructor_expression PD_TC__List ci
-				PD_StrictListType
+				PD_StrictListTypeIndex
 					-> type_code_constructor_expression PD_TC__StrictList ci
-				PD_UnboxedListType
+				PD_UnboxedListTypeIndex
 					-> type_code_constructor_expression PD_TC__UnboxedList ci
-				PD_TailStrictListType
+				PD_TailStrictListTypeIndex
 					-> type_code_constructor_expression PD_TC__TailStrictList ci
-				PD_StrictTailStrictListType
+				PD_StrictTailStrictListTypeIndex
 					-> type_code_constructor_expression PD_TC__StrictTailStrictList	ci
-				PD_UnboxedTailStrictListType
+				PD_UnboxedTailStrictListTypeIndex
 					-> type_code_constructor_expression PD_TC__UnboxedTailStrictList ci
-				PD_LazyArrayType
+				PD_LazyArrayTypeIndex
 					-> type_code_constructor_expression PD_TC__LazyArray ci
-				PD_StrictArrayType
+				PD_StrictArrayTypeIndex
 					-> type_code_constructor_expression PD_TC__StrictArray ci
-				PD_UnboxedArrayType
+				PD_UnboxedArrayTypeIndex
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
-				PD_PackedArrayType
+				PD_PackedArrayTypeIndex
 					-> type_code_constructor_expression PD_TC__PackedArray ci
-				PD_MaybeType
+				PD_MaybeTypeIndex
 					-> type_code_constructor_expression PD_TC__Maybe ci
-				PD_StrictMaybeType
+				PD_StrictMaybeTypeIndex
 					-> type_code_constructor_expression PD_TC__StrictMaybe ci
-				PD_UnitType
+				PD_UnitTypeIndex
 					-> type_code_constructor_expression PD_TC__Unit ci
 	typeConstructor (GTT_Constructor fun_ident _) ci
 		# type_fun
