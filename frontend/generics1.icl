@@ -450,13 +450,13 @@ buildGenericTypeRep type_index funs_and_groups
 
 buildBimapGenericTypeRep :: !GlobalIndex !*GenericState -> (!BimapGenTypeStruct,!*GenericState)
 buildBimapGenericTypeRep type_index
-		gs=:{gs_modules, gs_predefs, gs_error, gs_td_infos, gs_exprh, gs_varh, gs_genh, gs_avarh, gs_tvarh}
+		gs=:{gs_modules, gs_error, gs_td_infos, gs_exprh, gs_varh, gs_genh, gs_avarh, gs_tvarh}
 	# (type_def, gs_modules) = gs_modules![type_index.gi_module].com_type_defs.[type_index.gi_index]
 	// remove TVI_TypeKind's, otherwise: abort "type var is not empty", buildTypeDefInfo seems to do this in buildGenericTypeRep
 	  gs_tvarh = remove_type_argument_numbers type_def.td_args gs_tvarh
 	  heaps = {hp_expression_heap=gs_exprh, hp_var_heap=gs_varh, hp_generic_heap=gs_genh, hp_type_heaps={th_vars=gs_tvarh, th_attrs=gs_avarh}}
 	  (atype, (gs_modules, gs_td_infos, heaps, gs_error))
-		= buildBimapStructType type_index gs_predefs (gs_modules, gs_td_infos, heaps, gs_error)
+		= buildBimapStructType type_index (gs_modules, gs_td_infos, heaps, gs_error)
 	  {hp_expression_heap, hp_var_heap, hp_generic_heap, hp_type_heaps={th_vars, th_attrs}} = heaps
 	  gs & gs_modules = gs_modules, gs_td_infos = gs_td_infos, gs_error = gs_error, gs_avarh = th_attrs,
 		   gs_tvarh = th_vars, gs_varh = hp_var_heap, gs_genh = hp_generic_heap, gs_exprh = hp_expression_heap
@@ -464,9 +464,9 @@ buildBimapGenericTypeRep type_index
 
 //	the structure type
 
-convertATypeToGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-														   -> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convertATypeToGenTypeStruct ident pos {psd_predefs_a} type st
+convertATypeToGenTypeStruct :: !Ident !Position !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
+									-> (GenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+convertATypeToGenTypeStruct ident pos type st
 	= convert type st
 where
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -496,8 +496,7 @@ where
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
 			_
-				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
-				| type_index.glob_module == pds_module && type_index.glob_object == pds_def
+				| type_index.glob_module == cPredefinedModuleIndex && type_index.glob_object == PD_UnboxedArrayTypeIndex
 					-> (GTSAppCons KindConst [], (modules, td_infos, heaps, error))
 				| otherwise
 					#! ({tdi_kinds}, td_infos) = td_infos ! [type_index.glob_module,type_index.glob_object]
@@ -505,9 +504,9 @@ where
 					#! (args, st) = mapSt  convert args (modules, td_infos, heaps, error)
 					-> (GTSAppCons kind args, st)  
 
-convertATypeToBimapGenTypeStruct :: !Ident !Position !PredefinedSymbolsData !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-														   -> (BimapGenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convertATypeToBimapGenTypeStruct ident pos {psd_predefs_a} type st
+convertATypeToBimapGenTypeStruct :: !Ident !Position !AType (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
+									-> (BimapGenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+convertATypeToBimapGenTypeStruct ident pos type st
 	= convert type st
 where
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -537,8 +536,7 @@ where
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
 			AbstractType _
-				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
-				| type_index.glob_module == pds_module && type_index.glob_object == pds_def
+				| type_index.glob_module == cPredefinedModuleIndex && type_index.glob_object == PD_UnboxedArrayTypeIndex
 					-> (BGTSAppCons KindConst [], (modules, td_infos, heaps, error))
 			AlgType alts
 				# n_args = length args
@@ -559,9 +557,9 @@ where
 		#! (args, st) = mapSt convert args (modules, td_infos, heaps, error)
 		= (BGTSAppCons kind args, st)
 
-convert_generic_function_type_to_BimapGenTypeStruct :: !AType !Position !PredefinedSymbolsData (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
-																	   -> (BimapGenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
-convert_generic_function_type_to_BimapGenTypeStruct type pos {psd_predefs_a} st
+convert_generic_function_type_to_BimapGenTypeStruct :: !AType !Position (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
+												-> (BimapGenTypeStruct, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin))
+convert_generic_function_type_to_BimapGenTypeStruct type pos st
 	= convert type st
 where
 	convert {at_type=TA type_symb args, at_attribute} st
@@ -591,8 +589,7 @@ where
 				-> convert {at_type = expanded_type, at_attribute = attr} 
 					(modules, td_infos, {heaps & hp_type_heaps = th}, error) 
 			AbstractType _
-				#! {pds_module, pds_def} = psd_predefs_a.[PD_UnboxedArrayType]
-				| glob_module == pds_module && glob_object == pds_def
+				| glob_module == cPredefinedModuleIndex && glob_object == PD_UnboxedArrayTypeIndex
 					-> (BGTSAppCons KindConst [], (modules, td_infos, heaps, error))
 			AlgType alts
 				# n_args = length args
@@ -863,17 +860,17 @@ where
 			(modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]
 		| isEmpty cons_exi_vars
-			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)		
+			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos) st_args (modules, td_infos, heaps, error)
 			# args = [GTSField fi {gi_module=gi_module,gi_index=fs_index} ci_record_info arg \\ arg <- args & fi <- ci_field_infos & {fs_index}<-:rt_fields]
 			# prod_type = build_prod_type args
 			= (GTSRecord ci_record_info {gi_module=gi_module,gi_index=gi_index} gen_type_ds field_list_ds prod_type, st)
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 	build_type {td_rhs=NewType cons, td_ident, td_pos} (AlgebraicInfo type_info cons_desc_list_ds _ _) st
-		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module predefs st
+		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module st
 		= (GTSObject type_info {gi_module=gi_module,gi_index=gi_index} cons_desc_list_ds type, st)
 	build_type {td_rhs=AbstractNewType _ cons, td_ident, td_pos} (AlgebraicInfo type_info cons_desc_list_ds _ _) st
-		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module predefs st
+		# (type, st) = build_newtype_alt td_ident td_pos cons gi_module st
 		= (GTSObject type_info {gi_module=gi_module,gi_index=gi_index} cons_desc_list_ds type, st)
 	build_type {td_rhs=SynType type,td_ident, td_pos} type_infos (modules, td_infos, heaps, error)
 		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of a synonym type" error
@@ -885,28 +882,27 @@ where
 	build_alt td_ident td_pos type_info cons_def_sym=:{ds_index} cons_info gen_type_ds (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
 		| isEmpty cons_exi_vars
-			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)	
+			# (args, st) = mapSt (convertATypeToGenTypeStruct td_ident td_pos) st_args (modules, td_infos, heaps, error)
 			# prod_type = build_prod_type args
 			= (GTSCons cons_info {gi_module=gi_module,gi_index=ds_index} type_info gen_type_ds prod_type, st)
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 
-	build_newtype_alt td_ident td_pos cons_def_sym=:{ds_index} gi_module predefs (modules, td_infos, heaps, error)
+	build_newtype_alt td_ident td_pos cons_def_sym=:{ds_index} gi_module (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
 		| isEmpty cons_exi_vars
 			# st_arg = case st_args of [st_arg] -> st_arg;
-			= convertATypeToGenTypeStruct td_ident td_pos predefs st_arg (modules, td_infos, heaps, error)	
+			= convertATypeToGenTypeStruct td_ident td_pos st_arg (modules, td_infos, heaps, error)	
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (GTSE, (modules, td_infos, heaps, error))
 
 buildBimapStructType ::
 		!GlobalIndex				// type def global index
-		!PredefinedSymbolsData
 		(!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 	-> 	( !BimapGenTypeStruct		// the structure type
 		, (!*Modules, !*TypeDefInfos, !*Heaps, !*ErrorAdmin)
 		)
-buildBimapStructType {gi_module,gi_index} predefs (modules, td_infos, heaps, error)
+buildBimapStructType {gi_module,gi_index} (modules, td_infos, heaps, error)
 	# (type_def=:{td_ident}, modules) = modules![gi_module].com_type_defs.[gi_index]	
 	= build_type type_def (modules, td_infos, heaps, error)	
 where
@@ -916,12 +912,12 @@ where
 	build_type {td_rhs=RecordType {rt_constructor,rt_fields}, td_ident, td_pos} (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[rt_constructor.ds_index]
 		| isEmpty cons_exi_vars
-			# (args, st) = mapSt (convertATypeToBimapGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)
+			# (args, st) = mapSt (convertATypeToBimapGenTypeStruct td_ident td_pos) st_args (modules, td_infos, heaps, error)
 			= (BGTSRecord args, st)
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (BGTSE, (modules, td_infos, heaps, error))
 	build_type {td_rhs=NewType cons, td_ident, td_pos} st
-		= build_newtype_alt td_ident td_pos cons gi_module predefs st
+		= build_newtype_alt td_ident td_pos cons gi_module st
 	build_type {td_rhs=SynType type,td_ident, td_pos} (modules, td_infos, heaps, error)
 		# error = reportError td_ident.id_name td_pos "cannot build a generic representation of a synonym type" error
 		= (BGTSE, (modules, td_infos, heaps, error))
@@ -932,16 +928,16 @@ where
 	build_alt td_ident td_pos cons_def_sym=:{ds_index} (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
 		| cons_exi_vars=:[]
-			# (args, st) = mapSt (convertATypeToBimapGenTypeStruct td_ident td_pos predefs) st_args (modules, td_infos, heaps, error)
+			# (args, st) = mapSt (convertATypeToBimapGenTypeStruct td_ident td_pos) st_args (modules, td_infos, heaps, error)
 			= (args, st)
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= ([], (modules, td_infos, heaps, error))
 
-	build_newtype_alt td_ident td_pos cons_def_sym=:{ds_index} gi_module predefs (modules, td_infos, heaps, error)
+	build_newtype_alt td_ident td_pos cons_def_sym=:{ds_index} gi_module (modules, td_infos, heaps, error)
 		# ({cons_type={st_args},cons_exi_vars}, modules) = modules![gi_module].com_cons_defs.[ds_index]
 		| isEmpty cons_exi_vars
 			# st_arg = case st_args of [st_arg] -> st_arg;
-			= convertATypeToBimapGenTypeStruct td_ident td_pos predefs st_arg (modules, td_infos, heaps, error)	
+			= convertATypeToBimapGenTypeStruct td_ident td_pos st_arg (modules, td_infos, heaps, error)	
 			# error = reportError td_ident.id_name td_pos "cannot build a generic representation of an existential type" error
 			= (BGTSE, (modules, td_infos, heaps, error))
 
@@ -2844,7 +2840,7 @@ where
 	add_OBJECT_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gtd_name
 			# (args,n_args) = add_OBJECT_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args psd_predefs_a
+			= add_String_arg args n_args
 		| generic_info bitand 2<>0 // gtd_arity
 			# (args,n_args) = add_OBJECT_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2856,15 +2852,14 @@ where
 			# {pds_module, pds_def} = psd_predefs_a.[PD_TGenericConsDescriptor]
 			#! type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_TGenericConsDescriptor] 0
 			# type_GenericConsDescriptor = {at_type= TA type_symb [], at_attribute = TA_Multi}
-			# {pds_module,pds_def} = psd_predefs_a.[PD_ListType]
-			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_ListType] 1
-			= ([{at_type = TA string_type_symb [type_GenericConsDescriptor], at_attribute = TA_Multi} : args],n_args+1)
+			#! list_type_symb = MakeTypeSymbIdent {glob_module = cPredefinedModuleIndex, glob_object = PD_ListTypeIndex} predefined_idents.[PD_ListType] 1
+			= ([{at_type = TA list_type_symb [type_GenericConsDescriptor], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
 	add_CONS_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gcd_name
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args psd_predefs_a
+			= add_String_arg args n_args
 		| generic_info bitand 2<>0 // gcd_arity
 			# (args,n_args) = add_CONS_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2891,7 +2886,7 @@ where
 	add_RECORD_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // grd_name
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args psd_predefs_a
+			= add_String_arg args n_args
 		| generic_info bitand 2<>0 // grd_arity
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2905,18 +2900,16 @@ where
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 		| generic_info bitand 16<>0 // grd_fields
 			# (args,n_args) = add_RECORD_field_args (generic_info bitxor 16) args predefs
-			# {pds_module,pds_def} = psd_predefs_a.[PD_StringType]
-			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_StringType] 0
+			#! string_type_symb = MakeTypeSymbIdent {glob_module = cPredefinedModuleIndex, glob_object = PD_StringTypeIndex} predefined_idents.[PD_StringType] 0
 			# string_type = {at_type = TA string_type_symb [], at_attribute = TA_Multi}
-			# {pds_module,pds_def} = psd_predefs_a.[PD_ListType]
-			#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_ListType] 1
-			= ([{at_type = TA string_type_symb [string_type], at_attribute = TA_Multi} : args],n_args+1)
+			#! list_type_symb = MakeTypeSymbIdent {glob_module = cPredefinedModuleIndex, glob_object = PD_ListTypeIndex} predefined_idents.[PD_ListType] 1
+			= ([{at_type = TA list_type_symb [string_type], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
 	add_FIELD_field_args generic_info args predefs=:{psd_predefs_a}
 		| generic_info bitand 1<>0 // gfd_name
 			# (args,n_args) = add_FIELD_field_args (generic_info bitxor 1) args predefs
-			= add_String_arg args n_args psd_predefs_a
+			= add_String_arg args n_args
 		| generic_info bitand 2<>0 // gfd_index
 			# (args,n_args) = add_FIELD_field_args (generic_info bitxor 2) args predefs
 			= add_Int_arg args n_args
@@ -2927,9 +2920,8 @@ where
 			= ([{at_type = TA type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 			= (args,0)
 
-	add_String_arg args n_args psd_predefs_a
-		# {pds_module,pds_def} = psd_predefs_a.[PD_StringType]
-		#! string_type_symb = MakeTypeSymbIdent {glob_module = pds_module, glob_object = pds_def} predefined_idents.[PD_StringType] 0
+	add_String_arg args n_args
+		#! string_type_symb = MakeTypeSymbIdent {glob_module = cPredefinedModuleIndex, glob_object = PD_StringTypeIndex} predefined_idents.[PD_StringType] 0
 		= ([{at_type = TA string_type_symb [], at_attribute = TA_Multi} : args],n_args+1)
 
 	add_Int_arg args n_args
@@ -3173,7 +3165,7 @@ adapt_specialized_expr gc_pos {gen_type, gen_vars, gen_info_ptr} {gtr_to,gtr_fro
 	#! curried_gen_type = curry_symbol_type gen_type
 
 	#! (struct_gen_type, (modules, td_infos, heaps, error))
-		= convert_generic_function_type_to_BimapGenTypeStruct curried_gen_type gc_pos predefs (modules, td_infos, heaps, error)  
+		= convert_generic_function_type_to_BimapGenTypeStruct curried_gen_type gc_pos (modules, td_infos, heaps, error)
 
 	#! (struct_gen_type, heaps) = simplify_bimap_GenTypeStruct gen_vars struct_gen_type heaps
 

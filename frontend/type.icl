@@ -2739,9 +2739,8 @@ where
 	convert_array_instances array_instances common_defs fun_defs predef_symbols type_heaps error
 		| isEmpty array_instances
 			= ([],fun_defs, predef_symbols, type_heaps, error)
-			# ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_UnboxedArrayType]
 			# pds_ident = predefined_idents.[PD_UnboxedArrayType]
-			  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = pds_def, glob_module = pds_module } pds_ident 0) []
+			  unboxed_array_type = TA (MakeTypeSymbIdent { glob_object = PD_UnboxedArrayTypeIndex, glob_module = cPredefinedModuleIndex } pds_ident 0) []
 			  ({pds_module,pds_def},predef_symbols) = predef_symbols![PD_ArrayClass]
 			  {class_members} = common_defs.[pds_module].com_class_defs.[pds_def]
 			  array_members = common_defs.[pds_module].com_member_defs

@@ -11,8 +11,8 @@ checkFunctions :: !Index !Level !Index !Index !Int !*{#FunDef} !*ExpressionInfo 
 checkDclMacros :: !Index !Level !Index !Index !*ExpressionInfo !*Heaps !*CheckState
 										  -> (!*ExpressionInfo,!*Heaps,!*CheckState)
 
-checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !p:PredefinedSymbols !*{#FunDef}
-												  -> (!*ErrorAdmin,!p:PredefinedSymbols,!*{#FunDef})
+checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !*{#FunDef}
+												  -> (!*ErrorAdmin,!*{#FunDef})
 
 determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)

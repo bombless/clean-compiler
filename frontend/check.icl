@@ -885,13 +885,13 @@ where
 		= case tc_types of
 			[TA {type_index} [],TV _]
 				# {pds_def,pds_module} = predef_symbols.[PD_ArrayClass]
-				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_array type_index predef_symbols
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_array type_index
 					-> (tc_types, predef_symbols,error)
 				# {pds_def,pds_module} = predef_symbols.[PD_ListClass]
-				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_list type_index predef_symbols
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_list type_index
 					-> (tc_types, predef_symbols,error)
 				# {pds_module,pds_def} = predef_symbols.[PD_MaybeClass]
-				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_maybe type_index predef_symbols
+				| glob_module==pds_module && ds_index==pds_def && is_lazy_or_strict_maybe type_index
 					-> (tc_types, predef_symbols,error)
 			_
 				-> (tc_types, predef_symbols,checkError ds_ident.id_name "illegal specialization" error)
@@ -905,38 +905,18 @@ where
 	hasNoTypeVariables [ _ : types]
 		= hasNoTypeVariables types
 	
-	is_lazy_or_strict_array {glob_module,glob_object} predef_symbols
-		# {pds_def,pds_module} = predef_symbols.[PD_LazyArrayType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-		# {pds_def,pds_module} = predef_symbols.[PD_StrictArrayType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-			= False
+	is_lazy_or_strict_array {glob_module,glob_object}
+		= glob_module==cPredefinedModuleIndex &&
+			(glob_object==PD_LazyArrayTypeIndex || glob_object==PD_StrictArrayTypeIndex)
 
-	is_lazy_or_strict_list {glob_module,glob_object} predef_symbols
-		# {pds_def,pds_module} = predef_symbols.[PD_ListType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-		# {pds_def,pds_module} = predef_symbols.[PD_StrictListType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-		# {pds_def,pds_module} = predef_symbols.[PD_TailStrictListType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-		# {pds_def,pds_module} = predef_symbols.[PD_StrictTailStrictListType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-			= False
+	is_lazy_or_strict_list {glob_module,glob_object}
+		= glob_module==cPredefinedModuleIndex &&
+			(glob_object==PD_ListTypeIndex || glob_object==PD_StrictListTypeIndex ||
+			 glob_object==PD_TailStrictListTypeIndex || glob_object==PD_StrictTailStrictListTypeIndex)
 
-	is_lazy_or_strict_maybe {glob_module,glob_object} predef_symbols
-		# {pds_def,pds_module} = predef_symbols.[PD_MaybeType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-		# {pds_def,pds_module} = predef_symbols.[PD_StrictMaybeType]
-		| glob_module==pds_module && glob_object==pds_def
-			= True
-			= False
+	is_lazy_or_strict_maybe {glob_module,glob_object}
+		= glob_module==cPredefinedModuleIndex &&
+			(glob_object==PD_MaybeTypeIndex || glob_object==PD_StrictMaybeTypeIndex)
 
 initializeContextVariables :: ![TypeContext] !*VarHeap ->  (![TypeContext], !*VarHeap)
 initializeContextVariables contexts var_heap
@@ -2773,13 +2753,12 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		= (False, abort "evaluated error 2 (check.icl)", {}, {}, {}, cs.cs_x.x_main_dcl_module_n,heaps, cs.cs_predef_symbols, cs.cs_symbol_table, cs.cs_error.ea_file, [])
 
 	# cs_symbol_table = cs.cs_symbol_table
-	  cs_predef_symbols = cs.cs_predef_symbols
 	  hp_var_heap = heaps.hp_var_heap
-	# (dcl_modules,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+	# (dcl_modules,hp_var_heap,cs_symbol_table)
 		= if support_dynamics
-			(addDclTypeFunctions nr_of_cached_modules dcl_modules cs_predef_symbols hp_var_heap cs_symbol_table)
-			(dcl_modules,cs_predef_symbols,hp_var_heap,cs_symbol_table)
-	# cs = {cs & cs_symbol_table = cs_symbol_table, cs_predef_symbols = cs_predef_symbols}
+			(addDclTypeFunctions nr_of_cached_modules dcl_modules hp_var_heap cs_symbol_table)
+			(dcl_modules,hp_var_heap,cs_symbol_table)
+	# cs & cs_symbol_table = cs_symbol_table
 	  heaps = {heaps & hp_var_heap=hp_var_heap}
 
 	# (icl_common,local_defs,dcl_modules)
@@ -2843,15 +2822,15 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 				#! n_class_defs = dcl_sizes.[cClassDefs]
 				-> (n_dcl_type_defs,n_class_defs)
 
-	# {cs_symbol_table,cs_predef_symbols} = cs
+	# {cs_symbol_table} = cs
 	  {com_type_defs,com_class_defs} = icl_common
 	  hp_var_heap = heaps.hp_var_heap
-	  (icl_type_fun_range,icl_functions,com_type_defs,com_class_defs,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+	  (icl_type_fun_range,icl_functions,com_type_defs,com_class_defs,hp_var_heap,cs_symbol_table)
 	  	= if support_dynamics
-			(addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions com_type_defs com_class_defs cs_predef_symbols hp_var_heap cs_symbol_table)
-	  		({ir_from=0,ir_to=0},icl_functions,com_type_defs,com_class_defs,cs_predef_symbols,hp_var_heap,cs_symbol_table)
+			(addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions com_type_defs com_class_defs hp_var_heap cs_symbol_table)
+			({ir_from=0,ir_to=0},icl_functions,com_type_defs,com_class_defs,hp_var_heap,cs_symbol_table)
 	  icl_common = {icl_common & com_type_defs=com_type_defs,com_class_defs=com_class_defs}
-	  cs = {cs & cs_symbol_table=cs_symbol_table, cs_predef_symbols=cs_predef_symbols}
+	  cs & cs_symbol_table=cs_symbol_table
 	  heaps = {heaps & hp_var_heap=hp_var_heap}
 
 	# (nr_of_functions, icl_functions) = usize icl_functions
@@ -3177,16 +3156,16 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 checkForeignExports [] icl_global_functions_ranges fun_defs cs
 	= ([],fun_defs,cs)
 
-checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !p:PredefinedSymbols !*{#FunDef}
-												  -> (!*ErrorAdmin,!p:PredefinedSymbols,!*{#FunDef})
-checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admin predefined_symbols fun_defs
+checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !*{#FunDef}
+												  -> (!*ErrorAdmin,!*{#FunDef})
+checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admin fun_defs
 	| not (check_foreign_export_type st_result.at_type)
 		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin
-		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 	| not (check_foreign_export_types st_args)
 		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin
-		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
-		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predefined_symbols fun_defs2
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 	where
 		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fe_fd_index]
 
@@ -3202,8 +3181,7 @@ checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admi
 		check_foreign_export_type (TB (BT_String _))
 			= True
 		check_foreign_export_type (TA {type_index={glob_module,glob_object},type_arity} [{at_type=TB basic_type}])
-			| predefined_symbols.[PD_UnboxedArrayType].pds_def==glob_object &&
-			  predefined_symbols.[PD_UnboxedArrayType].pds_module==glob_module
+			| glob_module==cPredefinedModuleIndex && glob_object==PD_UnboxedArrayTypeIndex
 			  = case basic_type of
 					BT_Char -> True
 					BT_Int -> True
@@ -3215,8 +3193,8 @@ checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admi
 				&& first_n_are_strict type_arity strictness && check_foreign_export_types arguments
 		check_foreign_export_type _
 			= False
-checkForeignExportedFunctionTypes [] error_admin predefined_symbols fun_defs
-	= (error_admin,predefined_symbols,fun_defs)
+checkForeignExportedFunctionTypes [] error_admin fun_defs
+	= (error_admin,fun_defs)
 
 check_dynamics_used_without_support_dynamics support_dynamics mod_ident cs
 	| not support_dynamics && (cs.cs_x.x_needed_modules bitand cNeedStdDynamic)<>0
@@ -3573,8 +3551,7 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 		| mod_index == cs_predef_symbols.[PD_StdArray].pds_def
 			#! nr_of_instances = size class_instances
 			# ({pds_def}, cs_predef_symbols) = cs_predef_symbols![PD_ArrayClass]
-			  (class_instances, cs_predef_symbols) 
-				= iFoldSt (adjust_instances_of_array_functions mod_index pds_def) 0 nr_of_instances (class_instances, cs_predef_symbols)
+			  class_instances = iFoldSt (adjust_instances_of_array_functions mod_index pds_def) 0 nr_of_instances class_instances
 			= (class_instances, {cs & cs_predef_symbols = cs_predef_symbols})
 		| mod_index == cs_predef_symbols.[PD_StdStrictLists].pds_def
 			#! n_of_instances = size class_instances
@@ -3588,19 +3565,16 @@ checkInstancesOfDclModule mod_index	(nr_of_dcl_functions_and_instances, nr_of_dc
 			= (class_instances, {cs & cs_predef_symbols = cs_predef_symbols})
 			= (class_instances, cs)
 	where
-		adjust_instances_of_array_functions :: Index !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})
-																-> (!*{#ClassInstance},!v:{#PredefinedSymbol})
-		adjust_instances_of_array_functions array_mod_index array_class_index inst_index (class_instances, predef_symbols)
+		adjust_instances_of_array_functions :: Index !Index !Int !*{#ClassInstance} -> *{#ClassInstance}
+		adjust_instances_of_array_functions array_mod_index array_class_index inst_index class_instances
 			# ({ins_class_index={gi_module,gi_index},ins_type}, class_instances) = class_instances![inst_index]
-			| gi_module==array_mod_index && gi_index==array_class_index && is_polymorphic_unboxed_or_packed_array_instance_type ins_type.it_types predef_symbols
-				# class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances
-				= (class_instances, predef_symbols)
-				= (class_instances, predef_symbols)
+			| gi_module==array_mod_index && gi_index==array_class_index && is_polymorphic_unboxed_or_packed_array_instance_type ins_type.it_types
+				= {class_instances & [inst_index].ins_specials = SP_GenerateRecordInstances}
+				= class_instances
 
-		is_polymorphic_unboxed_or_packed_array_instance_type [TA {type_index={glob_object,glob_module}} _, TV _ : _] predef_symbols
-			= glob_module == predef_symbols.[PD_PredefinedModule].pds_def &&
-				(glob_object == predef_symbols.[PD_UnboxedArrayType].pds_def || glob_object == predef_symbols.[PD_PackedArrayType].pds_def)
-		is_polymorphic_unboxed_or_packed_array_instance_type _ _
+		is_polymorphic_unboxed_or_packed_array_instance_type [TA {type_index={glob_object,glob_module}} _, TV _ : _]
+			= glob_module == cPredefinedModuleIndex && (glob_object == PD_UnboxedArrayTypeIndex || glob_object == PD_PackedArrayTypeIndex)
+		is_polymorphic_unboxed_or_packed_array_instance_type _
 			= False
 
 		adjust_instances_of__SystemStrictLists_module :: !Index !Int !*(!*{#ClassInstance},!v:{#PredefinedSymbol})

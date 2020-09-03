@@ -1207,10 +1207,10 @@ predefineSymbols {dcl_common} predefs
 		define_unit_type
 			# constructor_symbol_be_f = BEConstructorSymbol predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex
 			  constructors_be_f = @^^^ BEConstructorList constructor_symbol_be_f BENoTypeArgs BENoConstructors
-			  type_symbol_be_f = BETypeSymbol predefs.[PD_UnitType].pds_def cPredefinedModuleIndex
+			  type_symbol_be_f = BETypeSymbol PD_UnitTypeIndex cPredefinedModuleIndex
 			= appBackEnd
 				(  BEDeclareConstructor predefs.[PD_UnitConsSymbol].pds_def cPredefinedModuleIndex "_Unit"
-			  	o` BEDeclareType predefs.[PD_UnitType].pds_def cPredefinedModuleIndex "_Unit"
+				o` BEDeclareType PD_UnitTypeIndex cPredefinedModuleIndex "_Unit"
 				o` @^&^ BEDefineAlgebraicType type_symbol_be_f BENoUniAttr constructors_be_f)
 
 bindSpecialIdents :: PredefinedSymbols NumberSet -> BackEnder

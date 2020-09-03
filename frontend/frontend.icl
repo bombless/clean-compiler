@@ -206,8 +206,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 	# {dcl_instances,dcl_specials,dcl_gencases,dcl_type_funs} = dcl_mods.[main_dcl_module_n]
 	# (start_function_index,predef_symbols) = get_index_of_start_rule main_dcl_module_n predef_symbols
 
-	# (error_admin,predef_symbols,fun_defs)
-		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin predef_symbols fun_defs	
+	# (error_admin,fun_defs)
+		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs	
 	
 	# [icl_exported_global_functions,icl_not_exported_global_functions:_] = icl_global_functions
 	# exported_global_functions = case start_function_index of

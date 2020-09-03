@@ -313,7 +313,7 @@ where
 				case_info_ptr = case_expr_ptr, case_default_pos = NoPos },
 				NoPos, var_store, expr_heap, opt_dynamics, cs)	
 	transform_pattern_into_cases (AP_Basic basic_val opt_var) fun_arg result_expr pattern_position var_store expr_heap opt_dynamics cs
-		# (basic_type, cs) = typeOfBasicValue basic_val cs
+		# basic_type = typeOfBasicValue basic_val
 	  	  (act_var, result_expr, expr_heap) = transform_pattern_variable fun_arg opt_var result_expr expr_heap
 		  case_guards = BasicPatterns basic_type [{ bp_value = basic_val, bp_expr = result_expr, bp_position = pattern_position }]
 		  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -1220,7 +1220,7 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 transform_pattern (AP_Basic basic_val opt_var) patterns pattern_scheme pattern_variables defaul result_expr _ pos var_store expr_heap opt_dynamics cs
 	# pattern = { bp_value = basic_val, bp_expr = result_expr, bp_position = pos}
 	  pattern_variables = cons_optional opt_var pattern_variables
-	  (type_symbol, cs) = typeOfBasicValue basic_val cs
+	  type_symbol = typeOfBasicValue basic_val
 	= case pattern_scheme of
 		BasicPatterns basic_type _
 			| type_symbol == basic_type
@@ -2183,7 +2183,7 @@ convertSubPattern (AP_Algebraic cons_symbol global_type_index args opt_var) resu
 				case_default_pos = NoPos },
 		NoPos, var_store, expr_heap, opt_dynamics, cs)
 convertSubPattern (AP_Basic basic_val opt_var) result_expr pattern_position var_store expr_heap opt_dynamics cs
-	# (basic_type, cs) = typeOfBasicValue basic_val cs
+	# basic_type = typeOfBasicValue basic_val
 	  case_guards = BasicPatterns basic_type [{ bp_value = basic_val, bp_expr = result_expr, bp_position = pattern_position }]
   	  ({bind_src,bind_dst}, var_store) = determinePatternVariable opt_var var_store
 	  (var_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
@@ -2958,15 +2958,13 @@ where
 				_
 					-> ({ ds_ident = symb_id, ds_index = NoIndex, ds_arity = arity }, { cs & cs_error = checkError symb_id "undefined" cs.cs_error })
 
-typeOfBasicValue :: !BasicValue !*CheckState -> (!BasicType, !*CheckState)
-typeOfBasicValue (BVI _) cs = (BT_Int, cs)
-typeOfBasicValue (BVInt _) cs = (BT_Int, cs)
-typeOfBasicValue (BVC _) cs = (BT_Char, cs)
-typeOfBasicValue (BVB _) cs = (BT_Bool, cs)
-typeOfBasicValue (BVR _) cs = (BT_Real, cs)
-typeOfBasicValue (BVS _) cs
-	# ({glob_module,glob_object={ds_ident,ds_index,ds_arity}}, cs) = getPredefinedGlobalSymbol PD_StringType PD_PredefinedModule STE_Type 0 cs
-	= (BT_String (TA (MakeTypeSymbIdent { glob_object = ds_index, glob_module = glob_module } ds_ident ds_arity) []), cs)
+typeOfBasicValue :: !BasicValue -> BasicType
+typeOfBasicValue (BVI _) = BT_Int
+typeOfBasicValue (BVInt _) = BT_Int
+typeOfBasicValue (BVC _) = BT_Char
+typeOfBasicValue (BVB _) = BT_Bool
+typeOfBasicValue (BVR _) = BT_Real
+typeOfBasicValue (BVS _) = BT_String (TA (MakeTypeSymbIdent { glob_object = PD_StringTypeIndex, glob_module = cPredefinedModuleIndex } predefined_idents.[PD_StringType] 0) [])
 
 buildTypeCase type_case_dynamic type_case_patterns type_case_default type_case_info_ptr case_explicit :==
 	Case {	case_expr = type_case_dynamic, case_guards = DynamicPatterns type_case_patterns, case_default = type_case_default, 

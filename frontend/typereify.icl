@@ -74,11 +74,9 @@ add_fun_types_of_dcl_module ctListDefSymb dcl_mod=:{dcl_functions, dcl_common={c
 							}
 	= (dcl_mod, var_heap, symbols)
 
-getListTypeSymb predefs
-	# ({pds_module, pds_def}, predefs) = predefs![PD_ListType]
-	  ident = predefined_idents.[PD_ListType]
-	  type_symb = {MakeNewTypeSymbIdent ident 0 & type_index.glob_module = pds_module, type_index.glob_object = pds_def}
-	= (type_symb, predefs)
+getListTypeSymb
+	# ident = predefined_idents.[PD_ListType]
+	= {MakeNewTypeSymbIdent ident 0 & type_index = {glob_module = cPredefinedModuleIndex, glob_object = PD_ListTypeIndex}}
 
 getNilSymb :: *PredefinedSymbols -> (SymbIdent, !*PredefinedSymbols)
 getNilSymb predefs
@@ -87,18 +85,18 @@ getNilSymb predefs
 	  symbol = { symb_ident = pds_ident, symb_kind = SK_Constructor { glob_module = pds_module, glob_object = pds_def} }
 	= (symbol, predefs)
 
-addDclTypeFunctions :: !Int !*{#DclModule} !*PredefinedSymbols !*VarHeap !*SymbolTable
-						-> (!*{#DclModule},!*PredefinedSymbols,!*VarHeap,!*SymbolTable)
-addDclTypeFunctions nr_cached_dcls dcl_modules predefs var_heap symbols
-	# (ctListDefSymb, predefs) = getListTypeSymb predefs
+addDclTypeFunctions :: !Int !*{#DclModule} !*VarHeap !*SymbolTable
+						-> (!*{#DclModule},!*VarHeap,!*SymbolTable)
+addDclTypeFunctions nr_cached_dcls dcl_modules var_heap symbols
+	# ctListDefSymb = getListTypeSymb
 	# (dcl_modules, var_heap, symbols)
 		=	add_dcl_type_fun_types ctListDefSymb nr_cached_dcls dcl_modules var_heap symbols
-	= (dcl_modules, predefs, var_heap, symbols)
+	= (dcl_modules, var_heap, symbols)
 
-addIclTypeFunctions :: !Int !Int !*{#FunDef} !*{#CheckedTypeDef} !*{#ClassDef} !*PredefinedSymbols !*VarHeap !*SymbolTable
-				 -> (!IndexRange,!*{#FunDef},!*{#CheckedTypeDef},!*{#ClassDef},!*PredefinedSymbols,!*VarHeap,!*SymbolTable)
-addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions icl_type_defs icl_class_defs predefs var_heap symbol_table
-	# (ctListDefSymb, predefs) = getListTypeSymb predefs
+addIclTypeFunctions :: !Int !Int !*{#FunDef} !*{#CheckedTypeDef} !*{#ClassDef} !*VarHeap !*SymbolTable
+				 -> (!IndexRange,!*{#FunDef},!*{#CheckedTypeDef},!*{#ClassDef},!*VarHeap,!*SymbolTable)
+addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions icl_type_defs icl_class_defs var_heap symbol_table
+	# ctListDefSymb = getListTypeSymb
 	  (n_functions_before, icl_functions) = usize icl_functions
 
 	# (type_fun_index,rev_type_funs,icl_type_defs,var_heap,symbol_table)
@@ -113,7 +111,7 @@ addIclTypeFunctions n_dcl_type_defs n_dcl_class_defs icl_functions icl_type_defs
 	  icl_functions = {function \\ function <- [e \\ e <-: icl_functions] ++ reverse rev_type_funs}
 	  (n_functions_after, icl_functions) = usize icl_functions
 	  type_fun_range = {ir_from=n_functions_before,ir_to=n_functions_after}
-	= (type_fun_range,icl_functions,icl_type_defs,icl_class_defs,predefs,var_heap,symbol_table)
+	= (type_fun_range,icl_functions,icl_type_defs,icl_class_defs,var_heap,symbol_table)
 where
 	add_td_funs_for_exported_types :: Int Int TypeSymbIdent Int [FunDef]  *{#CheckedTypeDef}  *VarHeap  *SymbolTable
 													  -> (!Int,![FunDef],!*{#CheckedTypeDef},!*VarHeap,!*SymbolTable)
