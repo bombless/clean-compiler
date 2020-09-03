@@ -3745,6 +3745,7 @@ where
 				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedMaybeType mod_index PD_UnboxedMaybeTypeIndex STE_Type
 				<=< adjustPredefSymbol PD_OverloadedMaybeType mod_index STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_UnitType mod_index PD_UnitTypeIndex STE_Type
+				<=< adjust_predef_symbols PD_ConsSymbol PD_UnitConsSymbol mod_index STE_Constructor
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class) (\x->x))
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeMember mod_index STE_Member) (\x->x))
 				<=< adjustPredefSymbol PD_DummyForStrictAliasFun mod_index STE_DclFunction
