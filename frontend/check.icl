@@ -3728,10 +3728,24 @@ where
 		| mod_index==cs_predef_symbols.[PD_PredefinedModule].pds_def
 			= cs
 				<=< adjustPredefSymbolAndCheckIndex PD_StringType mod_index PD_StringTypeIndex STE_Type
-				<=< adjust_predef_symbols PD_ListType PD_OverloadedListType mod_index STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_ListType mod_index PD_ListTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StrictListType mod_index PD_StrictListTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedListType mod_index PD_UnboxedListTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_TailStrictListType mod_index PD_TailStrictListTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StrictTailStrictListType mod_index PD_StrictTailStrictListTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedTailStrictListType mod_index PD_UnboxedTailStrictListTypeIndex STE_Type
+				<=< adjustPredefSymbol PD_OverloadedListType mod_index STE_Type
 				<=< adjust_predef_symbols_and_check_indices PD_Arity2TupleType PD_Arity32TupleType PD_Arity2TupleTypeIndex mod_index STE_Type
 				<=< adjust_predef_symbols PD_LazyArrayType PD_UnitType mod_index STE_Type
-				<=< adjust_predef_symbols PD_ConsSymbol PD_UnitConsSymbol mod_index STE_Constructor
+				<=< adjustPredefSymbolAndCheckIndex PD_LazyArrayType mod_index PD_LazyArrayTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StrictArrayType mod_index PD_StrictArrayTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedArrayType mod_index PD_UnboxedArrayTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_PackedArrayType mod_index PD_PackedArrayTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_MaybeType mod_index PD_MaybeTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StrictMaybeType mod_index PD_StrictMaybeTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedMaybeType mod_index PD_UnboxedMaybeTypeIndex STE_Type
+				<=< adjustPredefSymbol PD_OverloadedMaybeType mod_index STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnitType mod_index PD_UnitTypeIndex STE_Type
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeClass mod_index STE_Class) (\x->x))
 				<=< (if tc_class_defined (adjustPredefSymbol PD_TypeCodeMember mod_index STE_Member) (\x->x))
 				<=< adjustPredefSymbol PD_DummyForStrictAliasFun mod_index STE_DclFunction
@@ -3806,7 +3820,6 @@ adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_erro
 	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
 	| pre_index <> NoIndex
 		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
-			//---> ("predef_index", predef_index, size predefined_idents)
 		= { cs & cs_error = checkError pre_id " function not defined" cs_error }
 where
 	determine_index_of_symbol {ste_kind, ste_index} symb_kind

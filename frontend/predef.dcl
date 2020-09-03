@@ -19,9 +19,32 @@ buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.Predefi
 
 cPredefinedModuleIndex :== 1
 
+// index in com_type_defs
+
 PD_StringTypeIndex :== 0
+
+PD_ListTypeIndex :== 1
+PD_StrictListTypeIndex :== 2
+PD_UnboxedListTypeIndex :== 3
+PD_TailStrictListTypeIndex :== 4
+PD_StrictTailStrictListTypeIndex :== 5
+PD_UnboxedTailStrictListTypeIndex :== 6
+//PD_OverloadedListTypeIndex :== 7
+
 PD_Arity2TupleTypeIndex :== 8
 PD_Arity32TupleTypeIndex :== 38
+
+PD_LazyArrayTypeIndex :== 39
+PD_StrictArrayTypeIndex :== 40
+PD_UnboxedArrayTypeIndex :== 41
+PD_PackedArrayTypeIndex :== 42
+
+PD_MaybeTypeIndex :== 43
+PD_StrictMaybeTypeIndex :== 44
+PD_UnboxedMaybeTypeIndex :== 45
+//PD_OverloadedMaybeTypeIndex :== 46
+
+PD_UnitTypeIndex :== 47
 
 /* identifiers not present the hashtable */
 
