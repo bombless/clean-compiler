@@ -3736,7 +3736,6 @@ where
 				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedTailStrictListType mod_index PD_UnboxedTailStrictListTypeIndex STE_Type
 				<=< adjustPredefSymbol PD_OverloadedListType mod_index STE_Type
 				<=< adjust_predef_symbols_and_check_indices PD_Arity2TupleType PD_Arity32TupleType PD_Arity2TupleTypeIndex mod_index STE_Type
-				<=< adjust_predef_symbols PD_LazyArrayType PD_UnitType mod_index STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_LazyArrayType mod_index PD_LazyArrayTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_StrictArrayType mod_index PD_StrictArrayTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedArrayType mod_index PD_UnboxedArrayTypeIndex STE_Type
