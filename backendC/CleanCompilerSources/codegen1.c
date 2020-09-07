@@ -3790,6 +3790,8 @@ static int generate_int_char_or_bool_match (struct arg *first_arg,int *matches_a
 	return 0;
 }
 
+#define JMP_D
+
 #ifdef JMP_D
 static void gen_jmpD_case_labels (SymbolP compare_symbol,SymbolP symbol1,SymbolP symbol2,int label_1_n,int label_2_n)
 {
