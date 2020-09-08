@@ -1323,27 +1323,30 @@ where
 	build_expr_for_conses type_def_mod type_def_index cons_def_syms arg_expr heaps error
 		# (case_alts, heaps, error)
 			= build_exprs_for_conses 0 (length cons_def_syms) type_def_mod cons_def_syms  heaps error
-		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedListTypeIndex
-			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
-			  heaps & hp_expression_heap=expression_heap
-			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
-			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
-			= (case_expr, heaps, error)
-		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedTailStrictListTypeIndex
-			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
-			  heaps & hp_expression_heap=expression_heap
-			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
-			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
-			= (case_expr, heaps, error)
-		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedMaybeTypeIndex
-			# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
-			  heaps & hp_expression_heap=expression_heap
-			  case_patterns = OverloadedListPatterns unboxed_maybe from_just_expr case_alts
-			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
-			= (case_expr, heaps, error)
-			# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
-			# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
-			= (case_expr, heaps, error)
+		= case type_def_mod of
+			PredefinedModuleIndex
+				| type_def_index==PD_UnboxedListTypeIndex
+					# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
+					  heaps & hp_expression_heap=expression_heap
+					  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+					-> (case_expr, heaps, error)
+				| type_def_index==PD_UnboxedTailStrictListTypeIndex
+					# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
+					  heaps & hp_expression_heap=expression_heap
+					  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+					-> (case_expr, heaps, error)
+				| type_def_index==PD_UnboxedMaybeTypeIndex
+					# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
+					  heaps & hp_expression_heap=expression_heap
+					  case_patterns = OverloadedListPatterns unboxed_maybe from_just_expr case_alts
+					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+					-> (case_expr, heaps, error)
+			_
+				# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
+				# (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+				-> (case_expr, heaps, error)
 
 	// build conversions for constructors 	
 	build_exprs_for_conses :: !Int !Int !Int ![DefinedSymbol] !*Heaps !*ErrorAdmin
@@ -1558,6 +1561,11 @@ buildUnboxedNilSymbIdent predef_index predef_symbols
 	# cons_u_ident = predefined_idents.[predef_index]
 	  {pds_module,pds_def} = predef_symbols.[predef_index];
 	 = {symb_ident=cons_u_ident, symb_kind=SK_Function {glob_module=pds_module,glob_object=pds_def}};
+
+buildXVarExprs :: !Int !*Heaps -> (![Expression],![FreeVar],!*Heaps)
+buildXVarExprs arity heaps
+	# arg_names = ["x" +++ toString k \\ k <- [1..arity]]
+	= buildVarExprs arg_names heaps
 
 // build constructor application expression
 build_cons_app :: !SymbIdent !Int !*Heaps -> (!Expression, ![FreeVar], !*Heaps)
@@ -3028,7 +3036,7 @@ buildGenericBimapCaseBody main_module_index gc_pos type_index gc_ident generic_i
 	# (is_simple_bimap,modules,heaps)
 		= test_if_simple_bimap td_args td_rhs type_index.glob_module modules heaps
 	| is_simple_bimap
-		# (body_expr,modules,heaps) = build_simple_bimap td_args td_rhs type_index generated_arg_exprss original_arg_exprs modules heaps
+		# (body_expr,modules,heaps) = build_simple_bimap td_args td_rhs type_index generated_arg_exprss original_arg_exprs predefs modules heaps
 		# st & ss_modules=modules,ss_td_infos=td_infos,ss_heaps=heaps
 		= (TransformedBody {tb_args=arg_vars, tb_rhs=body_expr}, st)
 
@@ -3235,17 +3243,41 @@ test_if_simple_bimap td_args (AlgType alts) type_module modules heaps
 test_if_simple_bimap td_args td_rhs type_module modules heaps
 	= (False,modules,heaps)
 
-build_simple_bimap :: [ATypeVar] !TypeRhs (Global Index) [[Expression]] [Expression] *Modules *Heaps -> (!Expression,!*Modules,!*Heaps)
-build_simple_bimap td_args (AlgType alts) type_index generated_arg_exprss [original_arg_expr] modules heaps
+build_simple_bimap :: [ATypeVar] !TypeRhs (Global Index) [[Expression]] [Expression] PredefinedSymbolsData *Modules *Heaps -> (!Expression,!*Modules,!*Heaps)
+build_simple_bimap td_args (AlgType alts) type_index generated_arg_exprss [original_arg_expr] predefs modules heaps
 	# {hp_type_heaps} = heaps
 	  th_vars = set_arg_exprs td_args generated_arg_exprss hp_type_heaps.th_vars
-	  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
-	  (alg_patterns,modules,heaps) = build_bimap_alg_patterns alts type_index.glob_module modules heaps
-	  (case_expr,heaps) = build_bimap_alg_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False heaps
-	  {hp_type_heaps} = heaps
-	  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
-	  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
-	= (case_expr,modules,heaps)
+	#! heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+	= case type_index.glob_module of
+		PredefinedModuleIndex
+			| type_index.glob_object==PD_UnboxedListTypeIndex
+				# (alg_patterns,modules,heaps) = build_bimap_unboxed_alg_patterns alts type_index.glob_module modules heaps
+				  (case_expr,heaps) = build_bimap_unboxed_list_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False predefs heaps
+				  {hp_type_heaps} = heaps
+				  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
+				  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+				-> (case_expr,modules,heaps)
+			| type_index.glob_object==PD_UnboxedTailStrictListTypeIndex
+				# (alg_patterns,modules,heaps) = build_bimap_unboxed_alg_patterns alts type_index.glob_module modules heaps
+				  (case_expr,heaps) = build_bimap_unboxed_tail_strict_list_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False predefs heaps
+				  {hp_type_heaps} = heaps
+				  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
+				  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+				-> (case_expr,modules,heaps)
+			| type_index.glob_object==PD_UnboxedMaybeTypeIndex
+				# (alg_patterns,modules,heaps) = build_bimap_unboxed_alg_patterns alts type_index.glob_module modules heaps
+				  (case_expr,heaps) = build_bimap_unboxed_maybe_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False predefs heaps
+				  {hp_type_heaps} = heaps
+				  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
+				  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+				-> (case_expr,modules,heaps)
+		_
+			# (alg_patterns,modules,heaps) = build_bimap_alg_patterns alts type_index.glob_module modules heaps
+			  (case_expr,heaps) = build_bimap_alg_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False heaps
+			  {hp_type_heaps} = heaps
+			  th_vars = remove_type_argument_numbers td_args hp_type_heaps.th_vars
+			  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+			-> (case_expr,modules,heaps)
 where
 	set_arg_exprs :: ![ATypeVar] ![[Expression]] !*TypeVarHeap -> *TypeVarHeap
 	set_arg_exprs [{atv_variable={tv_info_ptr}}:atype_vars] [[arg_expr:_]:arg_exprs] th_vars
@@ -3257,8 +3289,7 @@ where
 	build_bimap_alg_patterns :: [DefinedSymbol] Int !*Modules *Heaps -> (![AlgebraicPattern],!*Modules,!*Heaps)
 	build_bimap_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] type_module_n modules heaps
 		# (cons_args,modules) = modules![type_module_n].com_cons_defs.[ds_index].cons_type.st_args
-		  arg_names = ["x" +++ toString k \\ k <- [1..ds_arity]]
-		  (var_exprs, vars, heaps) = buildVarExprs arg_names heaps
+		  (var_exprs, vars, heaps) = buildXVarExprs ds_arity heaps
 		  {hp_type_heaps} = heaps
 		  (args,th_vars) = bimaps_with_arg cons_args var_exprs hp_type_heaps.th_vars
 		  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}	  
@@ -3266,6 +3297,19 @@ where
 		  (alg_patterns,modules,heaps) = build_bimap_alg_patterns alts type_module_n modules heaps
 		= ([alg_pattern:alg_patterns],modules,heaps)
 	build_bimap_alg_patterns [] type_module_n modules heaps
+		= ([],modules,heaps)
+
+	build_bimap_unboxed_alg_patterns :: [DefinedSymbol] Int !*Modules *Heaps -> (![AlgebraicPattern],!*Modules,!*Heaps)
+	build_bimap_unboxed_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] type_module_n modules heaps
+		# (cons_args,modules) = modules![type_module_n].com_cons_defs.[ds_index].cons_type.st_args
+		  (var_exprs, vars, heaps) = buildXVarExprs ds_arity heaps
+		  {hp_type_heaps} = heaps
+		  (args,th_vars) = bimaps_with_arg cons_args var_exprs hp_type_heaps.th_vars
+		  heaps & hp_type_heaps={hp_type_heaps & th_vars=th_vars}
+		  (alg_pattern,heaps) = build_unboxed_alg_pattern cons_ds vars args type_module_n predefs heaps
+		  (alg_patterns,modules,heaps) = build_bimap_unboxed_alg_patterns alts type_module_n modules heaps
+		= ([alg_pattern:alg_patterns],modules,heaps)
+	build_bimap_unboxed_alg_patterns [] type_module_n modules heaps
 		= ([],modules,heaps)
 	
 	bimaps_with_arg :: [AType] [Expression] !*TypeVarHeap -> (![Expression],!*TypeVarHeap)
@@ -3309,11 +3353,29 @@ build_bimap td_rhs gtr_type type_index original_arg_exprs gc_ident gc_pos gcf_ge
 	= (case_expr,bs.bs_funs_and_groups,bs.bs_modules,bs.bs_heaps,bs.bs_error)
 where
 	build_bimap :: TypeRhs BimapGenTypeStruct (Global Index) [Expression] !BimapInfo !BimapState -> (!Expression,BimapState)
-	build_bimap (AlgType alts) (BGTSAlgebraic algebraic_gen_type) type_index [original_arg_expr] bi bs
-		# (alg_patterns,bs) = build_bimap_alg_patterns alts algebraic_gen_type type_index.glob_module bi bs
-		  (case_expr,heaps) = build_bimap_alg_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False bs.bs_heaps
-		  bs & bs_heaps=heaps
-		= (case_expr,bs)
+	build_bimap (AlgType alts) (BGTSAlgebraic algebraic_gen_type) type_index [original_arg_expr] bi=:{bi_predefs} bs
+		= case type_index.glob_module of
+			PredefinedModuleIndex
+				| type_index.glob_object==PD_UnboxedListTypeIndex
+					# (alg_patterns,bs) = build_bimap_unboxed_alg_patterns alts algebraic_gen_type type_index.glob_module bi bs
+					  (case_expr,heaps) = build_bimap_unboxed_list_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False bi_predefs bs.bs_heaps
+					  bs & bs_heaps=heaps
+					-> (case_expr,bs)
+				| type_index.glob_object==PD_UnboxedTailStrictListTypeIndex
+					# (alg_patterns,bs) = build_bimap_unboxed_alg_patterns alts algebraic_gen_type type_index.glob_module bi bs
+					  (case_expr,heaps) = build_bimap_unboxed_tail_strict_list_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False bi_predefs bs.bs_heaps
+					  bs & bs_heaps=heaps
+					-> (case_expr,bs)
+				| type_index.glob_object==PD_UnboxedMaybeTypeIndex
+					# (alg_patterns,bs) = build_bimap_unboxed_alg_patterns alts algebraic_gen_type type_index.glob_module bi bs
+					  (case_expr,heaps) = build_bimap_unboxed_maybe_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False bi_predefs bs.bs_heaps
+					  bs & bs_heaps=heaps
+					-> (case_expr,bs)
+			_
+				# (alg_patterns,bs) = build_bimap_alg_patterns alts algebraic_gen_type type_index.glob_module bi bs
+				  (case_expr,heaps) = build_bimap_alg_case {gi_module=type_index.glob_module,gi_index=type_index.glob_object} original_arg_expr alg_patterns False bs.bs_heaps
+				  bs & bs_heaps=heaps
+				-> (case_expr,bs)
 	where
 		build_bimap_alg_patterns :: [DefinedSymbol] [[BimapGenTypeStruct]] Int !BimapInfo !BimapState -> (![AlgebraicPattern],!BimapState)
 		build_bimap_alg_patterns [cons_ds:alts] [constuctor_gen_type:constuctor_gen_types] type_module_n bi bs
@@ -3323,6 +3385,16 @@ where
 			  (alg_patterns,bs) = build_bimap_alg_patterns alts constuctor_gen_types type_module_n bi bs
 			= ([alg_pattern:alg_patterns],bs)
 		build_bimap_alg_patterns [] [] type_module_n bi bs
+			= ([],bs)
+
+		build_bimap_unboxed_alg_patterns :: [DefinedSymbol] [[BimapGenTypeStruct]] Int !BimapInfo !BimapState -> (![AlgebraicPattern],!BimapState)
+		build_bimap_unboxed_alg_patterns [cons_ds:alts] [constuctor_gen_type:constuctor_gen_types] type_module_n bi bs
+			# (vars,args,bs) = build_bimap_for_constructor cons_ds constuctor_gen_type type_module_n bi bs
+			  (alg_pattern,heaps) = build_unboxed_alg_pattern cons_ds vars args type_module_n bi_predefs bs.bs_heaps
+			  bs & bs_heaps=heaps
+			  (alg_patterns,bs) = build_bimap_unboxed_alg_patterns alts constuctor_gen_types type_module_n bi bs
+			= ([alg_pattern:alg_patterns],bs)
+		build_bimap_unboxed_alg_patterns [] [] type_module_n bi bs
 			= ([],bs)
 	build_bimap (RecordType {rt_constructor}) (BGTSRecord record_gen_type) type_index [original_arg_expr] bi bs
 		# (vars,args,bs) = build_bimap_for_constructor rt_constructor record_gen_type type_index.glob_module bi bs
@@ -3340,8 +3412,7 @@ where
 build_bimap_for_constructor :: DefinedSymbol [BimapGenTypeStruct] Int !BimapInfo !BimapState
 													-> (![FreeVar],![Expression],!BimapState)
 build_bimap_for_constructor cons_ds=:{ds_arity} constuctor_gen_type type_module_n bi bs
-	# arg_names = ["x" +++ toString k \\ k <- [1..ds_arity]]
-	  (var_exprs, vars, heaps) = buildVarExprs arg_names bs.bs_heaps
+	# (var_exprs, vars, heaps) = buildXVarExprs ds_arity bs.bs_heaps
 	  bs & bs_heaps=heaps
 	  (args,bs) = bimap_to_with_args constuctor_gen_type var_exprs bi bs
 	= (vars,args,bs)
@@ -4328,33 +4399,44 @@ where
 
 bimap_to_simple_type :: !GlobalIndex !TypeKind ![BimapGenTypeStruct] ![Expression] !BimapInfo !BimapState
 																			 -> *(!Expression,!BimapState)
-bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args bi=:{bi_main_module_index,bi_bimap_exprs} bs
+bimap_to_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args bi=:{bi_main_module_index,bi_bimap_exprs,bi_predefs} bs
 	# (old_bimap_exprs,heaps) = read_bimap_exprs bi_bimap_exprs bs.bs_heaps
 	# heaps = copy_bimap_exprs bi_bimap_exprs heaps
 
 	# (alts,constructors_arg_types,modules,heaps)
 		= determine_constructors_arg_types global_type_def_index arg_types bs.bs_modules heaps
-	# bs & bs_modules=modules,bs_heaps=heaps
-	# (alg_patterns,bs)
-		= build_to_alg_patterns alts constructors_arg_types gi_module bi bs
-/*
-	= build_bimap_alg_case global_type_def_index arg_expr alg_patterns True heaps
-*/
-	# (arg_expr, arg_var, heaps) = buildVarExpr "x" bs.bs_heaps
-
-	# (case_expr,heaps)
-		= build_bimap_alg_case global_type_def_index arg_expr alg_patterns False heaps
-
-	# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs heaps
-
-	# (def_sym, funs_and_groups)
-		= buildFunAndGroup (makeIdent "bimapToGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
-	# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
-	= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
+	# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps
+	#! bs & bs_modules=modules,bs_heaps=heaps
+	= case global_type_def_index.gi_module of
+		PredefinedModuleIndex
+			| global_type_def_index.gi_index==PD_UnboxedListTypeIndex
+				# (alg_patterns,bs)
+					= build_to_unboxed_list_alg_patterns alts constructors_arg_types gi_module bi bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_list_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+			| global_type_def_index.gi_index==PD_UnboxedTailStrictListTypeIndex
+				# (alg_patterns,bs)
+					= build_to_unboxed_list_alg_patterns alts constructors_arg_types gi_module bi bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_tail_strict_list_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+			| global_type_def_index.gi_index==PD_UnboxedMaybeTypeIndex
+				# (alg_patterns,bs)
+					= build_to_unboxed_list_alg_patterns alts constructors_arg_types gi_module bi bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_maybe_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+		_
+			# (alg_patterns,bs)
+				= build_to_alg_patterns alts constructors_arg_types gi_module bi bs
+//			-> build_bimap_alg_case global_type_def_index arg_expr alg_patterns True heaps
+			# (case_expr,heaps)
+				= build_bimap_alg_case global_type_def_index arg_expr alg_patterns False bs.bs_heaps
+			-> add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
 where
 	build_to_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n bi bs
-		# arg_names = ["x" +++ toString k \\ k <- [1..ds_arity]]
-		  (var_exprs, vars, heaps) = buildVarExprs arg_names bs.bs_heaps
+		# (var_exprs, vars, heaps) = buildXVarExprs ds_arity bs.bs_heaps
 		  bs & bs_heaps=heaps
 		  (args,bs) = bimap_to_with_args constructor_arg_types var_exprs bi bs
 		  (alg_pattern,heaps) = build_alg_pattern cons_ds vars args type_module_n bs.bs_heaps
@@ -4364,34 +4446,63 @@ where
 	build_to_alg_patterns [] [] type_module_n bi bs
 		= ([],bs)
 
+	build_to_unboxed_list_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n bi bs
+		# (var_exprs, vars, heaps) = buildXVarExprs ds_arity bs.bs_heaps
+		  bs & bs_heaps=heaps
+		  (args,bs) = bimap_to_with_args constructor_arg_types var_exprs bi bs
+		  (alg_pattern,heaps) = build_unboxed_alg_pattern cons_ds vars args type_module_n bi_predefs bs.bs_heaps
+		  bs & bs_heaps=heaps
+		  (alg_patterns,bs) = build_to_unboxed_list_alg_patterns alts constructors_arg_types type_module_n bi bs
+		= ([alg_pattern:alg_patterns],bs)
+	build_to_unboxed_list_alg_patterns [] [] type_module_n bi bs
+		= ([],bs)
+
+	add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs bs=:{bs_heaps}
+		# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs bs_heaps
+		# (def_sym, funs_and_groups)
+			= buildFunAndGroup (makeIdent "bimapToGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
+		# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
+		= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
+
 bimap_from_simple_type :: !GlobalIndex !TypeKind ![BimapGenTypeStruct] ![Expression] !BimapInfo !BimapState
 																			   -> *(!Expression,!BimapState)
-bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args bi=:{bi_main_module_index,bi_bimap_exprs} bs
+bimap_from_simple_type global_type_def_index=:{gi_module} (KindArrow kinds) arg_types args bi=:{bi_main_module_index,bi_bimap_exprs,bi_predefs} bs
 	# (old_bimap_exprs,heaps) = read_bimap_exprs bi_bimap_exprs bs.bs_heaps
 	# heaps = copy_bimap_exprs bi_bimap_exprs heaps
 	# (alts,constructors_arg_types,modules,heaps)
 		= determine_constructors_arg_types global_type_def_index arg_types bs.bs_modules heaps
-	# bs & bs_modules=modules,bs_heaps=heaps
-	# (alg_patterns,bs)
-		= build_from_alg_patterns alts constructors_arg_types gi_module bs
-/*
-	= build_bimap_alg_case global_type_def_index arg_expr alg_patterns True heaps
-*/
-	# (arg_expr, arg_var, heaps) = buildVarExpr "x" bs.bs_heaps
-
-	# (case_expr,heaps)
-		= build_bimap_alg_case global_type_def_index arg_expr alg_patterns False heaps
-
-	# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs heaps
-
-	# (def_sym, funs_and_groups)
-		= buildFunAndGroup (makeIdent "bimapFromGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
-	# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
-	= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
+	# (arg_expr, arg_var, heaps) = buildVarExpr "x" heaps
+	#! bs & bs_modules=modules,bs_heaps=heaps
+	= case global_type_def_index.gi_module of
+		PredefinedModuleIndex
+			| global_type_def_index.gi_index==PD_UnboxedListTypeIndex
+				# (alg_patterns,bs)
+					= build_from_unboxed_list_alg_patterns alts constructors_arg_types gi_module bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_list_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+			| global_type_def_index.gi_index==PD_UnboxedTailStrictListTypeIndex
+				# (alg_patterns,bs)
+					= build_from_unboxed_list_alg_patterns alts constructors_arg_types gi_module bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_tail_strict_list_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+			| global_type_def_index.gi_index==PD_UnboxedMaybeTypeIndex
+				# (alg_patterns,bs)
+					= build_from_unboxed_list_alg_patterns alts constructors_arg_types gi_module bs
+				# (case_expr,heaps)
+					= build_bimap_unboxed_maybe_case global_type_def_index arg_expr alg_patterns False bi_predefs bs.bs_heaps
+				-> add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
+		_
+			# (alg_patterns,bs)
+				= build_from_alg_patterns alts constructors_arg_types gi_module bs
+//			-> build_bimap_alg_case global_type_def_index arg_expr alg_patterns True heaps
+			# (case_expr,heaps)
+				= build_bimap_alg_case global_type_def_index arg_expr alg_patterns False bs.bs_heaps
+			-> add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs {bs & bs_heaps=heaps}
 where
 	build_from_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n bs
-		# arg_names = ["x" +++ toString k \\ k <- [1..ds_arity]]
-		  (var_exprs, vars, heaps) = buildVarExprs arg_names bs.bs_heaps
+		# (var_exprs, vars, heaps) = buildXVarExprs ds_arity bs.bs_heaps
 		  bs & bs_heaps=heaps
 		  (args,bs) = bimap_from_with_args constructor_arg_types var_exprs bi bs
 		  (alg_pattern,heaps) = build_alg_pattern cons_ds vars args type_module_n bs.bs_heaps
@@ -4400,6 +4511,24 @@ where
 		= ([alg_pattern:alg_patterns],bs)
 	build_from_alg_patterns [] [] type_module_n bs
 		= ([],bs)
+
+	build_from_unboxed_list_alg_patterns [cons_ds=:{ds_ident,ds_index,ds_arity}:alts] [constructor_arg_types:constructors_arg_types] type_module_n bs
+		# (var_exprs, vars, heaps) = buildXVarExprs ds_arity bs.bs_heaps
+		  bs & bs_heaps=heaps
+		  (args,bs) = bimap_from_with_args constructor_arg_types var_exprs bi bs
+		  (alg_pattern,heaps) = build_unboxed_alg_pattern cons_ds vars args type_module_n bi_predefs bs.bs_heaps
+		  bs & bs_heaps=heaps
+		  (alg_patterns,bs) = build_from_unboxed_list_alg_patterns alts constructors_arg_types type_module_n bs
+		= ([alg_pattern:alg_patterns],bs)
+	build_from_unboxed_list_alg_patterns [] [] type_module_n bs
+		= ([],bs)
+
+	add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs bs=:{bs_heaps}
+		# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs bs_heaps
+		# (def_sym, funs_and_groups)
+			= buildFunAndGroup (makeIdent "bimapFromGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
+		# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
+		= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
 
 determine_constructors_arg_types :: !GlobalIndex ![BimapGenTypeStruct] !*Modules !*Heaps
 						  -> (![DefinedSymbol],![[BimapGenTypeStruct]],!*Modules,!*Heaps)
@@ -4492,6 +4621,32 @@ build_bimap_alg_case global_type_def_index arg alg_patterns case_explicit heaps
 	# heaps & hp_expression_heap = hp_expression_heap
 	= (case_expr, heaps)
 
+build_bimap_unboxed_case :: !CasePatterns !Expression !Bool !*Heaps -> (!Expression,!*Heaps)
+build_bimap_unboxed_case case_patterns arg case_explicit heaps
+	# (expr_info_ptr, expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
+	  heaps & hp_expression_heap=expression_heap
+	  case_expr = Case {case_expr = arg, case_guards = case_patterns, case_default = No, case_ident = No,
+						case_info_ptr = expr_info_ptr, case_explicit = case_explicit, case_default_pos = NoPos}
+	= (case_expr, heaps)
+
+build_bimap_unboxed_list_case :: !GlobalIndex !Expression ![AlgebraicPattern] !Bool PredefinedSymbolsData !*Heaps -> (!Expression,!*Heaps)
+build_bimap_unboxed_list_case global_type_def_index arg alg_patterns case_explicit predefs heaps
+	# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
+	  heaps & hp_expression_heap=expression_heap
+	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
+
+build_bimap_unboxed_tail_strict_list_case :: !GlobalIndex !Expression ![AlgebraicPattern] !Bool PredefinedSymbolsData !*Heaps -> (!Expression,!*Heaps)
+build_bimap_unboxed_tail_strict_list_case global_type_def_index arg alg_patterns case_explicit predefs heaps
+	# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
+	  heaps & hp_expression_heap=expression_heap
+	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
+
+build_bimap_unboxed_maybe_case :: !GlobalIndex !Expression ![AlgebraicPattern] !Bool PredefinedSymbolsData !*Heaps -> (!Expression,!*Heaps)
+build_bimap_unboxed_maybe_case global_type_def_index arg alg_patterns case_explicit predefs heaps
+	# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
+	  heaps & hp_expression_heap=expression_heap
+	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_maybe from_just_expr alg_patterns) arg case_explicit heaps
+
 build_bimap_newtype_case :: !GlobalIndex !Expression ![AlgebraicPattern] !*Heaps -> (!Expression,!*Heaps)
 build_bimap_newtype_case global_type_def_index arg alg_patterns heaps
 	# case_patterns = NewTypePatterns global_type_def_index alg_patterns
@@ -4512,6 +4667,43 @@ build_alg_pattern cons_ds=:{ds_ident,ds_index} vars args type_module_n heaps
 	#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
 	# heaps & hp_expression_heap = hp_expression_heap
 	= (alg_pattern,heaps)
+
+build_unboxed_alg_pattern :: !DefinedSymbol ![FreeVar] ![Expression] !Int !PredefinedSymbolsData !*Heaps -> (!AlgebraicPattern,!*Heaps)
+build_unboxed_alg_pattern cons_ds vars args type_module_n predefs heaps
+	# cons_symbol = {glob_module = type_module_n, glob_object = cons_ds}
+	# (expr_info_ptr, hp_expression_heap) = newPtr EI_Empty heaps.hp_expression_heap
+	#! heaps & hp_expression_heap = hp_expression_heap
+	# cons_index=cons_ds.ds_index+FirstConstructorPredefinedSymbolIndex
+	| cons_index==PD_UnboxedConsSymbol
+		# cons_symb_ident = buildUnboxedConsSymbIdent PD_cons_u predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
+	| cons_index==PD_UnboxedTailStrictConsSymbol
+		# cons_symb_ident = buildUnboxedConsSymbIdent PD_cons_uts predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
+	| cons_index==PD_UnboxedJustSymbol
+		# cons_symb_ident = buildUnboxedConsSymbIdent PD_just_u predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
+	| cons_index==PD_UnboxedNilSymbol
+		# cons_symb_ident = buildUnboxedNilSymbIdent PD_nil_u predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
+	| cons_index==PD_UnboxedTailStrictNilSymbol
+		# cons_symb_ident = buildUnboxedNilSymbIdent PD_nil_uts predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
+	| cons_index==PD_UnboxedNothingSymbol
+		# cons_symb_ident = buildUnboxedNilSymbIdent PD_nothing_u predefs.psd_predefs_a
+		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
+		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
+		= (alg_pattern,heaps)
 
 build_newtype_pattern :: !DefinedSymbol ![FreeVar] ![Expression] !Int !*Heaps -> (!AlgebraicPattern,!*Heaps)
 build_newtype_pattern cons_ds=:{ds_ident,ds_index} vars args type_module_n heaps

@@ -17,6 +17,7 @@ buildPredefinedSymbols :: !*HashTable -> (!.PredefinedSymbols,!*HashTable)
 
 buildPredefinedModule :: !Bool !*PredefinedSymbols -> (!ScannedModule, !.PredefinedSymbols)
 
+PredefinedModuleIndex :== 1
 cPredefinedModuleIndex :== 1
 
 // index in com_type_defs
