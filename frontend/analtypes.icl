@@ -426,13 +426,22 @@ condCombineTypeProperties has_root_attr prop1 prop2
 combineCoercionProperties prop1 prop2	:== (prop1 bitor prop2) bitand cIsNonCoercible
 combineHyperstrictness prop1 prop2		:== (prop1 bitand prop2) bitand cIsHyperStrict
 
-class analTypes type :: !Bool !{#CommonDefs} ![KindInfoPtr] !type !(!Conditions, !*AnalyseState)
-	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
+freshKindVarInfoPtr :: !*KindHeap -> (!KindInfoPtr,!*KindHeap)
+freshKindVarInfoPtr kind_heap
+	// KI_Const is overwritten by KI_Var to create a cycle
+	# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+	  kind_heap = writePtr kind_info_ptr (KI_Var kind_info_ptr) kind_heap
+	= (kind_info_ptr, kind_heap)
 
+freshKindVar :: !*KindHeap -> (!KindInfo,!*KindHeap)
 freshKindVar kind_heap
+	// KI_Const is overwritten by KI_Var to create a cycle
 	# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
 	# kind_var = KI_Var kind_info_ptr
 	= (kind_var, kind_heap <:= (kind_info_ptr, kind_var))
+
+class analTypes type :: !Bool !{#CommonDefs} ![KindInfoPtr] !type !(!Conditions, !*AnalyseState)
+	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
 
 instance analTypes AType
 where
@@ -579,9 +588,8 @@ where
 	where
 		new_kind :: !ATypeVar !(!Bool,!*TypeVarHeap,!*KindHeap) -> (!Bool,!*TypeVarHeap,!*KindHeap)
 		new_kind {atv_variable={tv_info_ptr},atv_attribute} (coercible, type_var_heap, kind_heap)
-			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-			= (coercible && is_not_a_variable atv_attribute, type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr),
-				kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+			# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+			= (coercible && is_not_a_variable atv_attribute, type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 		is_not_a_variable (TA_RootVar var)	= False
 		is_not_a_variable attr				= True
@@ -659,8 +667,8 @@ where
 	where
 		new_kind :: ATypeVar *(*TypeVarHeap,*KindHeap) -> (!TypeKind,!(!*TypeVarHeap,!*KindHeap));
 		new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
-			# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-			= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr)))
+			# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+			= (KindVar kind_info_ptr, (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap))
 
 	newKindConstVariables td_args (type_var_heap, as_kind_heap)
 		= mapSt new_kind_const td_args (type_var_heap, as_kind_heap)
@@ -927,8 +935,8 @@ where
 	where
 		fresh_kind_vars nr_of_vars fresh_vars kind_heap
 			| nr_of_vars > 0
-				# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-				= fresh_kind_vars (dec nr_of_vars) [ kind_info_ptr : fresh_vars] (kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+				# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+				= fresh_kind_vars (dec nr_of_vars) [kind_info_ptr : fresh_vars] kind_heap
 				= (fresh_vars, kind_heap)
 
 		isCyclicClass [ KindCycle : _ ] = True 
@@ -960,7 +968,7 @@ where
 	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index class_infos_and_as
 		# glob_member_index = members.[loc_member_index].ds_index
 		  {me_class_vars,me_type={st_vars,st_args,st_result,st_context}} = member_defs.[glob_member_index]
-		  other_contexts = (tl st_context)
+		  other_contexts = tl st_context
 		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
 		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
@@ -975,8 +983,8 @@ where
 			# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
 			= case tv_info of
 				TVI_Empty
-					# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-					-> (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+					# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+					-> (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 				_
 					-> (type_var_heap, kind_heap)
 					
@@ -993,8 +1001,8 @@ new_local_kind_variables_for_universal_vars type_vars type_var_heap as_kind_heap
   where
 	new_kind :: !ATypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
 	new_kind {atv_variable={tv_info_ptr}} (type_var_heap, kind_heap)
-		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-		= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+		# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+		= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 bindFreshKindVariablesToTypeVars :: [TypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
 bindFreshKindVariablesToTypeVars type_vars type_var_heap as_kind_heap
@@ -1002,8 +1010,8 @@ bindFreshKindVariablesToTypeVars type_vars type_var_heap as_kind_heap
 where
 	new_kind :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
 	new_kind {tv_info_ptr} (type_var_heap, kind_heap)
-		# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap <:= (kind_info_ptr, KI_Var kind_info_ptr))
+		# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
 	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
@@ -1047,7 +1055,7 @@ where
 			= (class_infos, as)
 			# (class_infos, as) = check_kinds_of_class_instance common_defs instance_defs.[instance_index] class_infos as
 			= check_kinds_of_class_instances common_defs (inc instance_index) instance_defs class_infos as
-	where	
+	where
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
 		check_kinds_of_class_instance common_defs {ins_class_index,ins_class_ident={ci_ident=Ident class_ident,ci_arity},ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
