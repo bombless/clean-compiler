@@ -1254,6 +1254,18 @@ make_unboxed_tail_strict_list expr_heap predef_symbols
 	  unboxed_list = UnboxedTailStrictList stdStrictLists_index decons_uts_index nil_uts_index
 	= (unboxed_list,decons_expr,expr_heap)
 
+make_unboxed_maybe :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_maybe expr_heap predef_symbols
+	# stdStrictMaybes_index = predef_symbols.[PD_StdStrictMaybes].pds_def
+	  nothing_u_index = predef_symbols.[PD_nothing_u].pds_def
+	  from_just_u_index = predef_symbols.[PD_from_just_u].pds_def
+	  from_just_u_ident = predefined_idents.[PD_from_just_u]
+	  app_symb = {symb_ident=from_just_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
+	  (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
+	  from_just_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
+	  unboxed_maybe = UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index
+	= (unboxed_maybe,from_just_expr,expr_heap)
+
 //	conversions functions
 
 // conversion from type to generic
@@ -1321,6 +1333,12 @@ where
 			# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
 			  heaps & hp_expression_heap=expression_heap
 			  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
+			= (case_expr, heaps, error)
+		| type_def_mod==cPredefinedModuleIndex && type_def_index==PD_UnboxedMaybeTypeIndex
+			# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
+			  heaps & hp_expression_heap=expression_heap
+			  case_patterns = OverloadedListPatterns unboxed_maybe from_just_expr case_alts
 			  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 			= (case_expr, heaps, error)
 			# case_patterns = AlgebraicPatterns {gi_module = type_def_mod, gi_index = type_def_index} case_alts
@@ -1473,10 +1491,14 @@ where
 				= build_sum_cons (buildUnboxedConsSymbIdent PD_cons_u predefs.psd_predefs_a) ds_arity heaps error
 			| cons_index==PD_UnboxedTailStrictConsSymbol
 				= build_sum_cons (buildUnboxedConsSymbIdent PD_cons_uts predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedJustSymbol
+				= build_sum_cons (buildUnboxedConsSymbIdent PD_just_u predefs.psd_predefs_a) ds_arity heaps error
 			| cons_index==PD_UnboxedNilSymbol
 				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_u predefs.psd_predefs_a) ds_arity heaps error
 			| cons_index==PD_UnboxedTailStrictNilSymbol
 				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_uts predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedNothingSymbol
+				= build_sum_cons (buildUnboxedNilSymbIdent PD_nothing_u predefs.psd_predefs_a) ds_arity heaps error
 				# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
 				= build_sum_cons symb_ident ds_arity heaps error
 			# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}

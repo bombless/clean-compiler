@@ -159,8 +159,8 @@ make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
 			# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list expr_heap cs
 			= (OverloadedListPatterns overloaded_list decons_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol
-			# (unboxed_list,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
-			= (OverloadedListPatterns unboxed_list from_just_expr alg_patterns,expr_heap,cs)
+			# (unboxed_maybe,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
+			= (OverloadedListPatterns unboxed_maybe from_just_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
 			# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
 			= (OverloadedListPatterns overloaded_maybe from_just_expr alg_patterns,expr_heap,cs)
