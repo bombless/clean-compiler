@@ -1167,11 +1167,16 @@ where
 			= make_arrow x y heaps
 
 		make_expr :: !AType !*Modules !*Heaps -> (!Expression,!*Modules,!*Heaps)
-		make_expr {at_type=TA {type_ident} arg_types} modules heaps
-			# (arg_exprs,modules, heaps) = make_exprs arg_types modules heaps
-			  (type_cons,heaps) = make_type_cons type_ident.id_name heaps
-			  (expr,heaps) = make_apps type_cons arg_exprs heaps
-			= (expr,modules,heaps)
+		make_expr {at_type=TA {type_ident,type_index} arg_types,at_attribute} modules heaps
+			| modules.[type_index.glob_module].com_type_defs.[type_index.glob_object].td_rhs =: SynType _
+				# (type_def, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+				  (expanded_type, th) = expandSynonymType type_def at_attribute arg_types heaps.hp_type_heaps
+				  heaps & hp_type_heaps = th
+				= make_expr {at_type = expanded_type, at_attribute = at_attribute} modules heaps
+				# (arg_exprs,modules, heaps) = make_exprs arg_types modules heaps
+				  (type_cons,heaps) = make_type_cons type_ident.id_name heaps
+				  (expr,heaps) = make_apps type_cons arg_exprs heaps
+				= (expr,modules,heaps)
 		make_expr {at_type=TAS {type_ident} arg_types _} modules heaps
 			# (arg_exprs,modules, heaps) = make_exprs arg_types modules heaps
 			  (type_cons,heaps) = make_type_cons type_ident.id_name heaps
