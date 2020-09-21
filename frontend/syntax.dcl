@@ -479,7 +479,8 @@ instance == GenericDependency
 	| TypeConsUnboxedArray TypeCons
 	| TypeConsArrow
 	| TypeConsVar TypeVar
-	| TypeConsQualifiedIdent !Ident !String 
+	| TypeConsQualifiedIdent !Ident !String
+	| ErroneousTypeCons
 
 :: GenericCaseDef =
 	{	gc_pos			:: !Position			// position in the source file

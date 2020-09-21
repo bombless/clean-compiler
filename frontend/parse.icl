@@ -679,12 +679,14 @@ wantGenericFunctionDefinition name parseContext pos pState
 	# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
 	| not ok
 		# pState = parseError "type argument" No "type constructor" pState
-		= (False, abort "no TypeCons", pState)
+		= (False, PD_Erroneous, pState)
 	# (ident, pState) = stringToIdent name (IC_GenericCase type) pState
 	# (generic_ident, pState) = stringToIdent name IC_Generic pState
 	# (type_cons, pState) = get_type_cons type pState
 	# (generic_fun_ident, pState) = make_generic_fun_ident type_cons pState
 		with
+			make_generic_fun_ident ErroneousTypeCons pState
+				= stringToIdent name IC_Expression pState
 			make_generic_fun_ident type_cons pState
 				# generic_fun_ident = genericIdentToFunIdent name type_cons
 				= stringToIdent generic_fun_ident.id_name IC_Expression pState
@@ -2264,7 +2266,7 @@ where
 			_
 				-> (GenericInstanceDependencies n_deps deps, token, pState)
 
-get_type_cons :: !Type !*ParseState -> (TypeCons, !*ParseState)
+get_type_cons :: !Type !*ParseState -> (!TypeCons, !*ParseState)
 get_type_cons (TA type_symb []) pState
 	= (TypeConsSymb type_symb, pState)
 get_type_cons (TA {type_ident={id_name=PD_UnboxedArray_String}} [{at_type}]) pState
@@ -2280,7 +2282,7 @@ get_type_cons (TQualifiedIdent module_id ident_name []) pState
 	= (TypeConsQualifiedIdent module_id ident_name, pState)
 get_type_cons type pState
 	# pState = parseError "generic type" No "type constructor" pState
-	= (abort "no TypeCons", pState)
+	= (ErroneousTypeCons, pState)
 
 wantDeriveInstanceDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveInstanceDefinition parseContext pos pState
