@@ -1141,70 +1141,90 @@ where
 		# fun = makeFunction field_dsc_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
 		= (fun, (modules, heaps))
 
+build_gen_type_function :: !Index !Index !Index Position PredefinedSymbolsData !DefinedSymbol !DefinedSymbol !(!*Modules,!*Heaps)
+																								 -> (!FunDef,!(!*Modules,!*Heaps))
 build_gen_type_function group_index main_module_index td_module td_pos predefs cons_info_ds cons_ds (modules, heaps)
 	# ({cons_type,cons_exi_vars}, modules) = modules![td_module].com_cons_defs.[cons_ds.ds_index]
-	# (type_expr, heaps) 	 = make_type_expr cons_exi_vars cons_type heaps
+	# (type_expr, modules, heaps) = make_type_expr cons_exi_vars cons_type modules heaps
 	# fun = makeFunction cons_info_ds.ds_ident group_index [] type_expr No main_module_index td_pos		
 	= (fun, (modules, heaps))
 where
-	make_type_expr [] {st_vars, st_args, st_result} heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
+	make_type_expr [] {st_vars, st_args, st_result} modules heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
 		# (_,th_vars) = foldSt (\ {tv_info_ptr} (n, th_vars) -> (n+1, writePtr tv_info_ptr (TVI_GenTypeVarNumber n) th_vars)) st_vars (0,th_vars)
-		# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
-		# (arg_exprs, heaps) = mapSt make_expr1 st_args heaps
-		# (result_expr, heaps) = make_expr1 st_result heaps
-		# {hp_type_heaps=type_heaps=:{th_vars}} = heaps
-		# th_vars = foldSt (\ {tv_info_ptr} th_vars -> writePtr tv_info_ptr TVI_Empty th_vars) st_vars th_vars
-		# heaps = {heaps & hp_type_heaps={type_heaps & th_vars=th_vars}}
-		= curry arg_exprs result_expr heaps
+		  heaps & hp_type_heaps={type_heaps & th_vars=th_vars}
+		  (arg_exprs,modules,heaps) = make_exprs st_args modules heaps
+		  (result_expr,modules,heaps) = make_expr st_result modules heaps
+		  {hp_type_heaps=type_heaps=:{th_vars}} = heaps
+		  th_vars = foldSt (\ {tv_info_ptr} th_vars -> writePtr tv_info_ptr TVI_Empty th_vars) st_vars th_vars
+		  heaps & hp_type_heaps={type_heaps & th_vars=th_vars}
+		  (type_expr,heaps) = curry arg_exprs result_expr heaps
+		= (type_expr,modules,heaps)
 	where
-		curry [] result_expr heaps 
+		curry [] result_expr heaps
 			= (result_expr, heaps)
 		curry [x:xs] result_expr heaps
 			# (y, heaps) = curry xs result_expr heaps
 			= make_arrow x y heaps
 
-		make_expr1 :: !AType !*Heaps -> (!Expression, !*Heaps)
-		make_expr1 {at_type} heaps = make_expr at_type heaps
-
-		make_expr :: !Type !*Heaps -> (!Expression, !*Heaps)
-		make_expr (TA type_symb arg_types) heaps
-			# (arg_exprs, heaps) = mapSt make_expr1 arg_types heaps
-			# (type_cons, heaps) = make_type_cons type_symb.type_ident.id_name heaps 
-			= make_apps type_cons arg_exprs heaps
-		make_expr (TAS type_symb arg_types _) heaps
-			# (arg_exprs, heaps) = mapSt make_expr1 arg_types heaps
-			# (type_cons, heaps) = make_type_cons type_symb.type_ident.id_name heaps 
-			= make_apps type_cons arg_exprs heaps
-		make_expr (x --> y) heaps
-			# (x, heaps) = make_expr1 x heaps
-			# (y, heaps) = make_expr1 y heaps				
-			= make_arrow x y heaps
-		make_expr TArrow heaps 
-			= make_type_cons "(->)" heaps
-		make_expr (TArrow1 type) heaps
-			# (arg_expr, heaps) = make_expr1 type heaps 
+		make_expr :: !AType !*Modules !*Heaps -> (!Expression,!*Modules,!*Heaps)
+		make_expr {at_type=TA {type_ident,type_index} arg_types,at_attribute} modules heaps
+			| modules.[type_index.glob_module].com_type_defs.[type_index.glob_object].td_rhs =: SynType _
+				# (type_def, modules) = modules![type_index.glob_module].com_type_defs.[type_index.glob_object]
+				  (expanded_type, th) = expandSynonymType type_def at_attribute arg_types heaps.hp_type_heaps
+				  heaps & hp_type_heaps = th
+				= make_expr {at_type = expanded_type, at_attribute = at_attribute} modules heaps
+				# (arg_exprs,modules, heaps) = make_exprs arg_types modules heaps
+				  (type_cons,heaps) = make_type_cons type_ident.id_name heaps
+				  (expr,heaps) = make_apps type_cons arg_exprs heaps
+				= (expr,modules,heaps)
+		make_expr {at_type=TAS {type_ident} arg_types _} modules heaps
+			# (arg_exprs,modules, heaps) = make_exprs arg_types modules heaps
+			  (type_cons,heaps) = make_type_cons type_ident.id_name heaps
+			  (expr,heaps) = make_apps type_cons arg_exprs heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=x --> y} modules heaps
+			# (x,modules,heaps) = make_expr x modules heaps
+			  (y,modules,heaps) = make_expr y modules heaps
+			  (expr,heaps) = make_arrow x y heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TArrow} modules heaps
+			# (expr,heaps) = make_type_cons "(->)" heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TArrow1 type} modules heaps
+			# (arg_expr,modules,heaps) = make_expr type modules heaps
 			# (arrow_expr, heaps) = make_type_cons "(->)" heaps
-			= make_app arrow_expr arg_expr heaps
-		make_expr (CV {tv_info_ptr} :@: arg_types) heaps
-			# (arg_exprs, heaps) = mapSt make_expr1 arg_types heaps
+			# (expr,heaps) = make_app arrow_expr arg_expr heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=CV {tv_info_ptr} :@: arg_types} modules heaps
+			# (arg_exprs, modules, heaps) = make_exprs arg_types modules heaps
 			# (tv_expr, heaps) = make_type_var tv_info_ptr heaps
-			= make_apps tv_expr arg_exprs heaps
-		make_expr (TB bt) heaps
-			= make_type_cons (toString bt) heaps	
-		make_expr (TV {tv_info_ptr}) heaps 
-			= make_type_var tv_info_ptr heaps 
-		make_expr (GTV {tv_info_ptr}) heaps
-			= make_type_var tv_info_ptr heaps 
-		make_expr TE heaps
-			= make_error_type_cons heaps
-		make_expr (TFA _ _) heaps
+			# (expr,heaps) = make_apps tv_expr arg_exprs heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TB bt} modules heaps
+			# (expr,heaps) = make_type_cons (toString bt) heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TV {tv_info_ptr}} modules heaps
+			# (expr,heaps) = make_type_var tv_info_ptr heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=GTV {tv_info_ptr}} modules heaps
+			# (expr,heaps) = make_type_var tv_info_ptr heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TE} modules heaps
+			# (expr,heaps) = make_error_type_cons heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TFA _ _} modules heaps
 			// error is reported in convertATypeToGenTypeStruct
-			= make_error_type_cons heaps
-		make_expr (TFAC _ _ _) heaps
+			# (expr,heaps) = make_error_type_cons heaps
+			= (expr,modules,heaps)
+		make_expr {at_type=TFAC _ _ _} modules heaps
 			// error is reported in convertATypeToGenTypeStruct
-			= make_error_type_cons heaps
-		make_expr _ heaps
+			# (expr,heaps) = make_error_type_cons heaps
+			= (expr,modules,heaps)
+		make_expr _ modules heaps
 			= abort "type does not match\n"
+
+		make_exprs arg_types modules heaps
+			= mapSt2 make_expr arg_types modules heaps
 
 		make_apps x [] heaps 
 			= (x, heaps)
@@ -1222,9 +1242,10 @@ where
 		make_app x y heaps = buildPredefConsApp PD_CGenTypeApp [x, y] predefs heaps 	 
 
 		make_error_type_cons heaps = make_type_cons "<error>" heaps
-	make_type_expr [_:_] {st_vars, st_args, st_result} heaps
+	make_type_expr [_:_] {st_vars, st_args, st_result} modules heaps
 		// Error "cannot build a generic representation of an existential type" is reported in buildStructType
-		= make_type_cons "<error>" heaps
+		# (type_expr,heaps) = make_type_cons "<error>" heaps
+		= (type_expr,modules,heaps)
 
 	make_type_cons name heaps
 		# name_expr = makeStringExpr name
