@@ -1023,11 +1023,15 @@ checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_
 		,	as_kind_heap		= newHeap
 		,	as_error			= error
 		}
-
 	# (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
 		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs)
 						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
-	= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
+	| main_module_index<first_uncached_module
+		= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
+		# (dcl_generic_defs,dcl_modules) = dcl_modules![main_module_index].dcl_common.com_generic_defs
+		  icl_generic_defs = common_defs.[main_module_index].com_generic_defs
+		  gen_heap = copy_gen_var_kinds_to_dcl_module 0 icl_generic_defs dcl_generic_defs gen_heap
+		= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
 where
 	check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs module_index
 					(icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as) 
@@ -1199,6 +1203,18 @@ where
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars dt_global_vars as_type_var_heap as_kind_heap
 			  as = force_star_kind common_defs dt_type { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 			= determine_kinds_of_type_contexts common_defs dt_contexts class_infos as
+
+	copy_gen_var_kinds_to_dcl_module :: !Int !{#GenericDef} !{#GenericDef} !*GenericHeap -> *GenericHeap
+	copy_gen_var_kinds_to_dcl_module gen_index icl_generic_defs dcl_generic_defs gen_heap
+		| gen_index<size dcl_generic_defs
+			# icl_gen_info_ptr = icl_generic_defs.[gen_index].gen_info_ptr
+			  dcl_gen_info_ptr = dcl_generic_defs.[gen_index].gen_info_ptr
+			  ({gen_var_kinds},gen_heap) = readPtr icl_gen_info_ptr gen_heap
+			  (dcl_gen_info,gen_heap) = readPtr dcl_gen_info_ptr gen_heap
+			  dcl_gen_info & gen_var_kinds = gen_var_kinds
+			  gen_heap = writePtr dcl_gen_info_ptr dcl_gen_info gen_heap
+			= copy_gen_var_kinds_to_dcl_module (gen_index+1) icl_generic_defs dcl_generic_defs gen_heap
+			= gen_heap
 
 instance <<< DynamicType
 where
