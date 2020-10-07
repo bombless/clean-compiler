@@ -4355,6 +4355,9 @@ where
 			| size producers==fun_arity && last_n_producers_are_empty member_arity (size producers) producers 
 				= case sreadPtr function_info_ptr fun_heap of
 					FI_Function {gf_fun_index,gf_instance_info}
+						| gf_fun_index<0	// if fusion stops because fused function arity>32 gf_fun_index = -1
+							# fun_defs = mark_fused_members l fun_arity instance_function_index member_arity fun_defs
+							-> mark_fused_members r fun_arity instance_function_index member_arity fun_defs
 						# (fun_info,fun_defs) = fun_defs![gf_fun_index].fun_info
 						  fun_info & fi_properties = fun_info.fi_properties bitor FI_FusedMember, fi_def_level = instance_function_index
 						  fun_defs & [gf_fun_index].fun_info = fun_info
