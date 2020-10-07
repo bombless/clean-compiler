@@ -554,7 +554,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 		convert_generic_contexts [] type_cons pos next_fun_index new_fun_defs
 			= ([!!],next_fun_index,new_fun_defs)
 
-		convert_generic_contexts_except [{tc_class=TCGeneric _ {gtc_generic={glob_object={ds_ident}}}}:type_contexts] missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+		convert_generic_contexts_except [{tc_class=TCGeneric {gtc_generic={glob_object={ds_ident}}}}:type_contexts] missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
 			| IsMemberM ds_ident.id_name except_class_names
 				# missing_except_class_names = RemoveMemberM ds_ident.id_name missing_except_class_names
 				= convert_generic_contexts_except type_contexts missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
