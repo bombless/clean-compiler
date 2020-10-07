@@ -683,7 +683,7 @@ where
 		# error = errorHeading "Error" error
 		  format = {form_properties = cNoProperties, form_attr_position = No}
 		  error & ea_file = error.ea_file
-			<<< "Specialized type contains incorrect type (" <:: (format, [type:[at_type\\{at_type}<-a_types]], No) <<< ")\n"
+			<<< " Specialized type contains incorrect type (" <:: (format, [type:[at_type\\{at_type}<-a_types]], No) <<< ")\n"
 		= report_erroneous_types erroneous_types error
 	report_erroneous_types [] error
 		= error
@@ -1244,6 +1244,8 @@ where
 		= (inc decl_index, [Declaration {decl_ident = gc_ident, decl_pos = gc_pos, decl_kind = STE_GenericCase, decl_index = decl_index} : decls])
 	gen_case_def_to_dcl {gc_gcf=GCFC gcfc_ident _, gc_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = gcfc_ident, decl_pos = gc_pos, decl_kind = STE_GenericDeriveClass, decl_index = decl_index} : decls]) 
+	gen_case_def_to_dcl {gc_gcf=GCFCExcept gcfc_ident _ _, gc_pos} (decl_index, decls)
+		= (inc decl_index, [Declaration {decl_ident = gcfc_ident, decl_pos = gc_pos, decl_kind = STE_GenericDeriveClass, decl_index = decl_index} : decls])
 
 createCommonDefinitions :: (CollectedDefinitions (ClassInstanceR member_types_and_functions)) -> *CommonDefsR member_types_and_functions
 createCommonDefinitions {def_types,def_constructors,def_selectors,def_classes,def_members,def_instances, def_generics,def_generic_cases}
@@ -2398,6 +2400,9 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFC _ _})
 						// error already reported in checkGenericCaseDefs
 						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCFS dcl_gcfs},{gc_gcf=GCFCExcept _ _ _})
+						// error already reported in checkGenericCaseDefs
+						-> (new_table, icl_gencases, error)
 				where
 					compare_icl_and_dcl_generic_info :: Int Int GenericInstanceDependencies GenericInstanceDependencies GenericCaseDef GenericCaseDef Int
 														*{#GenericCaseDef} *ErrorAdmin -> (!*{#GenericCaseDef},!*ErrorAdmin)
@@ -2683,12 +2688,6 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		convert_icl_class_instances1 :: .[ScannedInstanceAndMembers] -> .[ClassInstanceR [FunDef]]
 		convert_icl_class_instances1 insams
 			= [ParsedInstanceToClassInstance sim_pi sim_members {} \\ {sim_pi,sim_members}<-insams]
-
-		determine_indexes_of_members [{fun_ident,fun_arity}:members] next_fun_index
-			#! (member_symbols, last_fun_index) = determine_indexes_of_members members (inc next_fun_index)
-			= ([{cim_ident = fun_ident, cim_index = next_fun_index, cim_arity = fun_arity} : member_symbols], last_fun_index)
-		determine_indexes_of_members [] next_fun_index
-			= ([], next_fun_index)
 
   		make_macro_def_array :: *{#*{#FunDef}} *[*{#FunDef}] -> *{#*{#FunDef}}
   		make_macro_def_array cached_dcl_macros macro_defs

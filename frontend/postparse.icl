@@ -377,6 +377,8 @@ instance collectFunctions GenericCaseDef where
 		= (gc, ca)
 	collectFunctions gc=:{gc_gcf=GCFC _ _} icl_module ca
 		= (gc, ca)
+	collectFunctions gc=:{gc_gcf=GCFCExcept _ _ _} icl_module ca
+		= (gc, ca)
 
 instance collectFunctions FunDef where
 	collectFunctions fun_def=:{fun_body = ParsedBody bodies} icl_module ca

@@ -1,5 +1,6 @@
 implementation module hashtable
 
+import StdOverloadedList
 import predef, syntax, compare_types, compare_constructor
 
 ::	HashTableEntry
@@ -24,6 +25,7 @@ import predef, syntax, compare_types, compare_constructor
 				| IC_Generic
 				| IC_GenericCase !Type
 				| IC_GenericDeriveClass !Type
+				| IC_GenericDeriveClassExcept !Type ![!{#Char}!]
 				| IC_TypeExtension !{#Char}/*module name*/
 				| IC_Unknown
 
@@ -40,6 +42,11 @@ set_hte_mark hte_mark ht = {ht & hte_mark=hte_mark}
 
 instance =< IdentClass
 where
+	(=<) ic1 ic2
+		| not (equal_constructor ic1 ic2)
+			| less_constructor ic1 ic2
+				= Smaller
+				= Greater
 	(=<) (IC_Instance types1) (IC_Instance types2)
 		= compareInstances types1 types2
 	(=<) (IC_InstanceMember types1) (IC_InstanceMember types2)
@@ -49,21 +56,29 @@ where
 		| cmp == Equal
 			= compare_unboxed_array_element_type type1 type2
 			= cmp
+	(=<) (IC_Field typ_id1) (IC_Field typ_id2)
+		= typ_id1 =< typ_id2
 	(=<) (IC_GenericDeriveClass type1) (IC_GenericDeriveClass type2)
 		# cmp = type1 =< type2
 		| cmp == Equal
 			= compare_unboxed_array_element_type type1 type2
 			= cmp
-	(=<) (IC_Field typ_id1) (IC_Field typ_id2)
-		= typ_id1 =< typ_id2
+	(=<) (IC_GenericDeriveClassExcept type1 except_class_names1) (IC_GenericDeriveClassExcept type2 except_class_names2)
+		# cmp = type1 =< type2
+		| cmp == Equal
+			# cmp = compare_unboxed_array_element_type type1 type2
+			| cmp == Equal
+				| except_class_names1==except_class_names2
+					= Equal
+				| except_class_names1<except_class_names2
+					= Smaller
+					= Greater
+				= cmp
+			= cmp
 	(=<) (IC_TypeExtension module_name1) (IC_TypeExtension module_name2)
 		= module_name1=<module_name2
 	(=<) ic1 ic2
-		| equal_constructor ic1 ic2
-			= Equal
-		| less_constructor ic1 ic2
-			= Smaller
-			= Greater
+		= Equal
 
 compare_types [t1 : t1s] [t2 : t2s]
 	# cmp = t1 =< t2

@@ -493,6 +493,7 @@ instance == GenericDependency
 	= GCF !Ident !GCF
 	| GCFS ![!GCF!]
 	| GCFC !Ident !Ident	// IC_GenericDeriveClass IC_Class
+	| GCFCExcept !Ident !Ident ![!{#Char}!]	// IC_GenericDeriveClassExcept !Type ![!{#Char}!]
 
 ::	GCF = {
 		gcf_gident	:: !Ident,	  			// name in IC_Generic namespace

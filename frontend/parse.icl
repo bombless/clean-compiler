@@ -197,19 +197,44 @@ wantSepList msg sep_token scanContext try_fun pState :== want_list msg pState //
 				# (token, pState) = nextToken GeneralContext pState
 				= ([tree], parseError ("wantList of "+msg) (Yes token) msg pState)
 
+wantSepSList msg sep_token scanContext try_fun pState :== want_slist msg pState
+	where
+		want_slist msg pState
+			# (succ, tree, pState) = try_fun pState
+			| succ
+				# (token, pState) = nextToken scanContext pState
+				| token == sep_token
+					# (trees, pState) = optSepSList sep_token scanContext try_fun pState
+					= ([!tree : trees!], pState)
+					= ([!tree!], tokenBack pState)
+				# (token, pState) = nextToken GeneralContext pState
+				= ([!tree!], parseError ("wantList of "+msg) (Yes token) msg pState)
+
 //optSepList sep_token scanContext try_fun pState = want_list msg pState
 optSepList sep_token scanContext try_fun pState :== want_list pState // [ try_fun (sep_token tryfun)* ]
 	where
 		want_list pState
 			# (succ, tree, pState) = try_fun pState
 			| succ
-			 	# (token, pState) = nextToken scanContext pState
-			 	| token == sep_token
+				# (token, pState) = nextToken scanContext pState
+				| token == sep_token
 					# (trees, pState) = want_list pState
 					= ([tree : trees], pState)
 				// otherwise // token <> sep_token
 					= ([tree], tokenBack pState)
 			= ([], pState)
+
+optSepSList sep_token scanContext try_fun pState :== want_slist pState
+	where
+		want_slist pState
+			# (succ, tree, pState) = try_fun pState
+			| succ
+				# (token, pState) = nextToken scanContext pState
+				| token == sep_token
+					# (trees, pState) = want_slist pState
+					= ([!tree : trees!], pState)
+					= ([!tree!], tokenBack pState)
+			= ([!!], pState)
 
 //wantList msg try_fun pState = want_list msg pState
 wantList msg try_fun pState :== want_list msg pState // try_fun +
@@ -2063,6 +2088,12 @@ wantDeriveDefinition parseContext pos pState
 		ClassToken
 			# (class_name, pState) = want pState
 			# (class_ident, pState) = stringToIdent class_name IC_Class pState
+			# (token, pState) = nextToken TypeContext pState
+			| token=:BackSlashToken
+				# (except_class_names, pState) = wantSepSList "generic classes" CommaToken TypeContext try_generic_function_name pState
+				# (derive_defs, pState) = want_derive_class_except_types class_ident except_class_names pState
+				-> (PD_Derive derive_defs, pState)
+			# pState = tokenBack pState
 			# (derive_defs, pState) = want_derive_class_types class_ident pState
 			-> (PD_Derive derive_defs, pState)
 		_
@@ -2073,6 +2104,14 @@ where
 		= 	case token of
 			IdentToken name -> (name, pState)
 			_ -> ("", parseError "Generic Definition" (Yes token) "<identifier>" pState)
+
+	try_generic_function_name pState
+		# (token, pState) = nextToken TypeContext pState
+		= case token of
+			IdentToken name
+				-> (True,name, pState)
+			_
+				-> (False, "", parseError "generic function name" (Yes token) "<identifier>" pState)
 
 	want_derive_types :: String !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_types name pState
@@ -2147,15 +2186,34 @@ where
 			= ([derive_def:derive_defs], pState)
  			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
 			= ([derive_def], pState)
+	where
+		want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)
+		want_derive_class_type class_ident pState
+			# (type, pState) = wantType pState
+			# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClass type) pState
+			# (type_cons, pState) = get_type_cons type pState
+			# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons,
+							 gc_gcf = GCFC ident class_ident}
+			= (derive_def, pState)
 
-	want_derive_class_type :: Ident !*ParseState -> (GenericCaseDef, !*ParseState)			
-	want_derive_class_type class_ident pState
-		# (type, pState) = wantType pState
-		# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClass type) pState
-		# (type_cons, pState) = get_type_cons type pState
-		# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons,
-						 gc_gcf = GCFC ident class_ident}
-		= (derive_def, pState)
+	want_derive_class_except_types :: Ident [!{#Char}!] !*ParseState -> ([GenericCaseDef], !*ParseState)
+	want_derive_class_except_types class_ident except_class_names pState
+		# (derive_def, pState) = want_derive_class_except_type class_ident except_class_names pState
+		# (token, pState) = nextToken TypeContext pState
+		| token =: CommaToken
+			# (derive_defs, pState) = want_derive_class_except_types class_ident except_class_names pState
+			= ([derive_def:derive_defs], pState)
+			# pState = wantEndOfDefinition "derive definition" (tokenBack pState)
+			= ([derive_def], pState)
+	where
+		want_derive_class_except_type :: Ident [!{#Char}!] !*ParseState -> (GenericCaseDef, !*ParseState)
+		want_derive_class_except_type class_ident except_class_names pState
+			# (type, pState) = wantType pState
+			# (ident, pState) = stringToIdent class_ident.id_name (IC_GenericDeriveClassExcept type except_class_names) pState
+			# (type_cons, pState) = get_type_cons type pState
+			# derive_def = { gc_pos = pos, gc_type = type, gc_type_cons = type_cons,
+							 gc_gcf = GCFCExcept ident class_ident except_class_names}
+			= (derive_def, pState)
 
 	parse_info_fields "OBJECT" token pState
 		= parse_OBJECT_info_fields token 0 pState
@@ -3491,23 +3549,6 @@ optionalExistentialQuantifiedVariables pState
 			# (vars, pState) = wantList "existential quantified variable(s)" tryQuantifiedTypeVar pState
 			-> (vars, wantToken TypeContext "Existential Quantified Variables" ColonToken pState)
 		_	-> ([], tokenBack pState)
-
-/*  Sjaak 041001
-where
-	try_existential_type_var :: !ParseState -> (Bool,ATypeVar,ParseState)
-	try_existential_type_var pState
-		# (token, pState)	= nextToken TypeContext pState
-		= case token of
-			DotToken
-				# (typevar, pState)	= wantTypeVar pState
-				-> (True, {atv_attribute = TA_Anonymous, atv_annotation = AN_None, atv_variable = typevar}, pState)
-			_
-				# (succ, typevar, pState)	= tryTypeVarT token pState
-				| succ
-					#	atypevar = {atv_attribute = TA_None, atv_annotation = AN_None, atv_variable = typevar}
-					->	(True,atypevar,pState)
-					->	(False,abort "no ATypeVar",pState)
-*/
 
 optionalUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalUniversalQuantifiedVariables pState

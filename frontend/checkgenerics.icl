@@ -1,5 +1,6 @@
 implementation module checkgenerics
 
+import StdOverloadedList
 import syntax,checksupport,checktypes,genericsupport,explicitimports,compare_types,typesupport
 
 checkGenericDefs :: !Index !(Optional (CopiedDefinitions, Int))
@@ -203,6 +204,12 @@ where
 
 		check_generic_dep_error ident msg cs = {cs & cs_error = checkError ident msg cs.cs_error}	
 
+report_missing_except_class_names [!!] gcfc_class_ident gc_pos error
+	= error
+report_missing_except_class_names [!missing_except_class_name:missing_except_class_names!] gcfc_class_ident gc_pos error
+	# error = checkErrorWithPosition gcfc_class_ident gc_pos ("no "+++missing_except_class_name+++" in context") error
+	= report_missing_except_class_names missing_except_class_names gcfc_class_ident gc_pos error
+
 checkGenericCaseDefs :: !Index !*{#GenericCaseDef} !*{#GenericDef} !u:{#CheckedTypeDef} !*{#ClassDef} !*{#DclModule} !*Heaps !*CheckState
 						   -> (!*{#GenericCaseDef},!*{#GenericDef},!u:{#CheckedTypeDef},!*{#ClassDef},!*{#DclModule},!.Heaps,!.CheckState)
 checkGenericCaseDefs mod_index gen_case_defs generic_defs type_defs class_defs modules heaps cs
@@ -225,7 +232,7 @@ where
 			GCF gc_ident gcf=:{gcf_gident}
 				# cs = pushErrorAdmin (newPosition gc_ident gc_pos) cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
-				 	= check_instance_type mod_index gc_type type_defs modules heaps cs
+					= check_instance_type mod_index gc_type type_defs modules heaps cs
 				# (generic_gi, cs) = get_generic_index gcf_gident mod_index cs
 				| not cs.cs_error.ea_ok
 					# cs = popErrorAdmin cs
@@ -254,29 +261,73 @@ where
 					# cs = popErrorAdmin cs
 					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
 				# (entry,symbol_table) = readPtr id_info cs.cs_symbol_table
-				# cs = {cs & cs_symbol_table=symbol_table}
+				# cs & cs_symbol_table=symbol_table
 				-> case entry.ste_kind of
 					STE_Class
 						# (class_context,class_defs) = class_defs![entry.ste_index].class_context
-						# (gen_case_defs,cs) = check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
-						# cs = popErrorAdmin cs
+						# (gen_case_defs,cs) = check_generic_superclasses_case_defs class_context index mod_index gc_type gc_type_cons gen_case_defs cs
 						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
 					STE_Imported STE_Class decl_index
 	 					# (class_context,modules) = modules![decl_index].dcl_common.com_class_defs.[entry.ste_index].class_context
-						# (gen_case_defs,cs) = check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
-						# cs = popErrorAdmin cs
+						# (gen_case_defs,cs) = check_generic_superclasses_case_defs class_context index mod_index gc_type gc_type_cons gen_case_defs cs
 						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
 					_
-						# cs = popErrorAdmin cs
-						# cs = {cs & cs_error = checkErrorWithPosition gcfc_class_ident gc_pos "class undefined" cs.cs_error}
+						# cs = add_class_undefined_error gcfc_class_ident gc_pos cs
 						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
 				where
-					check_generic_superclasses_of_case_def class_context index mod_index gc_type gc_type_cons gen_case_defs cs
+					check_generic_superclasses_case_defs class_context index mod_index gc_type gc_type_cons gen_case_defs cs
 						# gcfs = convert_generic_contexts class_context
 						  (gcfs,cs) = check_generic_superclasses gcfs mod_index cs
-						  case_def = {case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons}
-						  gen_case_defs = {gen_case_defs & [index]=case_def}
+						  case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons
+						  gen_case_defs & [index]=case_def
+						  cs = popErrorAdmin cs
 						= (gen_case_defs,cs)
+			GCFCExcept _ gcfc_class_ident=:{id_info} except_class_names
+				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
+					= check_instance_type mod_index gc_type type_defs modules heaps cs
+				| not cs.cs_error.ea_ok
+					# cs = popErrorAdmin cs
+					-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
+				# (entry,symbol_table) = readPtr id_info cs.cs_symbol_table
+				# cs & cs_symbol_table=symbol_table
+				-> case entry.ste_kind of
+					STE_Class
+						# (class_context,class_defs) = class_defs![entry.ste_index].class_context
+						# (gen_case_defs,cs) = check_generic_superclasses_case_defs_except class_context except_class_names index mod_index gc_type gc_type_cons gen_case_defs cs
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+					STE_Imported STE_Class decl_index
+						# (class_context,modules) = modules![decl_index].dcl_common.com_class_defs.[entry.ste_index].class_context
+						# (gen_case_defs,cs) = check_generic_superclasses_case_defs_except class_context except_class_names index mod_index gc_type gc_type_cons gen_case_defs cs
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+					_
+						# cs = add_class_undefined_error gcfc_class_ident gc_pos cs
+						-> (gen_case_defs,generic_defs,type_defs,class_defs, modules,heaps,cs)
+				where
+					check_generic_superclasses_case_defs_except class_context except_class_names index mod_index gc_type gc_type_cons gen_case_defs cs
+						# gcfs = convert_generic_contexts class_context
+						  (gcfs,missing_except_class_names,cs) = check_generic_superclasses_except gcfs except_class_names except_class_names mod_index cs
+						  cs & cs_error = report_missing_except_class_names missing_except_class_names gcfc_class_ident gc_pos cs.cs_error
+						  case_def & gc_gcf=GCFS gcfs, gc_type=gc_type, gc_type_cons=gc_type_cons
+						  gen_case_defs & [index]=case_def
+						  cs = popErrorAdmin cs
+						= (gen_case_defs,cs)
+
+					check_generic_superclasses_except [!gcf=:{gcf_gident}:gcfs!] missing_except_class_names except_class_names mod_index cs
+						| IsMemberM gcf_gident.id_name except_class_names
+							# missing_except_class_names = RemoveMemberM gcf_gident.id_name missing_except_class_names
+							= check_generic_superclasses_except gcfs missing_except_class_names except_class_names mod_index cs
+						# (generic_gi,cs) = get_generic_index gcf_gident mod_index cs
+						| not cs.cs_error.ea_ok
+							# (gcfs,missing_except_class_names,cs)
+								= check_generic_superclasses_except gcfs missing_except_class_names except_class_names mod_index cs
+							= ([!gcf:gcfs!],missing_except_class_names,cs)
+							# gcf & gcf_generic = generic_gi
+							# (gcfs,missing_except_class_names,cs)
+								= check_generic_superclasses_except gcfs missing_except_class_names except_class_names mod_index cs
+							= ([!gcf:gcfs!],missing_except_class_names,cs)
+					check_generic_superclasses_except [!!] missing_except_class_names except_class_names mod_index cs
+						= ([!!],missing_except_class_names,cs)
 
 	convert_generic_contexts [{tc_class=TCGeneric {gtc_generic={glob_object={ds_ident}}}}:type_contexts]
 		# gcf = {
@@ -304,6 +355,10 @@ where
 			= ([!gcf:gcfs!],cs)
 	check_generic_superclasses [!!] mod_index cs
 		= ([!!],cs)
+
+	add_class_undefined_error gcfc_class_ident gc_pos cs
+		# cs = popErrorAdmin cs
+		= {cs & cs_error = checkErrorWithPosition gcfc_class_ident gc_pos "class undefined" cs.cs_error}
 
 	check_instance_type module_index (TA type_cons []) type_defs modules heaps cs
 		# (entry, cs_symbol_table) = readPtr type_cons.type_ident.id_info cs.cs_symbol_table
@@ -447,8 +502,30 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 			where
 				convert_generic_instances_and_superclasses class_context gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
 					# (gcfs,next_fun_index,new_fun_defs) = convert_generic_contexts class_context gc_type_cons gc_pos next_fun_index []
-					  gc = {gc & gc_gcf=GCFS gcfs}
-					  gencase_defs = {gencase_defs & [gci]=gc}
+					  gc & gc_gcf=GCFS gcfs
+					  gencase_defs & [gci]=gc
+					  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+						= convert_generic_instances (gci+1) next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					= (new_fun_defs++fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+			gc=:{gc_gcf=GCFCExcept _ gcfc_class_ident=:{id_info} except_class_names,gc_type_cons,gc_pos}
+				# (entry,symbol_table) = readPtr id_info symbol_table
+				-> case entry.ste_kind of
+					STE_Class
+						# (class_context,class_defs) = class_defs![entry.ste_index].class_context
+						-> convert_generic_instances_and_superclasses_except class_context except_class_names gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					STE_Imported STE_Class decl_index
+						# (class_context,dcl_modules) = dcl_modules![decl_index].dcl_common.com_class_defs.[entry.ste_index].class_context
+						-> convert_generic_instances_and_superclasses_except class_context except_class_names gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					_
+						# error = checkErrorWithPosition gcfc_class_ident gc_pos "class undefined" error
+						-> convert_generic_instances (gci+1) next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+			where
+				convert_generic_instances_and_superclasses_except class_context except_class_names gci next_fun_index gencase_defs class_defs symbol_table error dcl_modules
+					# (gcfs,missing_except_class_names,next_fun_index,new_fun_defs)
+						= convert_generic_contexts_except class_context except_class_names except_class_names gc_type_cons gc_pos next_fun_index []
+					  gc & gc_gcf=GCFS gcfs
+					  gencase_defs & [gci]=gc
+					  error = report_missing_except_class_names missing_except_class_names gcfc_class_ident gc_pos error
 					  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
 						= convert_generic_instances (gci+1) next_fun_index gencase_defs class_defs symbol_table error dcl_modules
 					= (new_fun_defs++fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
@@ -476,6 +553,33 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 			= convert_generic_contexts type_contexts type_cons pos next_fun_index new_fun_defs
 		convert_generic_contexts [] type_cons pos next_fun_index new_fun_defs
 			= ([!!],next_fun_index,new_fun_defs)
+
+		convert_generic_contexts_except [{tc_class=TCGeneric _ {gtc_generic={glob_object={ds_ident}}}}:type_contexts] missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+			| IsMemberM ds_ident.id_name except_class_names
+				# missing_except_class_names = RemoveMemberM ds_ident.id_name missing_except_class_names
+				= convert_generic_contexts_except type_contexts missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+			# fun_def = {
+				fun_ident = genericIdentToFunIdent ds_ident.id_name type_cons,
+				fun_arity = 0, fun_priority = NoPrio,
+				fun_body = GeneratedBody, fun_type = No,
+				fun_pos = pos, fun_kind = FK_Unknown,
+				fun_lifted = 0, fun_info = EmptyFunInfo
+				}
+			# gcf = {
+				gcf_gident = ds_ident,
+				gcf_generic = {gi_module=NoIndex,gi_index=NoIndex},
+				gcf_arity = 0,
+				gcf_generic_info = 0,
+				gcf_body = GCB_FunIndex next_fun_index,
+				gcf_kind = KindError,
+				gcf_generic_instance_deps = AllGenericInstanceDependencies }
+			# (gcfs,missing_except_class_names,next_fun_index,new_fun_defs)
+				= convert_generic_contexts_except type_contexts missing_except_class_names except_class_names type_cons pos (next_fun_index+1) new_fun_defs
+			= ([!gcf:gcfs!],missing_except_class_names,next_fun_index,[fun_def:new_fun_defs])
+		convert_generic_contexts_except [_:type_contexts] missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+			= convert_generic_contexts_except type_contexts missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+		convert_generic_contexts_except [] missing_except_class_names except_class_names type_cons pos next_fun_index new_fun_defs
+			= ([!!],missing_except_class_names,next_fun_index,new_fun_defs)
 
 create_gencase_funtypes :: !Index !*{#GenericCaseDef} !*Heaps
 			-> (!Index,![FunType],!*{#GenericCaseDef},!*Heaps)
