@@ -1020,6 +1020,12 @@ where
 				= convert_exported_generic_member_selector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
+// the first argument type (record of the class) of the BESetMemberTypeOfField type is not used in the backend
+// replace it by TE to prevent marking and generating unused descriptors
+// to do: update the backend and remove the argument instead
+make_first_arg_type_TE expanded_member_type=:{st_args=[{at_attribute}:args]}
+	= {expanded_member_type & st_args = [{at_attribute=at_attribute,at_type=TE}:tl expanded_member_type.st_args]}
+
 convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
 convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
@@ -1040,10 +1046,12 @@ convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p
 					->	(st_result,No,bes)
 				VI_ExpandedMemberType expanded_member_type (VI_ExpandedType {st_result})
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  expanded_member_type = make_first_arg_type_TE expanded_member_type
 					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(st_result,Yes type_alt_p,bes)
 				VI_ExpandedMemberType expanded_member_type VI_Empty
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  expanded_member_type = make_first_arg_type_TE expanded_member_type
 					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
@@ -1069,10 +1077,12 @@ convert_exported_generic_member_selector moduleIndex selectorDefs is_strict {fs_
 					->	(st_result,No,bes)
 				VI_ExpandedMemberType expanded_member_type (VI_ExpandedType {st_result})
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  expanded_member_type = make_first_arg_type_TE expanded_member_type
 					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(st_result,Yes type_alt_p,bes)
 				VI_ExpandedMemberType expanded_member_type VI_Empty
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
+					  expanded_member_type = make_first_arg_type_TE expanded_member_type
 					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
 					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
