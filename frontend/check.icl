@@ -506,9 +506,9 @@ where
 
 	make_class_member_instance_type :: InstanceType SymbolType [TypeVar] z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
 													   -> *(!SymbolType,!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
-	make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs
+	make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# (instance_type, _, type_heaps, Yes (modules, type_defs), cs_error)
-			= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, cs.cs_x.x_main_dcl_module_n)) cs.cs_error
+			= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None type_heaps (Yes (modules, type_defs, x_main_dcl_module_n)) cs.cs_error
 		  cs = {cs & cs_error = cs_error }
 		  (st_context, var_heap) = initializeContextVariables instance_type.st_context var_heap
 		  instance_type = { instance_type & st_context = st_context }
@@ -1872,7 +1872,7 @@ replace_icl_macros_by_dcl_macros _ {ir_from=first_icl_macro_index,ir_to=end_icl_
 
 checkDclModules :: [Import]								*{#DclModule} *{#*{#FunDef}} *Heaps *CheckState
 	-> (Int,[ExplicitImport],.[{#Char}],ExplImpInfos,	*{#DclModule},*{#*{#FunDef}},*Heaps,*CheckState)
-checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_table}
+checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_table,cs_x={x_main_dcl_module_n}}
 	#! nr_of_dcl_modules = size dcl_modules
 	# (bitvect, dependencies, dcl_modules, cs_symbol_table)
 			= iFoldSt add_dependencies 0 nr_of_dcl_modules
@@ -1885,7 +1885,7 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 					dependencies_of_icl_mod dcl_modules
 	  dependencies = { dependencies & [index_of_icl_module] = dependencies_of_icl_mod }
 	  module_dag = { dag_nr_of_nodes = nr_of_dcl_modules+1, dag_get_children = select dependencies }
-	  components = partitionateDAG module_dag [cs.cs_x.x_main_dcl_module_n,index_of_icl_module]
+	  components = partitionateDAG module_dag [x_main_dcl_module_n,index_of_icl_module]
 //	| False--->("biggest component:", m axList (map length components))
 //		= undef
 	# (nr_of_components, component_numbers)
@@ -2637,7 +2637,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 		add_predef_module_and_modules_to_symbol_table No modules mod_index cs
 			= add_modules_to_symbol_table modules mod_index cs
 	
-		add_modules_to_symbol_table [] mod_index cs=:{cs_predef_symbols,cs_symbol_table,cs_x}
+		add_modules_to_symbol_table [] mod_index cs=:{cs_predef_symbols,cs_symbol_table,cs_x={x_main_dcl_module_n}}
 			# (cs_predef_symbols, cs_symbol_table) = (cs_predef_symbols, cs_symbol_table) 
 					<=< adjust_predefined_module_symbol PD_StdArray
 					<=< adjust_predefined_module_symbol PD_StdEnum
@@ -2656,7 +2656,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 				# (mod_entry, symbol_table) = readPtr predefined_idents.[predef_index].id_info symbol_table
 				= case mod_entry.ste_kind of
 					STE_Module _
-						-> ({pre_def_symbols & [predef_index] = {mod_symb & pds_module = cs_x.x_main_dcl_module_n, pds_def = mod_entry.ste_index}}, symbol_table)
+						-> ({pre_def_symbols & [predef_index] = {mod_symb & pds_module = x_main_dcl_module_n, pds_def = mod_entry.ste_index}}, symbol_table)
 					_
 						-> (pre_def_symbols, symbol_table)
 
@@ -2962,13 +2962,14 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		  					icl_used_module_numbers = imported_module_numbers, icl_modification_time = mod_modification_time }
 		= (False, icl_mod, dcl_modules, {}, {}, cs_x.x_main_dcl_module_n,heaps, cs_predef_symbols, cs_symbol_table, cs_error.ea_file, directly_imported_dcl_modules)
 	where
-		check_start_rule mod_kind mod_ident icl_global_functions_ranges cs=:{cs_symbol_table,cs_x}
+		check_start_rule mod_kind mod_ident icl_global_functions_ranges cs=:{cs_symbol_table}
 			# ({ste_kind, ste_index}, cs_symbol_table) = readPtr predefined_idents.[PD_Start].id_info cs_symbol_table
 			  cs = { cs & cs_symbol_table = cs_symbol_table }
 			= case ste_kind of
 				STE_FunctionOrMacro _
 					| index_in_ranges ste_index icl_global_functions_ranges
-						-> { cs & cs_predef_symbols.[PD_Start] = { pds_def = ste_index, pds_module = cs_x.x_main_dcl_module_n }}
+						#! main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
+						-> { cs & cs_predef_symbols.[PD_Start] = { pds_def = ste_index, pds_module = main_dcl_module_n }}
 					where
 						index_in_ranges index [{ir_from, ir_to}:ranges]
 							= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;

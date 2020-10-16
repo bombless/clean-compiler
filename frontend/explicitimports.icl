@@ -575,7 +575,7 @@ get_eei_ident (eii=:ExplImpInfo eii_ident _) = (eii_ident, eii)
 checkExplicitImportCompleteness :: ![([Declaration], Position)] ![([Declaration], Int)]
 										!*{#DclModule} !*{#*{#FunDef}} !*ExpressionHeap !*CheckState
 									-> (!.{#DclModule},!*{#*{#FunDef}},!.ExpressionHeap,!.CheckState)
-checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table, cs_error}
+checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_modules macro_defs expr_heap cs=:{cs_symbol_table,cs_error,cs_x={x_main_dcl_module_n}}
 	#! n_dcl_modules = size dcl_modules
 
 	# (modified_symbol_ptrs,cs_symbol_table) = store_qualified_explicitly_imported_symbols_in_symbol_table explicit_qualified_imports [] cs_symbol_table
@@ -584,10 +584,9 @@ checkExplicitImportCompleteness dcls_explicit explicit_qualified_imports dcl_mod
 	   			ccs_set_of_visited_macros = { {} \\ module_n<-[0..n_dcl_modules-1]},
 				ccs_expr_heap = expr_heap, ccs_symbol_table = cs_symbol_table,
 				ccs_error = cs_error, ccs_heap_changes_accu = modified_symbol_ptrs }
-	  main_dcl_module_n = cs.cs_x.x_main_dcl_module_n
 
 	  ccs = foldSt (\(dcls, position) ccs
-	   					-> foldSt (checkCompleteness main_dcl_module_n position) dcls ccs)
+						-> foldSt (checkCompleteness x_main_dcl_module_n position) dcls ccs)
 	   				dcls_explicit
 	   				{ box_ccs = box_ccs }
 	  { ccs_dcl_modules, ccs_macro_defs,ccs_expr_heap, ccs_symbol_table, ccs_error, ccs_heap_changes_accu } = ccs.box_ccs

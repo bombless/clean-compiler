@@ -62,13 +62,13 @@ cCaseNotExplicit	:== False
 ::	RecordKind = RK_Constructor | RK_Update
 
 get_unboxed_list_indices_and_decons_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_unboxed_list_indices_and_decons_u_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_list_indices_and_decons_u_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	  (nil_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_u].pds_def
 	  (decons_u_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_u].pds_def
 	  decons_u_ident = predefined_idents.[PD_decons_u]
 	  app_symb = {symb_ident=decons_u_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_u_index,glob_module=stdStrictLists_index}}
-	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,decons_u_index,nil_u_index,app_symb,cs)
 
 make_unboxed_list expr_heap cs
@@ -79,13 +79,13 @@ make_unboxed_list expr_heap cs
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_tail_strict_list_indices_and_decons_uts_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	  (nil_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_nil_uts].pds_def
 	  (decons_uts_index,cs_predef_symbols)=cs_predef_symbols![PD_decons_uts].pds_def
 	  decons_uts_ident = predefined_idents.[PD_decons_uts]
 	  app_symb = {symb_ident=decons_uts_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_uts_index,glob_module=stdStrictLists_index}}
-	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,decons_uts_index,nil_uts_index,app_symb,cs)
 
 make_unboxed_tail_strict_list expr_heap cs
@@ -96,13 +96,13 @@ make_unboxed_tail_strict_list expr_heap cs
 	= (unboxed_list,decons_expr,expr_heap,cs)
 
 get_overloaded_list_indices_and_decons_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_overloaded_list_indices_and_decons_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_overloaded_list_indices_and_decons_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictLists_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictLists].pds_def
 	  (nil_index,cs_predef_symbols)=cs_predef_symbols![PD_nil].pds_def
 	  (decons_index,cs_predef_symbols)=cs_predef_symbols![PD_decons].pds_def
 	  decons_ident = predefined_idents.[PD_decons]
 	  app_symb = {symb_ident=decons_ident,symb_kind=SK_OverloadedFunction {glob_object=decons_index,glob_module=stdStrictLists_index}}
-	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictLists
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictLists}
 	= (stdStrictLists_index,decons_index,nil_index,app_symb,cs)
 
 make_overloaded_list expr_heap cs
@@ -113,13 +113,13 @@ make_overloaded_list expr_heap cs
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 get_unboxed_maybe_indices_and_from_just_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_unboxed_maybe_indices_and_from_just_u_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_unboxed_maybe_indices_and_from_just_u_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictMaybes_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictMaybes].pds_def
 	  (nothing_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nothing_u].pds_def
 	  (from_just_u_index,cs_predef_symbols)=cs_predef_symbols![PD_from_just_u].pds_def
 	  from_just_u_ident = predefined_idents.[PD_from_just_u]
 	  app_symb = {symb_ident=from_just_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
-	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictMaybes
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictMaybes}
 	= (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs)
 
 make_unboxed_maybe expr_heap cs
@@ -130,13 +130,13 @@ make_unboxed_maybe expr_heap cs
 	= (unboxed_maybe,decons_expr,expr_heap,cs)
 
 get_overloaded_maybe_indices_and_from_just_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
-get_overloaded_maybe_indices_and_from_just_symb_ident cs=:{cs_predef_symbols,cs_x}
+get_overloaded_maybe_indices_and_from_just_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictMaybes_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictMaybes].pds_def
 	  (nothing_index,cs_predef_symbols)=cs_predef_symbols![PD_nothing].pds_def
 	  (from_just_index,cs_predef_symbols)=cs_predef_symbols![PD_from_just].pds_def
 	  from_just_ident = predefined_idents.[PD_from_just]
 	  app_symb = {symb_ident=from_just_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_index,glob_module=stdStrictMaybes_index}}
-	  cs & cs_predef_symbols=cs_predef_symbols,cs_x.x_needed_modules=cs_x.x_needed_modules bitor cNeedStdStrictMaybes
+	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictMaybes}
 	= (stdStrictMaybes_index,from_just_index,nothing_index,app_symb,cs)
 
 make_overloaded_maybe expr_heap cs
@@ -906,13 +906,13 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 		check_generic_expr free_vars entry id kind e_input e_state e_info cs=:{cs_error}
 			= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "not a generic" cs_error })
 
-		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs
+		check_it free_vars mod_index gen_index id kind e_input e_state=:{es_expr_heap} e_info cs=:{cs_x=cs_x=:{x_needed_modules}}
 			#! symb_kind = SK_Generic {glob_object = gen_index, glob_module = mod_index} kind
 		  	#! symbol = { symb_ident = id, symb_kind = symb_kind }			
 			#! (new_info_ptr, es_expr_heap) = newPtr EI_Empty es_expr_heap
 			#! app = { app_symb = symbol, app_args = [], app_info_ptr = new_info_ptr }
 			#! e_state = { e_state & es_expr_heap = es_expr_heap }
-			#! cs = { cs & cs_x.x_needed_modules = cs.cs_x.x_needed_modules bitor cNeedStdGeneric }
+			#! cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdGeneric}
 			= (App app, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
 	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
@@ -1399,14 +1399,14 @@ checkIdentExpression is_expr_list free_vars id=:{id_info} e_input e_state e_info
 where
 	check_id_expression :: !SymbolTableEntry !Bool ![FreeVar] !Ident !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 														 -> (!Expression, ![FreeVar], !*ExpressionState,!u:ExpressionInfo,!*CheckState)
-	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error,cs_predef_symbols,cs_x}
+	check_id_expression {ste_kind = STE_Empty} is_expr_list free_vars id e_input e_state e_info cs=:{cs_error,cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 		# local_predefined_idents = predefined_idents
 		# from_ident = local_predefined_idents.[PD_From]
 		  from_then_ident = local_predefined_idents.[PD_FromThen]
 		  from_to_ident = local_predefined_idents.[PD_FromTo]
 		  from_then_to_ident = local_predefined_idents.[PD_FromThenTo]
 		| id==from_ident || id==from_then_ident || id==from_to_ident || id==from_then_to_ident
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cStdEnumImportMissing})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cStdEnumImportMissing}})
 				// instead of giving an error message remember that StdEnum should have been imported.
 				// Error will be given in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_FromS] || id==local_predefined_idents.[PD_FromTS] || id==local_predefined_idents.[PD_FromSTS]
@@ -1417,25 +1417,25 @@ where
 		|| id==local_predefined_idents.[PD_FromToU] || id==local_predefined_idents.[PD_FromToUTS] || id==local_predefined_idents.[PD_FromToO]
 		|| id==local_predefined_idents.[PD_FromThenToS] || id==local_predefined_idents.[PD_FromThenToTS] || id==local_predefined_idents.[PD_FromThenToSTS]
 		|| id==local_predefined_idents.[PD_FromThenToU] || id==local_predefined_idents.[PD_FromThenToUTS] || id==local_predefined_idents.[PD_FromThenToO]
-			= (EE, free_vars, e_state, e_info, {cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor c_SystemEnumStrictImportMissing})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor c_SystemEnumStrictImportMissing}})
 		# createArray_ident = local_predefined_idents.[PD__CreateArrayFun]
 		  uselect_ident = local_predefined_idents.[PD_UnqArraySelectFun]
 		  update_ident = local_predefined_idents.[PD_ArrayUpdateFun]
 		  usize_ident = local_predefined_idents.[PD_UnqArraySizeFun]
 		| id==createArray_ident || id==uselect_ident || id==update_ident || id==usize_ident
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cStdArrayImportMissing})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cStdArrayImportMissing}})
 				// instead of giving an error message remember that StdArray should have been be imported.
 				//  Error will be given in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_cons] || id==local_predefined_idents.[PD_decons]
 		  || id==local_predefined_idents.[PD_cons_u] || id==local_predefined_idents.[PD_decons_u]
 		  || id==local_predefined_idents.[PD_cons_uts] || id==local_predefined_idents.[PD_decons_uts]
 		  || id==local_predefined_idents.[PD_nil] || id==local_predefined_idents.[PD_nil_u] || id==local_predefined_idents.[PD_nil_uts]
-			= (EE, free_vars, e_state, e_info, { cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictLists})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdStrictLists}})
 				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_just] || id==local_predefined_idents.[PD_from_just]
 		  || id==local_predefined_idents.[PD_just_u] || id==local_predefined_idents.[PD_from_just_u]
 		  || id==local_predefined_idents.[PD_nothing] || id==local_predefined_idents.[PD_nothing_u]
-			= (EE, free_vars, e_state, e_info, {cs & cs_x.x_needed_modules = cs_x.x_needed_modules bitor cNeedStdStrictMaybes})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdStrictMaybes}})
 				// instead report that cNeedStdStrictMaybes should be imported in function check_needed_modules_are_imported
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })
 	check_id_expression {ste_kind = STE_Variable info_ptr,ste_def_level} is_expr_list free_vars id e_input=:{ei_fun_level} e_state=:{es_expr_heap} e_info cs
@@ -1477,10 +1477,10 @@ where
 	determine_info_of_symbol :: !SymbolTableEntry !SymbolPtr !ExpressionInput !*ExpressionState !u:ExpressionInfo !*CheckState
 		-> (!SymbKind, !Int, !Priority, !*ExpressionState, !u:ExpressionInfo,!*CheckState)
 	determine_info_of_symbol entry=:{ste_kind=STE_FunctionOrMacro calls,ste_index,ste_def_level} symb_info
-				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table,cs_x}
+				e_input=:{ei_fun_index} e_state=:{es_calls} e_info cs=:{cs_symbol_table,cs_x={x_main_dcl_module_n}}
 		# (fun_def,e_state) = e_state!es_fun_defs.[ste_index]
 		# {fun_arity,fun_kind,fun_priority,fun_info={fi_properties}}=fun_def
-		# index = { glob_object = ste_index, glob_module = cs_x.x_main_dcl_module_n }
+		# index = { glob_object = ste_index, glob_module = x_main_dcl_module_n }
 		# symbol_kind = convert_DefOrImpFunKind_to_icl_SymbKind fun_kind index fi_properties
 		| is_called_before ei_fun_index calls
 			= (symbol_kind, fun_arity, fun_priority, e_state, e_info, cs)
