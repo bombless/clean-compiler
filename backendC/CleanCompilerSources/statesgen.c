@@ -3012,8 +3012,39 @@ static void DetermineStatesOfNodeAndDefs (Node root_node,NodeDefs node_defs,Stat
 					
 					switch (node_id_state_p->state_type){
 						case RecordState:
+# ifdef REUSE_UNIQUE_NODES
+						{
+							SymbDef sdef;
+							AttributeKind lhs_type_attribute;
+
+							sdef=case_alt_node_p->node_push_symbol->symb_def;
+
+							lhs_type_attribute=sdef->sdef_type->type_attribute;
+							if (lhs_type_attribute==UniqueAttr || (node_id_state_p->state_mark & STATE_UNIQUE_MASK)!=0){
+								NodeIdListElementP node_ids_elem;
+								StateP arg_state_p;
+								FieldList field;
+
+								for_lla (node_ids_elem,field,arg_state_p,node_ids,
+										 sdef->sdef_type->type_fields,sdef->sdef_record_state.state_record_arguments,nidl_next,fl_next)
+								{
+									NodeIdP node_id_p;
+
+									node_id_p=node_ids_elem->nidl_node_id;
+									node_id_p->nid_ref_count_copy=node_id_p->nid_refcount;
+
+									node_id_p->nid_lhs_state_p_ = determine_unique_state_of_constructor_argument
+																	(arg_state_p,field->fl_type,lhs_type_attribute,node_id_state_p);
+								}
+
+								break;
+							}
+# endif
 							set_push_node_id_states (node_ids,case_alt_node_p->node_push_symbol->symb_def->sdef_record_state.state_record_arguments);
 							break;
+# ifdef REUSE_UNIQUE_NODES
+						}
+# endif
 						case TupleState:
 							set_push_node_id_states (node_ids,node_id_state_p->state_tuple_arguments);
 							break;
