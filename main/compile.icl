@@ -4,7 +4,6 @@ import StdEnv
 import frontend
 import backendinterface
 import filesystem, CoclSystemDependent
-import compilerSwitches
 
 from CoclSystemDependent import DirectorySeparator, ensureCleanSystemFilesExists
 
