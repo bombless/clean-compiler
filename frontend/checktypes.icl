@@ -1022,7 +1022,8 @@ checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_att
 */
 checkOpenAType mod_index scope dem_attr type=:{at_type = CV tv :@: types, at_attribute} (ots, oti, cs)
 	# (cons_var, var_attr, (oti, cs)) = checkTypeVar scope dem_attr tv at_attribute (oti, cs)
-	  (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope DAK_None) types (ots, oti, cs)
+	#! dem_arg_attr_kind = if dem_attr=:DAK_Ignore DAK_Ignore DAK_None
+	# (types, (ots, oti, cs)) = mapSt (checkOpenAType mod_index scope dem_arg_attr_kind) types (ots, oti, cs)
 	= ({ type & at_type = CV cons_var :@: types, at_attribute = var_attr }, (ots, oti, cs))
 checkOpenAType mod_index scope dem_attr_kind type=:{ at_type=TQualifiedIdent module_id type_name types, at_attribute}
 		(ots=:{ots_type_defs,ots_modules}, oti, cs=:{cs_symbol_table,cs_x={x_check_dynamic_types}})
