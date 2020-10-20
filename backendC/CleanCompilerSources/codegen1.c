@@ -1150,14 +1150,12 @@ static void coerce_args_from_class_to_instance_member
 static int generate_instance_entry_arguments
 	(struct symbol_def *dictionary_field,int function_arity,struct state *function_state_p,struct label *i_label_p,int *asize_p,int *bsize_p)
 {
-	struct type_alt *field_type_alt;
 	struct state *member_state_p;
 	int member_arity,n_dictionary_args;
 	int arg_n,asp,bsp,asize,bsize,oldamax,oldbmax,a_ind,b_ind,maxasize;
 	int member_called_with_root_node,function_updates_node,create_new_node;
 	
-	field_type_alt=dictionary_field->sdef_member_type_of_field; 
-	member_arity=field_type_alt->type_alt_lhs_arity-1;
+	member_arity=dictionary_field->sdef_member_type_of_field->type_alt_lhs_arity;
 	member_state_p=dictionary_field->sdef_member_states_of_field;
 	
 	if (DoDebug){
@@ -1171,8 +1169,6 @@ static int generate_instance_entry_arguments
 	
 	n_dictionary_args = function_arity-member_arity;
 
-	++member_state_p;
-
 	DetermineSizeOfStates (member_arity,member_state_p,&asp,&bsp);
 
 	asize=0;
@@ -1181,8 +1177,8 @@ static int generate_instance_entry_arguments
 	for (arg_n=0; arg_n<function_arity; ++arg_n)
 		AddStateSizeAndMaxFrameSize (function_state_p[arg_n],&maxasize,&asize,&bsize);
 
-	member_called_with_root_node = member_state_p[-2].state_type==SimpleState
-									&& !(member_state_p[-2].state_kind==StrictRedirection || member_state_p[-2].state_kind==OnB);
+	member_called_with_root_node = member_state_p[-1].state_type==SimpleState
+									&& !(member_state_p[-1].state_kind==StrictRedirection || member_state_p[-1].state_kind==OnB);
 	function_updates_node = function_state_p[-1].state_type==SimpleState
 							&& !(function_state_p[-1].state_kind==StrictRedirection || function_state_p[-1].state_kind==OnB);
 
@@ -1246,17 +1242,15 @@ static int generate_unboxed_record_cons_instance_entry
 
 		member_state_p=dictionary_field->sdef_member_states_of_field;
 		
-		++member_state_p;
-
 		GenFillR (unboxed_record_cons_lab_p,a_size,b_size,a_size,0,0,ReleaseAndFill,True);
 
-		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2])){
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-1])){
 			GenRtn (1,0,OnAState);
 		} else {
 			int result_asize,result_bsize;
 			
 			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
-			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-1],result_asize,result_bsize);
 		}
 
 		return 1;
@@ -1294,8 +1288,6 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 
 		member_state_p=dictionary_field->sdef_member_states_of_field;
 		
-		++member_state_p;
-
 		DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
 
 		if (result_bsize==0)
@@ -1303,10 +1295,10 @@ static int generate_unboxed_record_decons_instance_entry (struct symbol_def *rul
 		else
 			GenReplRArgs (result_asize,result_bsize);
 
-		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-1]))
 			GenRtn (result_asize,result_bsize,function_state_p[-1]);
 		else 
-			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-1],result_asize,result_bsize);
 
 		return 1;
 	}
@@ -1342,16 +1334,14 @@ static int generate_unboxed_record_instance_entry (struct symbol_def *rule_sdef,
 
 		member_state_p=dictionary_field->sdef_member_states_of_field;
 		
-		++member_state_p;
-
-		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-1]))
 			CallArrayFunction (rule_sdef,False,&rule_sdef->sdef_rule_type->rule_type_state_p[-1]);
 		else {
 			int result_asize,result_bsize;
 
 			CallArrayFunction (rule_sdef,True,&rule_sdef->sdef_rule_type->rule_type_state_p[-1]);
 			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
-			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-1],result_asize,result_bsize);
 		}
 
 		return 1;
@@ -2078,8 +2068,6 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 
 		member_state_p=dictionary_field->sdef_member_states_of_field;
 		
-		++member_state_p;
-
 		GenDStackLayoutOfStates (asize+function_updates_node,bsize,rule_sdef->sdef_arity,function_state_p);
 
 		current_alt_label = CurrentAltLabel;
@@ -2088,7 +2076,7 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 		if (rule_sdef->sdef_exported)
 			current_alt_label.lab_mod = NULL;
 
-		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-2]))
+		if (function_updates_node || EqualState (function_state_p[-1],member_state_p[-1]))
 			GenJmp (&current_alt_label);
 		else {
 			int result_asize,result_bsize;
@@ -2098,7 +2086,7 @@ int generate_instance_entry (struct symbol_def *rule_sdef,struct state *function
 			DetermineSizeOfState (function_state_p[-1],&result_asize,&result_bsize);
 			GenOStackLayoutOfState (result_asize,result_bsize,function_state_p[-1]);
 			function_called_only_curried_or_lazy_with_one_return = 0;
-			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-2],result_asize,result_bsize);
+			RedirectResultAndReturn (result_asize,result_bsize,result_asize,result_bsize,function_state_p[-1],member_state_p[-1],result_asize,result_bsize);
 		}
 
 		return 1;
@@ -5092,8 +5080,8 @@ static void repl_overloaded_cons_or_just_arguments (NodeP node_p,int *asp_p,int 
 			if (node_p->node_push_symbol->symb_kind==just_symb || member_states_of_field[-1].state_type==TupleState){
 				int a_size,b_size;
 
-				DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
-				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+				DetermineSizeOfStates (member_arity,member_states_of_field,&a_size,&b_size);
+				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity,member_states_of_field);
 
 				GenJsrI (1);
 

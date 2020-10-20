@@ -660,12 +660,10 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 				
 				selector_node_p=arg_p->arg_node;
 				if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
-					struct type_alt *member_type_alt;
-					
 					field_sdef=selector_node_p->node_symbol->symb_def;
-					member_type_alt=field_sdef->sdef_member_type_of_field;
+
 					if (DoDebug)
-						if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+						if (field_sdef->sdef_member_type_of_field->type_alt_lhs_arity==n_apply_args){
 							PutSOutFile ("\n||\t");
 							PutIOutFile (root->node_symbol->symb_instance_apply);
 							PutCOutFile (' ');
@@ -694,8 +692,8 @@ static void CodeRootApply (Node root,NodeId rootid,int asp,int bsp,CodeGenNodeId
 				member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
 												&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
 
-				DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
-				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+				DetermineSizeOfStates (member_arity,member_states_of_field,&a_size,&b_size);
+				GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity,member_states_of_field);
 
 				if (no_tail_call){
 					int result_a_size,result_b_size,jsr_i_result_a_size,jsr_i_result_b_size;

@@ -2037,8 +2037,8 @@ static Bool OptimizedMemberCallInAStrictContext (Node node,int arg_n,struct stat
 		parallel = DetermineStrictArgContext (arg1_p, StrictState, local_scope);
 	}
 
-	if (! IsLazyState (member_states_of_field[arg_n+1])){
-		if (DetermineStrictArgContext (arg2_p, member_states_of_field[arg_n+1], local_scope))
+	if (! IsLazyState (member_states_of_field[arg_n])){
+		if (DetermineStrictArgContext (arg2_p, member_states_of_field[arg_n], local_scope))
 			parallel = True;
 	} else
 		if (ShouldDecrRefCount)
@@ -2131,14 +2131,14 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 					member_type_alt=field_sdef->sdef_member_type_of_field;
 
 					if (OptimizeInstanceCalls){
-						arg_n=member_type_alt->type_alt_lhs_arity-1;
+						arg_n=member_type_alt->type_alt_lhs_arity;
 						node->node_state = field_sdef->sdef_member_states_of_field[-1];
 						return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
 					}
 
 					arg_strictness=0;
 					arg_n=0;
-					for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
+					for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments,type_arg_next){
 						if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
 							arg_strictness |= 1<<arg_n;
 						}
@@ -2171,7 +2171,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 							
 							field_sdef=selector_node_p->node_symbol->symb_def;
 							member_type_alt=field_sdef->sdef_member_type_of_field;
-							if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+							if (member_type_alt->type_alt_lhs_arity==n_apply_args){
 								int arg_n;
 								unsigned int arg_strictness;
 								struct type_arg *type_arg_p;
@@ -2187,14 +2187,14 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 								}
 
 								if (OptimizeInstanceCalls){
-									arg_n=member_type_alt->type_alt_lhs_arity-1;
+									arg_n=member_type_alt->type_alt_lhs_arity;
 									node->node_state = field_sdef->sdef_member_states_of_field[-1];
 									return OptimizedMemberCallInAStrictContext (node,arg_n,field_sdef->sdef_member_states_of_field,local_scope);
 								}
 
 								arg_strictness=0;
 								arg_n=0;
-								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
+								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments,type_arg_next){
 									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot){
 										arg_strictness |= 1<<arg_n;
 									}

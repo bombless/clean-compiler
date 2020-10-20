@@ -2280,7 +2280,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 							struct type_arg *type_arg_p;
 							
 							member_type_alt=arg_p->arg_node->node_symbol->symb_def->sdef_member_type_of_field;
-							if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+							if (member_type_alt->type_alt_lhs_arity==n_apply_args){
 								int arg_n;
 								unsigned int arg_strictness;
 								NodeP first_arg_of_apply_node_p;
@@ -2288,7 +2288,7 @@ static Exp ConvertNode (Node node, NodeId nid)
 								
 								arg_strictness=0;
 								arg_n=0;
-								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments->type_arg_next,type_arg_next){
+								for_l (type_arg_p,member_type_alt->type_alt_lhs_arguments,type_arg_next){
 									if (type_arg_p->type_arg_node->type_node_annotation==StrictAnnot)
 										arg_strictness |= 1<<arg_n;
 									++arg_n;

@@ -2886,12 +2886,10 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 			
 			selector_node_p=arg_p->arg_node;
 			if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
-				struct type_alt *member_type_alt;
-				
 				field_sdef=selector_node_p->node_symbol->symb_def;
-				member_type_alt=field_sdef->sdef_member_type_of_field;
+
 				if (DoDebug)
-					if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+					if (field_sdef->sdef_member_type_of_field->type_alt_lhs_arity==n_apply_args){
 						PutSOutFile ("\n||\t");
 						PutSOutFile (selector_node_p->node_symbol->symb_def->sdef_name);
 					} else {
@@ -2917,8 +2915,8 @@ static void generate_code_for_apply_in_strict_context (NodeP node,int *asp_p,int
 			member_called_with_root_node = member_states_of_field[-1].state_type==SimpleState
 											&& !(member_states_of_field[-1].state_kind==StrictRedirection || member_states_of_field[-1].state_kind==OnB);
 
-			DetermineSizeOfStates (member_arity-1,&member_states_of_field[1],&a_size,&b_size);
-			GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity-1,&member_states_of_field[1]);
+			DetermineSizeOfStates (member_arity,member_states_of_field,&a_size,&b_size);
+			GenDStackLayoutOfStates (a_size+1+member_called_with_root_node,b_size,member_arity,member_states_of_field);
 
 			GenJsrI (n_apply_args);
 

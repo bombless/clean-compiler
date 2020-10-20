@@ -1388,11 +1388,9 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 							selector_node_p=arg_p->arg_node;
 							if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
 								struct symbol_def *field_sdef;
-								struct type_alt *member_type_alt;
 									
 								field_sdef=selector_node_p->node_symbol->symb_def;
-								member_type_alt=field_sdef->sdef_member_type_of_field;
-								if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+								if (field_sdef->sdef_member_type_of_field->type_alt_lhs_arity==n_apply_args){
 									struct symbol *new_symbol_p;
 
 									new_symbol_p = CompAlloc (sizeof (struct symbol));
@@ -2182,7 +2180,7 @@ static void optimise_instance_call (NodeP node,int n_apply_args,struct state *me
 	int arg_n;
 	
 	arg_n=n_apply_args;
-	if (arg_n>1 || is_optimisable_argument (node->node_arguments->arg_next->arg_node,&member_states_of_field[1])){
+	if (arg_n>1 || is_optimisable_argument (node->node_arguments->arg_next->arg_node,member_states_of_field)){
 		struct arg *old_arg_p;
 		struct node *rhs_root_of_function;
 		
@@ -2268,11 +2266,9 @@ static void optimise_normal_node (Node node)
 					selector_node_p=arg_p->arg_node;
 					if ((selector_node_p->node_symbol->symb_def->sdef_mark & SDEF_FIELD_HAS_MEMBER_TYPE)!=0){
 						struct symbol_def *field_sdef;
-						struct type_alt *member_type_alt;
 							
 						field_sdef=selector_node_p->node_symbol->symb_def;
-						member_type_alt=field_sdef->sdef_member_type_of_field;
-						if (member_type_alt->type_alt_lhs_arity==n_apply_args+1){
+						if (field_sdef->sdef_member_type_of_field->type_alt_lhs_arity==n_apply_args){
 							struct symbol *new_symbol_p;
 
 							new_symbol_p = CompAlloc (sizeof (struct symbol));
