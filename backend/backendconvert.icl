@@ -1020,8 +1020,8 @@ where
 				= convert_exported_generic_member_selector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
-remove_first_arg_type expanded_member_type=:{st_args=[_:args],st_arity}
-	= {expanded_member_type & st_args = args, st_arity = st_arity-1}
+remove_first_arg_type expanded_member_type=:{st_args=[_:args],st_arity,st_args_strictness}
+	= {expanded_member_type & st_args = args, st_arity = st_arity-1, st_args_strictness = remove_first_n 1 st_args_strictness}
 
 convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
 convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
