@@ -1430,9 +1430,10 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 										new_arg->arg_state=LazyState;
 										*rhs_arg_p=new_arg;
 										rhs_arg_p=&new_arg->arg_next;
-										
+
+										/* member_states_of_field[-1] not used by create_arguments_for_local_function, because first arg is SelectorNode */
 										function_name_p = create_arguments_for_local_function (arg_node,arg_h,lhs_arg_h,&function_node->node_arguments,
-																								 member_states_of_field,arity_p,function_name_p,end_function_name,n_arguments_p);
+																								 &member_states_of_field[-1],arity_p,function_name_p,end_function_name,n_arguments_p);
 										
 										++arg_state_p;
 
@@ -2186,7 +2187,8 @@ static void optimise_instance_call (NodeP node,int n_apply_args,struct state *me
 		
 		old_arg_p = remove_apply_nodes (node,n_apply_args);
 		
-		rhs_root_of_function = create_new_local_function (node,member_states_of_field);
+		/* member_states_of_field[-1] not used by create_new_local_function, because first arg is SelectorNode */
+		rhs_root_of_function = create_new_local_function (node,&member_states_of_field[-1]);
 		
 		if (rhs_root_of_function!=NULL){
 			struct arg *arg_p;
