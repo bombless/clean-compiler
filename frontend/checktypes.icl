@@ -1263,35 +1263,49 @@ where
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
 
-checkSuperClasses :: ![TypeVar] ![TypeContext] !Index !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-	-> (![TypeVar], ![TypeContext], !u:{#CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
+checkSuperClasses :: !ClassArgs ![TypeContext] !Index !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
+	-> (!ClassArgs, ![TypeContext], !u:{#CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkSuperClasses class_args class_contexts mod_index type_defs class_defs modules heaps=:{th_vars} cs=:{cs_symbol_table,cs_error}
-	# (rev_class_args, cs_symbol_table, th_vars, cs_error)
-			= foldSt add_variable_to_symbol_table class_args ([], cs_symbol_table, th_vars, cs_error)
+	# (class_args, symbol_ptrs, cs_symbol_table, th_vars, cs_error)
+			= add_class_args_to_symbol_table class_args [] cs_symbol_table th_vars cs_error
 	  cs = {cs & cs_symbol_table = cs_symbol_table, cs_error = cs_error }
 	  ots = { ots_modules = modules, ots_type_defs = type_defs }
 	  oti = { oti_heaps = { heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
 	  (class_contexts, type_defs, class_defs, modules, type_heaps, cs)
 		  		= checkTypeContexts class_contexts mod_index class_defs ots oti cs
-	  (class_args, cs_symbol_table) = retrieve_variables_from_symbol_table rev_class_args [] cs.cs_symbol_table
+	  cs_symbol_table = remove_variables_from_symbol_table symbol_ptrs cs.cs_symbol_table
 	= (class_args, class_contexts, type_defs, class_defs, modules, type_heaps, {cs & cs_symbol_table = cs_symbol_table})
 where
-	add_variable_to_symbol_table :: !TypeVar !(![TypeVar], !*SymbolTable, !*TypeVarHeap, !*ErrorAdmin)
-		-> (![TypeVar],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
-	add_variable_to_symbol_table tv=:{tv_ident={id_name,id_info}} (rev_class_args, symbol_table, th_vars, error)
+	add_class_args_to_symbol_table :: !ClassArgs ![SymbolPtr] !*SymbolTable !*TypeVarHeap !*ErrorAdmin
+								  -> (!ClassArgs,![SymbolPtr],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
+	add_class_args_to_symbol_table (ClassArg tv class_args) symbol_ptrs symbol_table th_vars error
+		# (class_args, symbol_ptrs, symbol_table, th_vars, error)
+			= add_class_args_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
+		# (ok, tv, symbol_ptrs, symbol_table, th_vars, error)
+			= add_variable_to_symbol_table tv symbol_ptrs symbol_table th_vars error
+		| ok
+			= (ClassArg tv class_args, symbol_ptrs, symbol_table, th_vars, error)
+			= (class_args, symbol_ptrs, symbol_table, th_vars, error)
+	add_class_args_to_symbol_table NoClassArgs symbol_ptrs symbol_table th_vars error
+		= (NoClassArgs, symbol_ptrs, symbol_table, th_vars, error)
+
+	add_variable_to_symbol_table :: !TypeVar ![SymbolPtr] !*SymbolTable !*TypeVarHeap !*ErrorAdmin
+						  -> (!Bool,!TypeVar,![SymbolPtr],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
+	add_variable_to_symbol_table tv=:{tv_ident={id_name,id_info}} symbol_ptrs symbol_table th_vars error
 	  	# (entry, symbol_table) = readPtr id_info symbol_table
 		| entry.ste_kind =: STE_Empty || entry.ste_def_level < cGlobalScope
 			# (new_var_ptr, th_vars) = newPtr TVI_Empty th_vars
 			# symbol_table = NewEntry symbol_table id_info (STE_TypeVariable new_var_ptr) NoIndex cGlobalScope entry
-			= ([{ tv & tv_info_ptr = new_var_ptr} : rev_class_args], symbol_table, th_vars, error)
-			= (rev_class_args, symbol_table, th_vars, checkError id_name "(variable) already defined" error)
+			= (True, {tv & tv_info_ptr = new_var_ptr}, [id_info:symbol_ptrs], symbol_table, th_vars, error)
+			# error = checkError id_name "(variable) already defined" error
+			= (False, tv, symbol_ptrs, symbol_table, th_vars, error)
 
-	retrieve_variables_from_symbol_table :: ![TypeVar] ![TypeVar] !*SymbolTable -> (![TypeVar],!*SymbolTable)
-	retrieve_variables_from_symbol_table [var=:{tv_ident={id_name,id_info}} : vars] class_args symbol_table
+	remove_variables_from_symbol_table :: ![SymbolPtr] !*SymbolTable -> *SymbolTable
+	remove_variables_from_symbol_table [id_info:id_infos] symbol_table
 		# (entry, symbol_table) = readPtr id_info symbol_table
-		= retrieve_variables_from_symbol_table vars [var : class_args] (symbol_table <:= (id_info,entry.ste_previous))
-	retrieve_variables_from_symbol_table [] class_args symbol_table
-		= (class_args, symbol_table)
+		= remove_variables_from_symbol_table id_infos (writePtr id_info entry.ste_previous symbol_table)
+	remove_variables_from_symbol_table [] symbol_table
+		= symbol_table
 
 checkTypeContext ::  !Index !TypeContext !(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 	-> (!TypeContext,!(!v:{# ClassDef}, !u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
@@ -1882,7 +1896,7 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 		,	cons_pos		= NoPos
 		}
 
-	  (td_args, type_var_heap) = mapSt new_attributed_type_variable class_args type_var_heap
+	  (td_args, type_var_heap) = new_attributed_type_variables class_args type_var_heap
 	  
 	  type_def =
 	 	{	td_ident		= rec_type_id
@@ -1906,9 +1920,13 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 			type_id_info, { index_type = inc index_type, index_cons = inc index_cons, index_selector = index_selector },
 				type_var_heap, var_heap, symbol_table)
 where
-	new_attributed_type_variable tv type_var_heap
+	new_attributed_type_variables (ClassArg tv class_args) type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
-		= ({atv_attribute = TA_Multi, atv_variable = { tv & tv_info_ptr = new_tv_ptr }}, type_var_heap)
+		# atv = {atv_attribute = TA_Multi, atv_variable = {tv & tv_info_ptr = new_tv_ptr}}
+		# (atvs,type_var_heap) = new_attributed_type_variables class_args type_var_heap
+		= ([atv:atvs],type_var_heap)
+	new_attributed_type_variables NoClassArgs type_var_heap
+		= ([],type_var_heap);
 
 	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields
 					args_strictness var_heap symbol_table
@@ -1970,8 +1988,8 @@ where
 		= (field, var_heap, symbol_table <:= (id_info, { ste_kind = STE_DictField sel_def, ste_index = selector_index,
 				ste_def_level = NotALevel, ste_previous = abort "empty SymbolTableEntry" }))
 
-	same_args_as_root_class [TV tv1:tvs1] [tv2:tvs2] = tv1.tv_ident.id_name==tv2.tv_ident.id_name && same_args_as_root_class tvs1 tvs2
-	same_args_as_root_class [] [] = True
+	same_args_as_root_class [TV tv1:tvs1] (ClassArg tv2 tvs2) = tv1.tv_ident.id_name==tv2.tv_ident.id_name && same_args_as_root_class tvs1 tvs2
+	same_args_as_root_class [] NoClassArgs = True
 	same_args_as_root_class _ _ = False
 
 class toVariable var :: !STE_Kind !Ident -> var

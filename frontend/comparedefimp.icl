@@ -196,7 +196,7 @@ where
 			= (icl_class_defs, icl_member_defs, comp_st)
 
 	compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
+		# comp_type_var_heap = initialyseClassArgs dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
 		| not ok
@@ -525,6 +525,19 @@ initialyseATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_hea
 initialyseATypeVars [] [] type_var_heap
 	= type_var_heap
 
+initialyseClassArgs (ClassArg {tv_info_ptr=dcl_tv_info_ptr} dcl_type_vars) (ClassArg {tv_info_ptr=icl_tv_info_ptr} icl_type_vars) type_var_heap
+	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
+	= initialyseClassArgs dcl_type_vars icl_type_vars type_var_heap
+initialyseClassArgs NoClassArgs NoClassArgs type_var_heap
+	= type_var_heap
+initialyseClassArgs dcl_class_args icl_class_args type_var_heap
+	= initialyseClassArgsEmpty icl_class_args (initialyseClassArgsEmpty dcl_class_args type_var_heap)
+
+initialyseClassArgsEmpty (ClassArg {tv_info_ptr} type_vars) type_var_heap
+	= initialyseClassArgsEmpty type_vars (writePtr tv_info_ptr TVI_Empty type_var_heap)
+initialyseClassArgsEmpty NoClassArgs type_var_heap
+	= type_var_heap
+
 initialyseAttributeVars [{av_info_ptr=dcl_av_info_ptr}:dcl_type_vars] [{av_info_ptr=icl_av_info_ptr}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_av_info_ptr, AVI_AttrVar dcl_av_info_ptr) <:= (dcl_av_info_ptr, AVI_AttrVar icl_av_info_ptr)
 	= initialyseAttributeVars dcl_type_vars icl_type_vars type_var_heap
@@ -720,7 +733,17 @@ init_type_vars type_vars1 type_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn_
   where
 	init_type_var {tv_info_ptr} heap
 		= writePtr tv_info_ptr TVI_Empty heap
-	
+
+init_class_args type_vars1 type_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn_heap}}
+	# hwn_heap = init_class_args type_vars1 hwn_heap
+	# hwn_heap = init_class_args type_vars2 hwn_heap
+	= {tc_state & tc_type_vars = {tc_type_vars & hwn_heap = hwn_heap}}
+  where
+	init_class_args (ClassArg {tv_info_ptr} class_args) heap
+		= init_class_args class_args (writePtr tv_info_ptr TVI_Empty heap)
+	init_class_args NoClassArgs heap
+		= heap
+
 generate_error message iclDef iclDefs tc_state error_admin
 	# ident_pos = getIdentPos iclDef
 	  error_admin = pushErrorAdmin ident_pos error_admin
@@ -1101,6 +1124,15 @@ instance t_corresponds TypeVar where
 			# (unifiable, tc_type_vars) = tryToUnifyVars dclDef.tv_info_ptr iclDef.tv_info_ptr tc_type_vars
 			= (unifiable, { tc_state & tc_type_vars = tc_type_vars })
 
+instance t_corresponds ClassArgs where
+	t_corresponds NoClassArgs NoClassArgs
+		=	return True
+	t_corresponds (ClassArg dclDef dclDefs) (ClassArg iclDef iclDefs)
+		=	t_corresponds dclDef iclDef
+		&&&	t_corresponds dclDefs iclDefs
+	t_corresponds _ _
+		=	return False
+
 instance t_corresponds TypeRhs where
 	t_corresponds (AlgType dclConstructors) (AlgType iclConstructors)
 		=	t_corresponds dclConstructors iclConstructors
@@ -1178,7 +1210,7 @@ instance t_corresponds AttrInequality where
 
 instance t_corresponds ClassDef where
 	t_corresponds dclDef iclDef
-		=	do (init_type_vars dclDef.class_args iclDef.class_args)
+		=	do (init_class_args dclDef.class_args iclDef.class_args)
 		&&&	equal dclDef.class_ident iclDef.class_ident
 		&&&	t_corresponds dclDef.class_args iclDef.class_args
 		&&&	t_corresponds dclDef.class_context iclDef.class_context

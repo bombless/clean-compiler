@@ -1529,7 +1529,7 @@ reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = MoreConses type_ex
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,class_args} members : defs] def_counts=:{mem_count,macro_count} ca
 	# type_context = { tc_class = TCClass {glob_module = NoIndex, glob_object = {ds_ident = class_ident, ds_arity = class_arity, ds_index = NoIndex }},
-					   tc_types = [ TV tv \\ tv <- class_args ], tc_var = nilPtr}
+					   tc_types = class_args_to_types class_args, tc_var = nilPtr}
 	  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 			= check_symbols_of_class_members members type_context macro_count ca
 	  (mem_defs,ca) = add_default_members_without_type default_members_without_type mem_defs ca
@@ -1543,6 +1543,9 @@ reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,c
 	  			 def_members = mem_defs ++ c_defs.def_members }
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
+	class_args_to_types (ClassArg tv class_args) = [TV tv : class_args_to_types class_args]
+	class_args_to_types NoClassArgs = []
+
 	check_symbols_of_class_members :: ![ParsedDefinition] !TypeContext !Int !*CollectAdmin
 									-> (![MemberDef],![FunDef],![(Ident,MacroMember,Position)],[!MacroMember!],!Int,!*CollectAdmin)
 	check_symbols_of_class_members [PD_TypeSpec pos name prio opt_type=:(Yes type=:{st_context,st_arity}) specials : defs] type_context macro_count ca
@@ -1561,14 +1564,14 @@ where
 								-> DeriveDefault generic_ident no_index (Yes {igi_ident=member_ident,igi_g_index=no_index})
 					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
 									me_default_implementation = default_implementation,
-									me_offset = NoIndex, me_class_vars = [], me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+									me_offset = NoIndex, me_class_vars = NoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
 					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 				_
 					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
 									me_default_implementation = NoMemberDefault,
-									me_offset = NoIndex, me_class_vars = [], me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+									me_offset = NoIndex, me_class_vars = NoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
 					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
@@ -1590,7 +1593,7 @@ where
 			| not (has_PD_DeriveInstanceMember_in_where bodies)
 				# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
 				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex, 
-								me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_class_vars = NoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
 								me_default_implementation = MacroMemberDefault macro_member, me_type_ptr = nilPtr }
 				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 						= check_symbols_of_class_members defs type_context (macro_count+1) ca
@@ -1599,7 +1602,7 @@ where
 				# bodies = set_PD_DeriveInstanceMember_arity_in_where st_arity bodies
 				  macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
 				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex,
-								me_class_vars = [], me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_class_vars = NoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
 								me_default_implementation = MacroMemberDefaultWithDerive macro_member, me_type_ptr = nilPtr }
 				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 						= check_symbols_of_class_members defs type_context (macro_count+1) ca

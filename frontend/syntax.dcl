@@ -397,7 +397,7 @@ cNameLocationDependent :== True
 ::	ClassDef =
  	{	class_ident			:: !Ident
 	,	class_arity			:: !Int
-	,	class_args			:: ![TypeVar]
+	,	class_args			:: !ClassArgs
 	,	class_context		:: ![TypeContext]
 	,	class_members		:: !{# DefinedSymbol}
 	,	class_macro_members	:: {#MacroMember}
@@ -405,6 +405,10 @@ cNameLocationDependent :== True
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
 	}
+
+::	ClassArgs
+	= ClassArg !TypeVar !ClassArgs
+	| NoClassArgs
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
 
@@ -420,7 +424,7 @@ cNameLocationDependent :== True
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
-	,	me_class_vars	:: ![TypeVar]
+	,	me_class_vars	:: !ClassArgs
 	,	me_default_implementation :: !MemberDefault
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority

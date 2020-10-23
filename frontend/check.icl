@@ -51,12 +51,17 @@ checkSpecial mod_index fun_type=:{ft_type} fun_index subst (next_inst_index, spe
 	= ( { spec_index = { glob_module = mod_index, glob_object = next_inst_index }, spec_types = spec_types, spec_vars = subst.ss_vars, spec_attrs = subst.ss_attrs },
 			((inc next_inst_index), [{ fun_type & ft_type = ft_type, ft_specials = FSP_FunIndex fun_index, ft_type_ptr = new_info_ptr} : special_types ],
 					{ heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap }, predef_symbols, error))
-where	
-	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment type_heaps error
+where
+	substitute_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} {ss_environ,ss_vars,ss_attrs,ss_context} type_heaps error
+		# ss_environ_vars = class_args_of_ss_environ ss_environ
+		# ss_environ_types = [bind_src\\{bind_src}<-ss_environ]
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, _, type_heaps, error)
-			= instantiateTypes environment st_vars st_attr_vars [st_result : st_args] st_context st_attr_env [] type_heaps error
+			= instantiateTypes ss_environ_vars {it_types=ss_environ_types,it_vars=ss_vars,it_attr_vars=ss_attrs,it_context=ss_context} st_vars st_attr_vars [st_result : st_args] st_context st_attr_env [] type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, type_heaps, error)
+
+class_args_of_ss_environ [{bind_dst}:envs] = ClassArg bind_dst (class_args_of_ss_environ envs)
+class_args_of_ss_environ [] = NoClassArgs
 
 checkDclFunctions :: !Index !Index ![FunType] !v:{#CheckedTypeDef} !x:{#ClassDef} !v:{#.DclModule} !*Heaps !*CheckState
 	-> (!Index, ![FunType], ![FunType], !v:{#CheckedTypeDef}, !x:{#ClassDef}, !v:{#DclModule}, !*Heaps, !*CheckState)
@@ -179,7 +184,7 @@ where
 			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
 			   		= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
 			  (me_default_implementation,cs) = check_generic_default me_default_implementation module_index cs
-			  me_class_vars = [ type_var \\ (TV type_var) <- (hd me_type.st_context).tc_types ]
+			  me_class_vars = tv_list_to_class_args (hd me_type.st_context).tc_types
 			  (me_type_ptr, var_heap) = newPtr VI_Empty var_heap
 			  member_def & me_type=me_type, me_class_vars=me_class_vars, me_type_ptr=me_type_ptr, me_default_implementation=me_default_implementation
 			= ({member_defs & [member_index] = member_def}, type_defs, class_defs, modules, type_heaps, var_heap, cs)
@@ -189,6 +194,11 @@ where
 		= True
 	has_to_be_checked (Yes ({copied_class_defs}, n_cached_dcl_mods)) {glob_module,glob_object}
 		= not (glob_module < n_cached_dcl_mods && glob_object < size copied_class_defs && copied_class_defs.[glob_object])
+
+	tv_list_to_class_args [TV type_var:tv_list]
+		= ClassArg type_var (tv_list_to_class_args tv_list)
+	tv_list_to_class_args []
+		= NoClassArgs
 
 	check_generic_default (DeriveDefault generic_ident _ No) module_index cs
 		# (generic_index,cs) = get_generic_index generic_ident module_index cs
@@ -267,18 +277,18 @@ where
 
 	check_class_instance :: ClassDef !Index !Index !Index !ClassInstance !u:InstanceSymbols !*TypeHeaps !*CheckState 
 		-> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
-	check_class_instance class_def module_index class_index class_mod_index
+	check_class_instance {class_arity,class_args} module_index class_index class_mod_index
 			ins=:{ins_class_ident=ins_class_ident=:{ci_ident,ci_arity},ins_type,ins_specials,ins_pos,ins_ident}
 			is=:{is_class_defs,is_modules} type_heaps cs=:{cs_symbol_table}	
-		| class_def.class_arity == ci_arity
+		| class_arity == ci_arity
 			# ins_class_index = {gi_index = class_index, gi_module = class_mod_index}
 			  (ins_type, ins_specials, is_type_defs, is_class_defs, is_modules, type_heaps, cs)
-			  		= checkInstanceType module_index ins_class_index ins_class_ident ins_type ins_specials
-							is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
+					= checkInstanceType module_index ins_class_index ins_class_ident
+						ins_type ins_specials is.is_type_defs is.is_class_defs is.is_modules type_heaps cs
 			  is = { is & is_type_defs = is_type_defs, is_class_defs = is_class_defs, is_modules = is_modules }
 			= ({ins & ins_class_index = ins_class_index, ins_type = ins_type, ins_specials = ins_specials}, is, type_heaps, cs)
 			# (Ident {id_name}) = ci_ident
-			# cs = {cs & cs_error = checkError id_name ("wrong arity: expected "+++toString class_def.class_arity+++" found "+++toString ci_arity) cs.cs_error}
+			# cs & cs_error = checkError id_name ("wrong arity: expected "+++toString class_arity+++" found "+++toString ci_arity) cs.cs_error
 			= (ins, is, type_heaps, cs)
 
 check_derived_local_functions_in_member :: !Int !Int !Int !DclInstanceMemberTypeAndFunctions !*{#FunDef} !*CheckState
@@ -504,7 +514,7 @@ where
 		  instance_types = [(ins_member_index, instance_type) : instance_types]
 		= (instance_types,icl_functions,member_defs,type_defs,modules,var_heap,type_heaps,cs)
 
-	make_class_member_instance_type :: InstanceType SymbolType [TypeVar] z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
+	make_class_member_instance_type :: InstanceType SymbolType ClassArgs z:{#CheckedTypeDef}  u:{#DclModule}  *VarHeap  *TypeHeaps  *CheckState
 													   -> *(!SymbolType,!z:{#CheckedTypeDef},!u:{#DclModule},!*VarHeap,!*TypeHeaps,!*CheckState)
 	make_class_member_instance_type ins_type me_type me_class_vars type_defs modules var_heap type_heaps cs=:{cs_x={x_main_dcl_module_n}}
 		# (instance_type, _, type_heaps, Yes (modules, type_defs), cs_error)
@@ -585,18 +595,18 @@ getMemberDef mem_mod mem_index mod_index member_defs modules
 		# (dcl_mod,modules) = modules![mem_mod]
 		= (dcl_mod.dcl_common.com_member_defs.[mem_index], member_defs, modules)
 
-instantiateTypes :: !SpecialSubstitution
+instantiateTypes :: !ClassArgs !InstanceType
 					![TypeVar] ![AttributeVar] ![AType] ![TypeContext] ![AttrInequality] ![SpecialSubstitution] !*TypeHeaps !*ErrorAdmin
 				-> (![TypeVar],![AttributeVar],![AType],![TypeContext],![AttrInequality],![SpecialSubstitution],!*TypeHeaps,!*ErrorAdmin)
-instantiateTypes {ss_environ, ss_vars, ss_attrs, ss_context}
+instantiateTypes class_vars {it_types,it_vars,it_attr_vars,it_context}
 		old_type_vars old_attr_vars types type_contexts attr_env special_subst_list type_heaps=:{th_vars, th_attrs} error
 	# th_vars = clear_vars old_type_vars th_vars
 
-	  (new_type_vars, th_vars) = foldSt build_var_subst ss_vars ([], th_vars)
-	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst ss_attrs ([], th_attrs)
+	  (new_type_vars, th_vars) = foldSt build_var_subst it_vars ([], th_vars)
+	  (new_attr_vars, th_attrs) = foldSt build_attr_var_subst it_attr_vars ([], th_attrs)
 
-	  (erroneous_types,type_heaps) = foldSt build_type_subst ss_environ ([],{type_heaps & th_vars = th_vars, th_attrs = th_attrs})
-	  (_, new_ss_context, erroneous_types, type_heaps) = substitute_special ss_context erroneous_types type_heaps
+	  (erroneous_types,type_heaps,error) = build_type_substs class_vars it_types [] {type_heaps & th_vars = th_vars, th_attrs = th_attrs} error
+	  (_, new_ss_context, erroneous_types, type_heaps) = substitute_special it_context erroneous_types type_heaps
 
 	  (inst_vars, th_vars)			= foldSt determine_free_var old_type_vars (new_type_vars, type_heaps.th_vars) 
 	  (inst_attr_vars, th_attrs)	= foldSt build_attr_var_subst old_attr_vars (new_attr_vars, type_heaps.th_attrs)
@@ -619,7 +629,7 @@ where
 			_
 				-> (free_vars, type_var_heap)
 
-	build_type_subst {bind_src,bind_dst} (erroneous_types,type_heaps)
+	build_type_substs (ClassArg bind_dst type_vars) [bind_src:types] erroneous_types type_heaps error
 		# (_, bind_src, erroneous_types, type_heaps) = substitute_special bind_src erroneous_types type_heaps
 		/*
 			FIXME: this is a patch for the following incorrect function type (in a dcl module)
@@ -632,9 +642,11 @@ where
 			phase. Probably it's a better solution to change the order of checking.
 		*/
 		| isNilPtr bind_dst.tv_info_ptr
-			= (erroneous_types, type_heaps)
+			= build_type_substs type_vars types erroneous_types type_heaps error
 			# type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars
-			= (erroneous_types, type_heaps)
+			= build_type_substs type_vars types erroneous_types type_heaps error
+	build_type_substs NoClassArgs [] erroneous_types type_heaps error
+			= (erroneous_types, type_heaps, error)
 
 	substitue_arg_type at=:{at_type = TFA type_vars type} (erroneous_types, type_heaps)
 		# (fresh_type_vars, type_heaps) = foldSt build_avar_subst type_vars ([], type_heaps)
@@ -647,7 +659,7 @@ where
 	substitue_arg_type type (erroneous_types, type_heaps)
 		# (_, type, erroneous_types, type_heaps) = substitute_special type erroneous_types type_heaps
 		= (type, (erroneous_types, type_heaps))
-		
+
 	build_var_subst var (free_vars, type_var_heap)
 		# (new_info_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
 		  new_fv = { var & tv_info_ptr = new_info_ptr}
@@ -688,29 +700,27 @@ where
 	report_erroneous_types [] error
 		= error
 
-determineTypeOfMemberInstance :: !SymbolType ![TypeVar] !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
+determineTypeOfMemberInstance :: !SymbolType !ClassArgs !InstanceType !Specials !*TypeHeaps !u:(Optional (v:{#DclModule}, w:{#CheckedTypeDef}, Index)) !*ErrorAdmin
 												 -> (!SymbolType, !FunSpecials, !*TypeHeaps,!u: Optional (v:{#DclModule}, w:{#CheckedTypeDef}), !*ErrorAdmin)
-determineTypeOfMemberInstance mem_st class_vars {it_types,it_vars,it_attr_vars,it_context} specials type_heaps opt_modules error
-	# env = { ss_environ = foldl2 (\binds var type -> [ {bind_src = type, bind_dst = var} : binds]) [] class_vars it_types,
-			  ss_context = it_context, ss_vars = it_vars, ss_attrs = it_attr_vars} 
-	  (st, specials, type_heaps, error)
-	  		= determine_type_of_member_instance mem_st env specials type_heaps error
+determineTypeOfMemberInstance mem_st class_vars ins_type specials type_heaps opt_modules error
+	# (st, specials, type_heaps, error)
+			= determine_type_of_member_instance mem_st class_vars ins_type specials type_heaps error
 	  (type_heaps, opt_modules, error)
 	  		= check_attribution_consistency mem_st type_heaps opt_modules error
 	= (st, specials, type_heaps, opt_modules, error)
 where
-	determine_type_of_member_instance mem_st=:{st_context} env (SP_Substitutions substs) type_heaps error
+	determine_type_of_member_instance mem_st=:{st_context} class_vars ins_type (SP_Substitutions substs) type_heaps error
 		# (mem_st, substs, type_heaps, error) 
-				= substitute_symbol_type { mem_st &  st_context = tl st_context } env substs type_heaps error
+				= substitute_symbol_type {mem_st & st_context = tl st_context} class_vars ins_type substs type_heaps error
 		= (mem_st, FSP_Substitutions substs, type_heaps, error) 
-	determine_type_of_member_instance mem_st=:{st_context} env SP_None type_heaps error
+	determine_type_of_member_instance mem_st=:{st_context} class_vars ins_type SP_None type_heaps error
 		# (mem_st, _, type_heaps, error)
-				= substitute_symbol_type { mem_st &  st_context = tl st_context } env [] type_heaps error
+				= substitute_symbol_type {mem_st & st_context = tl st_context} class_vars ins_type [] type_heaps error
 		= (mem_st, FSP_None, type_heaps, error)
 
-	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} environment specials type_heaps error
+	substitute_symbol_type st=:{st_vars,st_attr_vars,st_args,st_result,st_context,st_attr_env} class_vars ins_type specials type_heaps error
 		# (st_vars, st_attr_vars, [st_result : st_args], st_context, st_attr_env, specials, type_heaps, error)
-			= instantiateTypes environment st_vars st_attr_vars [st_result : st_args] st_context st_attr_env specials type_heaps error
+			= instantiateTypes class_vars ins_type st_vars st_attr_vars [st_result : st_args] st_context st_attr_env specials type_heaps error
 		= ({st & st_vars = st_vars, st_args = st_args, st_result = st_result, st_attr_vars = st_attr_vars,
 			st_context = st_context, st_attr_env = st_attr_env }, specials, type_heaps, error)
 
@@ -746,28 +756,21 @@ where
 				-> (False, th_vars, modules, type_defs, error)
 		where
 			must_not_be_essentially_unique_for_TA type_ident type_index th_vars
-				# (type_def, type_defs, modules)
-						= getTypeDef x_main_dcl_module_n type_index type_defs modules
-				= case type_def.td_attribute of
-					TA_Unique
-						-> (True, th_vars, modules, type_defs,
+				| is_unique_type_def x_main_dcl_module_n type_index type_defs modules
+					= (True, th_vars, modules, type_defs,
 							checkError type_ident 
 								(   "is unique but instanciates class variable "
 								 +++tv_ident.id_name
 								 +++" that is non uniquely used in a member type"
 								) error
 						   )
-					_
-						-> (False, th_vars, modules, type_defs, error)
-		
-getTypeDef :: !Index !(Global Index) !v:{#CheckedTypeDef} !w:{#DclModule}
-		-> (!CheckedTypeDef, !v:{#CheckedTypeDef}, !w:{#DclModule})
-getTypeDef x_main_dcl_module_n {glob_module,glob_object} type_defs modules
-	| glob_module==x_main_dcl_module_n
-		# (type_def, type_defs) = type_defs![glob_object]
-		= (type_def, type_defs, modules)
-	# (type_def, modules) = modules![glob_module].dcl_common.com_type_defs.[glob_object]
-	= (type_def, type_defs, modules)
+					= (False, th_vars, modules, type_defs, error)
+
+			is_unique_type_def :: !Int !(Global Int) !{#CheckedTypeDef} !{#DclModule} -> Bool
+			is_unique_type_def x_main_dcl_module_n {glob_module,glob_object} type_defs modules
+				| glob_module==x_main_dcl_module_n
+					= type_defs.[glob_object].td_attribute=:TA_Unique
+					= modules.[glob_module].dcl_common.com_type_defs.[glob_object].td_attribute=:TA_Unique
 
 determineTypesOfDclInstances :: !Index !Index !*{#ClassInstance} !*{# ClassDef} !*{# MemberDef} 
 							 !*{#DclModule} !*TypeHeaps !*VarHeap !*CheckState
@@ -866,10 +869,12 @@ where
 					[{ inst & ins_type = { special_type & it_context = [] }, ins_specials = SP_TypeOffset type_offset} : all_instances ] type_heaps predef_symbols error
 		where
 			substitute_instance_type :: !InstanceType !SpecialSubstitution !*TypeHeaps !*ErrorAdmin -> (!InstanceType,!*TypeHeaps,!.ErrorAdmin)
-			substitute_instance_type it=:{it_vars,it_attr_vars,it_types,it_context} environment type_heaps cs_error
+			substitute_instance_type it=:{it_vars,it_attr_vars,it_types,it_context} {ss_environ,ss_vars,ss_attrs,ss_context} type_heaps cs_error
+				# ss_environ_vars = class_args_of_ss_environ ss_environ
+				# ss_environ_types = [bind_src\\{bind_src}<-ss_environ]
 				# (it_vars, it_attr_vars, it_atypes, it_context, _, _, type_heaps, cs_error)
-					= instantiateTypes environment it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] [] type_heaps cs_error
-				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)			
+					= instantiateTypes ss_environ_vars {it_types=ss_environ_types,it_vars=ss_vars,it_attr_vars=ss_attrs,it_context=ss_context} it_vars it_attr_vars [MakeAttributedType type \\ type <- it_types] it_context [] [] type_heaps cs_error
+				= ({it & it_vars = it_vars, it_types = [ at_type \\ {at_type} <- it_atypes ], it_attr_vars = it_attr_vars, it_context = it_context }, type_heaps, cs_error)
 		check_specials mod_index inst=:{ins_type} type_offset [] list_of_specials next_inst_index all_instances type_heaps predef_symbols error
 			= (list_of_specials,  next_inst_index, all_instances, type_heaps, predef_symbols, error)
 	check_instance_specials mod_index fun_type fun_index SP_None next_inst_index all_instances type_heaps predef_symbols error

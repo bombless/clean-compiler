@@ -2091,7 +2091,7 @@ where
 			me_offset = 0,
 			me_type = member_type,
 			me_type_ptr = type_ptr,				// empty
-			me_class_vars = [class_var], 		// the same variable as in the class
+			me_class_vars = ClassArg class_var NoClassArgs, 		// the same variable as in the class
 			me_pos = gen_pos,
 			me_priority = NoPrio,
 			me_default_implementation = NoMemberDefault
@@ -2111,7 +2111,7 @@ where
 			}
 		= { class_ident = class_ident,
 			class_arity = 1,  
-			class_args = [class_var],
+			class_args = ClassArg class_var NoClassArgs,
 		    class_context = [], 
 		    class_pos = gen_pos, 
 		    class_members = createArray 1 class_member, 
@@ -2851,7 +2851,7 @@ determine_type_of_member_instance_from_symbol_type :: !SymbolType !InstanceType 
 	-> (!SymbolType, !*TypeHeaps, !*VarHeap, !*ErrorAdmin)
 determine_type_of_member_instance_from_symbol_type me_type=:{st_context=[{tc_types = [TV class_var]}:_]} ins_type hp_type_heaps hp_var_heap error
 	#! (symbol_type, _, hp_type_heaps, _, error) 
-		= determineTypeOfMemberInstance me_type [class_var] ins_type SP_None hp_type_heaps No error
+		= determineTypeOfMemberInstance me_type (ClassArg class_var NoClassArgs) ins_type SP_None hp_type_heaps No error
 	#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
 	#! hp_type_heaps = clearSymbolType me_type hp_type_heaps
 	#! symbol_type = {symbol_type & st_context = st_context}

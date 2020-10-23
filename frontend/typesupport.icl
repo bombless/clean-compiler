@@ -502,8 +502,7 @@ where
 				= case type of
 					TE
 						-> (exi_vars, all_vars, cus)
-					_
-						# (TV var, cus) = cus!cus_var_env.[var_number]
+					TV var
 						-> ([{atv_attribute = var_attr, atv_variable = var } : exi_vars ], all_vars,
 							{cus & cus_var_env = {cus.cus_var_env & [var_number] = TE }, cus_error = existentialError cus.cus_error })
 				# all_vars = [var_number : all_vars]
@@ -1030,6 +1029,12 @@ where
 	equiv _ _ heaps
 		= (False, heaps)
 
+set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> !*TypeVarHeap
+set_class_args_types (ClassArg {tv_info_ptr} class_args) [type:types] type_var_heap
+	= set_class_args_types class_args types (writePtr tv_info_ptr (TVI_Type type) type_var_heap)
+set_class_args_types NoClassArgs _ type_var_heap
+	= type_var_heap
+
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} nr_of_contexts defs attr_env heaps
 	# nr_of_lifted_contexts = length st_context - nr_of_contexts
@@ -1058,29 +1063,17 @@ where
 	contains_context tc1 [] defs heaps
 		= (False, heaps)
 	
-	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
-		= equivalent_contexts {tc1 & tc_class = TCClass class1} {tc2 & tc_class = TCClass class2} defs heaps
-	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2 defs heaps
-		= equivalent_contexts {tc1 & tc_class = TCClass class1} tc2 defs heaps
-	equivalent_contexts tc1 tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
-		= equivalent_contexts tc1 {tc2 & tc_class = TCClass class2} defs heaps
 	equivalent_contexts tc1=:{tc_class=TCClass class1, tc_types=types1} {tc_class=TCClass class2, tc_types=types2} defs heaps
 		| class1 == class2
-			# (ok, heaps) = equiv types1 types2 heaps
-			= (ok, heaps)
+			= equiv types1 types2 heaps
 		# {glob_object={ds_index},glob_module} = class2
 		#! class_def = defs.[glob_module].com_class_defs.[ds_index]
 		# {class_context,class_args} = class_def
-		| isEmpty class_context
+		| class_context=:[]
 			= (False, heaps)
-		# th_vars = bind_class_args class_args types2 heaps.th_vars
+		# th_vars = set_class_args_types class_args types2 heaps.th_vars
 		= equivalent_superclasses class_context tc1 defs { heaps & th_vars = th_vars }
 	where	
-		bind_class_args [{tv_info_ptr} : vars] [type : types] type_var_heap
-			= bind_class_args vars types (writePtr tv_info_ptr (TVI_Type type) type_var_heap)
-		bind_class_args [] [] type_var_heap
-			= type_var_heap
-	
 		equivalent_superclasses [] tc defs heaps
 			= (False, heaps)
 		equivalent_superclasses [super_tc=:{tc_types} : tcs] tc defs heaps=:{th_vars}
@@ -1100,7 +1093,12 @@ where
 				= ([type : types], type_var_heap)
 			retrieve_types [] type_var_heap
 				= ([], type_var_heap)
-		
+	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
+		= equivalent_contexts {tc1 & tc_class = TCClass class1} {tc2 & tc_class = TCClass class2} defs heaps
+	equivalent_contexts tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2 defs heaps
+		= equivalent_contexts {tc1 & tc_class = TCClass class1} tc2 defs heaps
+	equivalent_contexts tc1 tc2=:{tc_class=TCGeneric {gtc_class=class2}} defs heaps
+		= equivalent_contexts tc1 {tc2 & tc_class = TCClass class2} defs heaps
 
 	fill_environment :: ![AttrCoercion] !*{! TypeAttribute} -> *{! TypeAttribute}
 	fill_environment [] attr_env

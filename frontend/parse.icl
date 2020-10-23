@@ -1753,12 +1753,12 @@ wantClassDefinition parseContext pos pState
 			= (succ, (False, type_var), pState)
 		
 		convert_class_variables [] arg_nr cons_vars
-			= (arg_nr, [], cons_vars)
+			= (arg_nr, NoClassArgs, cons_vars)
 		convert_class_variables [(annot, var) : class_vars] arg_nr cons_vars
 			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
 			| annot
-				= (arity, [var : class_vars], cons_vars bitor (1 << arg_nr))
-				= (arity, [var : class_vars], cons_vars)
+				= (arity, ClassArg var class_vars, cons_vars bitor (1 << arg_nr))
+				= (arity, ClassArg var class_vars, cons_vars)
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState

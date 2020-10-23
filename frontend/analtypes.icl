@@ -950,12 +950,11 @@ where
 		determine_kinds_of_context_class modules {tc_class=TCGeneric {gtc_kind}} infos_and_as
 			= infos_and_as 
 
-	bind_kind_vars type_vars kind_ptrs type_var_heap
-		= fold2St bind_kind_var type_vars kind_ptrs type_var_heap
-	where
-		bind_kind_var {tv_info_ptr} kind_info_ptr type_var_heap
-			= type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr)
-			
+	bind_kind_vars (ClassArg {tv_info_ptr} type_vars) [kind_info_ptr:kind_ptrs] type_var_heap
+		= bind_kind_vars type_vars kind_ptrs (writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap)
+	bind_kind_vars NoClassArgs [] type_var_heap
+		= type_var_heap
+
 	clear_variables type_vars type_var_heap
 		= foldSt clear_variable type_vars type_var_heap
 	where
@@ -964,7 +963,7 @@ where
 
 	determine_kinds_of_members modules members member_defs class_kind_vars (class_infos, as)
 		= iFoldSt (determine_kind_of_member modules members member_defs class_kind_vars) 0 (size members) (class_infos, as)
-		
+
 	determine_kind_of_member modules members member_defs class_kind_vars loc_member_index class_infos_and_as
 		# glob_member_index = members.[loc_member_index].ds_index
 		  {me_class_vars,me_type={st_vars,st_args,st_result,st_context}} = member_defs.[glob_member_index]

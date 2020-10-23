@@ -249,8 +249,6 @@ where
 			= (CA_Instance class_appls, rs_state)
 
 	reduce_context :: !ReduceInfo !TypeContext !*ReduceState -> *(!ReducedContexts, !*ReduceState)
-	reduce_context info tc=:{tc_class=TCGeneric {gtc_class}} rs_state
-		= reduce_context info {tc & tc_class = TCClass gtc_class} rs_state
 	reduce_context info=:{ri_defs,ri_instance_info,ri_main_dcl_module_n} {tc_class=tc_class=:TCClass class_symb=:{glob_object={ds_index},glob_module},tc_types}
 			rs_state
 		# {class_members,class_context,class_args,class_ident} = ri_defs.[glob_module].com_class_defs.[ds_index]
@@ -302,12 +300,12 @@ where
 			= ({ rcs_class_context = { rc_class_index = {gi_module=glob_module,gi_index=ds_index}, rc_inst_module = NoIndex, rc_inst_members = {}, rc_types = tc_types, rc_red_contexts = [] },
 				rcs_constraints_contexts = constraints }, rs_state)
 
-	reduce_contexts_in_constraints :: !ReduceInfo ![Type] ![TypeVar] ![TypeContext] *ReduceState
+	reduce_contexts_in_constraints :: !ReduceInfo ![Type] !ClassArgs ![TypeContext] *ReduceState
 		-> *([ClassApplication],*ReduceState)
 	reduce_contexts_in_constraints info types class_args [] rs_state
 		= ([],rs_state)
 	reduce_contexts_in_constraints info types class_args class_context rs_state=:{rs_type_heaps=rs_type_heaps=:{th_vars}}
-		# th_vars = fold2St (\ type {tv_info_ptr} -> writePtr tv_info_ptr (TVI_Type type)) types class_args th_vars
+		# th_vars = set_class_args_types class_args types th_vars
 		  (instantiated_context, rs_type_heaps) = fresh_contexts class_context { rs_type_heaps & th_vars = th_vars }
 		# rs_state = {rs_state & rs_type_heaps=rs_type_heaps}
 		= mapSt (reduce_any_context info) instantiated_context rs_state
@@ -1370,12 +1368,11 @@ where
 		= generate_super_classes {tc & tc_class=TCClass gtc_class} st
 	generate_super_classes {tc_class=TCClass {glob_object={ds_index},glob_module},tc_types} (super_classes, type_heaps)
 		# {class_args,class_members,class_context} = defs.[glob_module].com_class_defs.[ds_index]
-		  th_vars = fold2St set_type class_args tc_types type_heaps.th_vars
-		= foldSt subst_context_and_generate_super_classes class_context (super_classes, { type_heaps & th_vars = th_vars })
+		| class_context=:[]
+			= (super_classes, type_heaps)
+			# th_vars = set_class_args_types class_args tc_types type_heaps.th_vars
+			= foldSt subst_context_and_generate_super_classes class_context (super_classes, { type_heaps & th_vars = th_vars })
 	where
-		set_type {tv_info_ptr} type type_var_heap
-			= type_var_heap <:= (tv_info_ptr, TVI_Type type)
-		  
 		subst_context_and_generate_super_classes class_context (super_classes, type_heaps)
 			# (_, super_class, type_heaps) = substitute class_context type_heaps
 			| containsContext super_class super_classes
@@ -1671,7 +1668,9 @@ where
 			= (Yes address, type_heaps)
 			# {tc_class=TCClass {glob_object={ds_index},glob_module}} = tc2
 			  {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
-			  th_vars = foldr2 (\{tv_info_ptr} type -> writePtr tv_info_ptr (TVI_Type type)) th_vars class_args tc2.tc_types
+			| class_context=:[]
+				= (No, type_heaps)
+			# th_vars = set_class_args_types class_args tc2.tc_types th_vars
 			  (_, super_instances, type_heaps) = substitute class_context {type_heaps & th_vars = th_vars} 
 			= find_super_instance tc1 super_instances (size class_members) address glob_module class_dictionary.ds_index defs type_heaps
 	where
