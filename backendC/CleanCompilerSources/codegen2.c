@@ -1588,11 +1588,14 @@ static void FillOrReduceFieldSelection (Node node,SymbDef seldef,int *asp_p,int 
 					if (record_field_state_p!=NULL){
 						DetermineSizeOfState (*record_field_state_p, &asize, &bsize);						
 						if (record_field_state_p->state_type==RecordState){
+							StateP field_state_p;
+
 							CoerceArgumentOnTopOfStack (asp_p,bsp_p,*record_state_p,*record_field_state_p,asize,bsize);
-							DetermineSizeOfState (record_state_p->state_record_arguments[fieldnr], &asize, &bsize);
-							CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,record_state_p->state_record_arguments[fieldnr],asize,bsize);
-							
-							if (node->node_state.state_kind==OnA)
+							field_state_p = &record_state_p->state_record_arguments[fieldnr];
+							DetermineSizeOfState (*field_state_p, &asize, &bsize);
+							CoerceArgumentOnTopOfStack (asp_p,bsp_p,node->node_state,*field_state_p,asize,bsize);
+
+							if (node->node_state.state_kind==OnA && !IsLazyState (*field_state_p))
 								node->node_state.state_kind=StrictOnA;
 
 							return;
