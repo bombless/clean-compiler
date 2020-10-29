@@ -54,13 +54,16 @@ unboxError class_ident type err
 	  format = { form_properties = cNoProperties, form_attr_position = No }
 	= { err & ea_file = err.ea_file <<< ' ' <:: (format, type, Yes initialTypeVarBeautifulizer) <<< " instance cannot be unboxed\n"}
 
+beautifulizeIdent {id_name}
+	= case optBeautifulizeIdent id_name of
+		No
+			-> id_name
+		Yes (str, line_nr)
+			-> str+++" [line "+++toString line_nr+++"]"
+
 overloadingError op_symb err
 	# err = errorHeading "Overloading error" err
-	  str = case optBeautifulizeIdent op_symb.id_name of
-	  			No
-	  				-> op_symb.id_name
-	  			Yes (str, line_nr)
-	  				-> str+++" [line "+++toString line_nr+++"]"
+	  str = beautifulizeIdent op_symb
 	= { err & ea_file = err.ea_file <<< " internal overloading of \"" <<< str <<< "\" could not be solved\n" }
 
 class_name :: !TCClass -> {#Char}
@@ -80,11 +83,7 @@ where
 overloadingErrorWithContext :: !Ident !TCClass ![Type] !*ErrorAdmin -> *ErrorAdmin
 overloadingErrorWithContext op_symb tc_class tc_types err
 	# err=:{ea_file} = errorHeading "Overloading error" err
-	  str = case optBeautifulizeIdent op_symb.id_name of
-	  			No
-	  				-> op_symb.id_name
-	  			Yes (str, line_nr)
-	  				-> str+++" [line "+++toString line_nr+++"]"
+	  str = beautifulizeIdent op_symb
 	  format = { form_properties = cWriteUnderscoreforTE, form_attr_position = No }
 	# ea_file = ea_file <<< " internal overloading of \"" <<< str <<< "\" "
 						<<< "could not be solved for: "
@@ -95,11 +94,7 @@ overloadingErrorWithContext op_symb tc_class tc_types err
 missingContextError :: !Ident !TCClass ![Type] !*ErrorAdmin -> *ErrorAdmin
 missingContextError op_symb tc_class tc_types err
 	# err=:{ea_file} = errorHeading "Overloading error" err
-	  str = case optBeautifulizeIdent op_symb.id_name of
-	  			No
-	  				-> op_symb.id_name
-	  			Yes (str, line_nr)
-	  				-> str+++" [line "+++toString line_nr+++"]"
+	  str = beautifulizeIdent op_symb
 	  format = { form_properties = cWriteUnderscoreforTE, form_attr_position = No }
 	# ea_file = ea_file <<< " internal overloading of \"" <<< str <<< "\" "
 						<<< "could not be solved for: "
@@ -109,11 +104,7 @@ missingContextError op_symb tc_class tc_types err
 
 sub_class_error op_symb err
 	# err = errorHeading "Overloading error" err
-	  str = case optBeautifulizeIdent op_symb.id_name of
-	  			No
-	  				-> op_symb.id_name
-	  			Yes (str, line_nr)
-	  				-> str+++" [line "+++toString line_nr+++"]"
+	  str = beautifulizeIdent op_symb
 	= {err & ea_file = err.ea_file <<< " internal overloading could not be solved, because subclass of \"" <<< str <<< "\" used\n"}
 
 abstractTypeInDynamicError td_ident err=:{ea_ok}
