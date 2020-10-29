@@ -120,6 +120,11 @@ cycleAfterRemovingNewTypeConstructorsError ident err
 	# err = errorHeading "Error" err
 	= { err & ea_file = err.ea_file <<< (" cycle in definition of '" +++ toString ident +++ "' after removing newtype constructors") <<< '\n' }
 
+cannotAddDictionaryError op_symb err
+	# err = errorHeading "Overloading error" err
+	  str = beautifulizeIdent op_symb
+	= { err & ea_file = err.ea_file <<< " cannot add dictionary to missing overloaded argument of \"" <<< str <<< "\"\n" }
+
 /*
 	As soon as all overloaded variables in an type context are instantiated, context reduction is carried out.
 	This reduction yields a type class instance (here represented by a an index) and a list of
@@ -2138,7 +2143,7 @@ where
 						-> (select_expr @ all_args, examine_calls context_args
 								{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_ContextWithVarContexts context_args var_contexts
-					# (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts app_args 0 group_index ui				
+					# (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts app_args 0 group_index symb_ident ui
 					# (app_args, ui) = adjustClassExpressions symb_ident context_args app_args ui
 					#! main_dcl_module_n = ui.ui_x.UpdateInfoX.x_main_dcl_module_n
 					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
@@ -2175,10 +2180,10 @@ where
 					-> (Var { var_ident = symb, var_info_ptr = new_info_ptr, var_expr_ptr = nilPtr },
 								(var_heap <:= (tc_var, VI_ClassVar symb new_info_ptr 1), overloadingError symb error))
 
-		add_class_vars_for_var_contexts_and_update_expressions var_contexts=:(VarContext arg_n context arg_atype var_contexts_t) [app_arg:app_args] app_arg_n group_index ui
+		add_class_vars_for_var_contexts_and_update_expressions var_contexts=:(VarContext arg_n context arg_atype var_contexts_t) [app_arg:app_args] app_arg_n group_index symb_ident ui
 			| app_arg_n<arg_n
 				# (app_arg,ui) = updateExpression group_index app_arg ui
-				  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts app_args (app_arg_n+1) group_index ui
+				  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts app_args (app_arg_n+1) group_index symb_ident ui
 				= ([app_arg:app_args],ui)
 			| app_arg_n==arg_n
 				# (old_var_infos,var_heap) = add_class_vars_for_var_context context ui.ui_var_heap
@@ -2190,13 +2195,16 @@ where
 					expr @ args
 						| same_args args free_vars_and_types
 							# app_arg = expr
-							  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index ui
+							  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index symb_ident ui
 							-> ([app_arg:app_args],ui)
 					_
 						# app_arg = DictionariesFunction free_vars_and_types app_arg arg_atype
-						  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index ui
+						  (app_args,ui) = add_class_vars_for_var_contexts_and_update_expressions var_contexts_t app_args (app_arg_n+1) group_index symb_ident ui
 						-> ([app_arg:app_args],ui)
-		add_class_vars_for_var_contexts_and_update_expressions NoVarContexts app_args app_arg_n group_index ui
+		add_class_vars_for_var_contexts_and_update_expressions (VarContext _ _ _ _) [] app_arg_n group_index symb_ident ui
+			# ui & ui_error = cannotAddDictionaryError symb_ident ui.ui_error
+			= ([],ui)
+		add_class_vars_for_var_contexts_and_update_expressions NoVarContexts app_args app_arg_n group_index symb_ident ui
 			= updateExpression group_index app_args ui
 
 		same_args [] []
