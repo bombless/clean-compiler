@@ -39,6 +39,7 @@ add_next_not_strict :: !Int !Int !StrictnessList -> (!Int,!Int,!StrictnessList)
 append_strictness :: !Int !StrictnessList -> StrictnessList
 first_n_are_strict :: !Int !StrictnessList -> Bool
 remove_first_n :: !Int !StrictnessList -> StrictnessList
+remove_after_n :: !Int !StrictnessList -> StrictnessList
 remove_strictness :: !Int !StrictnessList -> StrictnessList
 
 :: IntKey :== Int

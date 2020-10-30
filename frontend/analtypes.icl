@@ -437,8 +437,17 @@ freshKindVar :: !*KindHeap -> (!KindInfo,!*KindHeap)
 freshKindVar kind_heap
 	// KI_Const is overwritten by KI_Var to create a cycle
 	# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
-	# kind_var = KI_Var kind_info_ptr
-	= (kind_var, kind_heap <:= (kind_info_ptr, kind_var))
+	  kind_var = KI_Var kind_info_ptr
+	  kind_heap = writePtr kind_info_ptr kind_var kind_heap
+	= (kind_var, kind_heap)
+
+freshKindVarAndInfoPtr :: !*KindHeap -> (!KindInfo,!KindInfoPtr,!*KindHeap)
+freshKindVarAndInfoPtr kind_heap
+	// KI_Const is overwritten by KI_Var to create a cycle
+	# (kind_info_ptr, kind_heap) = newPtr KI_Const kind_heap
+	  kind_var = KI_Var kind_info_ptr
+	  kind_heap = writePtr kind_info_ptr kind_var kind_heap
+	= (kind_var, kind_info_ptr, kind_heap)
 
 class analTypes type :: !Bool !{#CommonDefs} ![KindInfoPtr] !type !(!Conditions, !*AnalyseState)
 	-> (!KindInfo, !TypeProperties, !(!Conditions, !*AnalyseState))
@@ -888,13 +897,7 @@ determineKindsOfClasses used_module_numbers modules type_def_infos type_var_heap
 	# nr_of_modules = size modules
 	  class_infos = {{} \\ module_nr <- [0..nr_of_modules] }
 	  class_infos = iFoldSt (initialyse_info_for_module used_module_numbers modules) 0 nr_of_modules class_infos
-	  as =
-	  	{	as_td_infos			= type_def_infos
-		,	as_type_var_heap	= type_var_heap
-		,	as_kind_heap		= newHeap
-		,	as_error			= { error & ea_ok = True }
-		}
-
+	  as = {as_td_infos = type_def_infos, as_type_var_heap = type_var_heap, as_kind_heap = newHeap,	as_error = {error & ea_ok = True}}
 	  (class_infos, {as_td_infos,as_type_var_heap,as_error}) = iFoldSt (determine_kinds_of_class_in_module modules) 0 nr_of_modules (class_infos, as)
 	#! ok = as_error.ea_ok
 	= (class_infos, as_td_infos, as_type_var_heap, { as_error & ea_ok = prev_error_ok && ok })
@@ -915,7 +918,7 @@ where
 			# {com_class_defs,com_member_defs} = modules.[class_module]
 			  {class_args,class_context,class_members,class_arity,class_pos,class_ident} = com_class_defs.[class_index]
 			  (class_kind_vars, as_kind_heap) = fresh_kind_vars class_arity [] as.as_kind_heap
-			  as_type_var_heap = bind_kind_vars class_args class_kind_vars as.as_type_var_heap
+			  (as_type_var_heap,as_kind_heap) = bind_kind_vars class_args class_kind_vars as.as_type_var_heap as_kind_heap
 			  as_error = pushErrorAdmin (newPosition class_ident class_pos) as.as_error
 			  class_infos = { class_infos & [class_module,class_index] = cyclicClassInfoMark }
 			  (class_infos, as) = determine_kinds_of_context_classes class_context (class_infos,
@@ -950,10 +953,27 @@ where
 		determine_kinds_of_context_class modules {tc_class=TCGeneric {gtc_kind}} infos_and_as
 			= infos_and_as 
 
-	bind_kind_vars (ClassArg {tv_info_ptr} type_vars) [kind_info_ptr:kind_ptrs] type_var_heap
-		= bind_kind_vars type_vars kind_ptrs (writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap)
-	bind_kind_vars NoClassArgs [] type_var_heap
-		= type_var_heap
+	bind_kind_vars (ClassArg {tv_info_ptr} type_vars) [kind_info_ptr:kind_ptrs] type_var_heap kind_heap
+		= bind_kind_vars type_vars kind_ptrs (writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap) kind_heap
+	bind_kind_vars (ClassArgPattern {tv_info_ptr} pattern_type_vars type_vars) [kind_info_ptr:kind_ptrs] type_var_heap kind_heap
+		| pattern_type_vars=:[]
+			# type_var_heap = writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap
+			= bind_kind_vars type_vars kind_ptrs type_var_heap kind_heap
+			# (kind_info,kind_heap) = readPtr kind_info_ptr kind_heap
+			  (var_kind,type_var_heap,kind_heap) = bind_pattern_kind_vars pattern_type_vars kind_info type_var_heap kind_heap
+			  (var_info_ptr,kind_heap) = newPtr var_kind kind_heap
+			  type_var_heap = writePtr tv_info_ptr (TVI_TypeKind var_info_ptr) type_var_heap
+			= bind_kind_vars type_vars kind_ptrs type_var_heap kind_heap
+	bind_kind_vars NoClassArgs [] type_var_heap kind_heap
+		= (type_var_heap,kind_heap)
+
+	bind_pattern_kind_vars [{atv_variable={tv_info_ptr}}:pattern_type_vars] result_kind type_var_heap kind_heap
+		# (result_kind,type_var_heap,kind_heap) = bind_pattern_kind_vars pattern_type_vars result_kind type_var_heap kind_heap
+		  (kind_info,kind_info_ptr,kind_heap) = freshKindVarAndInfoPtr kind_heap
+		  type_var_heap = writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap
+		= (KI_Arrow kind_info result_kind,type_var_heap,kind_heap)
+	bind_pattern_kind_vars [] result_kind type_var_heap kind_heap
+		= (result_kind,type_var_heap,kind_heap)
 
 	clear_variables type_vars type_var_heap
 		= foldSt clear_variable type_vars type_var_heap
@@ -970,8 +990,8 @@ where
 		  other_contexts = tl st_context
 		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
-		  as_type_var_heap = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap
-		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as.as_kind_heap
+		  (as_type_var_heap,as_kind_heap) = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap as.as_kind_heap
+		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as_kind_heap
 		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 		= determine_kinds_of_type_contexts modules other_contexts class_infos as
 	where

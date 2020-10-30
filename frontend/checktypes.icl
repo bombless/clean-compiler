@@ -1286,6 +1286,18 @@ where
 		| ok
 			= (ClassArg tv class_args, symbol_ptrs, symbol_table, th_vars, error)
 			= (class_args, symbol_ptrs, symbol_table, th_vars, error)
+	add_class_args_to_symbol_table (ClassArgPattern tv atvs class_args) symbol_ptrs symbol_table th_vars error
+		# (ok, tv, symbol_ptrs, symbol_table, th_vars, error)
+			= add_variable_to_symbol_table tv symbol_ptrs symbol_table th_vars error
+		# (atvs, symbol_ptrs, symbol_table, th_vars, error)
+			= add_avariables_to_symbol_table atvs symbol_ptrs symbol_table th_vars error
+		| ok
+			# (class_args, symbol_ptrs, symbol_table, th_vars, error)
+				= add_class_args_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
+			= (ClassArgPattern tv atvs class_args, symbol_ptrs, symbol_table, th_vars, error)
+			# (class_args, symbol_ptrs, symbol_table, th_vars, error)
+				= add_class_args_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
+			= (class_args, symbol_ptrs, symbol_table, th_vars, error)
 	add_class_args_to_symbol_table NoClassArgs symbol_ptrs symbol_table th_vars error
 		= (NoClassArgs, symbol_ptrs, symbol_table, th_vars, error)
 
@@ -1299,6 +1311,20 @@ where
 			= (True, {tv & tv_info_ptr = new_var_ptr}, [id_info:symbol_ptrs], symbol_table, th_vars, error)
 			# error = checkError id_name "(variable) already defined" error
 			= (False, tv, symbol_ptrs, symbol_table, th_vars, error)
+
+	add_avariables_to_symbol_table :: ![ATypeVar] ![SymbolPtr] !*SymbolTable !*TypeVarHeap !*ErrorAdmin
+								  -> (![ATypeVar],![SymbolPtr],!*SymbolTable,!*TypeVarHeap,!*ErrorAdmin)
+	add_avariables_to_symbol_table [{atv_variable=tv,atv_attribute}:class_args] symbol_ptrs symbol_table th_vars error
+		# (class_args, symbol_ptrs, symbol_table, th_vars, error)
+			= add_avariables_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
+		# (ok, tv, symbol_ptrs, symbol_table, th_vars, error)
+			= add_variable_to_symbol_table tv symbol_ptrs symbol_table th_vars error
+		| ok
+			// to do: atv_attribute
+			= ([{atv_attribute=atv_attribute,atv_variable=tv}:class_args], symbol_ptrs, symbol_table, th_vars, error)
+			= (class_args, symbol_ptrs, symbol_table, th_vars, error)
+	add_avariables_to_symbol_table [] symbol_ptrs symbol_table th_vars error
+		= ([], symbol_ptrs, symbol_table, th_vars, error)
 
 	remove_variables_from_symbol_table :: ![SymbolPtr] !*SymbolTable -> *SymbolTable
 	remove_variables_from_symbol_table [id_info:id_infos] symbol_table
@@ -1921,6 +1947,11 @@ create_class_dictionary mod_index class_index class_defs =:{[class_index] = clas
 				type_var_heap, var_heap, symbol_table)
 where
 	new_attributed_type_variables (ClassArg tv class_args) type_var_heap
+		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
+		# atv = {atv_attribute = TA_Multi, atv_variable = {tv & tv_info_ptr = new_tv_ptr}}
+		# (atvs,type_var_heap) = new_attributed_type_variables class_args type_var_heap
+		= ([atv:atvs],type_var_heap)
+	new_attributed_type_variables (ClassArgPattern tv _ class_args) type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
 		# atv = {atv_attribute = TA_Multi, atv_variable = {tv & tv_info_ptr = new_tv_ptr}}
 		# (atvs,type_var_heap) = new_attributed_type_variables class_args type_var_heap

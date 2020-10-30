@@ -1544,7 +1544,12 @@ reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,c
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)  
 where
 	class_args_to_types (ClassArg tv class_args) = [TV tv : class_args_to_types class_args]
+	class_args_to_types (ClassArgPattern tv pattern_args class_args)
+		= [CV tv :@: class_pattern_args_to_types pattern_args : class_args_to_types class_args]
 	class_args_to_types NoClassArgs = []
+
+	class_pattern_args_to_types pattern_args
+		= [{at_attribute=atv_attribute,at_type=TV ptv} \\ {atv_attribute,atv_variable=ptv}<-pattern_args]
 
 	check_symbols_of_class_members :: ![ParsedDefinition] !TypeContext !Int !*CollectAdmin
 									-> (![MemberDef],![FunDef],![(Ident,MacroMember,Position)],[!MacroMember!],!Int,!*CollectAdmin)

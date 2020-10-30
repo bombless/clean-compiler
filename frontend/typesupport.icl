@@ -1032,7 +1032,59 @@ where
 set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> !*TypeVarHeap
 set_class_args_types (ClassArg {tv_info_ptr} class_args) [type:types] type_var_heap
 	= set_class_args_types class_args types (writePtr tv_info_ptr (TVI_Type type) type_var_heap)
+set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:TA type_cons=:{type_arity} a_types:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| type_arity==n_pattern_vars
+		# type = TA {type_cons & type_arity=0} []
+		# type_var_heap = set_class_arg_pattern pattern_vars a_types type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+	| type_arity>n_pattern_vars
+		# n_extra_types = type_arity-n_pattern_vars
+		# type = TA {type_cons & type_arity=n_extra_types} (take n_extra_types a_types)
+		# type_var_heap = set_class_arg_pattern pattern_vars (drop n_extra_types a_types) type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:TAS type_cons=:{type_arity} a_types strictness:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| type_arity==n_pattern_vars
+		# type = TAS {type_cons & type_arity=0} [] NotStrict
+		# type_var_heap = set_class_arg_pattern pattern_vars a_types type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+	| type_arity>n_pattern_vars
+		# n_extra_types = type_arity-n_pattern_vars
+		# type = TAS {type_cons & type_arity=n_extra_types} (take n_extra_types a_types) (remove_after_n n_extra_types strictness)
+		# type_var_heap = set_class_arg_pattern pattern_vars (drop n_extra_types a_types) type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:atype1 --> atype2:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| n_pattern_vars==2
+		# type = TArrow
+		# type_var_heap = set_class_arg_pattern pattern_vars [atype1,atype2] type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+	| n_pattern_vars==1
+		# type = TArrow1 atype1
+		# type_var_heap = set_class_arg_pattern pattern_vars [atype2] type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:TArrow1 atype:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| n_pattern_vars==1
+		# type = TArrow
+		# type_var_heap = set_class_arg_pattern pattern_vars [atype] type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
 set_class_args_types NoClassArgs _ type_var_heap
+	= type_var_heap
+
+set_class_arg_pattern :: ![ATypeVar] ![AType] !*TypeVarHeap -> *TypeVarHeap
+set_class_arg_pattern [{atv_variable={tv_info_ptr}}:pattern_vars] [{at_type}:a_types] type_var_heap
+	# type_var_heap = writePtr tv_info_ptr (TVI_Type at_type) type_var_heap
+	= set_class_arg_pattern pattern_vars a_types type_var_heap
+set_class_arg_pattern [] [] type_var_heap
 	= type_var_heap
 
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 

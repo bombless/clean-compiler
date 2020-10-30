@@ -1748,17 +1748,25 @@ wantClassDefinition parseContext pos pState
 			# (token, pState) = nextToken TypeContext pState
 			| token =: DotToken
 				# (type_var, pState) = wantTypeVar pState
-				= (True, (True, type_var), pState)
+				= (True, (True,type_var,[]), pState)
+			| token=:OpenToken
+				# (type_var,pState) = wantTypeVar pState
+				  (type_vars,pState) = wantList "class variable argument(s)" tryQuantifiedTypeVar pState
+				  pState = wantToken TypeContext "class variable arguments" CloseToken pState
+				= (True, (False,type_var,type_vars), pState)
 			# (succ, type_var, pState) = tryTypeVarT token pState
-			= (succ, (False, type_var), pState)
-		
+			= (succ, (False,type_var,[]), pState)
+
 		convert_class_variables [] arg_nr cons_vars
 			= (arg_nr, NoClassArgs, cons_vars)
-		convert_class_variables [(annot, var) : class_vars] arg_nr cons_vars
+		convert_class_variables [(annot,var,[]) : class_vars] arg_nr cons_vars
 			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
 			| annot
 				= (arity, ClassArg var class_vars, cons_vars bitor (1 << arg_nr))
 				= (arity, ClassArg var class_vars, cons_vars)
+		convert_class_variables [(_,var,vars) : class_vars] arg_nr cons_vars
+			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
+			= (arity, ClassArgPattern var vars class_vars, cons_vars)
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState

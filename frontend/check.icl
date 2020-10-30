@@ -197,8 +197,13 @@ where
 
 	tv_list_to_class_args [TV type_var:tv_list]
 		= ClassArg type_var (tv_list_to_class_args tv_list)
+	tv_list_to_class_args [CV tv :@: pattern_args:tv_list]
+		= ClassArgPattern tv (atype_list_to_atype_var_list pattern_args) (tv_list_to_class_args tv_list)
 	tv_list_to_class_args []
 		= NoClassArgs
+
+	atype_list_to_atype_var_list pattern_args
+		= [{atv_attribute=at_attribute,atv_variable=ptv} \\ {at_attribute,at_type=TV ptv}<-pattern_args]
 
 	check_generic_default (DeriveDefault generic_ident _ No) module_index cs
 		# (generic_index,cs) = get_generic_index generic_ident module_index cs
@@ -645,6 +650,60 @@ where
 			= build_type_substs type_vars types erroneous_types type_heaps error
 			# type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars
 			= build_type_substs type_vars types erroneous_types type_heaps error
+	build_type_substs (ClassArgPattern bind_dst pattern_vars type_vars) [bind_src:types] erroneous_types type_heaps error
+		# (_, bind_src, erroneous_types, type_heaps) = substitute_special bind_src erroneous_types type_heaps
+		#! n_pattern_vars = length pattern_vars
+		= case bind_src of
+			TA type_cons=:{type_arity} a_types
+				| type_arity==n_pattern_vars
+					# bind_src = TA {type_cons & type_arity=0} []
+					-> build_type_substs_continue pattern_vars a_types type_vars bind_dst bind_src types erroneous_types type_heaps error
+				| type_arity>n_pattern_vars
+					# n_extra_types = type_arity-n_pattern_vars
+					# bind_src = TA {type_cons & type_arity=n_extra_types} (take n_extra_types a_types)
+					# a_types = drop n_extra_types a_types
+					-> build_type_substs_continue pattern_vars a_types type_vars bind_dst bind_src types erroneous_types type_heaps error
+			TAS type_cons=:{type_arity} a_types strictness
+				| type_arity==n_pattern_vars
+					# bind_src = TAS {type_cons & type_arity=0} [] NotStrict
+					-> build_type_substs_continue pattern_vars a_types type_vars bind_dst bind_src types erroneous_types type_heaps error
+				| type_arity>n_pattern_vars
+					# n_extra_types = type_arity-n_pattern_vars
+					# bind_src = TAS {type_cons & type_arity=n_extra_types} (take n_extra_types a_types) (remove_after_n n_extra_types strictness)
+					# a_types = drop n_extra_types a_types
+					-> build_type_substs_continue pattern_vars a_types type_vars bind_dst bind_src types erroneous_types type_heaps error
+			TArrow1	a_type
+				| n_pattern_vars==1
+					# bind_src = TArrow
+					-> build_type_substs_continue pattern_vars [a_type] type_vars bind_dst bind_src types erroneous_types type_heaps error
+			a_type1 --> a_type2
+				| n_pattern_vars==2
+					# bind_src = TArrow
+					-> build_type_substs_continue pattern_vars [a_type1,a_type2] type_vars bind_dst bind_src types erroneous_types type_heaps error
+				| n_pattern_vars==1
+					# bind_src = TArrow1 a_type1
+					-> build_type_substs_continue pattern_vars [a_type2] type_vars bind_dst bind_src types erroneous_types type_heaps error
+			_
+				# error = errorHeading "Error" error
+				  format = {form_properties = cNoProperties, form_attr_position = No}
+				  error & ea_file = error.ea_file
+					<<< " Instance type has too few arguments ("<<< n_pattern_vars <<< " expected) " <:: (format, bind_src, No) <<< ")\n"
+				-> build_type_substs type_vars types erroneous_types type_heaps error
+	where
+		build_type_substs_continue pattern_vars a_types type_vars bind_dst bind_src types erroneous_types type_heaps error
+			# type_heaps = build_pattern_type_substs pattern_vars a_types type_heaps
+			| isNilPtr bind_dst.tv_info_ptr
+				= build_type_substs type_vars types erroneous_types type_heaps error
+				# type_heaps & th_vars = writePtr bind_dst.tv_info_ptr (TVI_Type bind_src) type_heaps.th_vars
+				= build_type_substs type_vars types erroneous_types type_heaps error
+
+		build_pattern_type_substs [{atv_variable={tv_info_ptr}}:pattern_vars] [{at_type}:a_types] type_heaps
+			| isNilPtr tv_info_ptr
+				= build_pattern_type_substs pattern_vars a_types type_heaps
+				# type_heaps & th_vars = writePtr tv_info_ptr (TVI_Type at_type) type_heaps.th_vars
+				= build_pattern_type_substs pattern_vars a_types type_heaps
+		build_pattern_type_substs [] [] type_heaps
+			= type_heaps
 	build_type_substs NoClassArgs [] erroneous_types type_heaps error
 			= (erroneous_types, type_heaps, error)
 

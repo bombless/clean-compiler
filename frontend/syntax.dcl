@@ -408,6 +408,7 @@ cNameLocationDependent :== True
 
 ::	ClassArgs
 	= ClassArg !TypeVar !ClassArgs
+	| ClassArgPattern !TypeVar ![ATypeVar] !ClassArgs
 	| NoClassArgs
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}
@@ -1193,7 +1194,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 	}
 
 ::	TypeVar =
-	{	tv_ident				:: !Ident
+	{	tv_ident			:: !Ident
 	,	tv_info_ptr			:: !TypeVarInfoPtr
 	}
 

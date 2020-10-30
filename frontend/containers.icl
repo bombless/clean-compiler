@@ -386,6 +386,26 @@ remove_first_n n (StrictList s l)
 		= StrictList s (remove_first_n n l)
 		= remove_first_n (n-32) l
 
+remove_after_n :: !Int !StrictnessList -> StrictnessList
+remove_after_n 0 s
+	= NotStrict
+remove_after_n _ NotStrict
+	= NotStrict
+remove_after_n n (Strict s)
+	| n<32
+		# s = s bitand ((1<<n)-1)
+		| s<>0
+			= Strict s
+			= NotStrict
+		= Strict s
+remove_after_n n (StrictList s l)
+	| n<32
+		# s = s bitand ((1<<n)-1)
+		| s<>0
+			= Strict s
+			= NotStrict
+		= StrictList s (remove_after_n (n-32) l)
+
 remove_strictness :: !Int !StrictnessList -> StrictnessList
 remove_strictness index NotStrict
 	= NotStrict
