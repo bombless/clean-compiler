@@ -964,6 +964,13 @@ where
 			  (var_info_ptr,kind_heap) = newPtr var_kind kind_heap
 			  type_var_heap = writePtr tv_info_ptr (TVI_TypeKind var_info_ptr) type_var_heap
 			= bind_kind_vars type_vars kind_ptrs type_var_heap kind_heap
+	bind_kind_vars (ClassArgPatternSameTypeVar pattern_type_vars type_vars) [kind_info_ptr:kind_ptrs] type_var_heap kind_heap
+		| pattern_type_vars=:[]
+			= bind_kind_vars type_vars kind_ptrs type_var_heap kind_heap
+			# (kind_info,kind_heap) = readPtr kind_info_ptr kind_heap
+			  (var_kind,type_var_heap,kind_heap) = bind_pattern_kind_vars pattern_type_vars kind_info type_var_heap kind_heap
+			  // to do check var_kind
+			= bind_kind_vars type_vars kind_ptrs type_var_heap kind_heap
 	bind_kind_vars NoClassArgs [] type_var_heap kind_heap
 		= (type_var_heap,kind_heap)
 

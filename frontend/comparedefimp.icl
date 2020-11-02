@@ -78,8 +78,8 @@ where
 		| not copied_from_dcl.[type_index]
 			# dcl_type_def = dcl_type_defs.[type_index]
 			  (icl_type_def, icl_type_defs) = icl_type_defs![type_index]
-			  comp_type_var_heap = initialyseATypeVars dcl_type_def.td_args icl_type_def.td_args comp_type_var_heap
-			  comp_attr_var_heap = initialyseAttributeVars dcl_type_def.td_attrs icl_type_def.td_attrs comp_attr_var_heap
+			  comp_type_var_heap = initialiseATypeVars dcl_type_def.td_args icl_type_def.td_args comp_type_var_heap
+			  comp_attr_var_heap = initialiseAttributeVars dcl_type_def.td_attrs icl_type_def.td_attrs comp_attr_var_heap
 			  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
 			| ok && dcl_type_def.td_arity==icl_type_def.td_arity && dcl_type_def.td_attribute==icl_type_def.td_attribute
@@ -164,7 +164,7 @@ where
 			= (False,comp_st)
 		# dcl_cons_type = dcl_cons_def.cons_type
 		  icl_cons_type = icl_cons_def.cons_type
-		  comp_type_var_heap = initialyseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
+		  comp_type_var_heap = initialiseATypeVars dcl_cons_def.cons_exi_vars icl_cons_def.cons_exi_vars comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		  (ok, comp_st) = compare (dcl_cons_type.st_args,dcl_cons_type.st_args_strictness) (icl_cons_type.st_args,icl_cons_type.st_args_strictness) comp_st
 		| not ok
@@ -196,7 +196,7 @@ where
 			= (icl_class_defs, icl_member_defs, comp_st)
 
 	compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseClassArgs dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
+		# comp_type_var_heap = initialiseClassArgs dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
 		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
 		| not ok
@@ -384,13 +384,13 @@ where
 	compare (TV dclVar) (TV iclVar) comp_st
 		= compare dclVar iclVar comp_st
 	compare (TFA dclvars dcltype) (TFA iclvars icltype) comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
+		# comp_type_var_heap = initialiseATypeVars dclvars iclvars comp_type_var_heap
 		  (ok, comp_st) = compare dcltype icltype {comp_st & comp_type_var_heap = comp_type_var_heap}
 		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
 		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
 		= (ok, {comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap})
 	compare (TFAC dclvars dcltype dcl_contexts) (TFAC iclvars icltype icl_contexts) comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialyseATypeVars dclvars iclvars comp_type_var_heap
+		# comp_type_var_heap = initialiseATypeVars dclvars iclvars comp_type_var_heap
 		  (ok, comp_st) = compare (dcltype,dcl_contexts) (icltype,icl_contexts) {comp_st & comp_type_var_heap = comp_type_var_heap}
 		  type_heaps = clear_type_vars dclvars (comp_st.comp_type_var_heap, comp_st.comp_attr_var_heap)
 		  (comp_type_var_heap, comp_attr_var_heap) = clear_type_vars iclvars type_heaps
@@ -478,8 +478,8 @@ where
 instance compare SymbolType
 where
 	compare dcl_st icl_st comp_st=:{comp_type_var_heap,comp_attr_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_st.st_vars icl_st.st_vars comp_type_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars dcl_st.st_attr_vars icl_st.st_attr_vars comp_attr_var_heap
+		# comp_type_var_heap = initialiseTypeVars dcl_st.st_vars icl_st.st_vars comp_type_var_heap
+		  comp_attr_var_heap = initialiseAttributeVars dcl_st.st_attr_vars icl_st.st_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare	(dcl_st.st_args, (dcl_st.st_args_strictness, (dcl_st.st_result, (dcl_st.st_context, dcl_st.st_attr_env))))
 					(icl_st.st_args, (icl_st.st_args_strictness, (icl_st.st_result, (icl_st.st_context, icl_st.st_attr_env)))) comp_st
@@ -487,8 +487,8 @@ where
 instance compare InstanceType
 where
 	compare dcl_it icl_it comp_st=:{comp_type_var_heap,comp_attr_var_heap}
-		# comp_type_var_heap = initialyseTypeVars dcl_it.it_vars icl_it.it_vars comp_type_var_heap
-		  comp_attr_var_heap = initialyseAttributeVars dcl_it.it_attr_vars icl_it.it_attr_vars comp_attr_var_heap
+		# comp_type_var_heap = initialiseTypeVars dcl_it.it_vars icl_it.it_vars comp_type_var_heap
+		  comp_attr_var_heap = initialiseAttributeVars dcl_it.it_attr_vars icl_it.it_attr_vars comp_attr_var_heap
 		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap, comp_attr_var_heap = comp_attr_var_heap }
 		= compare (dcl_it.it_types, dcl_it.it_context) (icl_it.it_types, icl_it.it_context) comp_st
 
@@ -505,68 +505,73 @@ where
 		| dcl_gd.gd_index == icl_gd.gd_index = compare dcl_gd.gd_vars icl_gd.gd_vars comp_st
 		= (False, comp_st)
 
-initialyseTypeVars [{tv_info_ptr=dcl_tv_info_ptr}:dcl_type_vars] [{tv_info_ptr=icl_tv_info_ptr}:icl_type_vars] type_var_heap
+initialiseTypeVars [{tv_info_ptr=dcl_tv_info_ptr}:dcl_type_vars] [{tv_info_ptr=icl_tv_info_ptr}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
-	= initialyseTypeVars dcl_type_vars icl_type_vars type_var_heap
-initialyseTypeVars [{tv_info_ptr}:dcl_type_vars] [] type_var_heap
-	= initialyseTypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-initialyseTypeVars [] [{tv_info_ptr}:icl_type_vars] type_var_heap
-	= initialyseTypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-initialyseTypeVars [] [] type_var_heap
+	= initialiseTypeVars dcl_type_vars icl_type_vars type_var_heap
+initialiseTypeVars [{tv_info_ptr}:dcl_type_vars] [] type_var_heap
+	= initialiseTypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialiseTypeVars [] [{tv_info_ptr}:icl_type_vars] type_var_heap
+	= initialiseTypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialiseTypeVars [] [] type_var_heap
 	= type_var_heap
 
-initialyseATypeVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_type_vars] [{atv_variable={tv_info_ptr=icl_tv_info_ptr}}:icl_type_vars] type_var_heap
+initialiseATypeVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_type_vars] [{atv_variable={tv_info_ptr=icl_tv_info_ptr}}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
-	= initialyseATypeVars dcl_type_vars icl_type_vars type_var_heap
-initialyseATypeVars [{atv_variable={tv_info_ptr}}:dcl_type_vars] [] type_var_heap
-	= initialyseATypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-initialyseATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_heap
-	= initialyseATypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-initialyseATypeVars [] [] type_var_heap
+	= initialiseATypeVars dcl_type_vars icl_type_vars type_var_heap
+initialiseATypeVars [{atv_variable={tv_info_ptr}}:dcl_type_vars] [] type_var_heap
+	= initialiseATypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+ATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_heap
+	= initialiseATypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
+initialiseinitialiseATypeVars [] [] type_var_heap
 	= type_var_heap
 
-initialyseClassArgs (ClassArg {tv_info_ptr=dcl_tv_info_ptr} dcl_type_vars) (ClassArg {tv_info_ptr=icl_tv_info_ptr} icl_type_vars) type_var_heap
+initialiseClassArgs (ClassArg {tv_info_ptr=dcl_tv_info_ptr} dcl_type_vars) (ClassArg {tv_info_ptr=icl_tv_info_ptr} icl_type_vars) type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
-	= initialyseClassArgs dcl_type_vars icl_type_vars type_var_heap
-initialyseClassArgs (ClassArgPattern {tv_info_ptr=dcl_tv_info_ptr} dcl_pattern_vars dcl_type_vars) (ClassArgPattern {tv_info_ptr=icl_tv_info_ptr} icl_pattern_vars icl_type_vars) type_var_heap
+	= initialiseClassArgs dcl_type_vars icl_type_vars type_var_heap
+initialiseClassArgs (ClassArgPattern {tv_info_ptr=dcl_tv_info_ptr} dcl_pattern_vars dcl_type_vars) (ClassArgPattern {tv_info_ptr=icl_tv_info_ptr} icl_pattern_vars icl_type_vars) type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
-	# type_var_heap = initialyseClassArgPatternVars dcl_pattern_vars icl_pattern_vars type_var_heap
-	= initialyseClassArgs dcl_type_vars icl_type_vars type_var_heap
-initialyseClassArgs NoClassArgs NoClassArgs type_var_heap
+	# type_var_heap = initialiseClassArgPatternVars dcl_pattern_vars icl_pattern_vars type_var_heap
+	= initialiseClassArgs dcl_type_vars icl_type_vars type_var_heap
+initialiseClassArgs (ClassArgPatternSameTypeVar dcl_pattern_vars dcl_type_vars) (ClassArgPatternSameTypeVar icl_pattern_vars icl_type_vars) type_var_heap
+	# type_var_heap = initialiseClassArgPatternVars dcl_pattern_vars icl_pattern_vars type_var_heap
+	= initialiseClassArgs dcl_type_vars icl_type_vars type_var_heap
+initialiseClassArgs NoClassArgs NoClassArgs type_var_heap
 	= type_var_heap
-initialyseClassArgs dcl_class_args icl_class_args type_var_heap
-	= initialyseClassArgsEmpty icl_class_args (initialyseClassArgsEmpty dcl_class_args type_var_heap)
+initialiseClassArgs dcl_class_args icl_class_args type_var_heap
+	= initialiseClassArgsEmpty icl_class_args (initialiseClassArgsEmpty dcl_class_args type_var_heap)
 
-initialyseClassArgPatternVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_pattern_vars] [{atv_variable={tv_info_ptr=icl_tv_info_ptr}}:icl_pattern_vars] type_var_heap
+initialiseClassArgPatternVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_pattern_vars] [{atv_variable={tv_info_ptr=icl_tv_info_ptr}}:icl_pattern_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_tv_info_ptr, TVI_TypeVar dcl_tv_info_ptr) <:= (dcl_tv_info_ptr, TVI_TypeVar icl_tv_info_ptr)
-	= initialyseClassArgPatternVars dcl_pattern_vars icl_pattern_vars type_var_heap
-initialyseClassArgPatternVars [] [] type_var_heap
+	= initialiseClassArgPatternVars dcl_pattern_vars icl_pattern_vars type_var_heap
+initialiseClassArgPatternVars [] [] type_var_heap
 	= type_var_heap
-initialyseClassArgPatternVars [] icl_pattern_vars type_var_heap
-	= initialyseClassArgPatternVarsEmpty icl_pattern_vars type_var_heap
-initialyseClassArgPatternVars dcl_pattern_vars [] type_var_heap
-	= initialyseClassArgPatternVarsEmpty dcl_pattern_vars type_var_heap
+initialiseClassArgPatternVars [] icl_pattern_vars type_var_heap
+	= initialiseClassArgPatternVarsEmpty icl_pattern_vars type_var_heap
+initialiseClassArgPatternVars dcl_pattern_vars [] type_var_heap
+	= initialiseClassArgPatternVarsEmpty dcl_pattern_vars type_var_heap
 
-initialyseClassArgsEmpty (ClassArg {tv_info_ptr} type_vars) type_var_heap
-	= initialyseClassArgsEmpty type_vars (writePtr tv_info_ptr TVI_Empty type_var_heap)
-initialyseClassArgsEmpty (ClassArgPattern {tv_info_ptr} pattern_args type_vars) type_var_heap
-	= initialyseClassArgsEmpty type_vars (initialyseClassArgPatternVarsEmpty pattern_args (writePtr tv_info_ptr TVI_Empty type_var_heap))
-initialyseClassArgsEmpty NoClassArgs type_var_heap
-	= type_var_heap
-
-initialyseClassArgPatternVarsEmpty [{atv_variable={tv_info_ptr}}:pattern_args] type_var_heap
-	= initialyseClassArgPatternVarsEmpty pattern_args (writePtr tv_info_ptr TVI_Empty type_var_heap)
-initialyseClassArgPatternVarsEmpty [] type_var_heap
+initialiseClassArgsEmpty (ClassArg {tv_info_ptr} type_vars) type_var_heap
+	= initialiseClassArgsEmpty type_vars (writePtr tv_info_ptr TVI_Empty type_var_heap)
+initialiseClassArgsEmpty (ClassArgPattern {tv_info_ptr} pattern_args type_vars) type_var_heap
+	= initialiseClassArgsEmpty type_vars (initialiseClassArgPatternVarsEmpty pattern_args (writePtr tv_info_ptr TVI_Empty type_var_heap))
+initialiseClassArgsEmpty (ClassArgPatternSameTypeVar pattern_args type_vars) type_var_heap
+	= initialiseClassArgsEmpty type_vars (initialiseClassArgPatternVarsEmpty pattern_args type_var_heap)
+initialiseClassArgsEmpty NoClassArgs type_var_heap
 	= type_var_heap
 
-initialyseAttributeVars [{av_info_ptr=dcl_av_info_ptr}:dcl_type_vars] [{av_info_ptr=icl_av_info_ptr}:icl_type_vars] type_var_heap
+initialiseClassArgPatternVarsEmpty [{atv_variable={tv_info_ptr}}:pattern_args] type_var_heap
+	= initialiseClassArgPatternVarsEmpty pattern_args (writePtr tv_info_ptr TVI_Empty type_var_heap)
+initialiseClassArgPatternVarsEmpty [] type_var_heap
+	= type_var_heap
+
+initialiseAttributeVars [{av_info_ptr=dcl_av_info_ptr}:dcl_type_vars] [{av_info_ptr=icl_av_info_ptr}:icl_type_vars] type_var_heap
 	# type_var_heap = type_var_heap <:= (icl_av_info_ptr, AVI_AttrVar dcl_av_info_ptr) <:= (dcl_av_info_ptr, AVI_AttrVar icl_av_info_ptr)
-	= initialyseAttributeVars dcl_type_vars icl_type_vars type_var_heap
-initialyseAttributeVars [{av_info_ptr}:dcl_type_vars] [] type_var_heap
-	= initialyseAttributeVars dcl_type_vars [] (type_var_heap <:= (av_info_ptr, AVI_Empty));
-initialyseAttributeVars [] [{av_info_ptr}:icl_type_vars] type_var_heap
-	= initialyseAttributeVars [] icl_type_vars (type_var_heap <:= (av_info_ptr, AVI_Empty));
-initialyseAttributeVars [] [] type_var_heap
+	= initialiseAttributeVars dcl_type_vars icl_type_vars type_var_heap
+initialiseAttributeVars [{av_info_ptr}:dcl_type_vars] [] type_var_heap
+	= initialiseAttributeVars dcl_type_vars [] (type_var_heap <:= (av_info_ptr, AVI_Empty));
+initialiseAttributeVars [] [{av_info_ptr}:icl_type_vars] type_var_heap
+	= initialiseAttributeVars [] icl_type_vars (type_var_heap <:= (av_info_ptr, AVI_Empty));
+initialiseAttributeVars [] [] type_var_heap
 	= type_var_heap
 
 :: TypesCorrespondState =
@@ -764,6 +769,8 @@ init_class_args type_vars1 type_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn
 		= init_class_args class_args (writePtr tv_info_ptr TVI_Empty heap)
 	init_class_args (ClassArgPattern {tv_info_ptr} type_vars class_args) heap
 		= init_class_args class_args (init_atype_var_list type_vars (writePtr tv_info_ptr TVI_Empty heap))
+	init_class_args (ClassArgPatternSameTypeVar type_vars class_args) heap
+		= init_class_args class_args (init_atype_var_list type_vars heap)
 	init_class_args NoClassArgs heap
 		= heap
 
@@ -1162,6 +1169,9 @@ instance t_corresponds ClassArgs where
 	t_corresponds (ClassArgPattern dclDef1 dclDef2 dclDefs) (ClassArgPattern iclDef1 iclDef2 iclDefs)
 		=	t_corresponds dclDef1 iclDef1
 		&&&	t_corresponds dclDef2 iclDef2
+		&&&	t_corresponds dclDefs iclDefs
+	t_corresponds (ClassArgPatternSameTypeVar dclDef dclDefs) (ClassArgPatternSameTypeVar iclDef iclDefs)
+		=	t_corresponds dclDef iclDef
 		&&&	t_corresponds dclDefs iclDefs
 	t_corresponds _ _
 		=	return False

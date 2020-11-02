@@ -205,6 +205,11 @@ retrieveTypeDefinition type_ptr mod_index symbol_table used_types
 determine_type_attribute TA_Unique		= TA_Unique
 determine_type_attribute _				= TA_Multi
 
+checkArityOfType act_arity form_arity (SynType _)
+	= form_arity == act_arity
+checkArityOfType act_arity form_arity _
+	= form_arity >= act_arity
+
 instance bindTypes Type
 where
 	bindTypes cti (TV tv) ts_ti_cs
@@ -817,11 +822,6 @@ getTypeDef type_index type_module module_index type_defs modules
 		  type_def = com_type_defs.[type_index]
 		= (type_def, type_index, type_defs, modules)
 
-checkArityOfType act_arity form_arity (SynType _)
-	= form_arity == act_arity
-checkArityOfType act_arity form_arity _
-	= form_arity >= act_arity
-
 checkAbstractType type_index (AbstractType _)			= type_index <> cPredefinedModuleIndex 
 checkAbstractType type_index (AbstractSynType _ _)		= type_index <> cPredefinedModuleIndex 
 checkAbstractType _ _									= False
@@ -1109,15 +1109,15 @@ remove_universal_vars vars symbol_table
 	remove_universal_var {atv_variable = {tv_ident}} cs_symbol_table
 		= removeDefinitionFromSymbolTable cRankTwoScope tv_ident cs_symbol_table
 
-checkInstanceType :: !Index !GlobalIndex !ClassIdent !InstanceType !Specials !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
-												 -> (!InstanceType,!Specials,!u:{# CheckedTypeDef},!v:{# ClassDef},!u:{# DclModule},!*TypeHeaps,!*CheckState)
-checkInstanceType mod_index ins_class_index ins_class_ident it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
+checkInstanceType :: !Index !GlobalIndex !ClassIdent !ClassArgs !InstanceType !Specials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+															-> (!InstanceType,!Specials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
+checkInstanceType mod_index ins_class_index ins_class_ident class_args it=:{it_types,it_context} specials type_defs class_defs modules heaps cs
 	# cs_error = check_fully_polymorphity it_types it_context cs.cs_error
 	  ots = { ots_type_defs = type_defs, ots_modules = modules }
 	  oti = { oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= [] }
 	  (it_types, (ots, oti=:{oti_all_vars = it_vars, oti_all_attrs = it_attr_vars}, cs))
 	  	= checkOpenTypes mod_index cGlobalScope DAK_None it_types (ots, oti, { cs & cs_error = cs_error })
-	  (heaps, cs) = check_linearity_of_type_vars it_vars oti.oti_heaps cs
+	  (heaps, cs) = check_linearity_of_type_vars it_vars class_args it_types oti.oti_heaps cs
 	  oti = { oti &  oti_all_vars = [], oti_all_attrs = [], oti_heaps = heaps }
 	  (it_context, type_defs, class_defs, modules, heaps, cs) = checkTypeContexts it_context mod_index class_defs ots oti cs
 	  cs_error = foldSt (compare_context_and_instance_types ins_class_index ins_class_ident it_types) it_context cs.cs_error
@@ -1136,15 +1136,54 @@ checkInstanceType mod_index ins_class_index ins_class_ident it=:{it_types,it_con
 		is_type_var (TV _) = True
 		is_type_var _ = False
 	
-	check_linearity_of_type_vars vars heaps=:{th_vars} cs=:{cs_error}
+	check_linearity_of_type_vars vars class_args it_types heaps=:{th_vars} cs=:{cs_error}
 		# (th_vars, cs_error) = foldSt check_linearity vars (th_vars, cs_error)
 		= ({heaps & th_vars = th_vars}, {cs & cs_error = cs_error})
 	where
 		check_linearity {tv_ident, tv_info_ptr} (th_vars, error)
 			# (TVI_AttrAndRefCount prev_attr ref_count, th_vars) = readPtr tv_info_ptr th_vars
 			| ref_count > 1
+				&& not (shared_type_arg_pattern_var class_args it_types tv_info_ptr ref_count)
 				= (th_vars, checkError tv_ident ": this type variable occurs more than once in an instance type" error)
 				= (th_vars, error)
+
+		shared_type_arg_pattern_var (ClassArg _ class_args) [_:types] tv_info_ptr ref_count
+			= shared_type_arg_pattern_var class_args types tv_info_ptr ref_count
+		shared_type_arg_pattern_var (ClassArgPattern tv atvs class_args) [type:types] tv_info_ptr ref_count
+			| contains_type_var type tv_info_ptr (length atvs)
+				= check_type_arg_pattern_var_ref_count class_args types tv_info_ptr (ref_count-1)
+				= shared_type_arg_pattern_var class_args types tv_info_ptr ref_count
+		shared_type_arg_pattern_var (ClassArgPatternSameTypeVar _ class_args) [type:types] tv_info_ptr ref_count
+			= shared_type_arg_pattern_var class_args types tv_info_ptr ref_count
+		shared_type_arg_pattern_var _ _ _ _
+			= False
+
+		check_type_arg_pattern_var_ref_count (ClassArgPatternSameTypeVar atvs class_args) [type:types] tv_info_ptr ref_count
+			| ref_count==0
+				= True
+			| contains_type_var type tv_info_ptr (length atvs)
+				= check_type_arg_pattern_var_ref_count class_args types tv_info_ptr (ref_count-1)
+				= False
+		check_type_arg_pattern_var_ref_count _ _ tv_info_ptr ref_count
+			= ref_count==0
+
+		contains_type_var (TA {type_arity} atypes) tv_info_ptr n_atvs
+			| type_arity>n_atvs
+				= list_contains_type_var (drop n_atvs atypes) tv_info_ptr
+				= False
+		contains_type_var (TAS {type_arity} atypes _) tv_info_ptr n_atvs
+			| type_arity>n_atvs
+				= list_contains_type_var (take (type_arity-n_atvs) atypes) tv_info_ptr
+				= False
+		contains_type_var type tv_info_ptr n_atvs
+			= False
+
+		list_contains_type_var [{at_type=TV tv}:atypes] tv_info_ptr
+			= tv.tv_info_ptr==tv_info_ptr || list_contains_type_var atypes tv_info_ptr
+		list_contains_type_var [_:atypes] tv_info_ptr
+			= list_contains_type_var atypes tv_info_ptr
+		list_contains_type_var [] tv_info_ptr
+			= False
 
 	compare_context_and_instance_types ins_class_index ins_class_ident it_types {tc_class=TCGeneric _, tc_types} cs_error
 		= cs_error
@@ -1298,6 +1337,12 @@ where
 			# (class_args, symbol_ptrs, symbol_table, th_vars, error)
 				= add_class_args_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
 			= (class_args, symbol_ptrs, symbol_table, th_vars, error)
+	add_class_args_to_symbol_table (ClassArgPatternSameTypeVar atvs class_args) symbol_ptrs symbol_table th_vars error
+		# (atvs, symbol_ptrs, symbol_table, th_vars, error)
+			= add_avariables_to_symbol_table atvs symbol_ptrs symbol_table th_vars error
+		# (class_args, symbol_ptrs, symbol_table, th_vars, error)
+			= add_class_args_to_symbol_table class_args symbol_ptrs symbol_table th_vars error
+		= (ClassArgPatternSameTypeVar atvs class_args, symbol_ptrs, symbol_table, th_vars, error)
 	add_class_args_to_symbol_table NoClassArgs symbol_ptrs symbol_table th_vars error
 		= (NoClassArgs, symbol_ptrs, symbol_table, th_vars, error)
 
@@ -1954,10 +1999,18 @@ where
 	new_attributed_type_variables (ClassArgPattern tv _ class_args) type_var_heap
 		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
 		# atv = {atv_attribute = TA_Multi, atv_variable = {tv & tv_info_ptr = new_tv_ptr}}
-		# (atvs,type_var_heap) = new_attributed_type_variables class_args type_var_heap
+		# (atvs,type_var_heap) = new_attributed_type_variables_after_pattern class_args tv type_var_heap
 		= ([atv:atvs],type_var_heap)
 	new_attributed_type_variables NoClassArgs type_var_heap
 		= ([],type_var_heap);
+
+	new_attributed_type_variables_after_pattern (ClassArgPatternSameTypeVar _ class_args) tv type_var_heap
+		# (new_tv_ptr, type_var_heap) = newPtr TVI_Empty type_var_heap
+		# atv = {atv_attribute = TA_Multi, atv_variable = {tv & tv_info_ptr = new_tv_ptr}}
+		# (atvs,type_var_heap) = new_attributed_type_variables_after_pattern class_args tv type_var_heap
+		= ([atv:atvs],type_var_heap)
+	new_attributed_type_variables_after_pattern class_args tv type_var_heap
+		= new_attributed_type_variables class_args type_var_heap
 
 	build_fields field_nr nr_of_fields class_members rec_type field_type rec_type_index next_selector_index rev_fields
 					args_strictness var_heap symbol_table

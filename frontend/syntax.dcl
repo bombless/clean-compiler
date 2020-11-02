@@ -409,6 +409,7 @@ cNameLocationDependent :== True
 ::	ClassArgs
 	= ClassArg !TypeVar !ClassArgs
 	| ClassArgPattern !TypeVar ![ATypeVar] !ClassArgs
+	| ClassArgPatternSameTypeVar ![ATypeVar] !ClassArgs
 	| NoClassArgs
 
 ::	ClassDefInfos :== {# .{! [TypeKind]}}

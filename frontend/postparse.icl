@@ -1545,8 +1545,13 @@ reorganiseDefinitions icl_module [PD_Class class_def=:{class_ident,class_arity,c
 where
 	class_args_to_types (ClassArg tv class_args) = [TV tv : class_args_to_types class_args]
 	class_args_to_types (ClassArgPattern tv pattern_args class_args)
-		= [CV tv :@: class_pattern_args_to_types pattern_args : class_args_to_types class_args]
+		= [CV tv :@: class_pattern_args_to_types pattern_args : class_args_to_types_after_pattern class_args tv]
 	class_args_to_types NoClassArgs = []
+
+	class_args_to_types_after_pattern (ClassArgPatternSameTypeVar pattern_args class_args) tv
+		= [CV tv :@: class_pattern_args_to_types pattern_args : class_args_to_types_after_pattern class_args tv]
+	class_args_to_types_after_pattern class_args tv
+		= class_args_to_types class_args
 
 	class_pattern_args_to_types pattern_args
 		= [{at_attribute=atv_attribute,at_type=TV ptv} \\ {atv_attribute,atv_variable=ptv}<-pattern_args]
