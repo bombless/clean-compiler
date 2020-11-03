@@ -337,7 +337,8 @@ where
 
 	find_instance_in_group :: [Type] ![Global Index] {#CommonDefs} *TypeHeaps *Coercions -> *(Global Int,[TypeContext],Bool,*TypeHeaps,*Coercions)
 	find_instance_in_group co_types [this_inst_index=:{glob_object,glob_module}:instances] defs type_heaps coercion_env
-		# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+		# {ins_type={it_types,it_vars,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+		  type_heaps & th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 		  (matched, type_heaps) = match defs it_types co_types type_heaps
 		| matched
 			# (subst_context, type_heaps) = fresh_contexts it_context type_heaps
@@ -355,7 +356,8 @@ where
 		# (left_index, types, uni_ok, type_heaps, coercion_env) = find_instance_in_tree co_types left defs type_heaps coercion_env
 		| FoundObject left_index
 			= (left_index, types, uni_ok, type_heaps, coercion_env)
-			# {ins_type={it_types,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+			# {ins_type={it_types,it_vars,it_context}, ins_specials} = defs.[glob_module].com_instance_defs.[glob_object]
+			  type_heaps & th_vars = clear_binding_of_type_vars it_vars type_heaps.th_vars
 			  (matched, type_heaps) = match defs it_types co_types type_heaps
 			| matched
 				# (subst_context, type_heaps) = fresh_contexts it_context type_heaps
@@ -963,6 +965,12 @@ tryToExpandTypeSyn defs type cons_id=:{type_ident,type_index={glob_object,glob_m
 		_
 			-> (False, type, type_heaps)
 
+clear_binding_of_type_vars vars type_var_heap
+	= foldSt clear_binding_of_type_var vars type_var_heap
+where
+	clear_binding_of_type_var {tv_info_ptr} type_var_heap
+		= type_var_heap <:= (tv_info_ptr, TVI_Empty)
+
 class match type ::  !{# CommonDefs} !type !type !*TypeHeaps -> (!Bool, !*TypeHeaps)
 
 instance match AType
@@ -989,10 +997,91 @@ expand_and_match cons_id1 cons_args1 cons_id2 cons_args2 defs type1 type2 type_h
 */
 		= (False, type_heaps)
 
+class matchSameType a :: !a !a !{#CommonDefs} !*TypeHeaps -> (!Bool, !*TypeHeaps)
+
+instance matchSameType AType
+where
+	matchSameType atype1 atype2 defs type_heaps = matchSameType atype1.at_type atype2.at_type defs type_heaps
+
+instance matchSameType Type
+where
+	matchSameType (TempV tv_number1) (TempV tv_number2) defs type_heaps
+		= (tv_number1==tv_number2, type_heaps)
+	matchSameType type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) defs type_heaps
+		| cons_id1 == cons_id2
+			= matchSameType cons_args1 cons_args2 defs type_heaps
+	matchSameType type1=:(TA cons_id1 cons_args1) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps
+		| cons_id1 == cons_id2
+			= matchSameType cons_args1 cons_args2 defs type_heaps
+	matchSameType type1=:(TA cons_id1 cons_args1) type2 defs type_heaps
+		# (succ, type1, type_heaps) = tryToExpandTypeSyn defs type1 cons_id1 cons_args1 type_heaps
+		| succ
+			= matchSameType type1 type2 defs type_heaps
+	matchSameType type1=:(TAS cons_id1 cons_args1 _) type2=:(TA cons_id2 cons_args2) defs type_heaps
+		| cons_id1 == cons_id2
+			= matchSameType cons_args1 cons_args2 defs type_heaps
+	matchSameType type1=:(TAS cons_id1 cons_args1 _) type2=:(TAS cons_id2 cons_args2 _) defs type_heaps
+		| cons_id1 == cons_id2
+			= matchSameType cons_args1 cons_args2 defs type_heaps
+	matchSameType (TB tb1) (TB tb2) defs type_heaps
+		= (tb1 == tb2, type_heaps)
+	matchSameType (arg_type1 --> res_type1) (arg_type2 --> res_type2) defs type_heaps
+		= matchSameType (arg_type1,res_type1) (arg_type2,res_type2) defs type_heaps
+	matchSameType (TempCV tv_n1 :@: types1) (TempCV tv_n2 :@: types2) defs type_heaps
+		| tv_n1==tv_n2
+			= matchSameType types1 types2 defs type_heaps
+			= (False, type_heaps)
+	matchSameType type1=:(TempCV tv_n :@: types) type2=:(TA type_cons cons_args) defs type_heaps
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= matchSameType type1 type2e defs type_heaps
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				= matchSameType (TempV tv_n, types) (TA {type_cons & type_arity = diff} (take diff cons_args), drop diff cons_args) defs type_heaps
+				= (False, type_heaps)
+	matchSameType type1=:(TempCV tv_n :@: types) type2=:(TAS type_cons cons_args sl) defs type_heaps
+		# (succ, type2e, type_heaps) = tryToExpandTypeSyn defs type2 type_cons cons_args type_heaps
+		| succ
+			= matchSameType type1 type2e defs type_heaps
+			# diff = type_cons.type_arity - length types
+			| diff >= 0
+				= matchSameType (TempV tv_n, types) (TAS {type_cons & type_arity = diff} (take diff cons_args) sl, drop diff cons_args) defs type_heaps
+				= (False, type_heaps)
+	matchSameType type1 type2=:(TA cons_id2 cons_args2) defs type_heaps
+		# (succ, type2, type_heaps) = tryToExpandTypeSyn defs type2 cons_id2 cons_args2 type_heaps
+		| succ
+			= matchSameType type1 type2 defs type_heaps
+	matchSameType TArrow TArrow defs type_heaps
+		= (True, type_heaps)
+	matchSameType (TArrow1 t1) (TArrow1 t2) defs type_heaps
+		= matchSameType t1 t2 defs type_heaps
+	matchSameType type1 type2 defs type_heaps
+		= (False, type_heaps)
+
+instance matchSameType (!a,!b) | matchSameType a & matchSameType b
+where
+	matchSameType (x1,y1) (x2,y2) defs type_heaps
+		# (succ, type_heaps) = matchSameType x1 x2 defs type_heaps
+		| succ
+			= matchSameType y1 y2 defs type_heaps
+			= (False, type_heaps)
+
+instance matchSameType [a] | matchSameType a
+where
+	matchSameType [t1 : ts1] [t2 : ts2] defs type_heaps
+		= matchSameType (t1,ts1) (t2,ts2) defs type_heaps
+	matchSameType [] [] defs type_heaps
+		= (True, type_heaps)
+
 instance match Type
 where
 	match defs (TV {tv_info_ptr}) type type_heaps=:{th_vars}
-		= (True, { type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
+		# (type_info,th_vars) = readPtr tv_info_ptr th_vars
+		= case type_info of
+			TVI_Empty
+				-> (True, {type_heaps & th_vars = th_vars <:= (tv_info_ptr,TVI_Type type)})
+			TVI_Type type2
+				-> matchSameType type type2 defs {type_heaps & th_vars = th_vars}
 	match defs type1=:(TA cons_id1 cons_args1) type2=:(TA cons_id2 cons_args2) type_heaps
 		| cons_id1 == cons_id2
 			= match defs cons_args1 cons_args2 type_heaps
