@@ -1653,15 +1653,11 @@ where
 
 	determine_address :: !TypeContext !TypeContext ![(Int, Global DefinedSymbol)] !{#CommonDefs} !*TypeHeaps
 		-> (!Optional [(Int, Global DefinedSymbol)],!*TypeHeaps)
-	determine_address tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2=:{tc_class=TCGeneric {gtc_class=class2}} address defs type_heaps
-		= determine_address {tc1 & tc_class=TCClass class1} {tc2 & tc_class=TCClass class2} address defs type_heaps
-	determine_address tc1=:{tc_class=TCGeneric {gtc_class=class1}} tc2 address defs type_heaps
-		= determine_address {tc1 & tc_class=TCClass class1} tc2 address defs type_heaps
-	determine_address tc1 tc2=:{tc_class=TCGeneric {gtc_class=class2}} address defs type_heaps
-		= determine_address tc1 {tc2 & tc_class=TCClass class2} address defs type_heaps		
 	determine_address tc1 tc2 address defs type_heaps=:{th_vars}
 		| tc1 == tc2
 			= (Yes address, type_heaps)
+		| tc2.tc_class=:TCGeneric _
+			= (No, type_heaps)	// class_context==[] for generic classes
 			# {tc_class=TCClass {glob_object={ds_index},glob_module}} = tc2
 			  {class_args,class_members,class_context,class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
 			| class_context=:[]
