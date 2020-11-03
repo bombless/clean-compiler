@@ -520,9 +520,9 @@ initialiseATypeVars [{atv_variable={tv_info_ptr=dcl_tv_info_ptr}}:dcl_type_vars]
 	= initialiseATypeVars dcl_type_vars icl_type_vars type_var_heap
 initialiseATypeVars [{atv_variable={tv_info_ptr}}:dcl_type_vars] [] type_var_heap
 	= initialiseATypeVars dcl_type_vars [] (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-ATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_heap
+initialiseATypeVars [] [{atv_variable={tv_info_ptr}}:icl_type_vars] type_var_heap
 	= initialiseATypeVars [] icl_type_vars (type_var_heap <:= (tv_info_ptr, TVI_Empty));
-initialiseinitialiseATypeVars [] [] type_var_heap
+initialiseATypeVars [] [] type_var_heap
 	= type_var_heap
 
 initialiseClassArgs (ClassArg {tv_info_ptr=dcl_tv_info_ptr} dcl_type_vars) (ClassArg {tv_info_ptr=icl_tv_info_ptr} icl_type_vars) type_var_heap
