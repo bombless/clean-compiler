@@ -136,15 +136,6 @@ retrieveGlobalDefinition {ste_kind,ste_def_level,ste_index} requ_kind mod_index
 		= (ste_index, mod_index)
 		= (NotFound, mod_index)
 
-retrieveGlobalGenericDefinition :: !SymbolTableEntry !Index -> (!Index, !Index, !Int)
-retrieveGlobalGenericDefinition {ste_kind = STE_Imported (STE_Generic arity) decl_index, ste_def_level, ste_index} mod_index
-	= (ste_index, decl_index, arity)
-retrieveGlobalGenericDefinition {ste_kind = STE_Generic arity,ste_def_level,ste_index} mod_index
-	| ste_def_level == cGlobalScope
-		= (ste_index, mod_index, arity)
-retrieveGlobalGenericDefinition _ mod_index
-	= (NotFound, mod_index ,-1)
-
 getBelongingSymbols :: !Declaration !v:{#DclModule} -> (!BelongingSymbols, !v:{#DclModule})
 getBelongingSymbols (Declaration {decl_kind=STE_Imported STE_Type def_mod_index, decl_index}) dcl_modules
 	# (td_rhs,dcl_modules) = dcl_modules![def_mod_index].dcl_common.com_type_defs.[decl_index].td_rhs

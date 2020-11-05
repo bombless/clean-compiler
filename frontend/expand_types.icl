@@ -548,7 +548,7 @@ where
 					# (ok, simplified_type) = simplifyAndCheckTypeApplication s_type types
 					| ok
 						-> (True, simplified_type, erroneous_types, heaps)
-						# erroneous_types = [(s_type,types_r):erroneous_types]
+						# erroneous_types = [(s_type,types):erroneous_types]
 						-> 	(False, type, erroneous_types, heaps)
 				_
 					-> 	(False, type, erroneous_types, heaps)

@@ -333,6 +333,15 @@ addToAttributeEnviron (TA_RootVar attr_var) root_attr attr_env error
 addToAttributeEnviron _ _ attr_env error
 	= (attr_env, checkError "inconsistent attribution of type definition" "" error)
 
+retrieveGlobalGenericDefinition :: !SymbolTableEntry !Index -> (!Index, !Index, !Int)
+retrieveGlobalGenericDefinition {ste_kind = STE_Imported (STE_Generic arity) decl_index, ste_def_level, ste_index} mod_index
+	= (ste_index, decl_index, arity)
+retrieveGlobalGenericDefinition {ste_kind = STE_Generic arity,ste_def_level,ste_index} mod_index
+	| ste_def_level == cGlobalScope
+		= (ste_index, mod_index, arity)
+retrieveGlobalGenericDefinition _ mod_index
+	= (NotFound, mod_index ,-1)
+
 check_context_class :: TCClass [Type] Int u:{#ClassDef} v:{#DclModule} *CheckState
 							  -> (TCClass,u:{#ClassDef},v:{#DclModule},*CheckState)
 check_context_class (TCClass cl) tc_types mod_index class_defs modules cs
