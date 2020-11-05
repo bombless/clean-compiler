@@ -206,6 +206,8 @@ where
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
 	(<<<) file (TempQDV tv_number)
 		= file  <<< "E.#" <<< tv_number <<< ' ' 
+	(<<<) file TAll
+		= file <<< "_"
 	(<<<) file TE
 		= file <<< "### EMPTY ###"
 /*

@@ -114,10 +114,8 @@ where
 				 					cus_heaps = { cus_heaps & th_attrs = th_attrs }, cus_attr_store = inc cus_attr_store})	
 	clean_up_attribute_variable av_group_nr attr_and_cus
 		= attr_and_cus
-		
 cleanUpTypeAttribute _ cui av=:(TA_Var _) cus
-	= (av, cus)			
-
+	= (av, cus)
 cleanUpTypeAttribute _ cui type_attribute cus
 	= abort ("cleanUpTypeAttribute "+++toString type_attribute)
 
@@ -181,17 +179,19 @@ where
 			= cleanUpVariable False type qv_number cus
 	clean_up cui tv=:(TV _) cus
 		= (tv, cus)
+	clean_up cui TAll cus
+		= (TAll, cus)
 	clean_up cui (TFA vars type) cus=:{cus_heaps}
 		# (type, cus) = clean_up cui type cus
 		= (TFA vars type, cus)
 	clean_up cui type cus
-		= abort ("clean_up Type (typesupport.icl): unknown type " ---> ("clean_up Type", type))
+		= abort "clean_up Type (typesupport.icl): unknown type"
 
 add_new_variable TE qv_number cus_exis_vars
 	= [(qv_number, TA_None) : cus_exis_vars]
 add_new_variable type qv_number cus_exis_vars
 	= cus_exis_vars
-				
+
 instance clean_up [a] | clean_up a
 where
 	clean_up cui l cus = mapSt (clean_up cui) l cus
@@ -212,7 +212,6 @@ cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
 		= (TV var, cus)
 cleanUpVariable _ type tv_number cus
 	= (type, cus)
-
 
 ::	CleanUpResult :== BITVECT
 
@@ -524,6 +523,8 @@ where
 	clean_up_type_contexts spec_type spec_context derived_context env type_heaps var_heap error
 		| spec_type
 			# (type_heaps,var_heap) = foldSt (mark_specified_context derived_context) spec_context (type_heaps,var_heap)
+			  (derived_context,var_heap) = remove_specified_contexts derived_context var_heap
+			  (type_heaps,var_heap) = mark_TAll_contexts derived_context spec_context type_heaps var_heap
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
@@ -547,6 +548,50 @@ where
 				= (type_heaps,var_heap)
 			= mark_specified_context tcs spec_tc (type_heaps,var_heap)
 
+	remove_specified_contexts [derived_tc=:{tc_var}:derived_tcs] var_heap
+		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
+			# var_heap = writePtr tc_var VI_Empty var_heap
+			= remove_specified_contexts derived_tcs var_heap
+			| False ---> ("remove_specified_contexts",derived_tc.tc_types) = undef
+			# (derived_tcs,var_heap) = remove_specified_contexts derived_tcs var_heap
+			= ([derived_tc:derived_tcs],var_heap)
+	remove_specified_contexts [] var_heap
+		= ([],var_heap)
+
+	mark_TAll_contexts [derived_tc=:{tc_class=TCClass {glob_module,glob_object={ds_index}},tc_types,tc_var}:derived_tcs] spec_context type_heaps var_heap
+		# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+		# (maybe_added_TAll,tc_types2) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
+		| maybe_added_TAll
+			# derived_tc2 = {derived_tc & tc_types = tc_types2}
+			# (type_heaps,var_heap) = foldSt (mark_specified_context [derived_tc2]) spec_context (type_heaps,var_heap)
+			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
+			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
+	mark_TAll_contexts [derived_tc=:{tc_class=TCGeneric {gtc_class={glob_module,glob_object={ds_index}}},tc_types,tc_var}:derived_tcs] spec_context type_heaps var_heap
+		# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+		# (maybe_added_TAll,tc_types2) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
+		| maybe_added_TAll
+			# derived_tc2 = {derived_tc & tc_types = tc_types2}
+			# (type_heaps,var_heap) = foldSt (mark_specified_context [derived_tc2]) spec_context (type_heaps,var_heap)
+			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
+			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
+	mark_TAll_contexts [_:derived_tcs] spec_context type_heaps var_heap
+		= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
+	mark_TAll_contexts [] spec_context type_heaps var_heap
+		= (type_heaps,var_heap)
+
+	replace_TempCV_with_TempQV_by_TAll (ClassArgPattern _ class_arg_vars class_args) [TempCV type_var_n:@:cv_arg_types:tc_types]
+		| length class_arg_vars==length cv_arg_types
+			# cv_type = TempCV type_var_n :@: replace_TempQV_by_TAll cv_arg_types
+			# (_,tc_types) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
+			= (True,[cv_type:tc_types])
+	replace_TempCV_with_TempQV_by_TAll (ClassArgPatternSameTypeVar class_arg_vars class_args) [TempCV type_var_n:@:cv_arg_types:tc_types]
+		| length class_arg_vars==length cv_arg_types
+			# cv_type = TempCV type_var_n :@: replace_TempQV_by_TAll cv_arg_types
+			# (_,tc_types) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
+			= (True,[cv_type:tc_types])
+	replace_TempCV_with_TempQV_by_TAll _ tc_types
+		= (False,tc_types)
+
 	clean_up_lifted_type_context tc=:{tc_var,tc_types} (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
 			# var_heap = writePtr tc_var VI_Empty var_heap
@@ -565,7 +610,7 @@ where
 			= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 
 	clean_up_type_context tc=:{tc_types,tc_class,tc_var} (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-		| case sreadPtr tc_var var_heap of VI_EmptyConstructorClassVar-> True; _ -> False
+		| (sreadPtr tc_var var_heap)=:VI_EmptyConstructorClassVar
 			= (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 		# (cur, tc_types, env) = cleanUpClosed tc_types env
 		| checkCleanUpResult cur cUndefinedVar
@@ -574,8 +619,44 @@ where
 		| checkCleanUpResult cur cLiftedVar
 			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, liftedContextError (toString tc_class) error)
 		| checkCleanUpResult cur cQVar
-			= (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= case tc_class of
+				TCClass {glob_module,glob_object={ds_index}}
+					# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+					# (maybe_added_TAll,tc_types2) = replace_CV_with_TempQV_by_TAll class_args tc_types
+					| maybe_added_TAll
+						# (cur, tc_types2, env) = cleanUpClosed tc_types2 env
+						| cur==0
+							-> ([{tc & tc_types = tc_types2} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, error)
+							-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+						-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+				TCGeneric {gtc_class={glob_module,glob_object={ds_index}}}
+					# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+					# (maybe_added_TAll,tc_types2) = replace_CV_with_TempQV_by_TAll class_args tc_types
+					| maybe_added_TAll
+						# (cur, tc_types2, env) = cleanUpClosed tc_types2 env
+						| cur==0
+							-> ([{tc & tc_types = tc_types2} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, error)
+							-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+						-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+				_
+					-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, error)
+
+	replace_CV_with_TempQV_by_TAll (ClassArgPattern _ class_arg_vars class_args) [CV type_var:@:cv_arg_types:tc_types]
+		| length class_arg_vars==length cv_arg_types
+			# cv_type = CV type_var :@: replace_TempQV_by_TAll cv_arg_types
+			# (_,tc_types) = replace_CV_with_TempQV_by_TAll class_args tc_types
+			= (True,[cv_type:tc_types])
+	replace_CV_with_TempQV_by_TAll (ClassArgPatternSameTypeVar class_arg_vars class_args) [CV type_var:@:cv_arg_types:tc_types]
+		| length class_arg_vars==length cv_arg_types
+			# cv_type = CV type_var :@: replace_TempQV_by_TAll cv_arg_types
+			# (_,tc_types) = replace_CV_with_TempQV_by_TAll class_args tc_types
+			= (True,[cv_type:tc_types])
+	replace_CV_with_TempQV_by_TAll _ tc_types
+		= (False,tc_types)
+
+	replace_TempQV_by_TAll cv_arg_types
+		= [if type.at_type=:TempQV _ {type & at_type=TAll} type \\ type<-cv_arg_types]
 
 	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
 																							-> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
@@ -763,8 +844,10 @@ where
 					-> (type_heaps, expr_heap <:= (expr_ptr, EI_LetType let_type_r))
 					-> (type_heaps, expr_heap)
 			EI_DictionaryType dict_type
-				# (_, dict_type, type_heaps) = substitute dict_type type_heaps
-				-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type))
+				# (changed, dict_type_r, type_heaps) = substitute dict_type type_heaps
+				| changed
+					-> (type_heaps, expr_heap <:= (expr_ptr, EI_DictionaryType dict_type_r))
+					-> (type_heaps, expr_heap)
 			EI_ContextWithVarContexts class_expressions var_contexts
 				# (var_contexts,type_heaps) = substitute_var_contexts var_contexts type_heaps
 				-> (type_heaps,writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap)
@@ -892,14 +975,6 @@ where
 	clear_attribute _ th_attrs
 		= th_attrs
 
-/*
-expandTypeApplication :: ![ATypeVar] !TypeAttribute !Type ![AType] !TypeAttribute !*TypeHeaps -> (!Type, !*TypeHeaps)
-expandTypeApplication type_args form_attr type_rhs arg_types act_attr type_heaps=:{th_attrs}
-	# type_heaps = bindTypeVarsAndAttributes form_attr act_attr type_args arg_types type_heaps 
-	  (_, exp_type, type_heaps) = substitute type_rhs type_heaps
-	= (exp_type, clearBindingsOfTypeVarsAndAttributes form_attr type_args type_heaps)
-*/
-
 VarIdTable :: {# String}
 VarIdTable =: { "a", "b", "c", "d", "e", "f", "g", "h", "i", "j" }
 
@@ -961,7 +1036,6 @@ equivTypeVars {tv_info_ptr} var_number type_var_heap
 			-> (forw_var_number == var_number, type_var_heap)
 		_
 			-> (True, type_var_heap <:= (tv_info_ptr, TVI_Forward var_number))
-	
 
 instance equiv Type
 where
@@ -1002,6 +1076,8 @@ where
 	equiv (CV tv1 :@: types1) (CV tv2 :@: types2) heaps
 		// should occur only for A. type variables
 		= equiv types1 types2 heaps
+	equiv TAll TAll heaps
+		= (True, heaps)
 	equiv (TFA vars1 type1) (TFA vars2 type2) heaps
 		= equiv type1 type2 heaps
 	equiv (TFAC vars1 type1 _) (TFAC vars2 type2 _) heaps
@@ -1496,6 +1572,8 @@ where
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
 	writeType file opt_beautifulizer (form, TempQDV tv_number)
 		= (file  <<< "E." <<< tv_number <<< ' ', opt_beautifulizer)
+	writeType file opt_beautifulizer (form, TAll)
+		= (file <<< "_", opt_beautifulizer)
 	writeType file opt_beautifulizer (form=:{form_properties}, TE)
 		| form_properties bitand cWriteUnderscoreforTE<>0
 			= (file <<< "_", opt_beautifulizer)
@@ -2257,11 +2335,9 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st
 				= fold_atype_st r (fold_atype_st l st)
 		= on_type type st
-//AA..
 	fold_type_st type=:(TArrow1 t) st
 		#! st = fold_atype_st t st
 		= on_type type st	
-//..AA		
 	fold_type_st type=:(_ :@: args) st
 		#! st
 				= foldSt fold_atype_st args st

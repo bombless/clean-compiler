@@ -1117,6 +1117,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 			| 	TV !TypeVar
 
 			|	TFAC ![ATypeVar] !Type ![TypeContext]	// Universally quantified function argument type with contexts
+			|	TAll							// A.t: t
 
 			|	TempV !TempVarId				/* Auxiliary, used during type checking */
 			|	TempQV !TempVarId				/* Auxiliary, used during type checking */

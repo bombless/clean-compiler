@@ -410,6 +410,8 @@ unifyTypes (TempQDV qv_number) attr1 type attr2 modules subst heaps
 	= (False, subst, heaps)
 unifyTypes type attr1 (TempQDV qv_number1) attr2 modules subst heaps
 	= (False, subst, heaps)
+unifyTypes TAll attr1 TAll attr2 modules subst heaps
+	= (True, subst, heaps)
 unifyTypes type1 attr1 type2 attr2 modules subst heaps
 	# (succ1, type1, heaps) = tryToExpandInUnify type1 attr1 modules heaps
 	  (succ2, type2, heaps) = tryToExpandInUnify type2 attr2 modules heaps
