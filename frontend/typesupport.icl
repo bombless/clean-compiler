@@ -552,7 +552,6 @@ where
 		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
 			# var_heap = writePtr tc_var VI_Empty var_heap
 			= remove_specified_contexts derived_tcs var_heap
-			| False ---> ("remove_specified_contexts",derived_tc.tc_types) = undef
 			# (derived_tcs,var_heap) = remove_specified_contexts derived_tcs var_heap
 			= ([derived_tc:derived_tcs],var_heap)
 	remove_specified_contexts [] var_heap
