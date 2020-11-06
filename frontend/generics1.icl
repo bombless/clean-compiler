@@ -404,6 +404,7 @@ build_generic_type_rep glob_module glob_object build_type_rep build_bimap_type_r
 							# (gen_bimap_type_rep, gs) = buildBimapGenericTypeRep type_def_gi gs
 							# gs & gs_td_infos.[glob_module,glob_object].tdi_gen_rep = GenericBimapTypeRep gen_bimap_type_rep
 							-> (funs_and_groups, gs)
+							-> (funs_and_groups, gs)
 where
 	report_derive_error g_ident_name gc_pos kind_of_type_string type_def_ident_name gs_error
 		= reportError g_ident_name gc_pos ("cannot derive a generic instance for "+++kind_of_type_string+++type_def_ident_name) gs_error
