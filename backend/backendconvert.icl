@@ -1707,6 +1707,8 @@ convertTypeNode (a :@: b) annotation attribution
 	=	beFunction2 (BESymbolTypeNode annotation attribution) (beBasicTypeSymbol BEApplyType) (convertTypeArgs [{at_attribute=TA_Multi, at_type = consVariableToType a} : b])
 convertTypeNode TE annotation attribution
 	=	beFunction2 (BESymbolTypeNode annotation attribution) beDontCareTypeDefinitionSymbol beNoTypeArgs
+convertTypeNode TAll annotation attribution
+	=	beFunction2 (BESymbolTypeNode annotation attribution) beDontCareTypeDefinitionSymbol beNoTypeArgs
 convertTypeNode (TFA vars type) annotation attribution
 	=	convertTypeNode type annotation attribution
 convertTypeNode (TFAC vars type contexts) annotation attribution
