@@ -530,8 +530,8 @@ where
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_type_context spec_context (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
-			# (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-				= foldSt clean_up_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
+			# (rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+				= foldSt clean_up_type_context2 derived_context ([], NoErrorContexts, env, type_heaps, var_heap, error)
 			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
 
 	mark_specified_context :: ![TypeContext] !TypeContext !*(*TypeHeaps,!*VarHeap) -> (!*TypeHeaps,!*VarHeap)
@@ -548,6 +548,35 @@ where
 				= (type_heaps,var_heap)
 			= mark_specified_context tcs spec_tc (type_heaps,var_heap)
 
+	mark_specified_contexts2 derived_tc=:{tc_var} spec_context (type_heaps,var_heap)
+		# (context_found,equal_spec_context,type_heaps) = find_equal_context derived_tc spec_context type_heaps
+		| not context_found
+			= (type_heaps,var_heap)
+		# (tc_var_info,var_heap) = readPtr tc_var var_heap
+		# var_heap = if (tc_var_info=:VI_Empty) (writePtr tc_var VI_ContextSpecified var_heap) var_heap
+		| equal_spec_context.tc_var == tc_var
+			= (type_heaps,var_heap)
+		# (equal_spec_context_var_info,var_heap) = readPtr equal_spec_context.tc_var var_heap
+		= case equal_spec_context_var_info of
+			VI_ForwardClassVar _
+				# var_heap = writePtr equal_spec_context.tc_var (VI_ForwardClassVars tc_var equal_spec_context_var_info) var_heap
+				-> (type_heaps,var_heap)
+			VI_ForwardClassVars _ _
+				# var_heap = writePtr equal_spec_context.tc_var (VI_ForwardClassVars tc_var equal_spec_context_var_info) var_heap
+				-> (type_heaps,var_heap)
+			_
+				# var_heap = writePtr equal_spec_context.tc_var (VI_ForwardClassVar tc_var) var_heap
+				-> (type_heaps,var_heap)
+
+	find_equal_context :: !TypeContext ![TypeContext] !*TypeHeaps -> (!Bool,!TypeContext,!*TypeHeaps)
+	find_equal_context tc [spec_tc:spec_tcs] type_heaps
+		# (contexts_equal,type_heaps) = equal_context spec_tc tc common_defs type_heaps
+		| contexts_equal
+			= (True,spec_tc,type_heaps)
+			= find_equal_context tc spec_tcs type_heaps
+	find_equal_context tc [] type_heaps
+		= (False,tc,type_heaps)
+
 	remove_specified_contexts [derived_tc=:{tc_var}:derived_tcs] var_heap
 		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
 			# var_heap = writePtr tc_var VI_Empty var_heap
@@ -562,7 +591,7 @@ where
 		# (maybe_added_TAll,tc_types2) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
 		| maybe_added_TAll
 			# derived_tc2 = {derived_tc & tc_types = tc_types2}
-			# (type_heaps,var_heap) = foldSt (mark_specified_context [derived_tc2]) spec_context (type_heaps,var_heap)
+			# (type_heaps,var_heap) = mark_specified_contexts2 derived_tc2 spec_context (type_heaps,var_heap)
 			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
 			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
 	mark_TAll_contexts [derived_tc=:{tc_class=TCGeneric {gtc_class={glob_module,glob_object={ds_index}}},tc_types,tc_var}:derived_tcs] spec_context type_heaps var_heap
@@ -570,7 +599,7 @@ where
 		# (maybe_added_TAll,tc_types2) = replace_TempCV_with_TempQV_by_TAll class_args tc_types
 		| maybe_added_TAll
 			# derived_tc2 = {derived_tc & tc_types = tc_types2}
-			# (type_heaps,var_heap) = foldSt (mark_specified_context [derived_tc2]) spec_context (type_heaps,var_heap)
+			# (type_heaps,var_heap) = mark_specified_contexts2 derived_tc2 spec_context (type_heaps,var_heap)
 			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
 			= mark_TAll_contexts derived_tcs spec_context type_heaps var_heap
 	mark_TAll_contexts [_:derived_tcs] spec_context type_heaps var_heap
@@ -640,6 +669,54 @@ where
 				_
 					-> (collected_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, var_heap, error)
+
+	clean_up_type_context2 tc=:{tc_types,tc_class,tc_var} (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		| (sreadPtr tc_var var_heap)=:VI_EmptyConstructorClassVar
+			= (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		# (cur, tc_types, env) = cleanUpClosed tc_types env
+		| cur bitand (bitnot cDefinedVar)==0
+			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		| checkCleanUpResult cur cUndefinedVar
+			# ambiguous_or_missing_contexts = AmbiguousContext {tc & tc_types = tc_types} ambiguous_or_missing_contexts
+			= (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		| checkCleanUpResult cur cLiftedVar
+			# error = liftedContextError (toString tc_class) error
+			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		| checkCleanUpResult cur cQVar
+			= case tc_class of
+				TCClass {glob_module,glob_object={ds_index}}
+					# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+					# (maybe_added_TAll,tc_types2) = replace_CV_with_TempQV_by_TAll class_args tc_types
+					| maybe_added_TAll
+						# (cur, tc_types2, env) = cleanUpClosed tc_types2 env
+						| cur==0
+							# tc & tc_types = tc_types2
+							# (context_found,equal_collected_context,type_heaps)
+								= find_equal_context tc collected_contexts type_heaps
+							| not context_found
+								-> ([tc : collected_contexts], ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+								# var_heap = writePtr tc.tc_var (VI_ForwardTypeContextVar equal_collected_context.tc_var) var_heap
+								-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+							-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+						-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+				TCGeneric {gtc_class={glob_module,glob_object={ds_index}}}
+					# class_args = common_defs.[glob_module].com_class_defs.[ds_index].class_args
+					# (maybe_added_TAll,tc_types2) = replace_CV_with_TempQV_by_TAll class_args tc_types
+					| maybe_added_TAll
+						# (cur, tc_types2, env) = cleanUpClosed tc_types2 env
+						| cur==0
+							# tc & tc_types = tc_types2
+							# (context_found,equal_collected_context,type_heaps)
+								= find_equal_context tc collected_contexts type_heaps
+							| not context_found
+								-> ([tc : collected_contexts], ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+								# var_heap = writePtr tc.tc_var (VI_ForwardTypeContextVar equal_collected_context.tc_var) var_heap
+								-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+							-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+						-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+				_
+					-> (collected_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+			= ([{tc & tc_types = tc_types} : collected_contexts], ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
 
 	replace_CV_with_TempQV_by_TAll (ClassArgPattern _ class_arg_vars class_args) [CV type_var:@:cv_arg_types:tc_types]
 		| length class_arg_vars==length cv_arg_types

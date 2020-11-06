@@ -1781,6 +1781,8 @@ getClassVariable symb var_info_ptr var_heap error
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			# error = missingContextError symb tc_class tc_types error
 			-> (symb, new_info_ptr, var_heap <:= (var_info_ptr, VI_ClassVar symb new_info_ptr 1), error)
+		(VI_ForwardTypeContextVar var_info_ptr,var_heap)
+			-> getClassVariable symb var_info_ptr var_heap error
 		(_,var_heap)
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 			# error = overloadingError symb error
@@ -1864,6 +1866,12 @@ where
 				-> add_class_var tc_var tc_class var_heap error
 			VI_EmptyConstructorClassVar
 				-> add_class_var tc_var tc_class var_heap error
+			VI_ForwardClassVars var_info_ptr forward_class_var_info
+				# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
+				  vi_class_var = VI_ClassVar (build_var_name (toString tc_class)) new_info_ptr 0
+				  var_heap = writePtr var_info_ptr vi_class_var var_heap
+				  (var_heap,error) = set_forward_class_vars forward_class_var_info vi_class_var var_heap error
+				-> ([var_info_ptr : variables],var_heap,error)
 	where
 		add_class_var var tc_class var_heap error
 			# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
@@ -1872,6 +1880,26 @@ where
 
 	build_var_name id_name
 		= { id_name = "_v" +++ id_name, id_info = nilPtr }
+
+	set_forward_class_vars (VI_ForwardClassVars var_info_ptr forward_class_var_info) vi_class_var var_heap error
+		# (var_heap,error) = set_forward_class_var var_info_ptr vi_class_var var_heap error
+		= set_forward_class_vars forward_class_var_info vi_class_var var_heap error
+	set_forward_class_vars (VI_ForwardClassVar var_info_ptr) vi_class_var var_heap error
+		= set_forward_class_var var_info_ptr vi_class_var var_heap error
+
+	set_forward_class_var var_info_ptr vi_class_var var_heap error
+		# (var_info, var_heap) = readPtr var_info_ptr var_heap
+		= case var_info of
+			VI_Empty
+				# var_heap = writePtr var_info_ptr vi_class_var var_heap
+				-> (var_heap,error)
+			VI_EmptyConstructorClassVar
+				# var_heap = writePtr var_info_ptr vi_class_var var_heap
+				-> (var_heap,error)
+			VI_ClassVar _ _ _
+				# error = errorHeading "Overloading error" error
+				  error = {error & ea_file = error.ea_file <<< " a type context occurs multiple times in the specified type\n" }
+				-> (var_heap,error)
 
 	retrieve_class_argument var_info_ptr (args, var_heap)
 		# (VI_ClassVar var_ident new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap

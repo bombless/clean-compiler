@@ -817,6 +817,8 @@ pIsSafe			:== True
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
+				VI_ForwardClassVars !VarInfoPtr !VarInfo |
+				VI_ForwardTypeContextVar !VarInfoPtr |
 				VI_Forward !BoundVar |
 				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
