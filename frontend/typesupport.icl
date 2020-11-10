@@ -1692,6 +1692,21 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob
 			= writeWithinBrackets "{32#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_MaybeTypeIndex
+			| checkProperty form cBrackets
+				# (file, opt_beautifulizer) = writeType (file <<< "(?^ ") opt_beautifulizer (form, types)
+				= (file <<< ')', opt_beautifulizer)
+				= writeType (file <<< "?^ ") opt_beautifulizer (setProperty form cBrackets, types)
+		| glob_object==PD_StrictMaybeTypeIndex
+			| checkProperty form cBrackets
+				# (file, opt_beautifulizer) = writeType (file <<< "(? ") opt_beautifulizer (form, types)
+				= (file <<< ')', opt_beautifulizer)
+				= writeType (file <<< "? ") opt_beautifulizer (setProperty form cBrackets, types)
+		| glob_object==PD_UnboxedMaybeTypeIndex
+			| checkProperty form cBrackets
+				# (file, opt_beautifulizer) = writeType (file <<< "(?# ") opt_beautifulizer (form, types)
+				= (file <<< ')', opt_beautifulizer)
+				= writeType (file <<< "?# ") opt_beautifulizer (setProperty form cBrackets, types)
 		| checkProperty form cBrackets
 			# (file, opt_beautifulizer)
 					= writeType (file <<< '(' <<< type_ident <<< ' ') opt_beautifulizer (form, types)
