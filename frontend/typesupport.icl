@@ -264,6 +264,10 @@ where
 		| type=:TE
 			= (combineCleanUpResults cur1 cur2, CVE :@: types, env)
 			= (combineCleanUpResults cur1 cur2, simplifyTypeApplication type types, env)
+	cleanUpClosed t=:(TempQCV _ :@: types) env
+		= (cQVar, t, env)
+	cleanUpClosed t=:(TempQCDV _ :@: types) env
+		= (cQVar, t, env)
 	cleanUpClosed t=:(TempQV _) env
 		= (cQVar, t, env)
 	cleanUpClosed t=:(TempQDV _) env
