@@ -1958,16 +1958,12 @@ lookupDependencyDef {gd_index} modules = modules![gd_index.gi_module].com_generi
 
 // limitations:
 // - context restrictions on generic variables are not allowed
-buildMemberType :: !GenericDef !TypeKind !TypeVar !TCClass !*GenericState -> (!SymbolType, !*GenericState)
-buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var tc_class gs=:{gs_varh}
-	# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs_varh
-	# gs & gs_varh = gs_varh
-	#! type_context = {tc_class = tc_class, tc_types = [TV class_var], tc_var = tc_var_ptr}
-
+buildMemberType :: !GenericDef !TypeKind !TypeVar !TCClass !*GenericState -> (!SymbolType,![[ATypeVar]],!*GenericState)
+buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var tc_class gs
 	#! (gen_type, gs) = add_bimap_contexts gen_def gs
 
 	#! th = {th_vars = gs.gs_tvarh, th_attrs = gs.gs_avarh}
-	#! (kind_indexed_st, gatvs, th, modules, error)
+	#! (kind_indexed_st, gatvs, arg_gatvss, th, modules, error)
 		= buildKindIndexedType gen_type gen_vars gen_deps kind gen_ident gen_pos th gs.gs_modules gs.gs_error
 
 	#! (member_st, th) 
@@ -1976,10 +1972,25 @@ buildMemberType gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind cla
 	#! th = assertSymbolType member_st th // just paranoied about cleared variables
 	#! th = assertSymbolType gen_type th
 
-	# member_st & st_context = [type_context : member_st.st_context]	
-	
-	# gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_modules = modules, gs_error = error }
-	= (member_st, gs)
+	| not arg_gatvss=:[]
+		# class_var_argss = transpose arg_gatvss
+		# class_var_type_argss = [[{at_attribute=atv_attribute,at_type=TV atv_variable} \\ {atv_attribute,atv_variable}<-class_var_args] \\ class_var_args<-class_var_argss]
+		# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs.gs_varh
+		# tc_types = [CV class_var :@: class_var_type_args \\ class_var_type_args <- class_var_type_argss]
+		#! type_context = {tc_class = tc_class, tc_types = tc_types, tc_var = tc_var_ptr}
+
+		# member_st & st_context = [type_context : member_st.st_context]
+
+		# gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_varh = gs_varh, gs_modules = modules, gs_error = error }
+		= (member_st, class_var_argss, gs)
+
+		# (tc_var_ptr, gs_varh) = newPtr VI_Empty gs.gs_varh
+		#! type_context = {tc_class = tc_class, tc_types = [TV class_var], tc_var = tc_var_ptr}
+
+		# member_st & st_context = [type_context : member_st.st_context]
+
+		# gs = {gs & gs_avarh = th.th_attrs, gs_tvarh = th.th_vars, gs_varh = gs_varh, gs_modules = modules, gs_error = error }
+		= (member_st, [], gs)
 
 buildMemberTypeWithPartialDependencies :: !GenericDef !TypeKind !TypeVar !TCClass !Int !*GenericState -> (!SymbolType, !*GenericState)
 buildMemberTypeWithPartialDependencies gen_def=:{gen_ident,gen_pos,gen_type,gen_vars,gen_deps} kind class_var unused_class deps gs=:{gs_varh}
@@ -2061,7 +2072,7 @@ where
 		= { th & th_vars = th_vars, th_attrs = th_attrs }
 	
 	subst_tv {tv_info_ptr} th_vars
-		= writePtr tv_info_ptr (TVI_Type (TV class_var)) th_vars
+		= writePtr tv_info_ptr f(TVI_Type (TV class_var)) th_vars
 
 	subst_av av {av_info_ptr} th_attrs
 		= writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs
@@ -2072,9 +2083,9 @@ buildClassAndMember
 		gen_def=:{gen_ident, gen_pos}
 		gs=:{gs_tvarh}
 	# (class_var, gs_tvarh) = freshTypeVar (makeIdent "class_var") gs_tvarh
-	#! (member_def, gs)
+	#! (member_def,class_args,class_arity,gs)
 		= build_class_member class_var {gs & gs_tvarh = gs_tvarh}	
-	#! class_def = build_class class_var member_def
+	#! class_def = build_class class_args class_arity member_def
 	= (class_def, member_def, gs)
 where
 	class_ident = genericIdentToClassIdent gen_def.gen_ident.id_name kind
@@ -2082,24 +2093,38 @@ where
 	class_ds = {ds_index = class_index, ds_ident = class_ident, ds_arity = 1}
 
 	build_class_member class_var gs
-		#! (member_type, gs) 
+		#! (member_type, class_var_argss, gs)
 			= buildMemberType gen_def kind class_var (TCClass {glob_module = module_index, glob_object=class_ds}) gs
 		#! (type_ptr, gs_varh) = newPtr VI_Empty gs.gs_varh 
 		#! gs & gs_varh = gs_varh
+		# class_args = if (class_var_argss=:[])
+						(ClassArg class_var NoClassArgs)
+						(make_class_args class_var_argss)
+			with
+				make_class_args [class_var_args:class_var_argss]
+					= ClassArgPattern class_var class_var_args (make_more_class_args class_var_argss)
+				make_class_args []
+					= NoClassArgs
+
+				make_more_class_args [class_var_args:class_var_argss]
+					= ClassArgPatternSameTypeVar class_var_args (make_more_class_args class_var_argss)
+				make_more_class_args []
+					= NoClassArgs
 		#! member_def = {
 			me_ident = member_ident, 
 			me_class = {glob_module = module_index, glob_object = class_index},
 			me_offset = 0,
 			me_type = member_type,
 			me_type_ptr = type_ptr,				// empty
-			me_class_vars = ClassArg class_var NoClassArgs, 		// the same variable as in the class
+			me_class_vars = class_args,			// the same variables as in the class
 			me_pos = gen_pos,
 			me_priority = NoPrio,
 			me_default_implementation = NoMemberDefault
 			}
-		= (member_def, gs)
+		#! class_arity = if (class_var_argss=:[]) 1 (length class_var_argss)
+		= (member_def,class_args,class_arity,gs)
 
-	build_class class_var member_def=:{me_type}
+	build_class class_args class_arity member_def=:{me_type}
 		#! class_member = 
 			{ ds_ident = member_ident
 			, ds_index = member_index
@@ -2111,11 +2136,11 @@ where
 			, ds_index = NoIndex/*index in the type def table, filled in later*/ 
 			}
 		= { class_ident = class_ident,
-			class_arity = 1,  
-			class_args = ClassArg class_var NoClassArgs,
+			class_arity = class_arity,
+			class_args = class_args,
 		    class_context = [], 
 		    class_pos = gen_pos, 
-		    class_members = createArray 1 class_member, 
+		    class_members = createArray 1 class_member,
 		    class_macro_members = {},
 		    class_cons_vars = 0, // dotted class variables
 		    class_dictionary = class_dictionary
@@ -2296,6 +2321,92 @@ add_instance_calls_to_GenTypeStruct GTSUnit member_symb_ident
 add_instance_calls_to_GenTypeStruct _ member_symb_ident
 	= GTSMemberCall member_symb_ident
 
+add_type_variables_to_instance_type :: !InstanceType !ClassArgs !PredefinedSymbolsData Ident Position !*TypeHeaps !*VarHeap !*ErrorAdmin
+																					-> (!InstanceType,!*TypeHeaps,!*VarHeap,!*ErrorAdmin)
+add_type_variables_to_instance_type ins_type=:{it_types=[type=:TA {type_index} []]} aclass_args=:(ClassArgPattern _ _ _) gs_predefs gc_ident gc_pos
+		type_heaps var_heap error
+	# (it_types,type_vars,attr_vars,type_heaps) = add_type_variables_to_type type aclass_args 0 type_heaps
+	# ins_type & it_types = it_types, it_vars=ins_type.it_vars++type_vars, it_attr_vars=ins_type.it_attr_vars++attr_vars
+	| type_index.glob_module==cPredefinedModuleIndex
+		| type_index.glob_object==PD_UnboxedListTypeIndex
+			# {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_UListClass]
+			| pds_module<0 || pds_def<0
+				# error = reportError gc_ident.id_name gc_pos "class UList not imported from module _SystemStrictLists" error
+				= (ins_type,type_heaps,var_heap,error)
+			# tc_class = TCClass {glob_module=pds_module,
+								  glob_object={ds_ident=predefined_idents.[PD_UListClass], ds_index=pds_def, ds_arity=1}}
+			# (ulist_contexts,var_heap) = make_unbox_contexts it_types tc_class var_heap
+			# ins_type & it_context = ins_type.it_context++ulist_contexts
+			= (ins_type,type_heaps,var_heap,error)
+		| type_index.glob_object==PD_UnboxedTailStrictListTypeIndex
+			# {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_UTSListClass]
+			| pds_module<0 || pds_def<0
+				# error = reportError gc_ident.id_name gc_pos "class UTSList not imported from module _SystemStrictLists" error
+				= (ins_type,type_heaps,var_heap,error)
+			# tc_class = TCClass {glob_module=pds_module,
+								  glob_object={ds_ident=predefined_idents.[PD_UTSListClass], ds_index=pds_def, ds_arity=1}}
+			# (utslist_contexts,var_heap) = make_unbox_contexts it_types tc_class var_heap
+			# ins_type & it_context = ins_type.it_context++utslist_contexts
+			= (ins_type,type_heaps,var_heap,error)
+		| type_index.glob_object==PD_UnboxedMaybeTypeIndex
+			# {pds_module,pds_def} = gs_predefs.psd_predefs_a.[PD_UMaybeClass]
+			| pds_module<0 || pds_def<0
+				# error = reportError gc_ident.id_name gc_pos "class UMaybe not imported from module _SystemStrictMaybes" error
+				= (ins_type,type_heaps,var_heap,error)
+			# tc_class = TCClass {glob_module=pds_module,
+								  glob_object={ds_ident=predefined_idents.[PD_UMaybeClass], ds_index=pds_def, ds_arity=1}}
+			# (umaybe_contexts,var_heap) = make_unbox_contexts it_types tc_class var_heap
+			# ins_type & it_context = ins_type.it_context++umaybe_contexts
+			= (ins_type,type_heaps,var_heap,error)
+			= (ins_type,type_heaps,var_heap,error)
+		= (ins_type,type_heaps,var_heap,error)
+	where
+		make_unbox_contexts [TA _ [{at_type=tv=:TV _}]:types] tc_class var_heap
+			# (unbox_contexts,var_heap) = make_unbox_contexts types tc_class var_heap
+			# (var_info_ptr,var_heap) = newPtr VI_Empty var_heap
+			= ([{tc_class = tc_class, tc_types = [tv], tc_var = var_info_ptr}:unbox_contexts],var_heap)
+		make_unbox_contexts [] tc_class var_heap
+			= ([],var_heap)
+add_type_variables_to_instance_type ins_type=:{it_types=[type]} class_args=:(ClassArgPattern _ _ _) gs_predefs gc_ident gc_pos
+		type_heaps var_heap error
+	# (it_types,type_vars,attr_vars,type_heaps) = add_type_variables_to_type type class_args 0 type_heaps
+	# ins_type & it_types = it_types, it_vars=ins_type.it_vars++type_vars, it_attr_vars=ins_type.it_attr_vars++attr_vars
+	= (ins_type,type_heaps,var_heap,error)
+add_type_variables_to_instance_type ins_type class_args gs_predefs gc_ident gc_pos
+		type_heaps var_heap error
+	= (ins_type,type_heaps,var_heap,error)
+
+add_type_variables_to_type type (ClassArgPattern _ class_var_args aclass_args) type_n type_heaps
+	= add_type_variables_to_pattern_type type class_var_args aclass_args type_n type_heaps
+add_type_variables_to_type type (ClassArgPatternSameTypeVar class_var_args aclass_args) type_n type_heaps
+	= add_type_variables_to_pattern_type type class_var_args aclass_args type_n type_heaps
+add_type_variables_to_type type aclass_args first_char type_heaps
+	= ([],[],[],type_heaps)
+
+add_type_variables_to_pattern_type type class_var_args aclass_args type_n {th_vars,th_attrs}
+	# arity = length class_var_args
+	# first_char_s = {#toChar (toInt 'z'-type_n)}
+	# type_var_names = [makeIdent (first_char_s +++ toString i) \\ i <- [1 .. arity]]
+	# (type_vars, th_vars) = mapSt freshTypeVar type_var_names th_vars
+	# (attr_vars2,type_var_types,th_attrs) = make_arg_types type_vars class_var_args th_attrs
+	# new_type = simplifyTypeApp type type_var_types
+	# (types,type_vars2,attr_vars,type_heaps) = add_type_variables_to_type type aclass_args (type_n+1) {th_vars=th_vars,th_attrs=th_attrs}
+	= ([new_type:types],type_vars++type_vars2,attr_vars++attr_vars2,type_heaps)
+where
+	make_arg_types [type_var:type_vars] [{atv_attribute}:class_var_args] th_attrs
+		# (attr_vars,type_var_types,th_attrs) = make_arg_types type_vars class_var_args th_attrs
+		# (at_attribute,attr_vars,th_attrs) = case atv_attribute of
+				TA_Unique -> (TA_Unique,attr_vars,th_attrs)
+				TA_Multi -> (TA_Multi,attr_vars,th_attrs)
+				TA_Var _
+					# (av,th_attrs) = freshAttrVar {type_var.tv_ident & id_info=nilPtr} th_attrs
+					-> (TA_Var av,[av:attr_vars],th_attrs)
+				TA_None -> (TA_None,attr_vars,th_attrs)
+		# type_var_types = [{at_attribute=at_attribute,at_type=TV type_var}:type_var_types]
+		= (attr_vars,type_var_types,th_attrs)
+	make_arg_types [] [] th_attrs
+		= ([],[],th_attrs)
+
 convertGenericCases :: !BimapFunctions ![Group] !Int !*DclMacros !*GenericState -> (![Group], !Int, !*DclMacros, !*GenericState)
 convertGenericCases bimap_functions new_groups group_index dcl_macros
 		gs=:{gs_main_module, gs_used_modules, gs_predefs, gs_funs, gs_modules, gs_dcl_modules, gs_td_infos, 
@@ -2414,6 +2525,10 @@ where
 
 			| generic_info_index<0
 				#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+				# (ins_type,hp_type_heaps,hp_var_heap,error)
+					= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+						heaps.hp_type_heaps heaps.hp_var_heap error
+				# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 				#! (fun_type, heaps, error)
 					= determine_type_of_member_instance member_def ins_type heaps error
 				#! (dcl_functions, heaps)
@@ -2428,6 +2543,10 @@ where
 							-> (fun_type,modules,heaps,error)
 						No
 							#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+							# (ins_type,hp_type_heaps,hp_var_heap,error)
+								= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+									heaps.hp_type_heaps heaps.hp_var_heap error
+							# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 							# (fun_type, heaps, error)
 								= determine_type_of_member_instance member_def ins_type heaps error
 							-> (fun_type,modules,heaps,error)
@@ -2493,6 +2612,10 @@ where
 
 			| generic_info_index<0
 				#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+				# (ins_type,hp_type_heaps,hp_var_heap,error)
+					= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+						heaps.hp_type_heaps heaps.hp_var_heap error
+				# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 				#! (fun_type, heaps, error)
 					= determine_type_of_member_instance member_def ins_type heaps error
 				#! (dcl_functions, heaps)
@@ -2511,6 +2634,10 @@ where
 							-> (fun_type,modules,heaps,error)
 						No
 							#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+							# (ins_type,hp_type_heaps,hp_var_heap,error)
+								= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+									heaps.hp_type_heaps heaps.hp_var_heap error
+							# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 							# (fun_type,heaps,error) = determine_type_of_member_instance member_def ins_type heaps error
 							-> (fun_type,modules,heaps,error)
 				# fun_type_with_generic_info
@@ -2581,16 +2708,21 @@ where
 			#! (class_info, (modules, heaps)) = get_class_for_kind gcf_generic this_kind (modules, heaps)
 			#! (arg_class_infos, (modules, heaps)) 
 				= mapSt (get_class_for_kind gcf_generic) consumed_kinds (modules, heaps)
-			# (deps, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_deps
+			# ({gen_deps=deps,gen_vars}, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index]
+			# n_gen_vars = length gen_vars
 			# (dep_class_infoss, (modules, heaps))
 				= mapSt (\{gd_index} -> mapSt (get_class_for_kind gd_index) consumed_kinds) deps (modules, heaps)
 			# class_idents = [(gcf_generic, gc_ident):[(gd_index, ident) \\ {gd_index, gd_ident=Ident ident} <- deps]]
 			# arg_and_dep_class_infoss = map (zip2 class_idents) (transpose [arg_class_infos:dep_class_infoss])
 
 			#! (ins_type, heaps)
-				= build_instance_type gc_type num_args (map removeDupByIndex arg_and_dep_class_infoss) heaps
+				= build_instance_type gc_type num_args n_gen_vars (map removeDupByIndex arg_and_dep_class_infoss) heaps
 		
 			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+			# (ins_type,hp_type_heaps,hp_var_heap,error)
+				= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+					heaps.hp_type_heaps heaps.hp_var_heap error
+			# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 			#! (fun_type, heaps, error)
 				= determine_type_of_member_instance member_def ins_type heaps error
 			# fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
@@ -2605,7 +2737,7 @@ where
 			removeDupByIndex [] = []
 			removeDupByIndex [x=:((indexx, _), _):xs] = [x:removeDupByIndex (filter (\((indexy, _), _) -> indexx <> indexy) xs)]
 
-		build_instance_type type arity arg_and_dep_class_infoss heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
+		build_instance_type type arity n_gen_vars arg_and_dep_class_infoss heaps=:{hp_type_heaps=th=:{th_vars},hp_var_heap}
 			#! type_var_names = [makeIdent ("a" +++ toString i) \\ i <- [1 .. arity]]
 			#! (type_vars, th_vars) = mapSt freshTypeVar type_var_names th_vars 
 			#! type_var_types = [TV tv \\ tv <- type_vars] 	
@@ -2617,7 +2749,9 @@ where
 			# context_type_vars = flatten (map (repeatn num_contexts) type_vars)
 			#! (contexts, hp_var_heap) 
 				= zipWithSt build_context (flatten arg_and_dep_class_infoss) context_type_vars hp_var_heap
-			
+
+			# (contexts,hp_var_heap) = add_unboxed_contexts type contexts hp_var_heap
+
 			#! ins_type = 
 				{	it_vars	= type_vars
 				,	it_types = [type]
@@ -2639,21 +2773,55 @@ where
 			fill_type_args type args
 				= abort ("fill_type_args\n"---> ("fill_type_args", type, args)) 
 
+			add_unboxed_contexts (TA {type_index} [{at_type=tv=:TV _}]) contexts var_heap
+				| type_index.glob_module==cPredefinedModuleIndex
+					| type_index.glob_object==PD_UnboxedListTypeIndex
+						# pds = gs_predefs.psd_predefs_a.[PD_UListClass]
+						| pds.pds_module<0 || pds.pds_def<0
+							// error should be reported in add_type_variables_to_instance_type
+							= (contexts,var_heap)
+						# (ulist_context,var_heap) = make_unbox_context pds PD_UListClass var_heap
+						= (contexts++[ulist_context],var_heap)
+					| type_index.glob_object==PD_UnboxedTailStrictListTypeIndex
+						# pds = gs_predefs.psd_predefs_a.[PD_UTSListClass]
+						| pds.pds_module<0 || pds.pds_def<0
+							// error should be reported in add_type_variables_to_instance_type
+							= (contexts,var_heap)
+						# (utslist_context,var_heap) = make_unbox_context pds PD_UTSListClass var_heap
+						= (contexts++[utslist_context],var_heap)
+					| type_index.glob_object==PD_UnboxedMaybeTypeIndex
+						# pds = gs_predefs.psd_predefs_a.[PD_UMaybeClass]
+						| pds.pds_module<0 || pds.pds_def<0
+							// error should be reported in add_type_variables_to_instance_type
+							= (contexts,var_heap)
+						# (utslist_context,var_heap) = make_unbox_context pds PD_UMaybeClass var_heap
+						= (contexts++[utslist_context],var_heap)
+						= (contexts,var_heap)
+					= (contexts,var_heap)
+			where
+				make_unbox_context {pds_module,pds_def} predefined_idents_class_index var_heap
+					# (var_info_ptr,var_heap) = newPtr VI_Empty var_heap
+					# tc_class = TCClass {glob_module=pds_module,
+										  glob_object={ds_ident=predefined_idents.[predefined_idents_class_index], ds_index=pds_def, ds_arity=1}}
+					= ({tc_class = tc_class, tc_types = [tv], tc_var = var_info_ptr},var_heap)
+			add_unboxed_contexts type contexts var_heap
+				= (contexts,var_heap)
+			
 			build_context ((_, ident), {gci_class, gci_module, gci_kind}) tv hp_var_heap
-				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap			
-				# type_context =
-					{	tc_class = TCClass
-							{ glob_module=gci_module // the same as icl module
-							, glob_object =
-								{ ds_ident = genericIdentToClassIdent ident.id_name gci_kind
-								, ds_index = gci_class
-								, ds_arity = 1
-								}
-							}
-					,	tc_types = [TV tv]
-					,	tc_var	 = var_info_ptr
-					}
-				= (type_context, hp_var_heap)
+				# (var_info_ptr, hp_var_heap) = newPtr VI_Empty hp_var_heap
+				# ds_ident = genericIdentToClassIdent ident.id_name gci_kind
+				| not gci_kind=:KindArrow _
+					# tc_class = TCClass { glob_module=gci_module // the same as icl module
+										 , glob_object = {ds_ident = ds_ident, ds_index = gci_class, ds_arity = 1} }
+					# type_context = {tc_class = tc_class, tc_types = [TV tv], tc_var = var_info_ptr}
+					= (type_context, hp_var_heap)
+					# tc_class = TCClass { glob_module=gci_module // the same as icl module
+										 , glob_object = {ds_ident = ds_ident, ds_index = gci_class, ds_arity = n_gen_vars} }
+					# (KindArrow type_kinds) = gci_kind
+					#! n_type_args = length type_kinds
+					# tc_types = repeatn n_gen_vars (CV tv :@: repeatn n_type_args {at_attribute=TA_None,at_type=TAll})
+					# type_context = {tc_class = tc_class, tc_types = tc_types, tc_var = var_info_ptr}
+					= (type_context, hp_var_heap)
 
 		build_shorthand_instance_member :: Int TypeKind Int Ident Position SymbolType [((GlobalIndex, Ident), GenericClassInfo)] !FunsAndGroups !*Heaps
 										-> (!DefinedSymbol,!FunsAndGroups,!*Heaps)
@@ -3624,8 +3792,8 @@ where
 
 	convert_context :: !Ident !Position !TypeContext (!*Modules, !*Heaps, !*ErrorAdmin)
 		-> (!Bool, !TypeContext, (!*Modules, !*Heaps, !*ErrorAdmin))
-	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic, gtc_kind}} (modules, heaps=:{hp_generic_heap}, error)
-		# ({gen_info_ptr,gen_type}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
+	convert_context fun_name fun_pos tc=:{tc_class=TCGeneric gtc=:{gtc_generic,gtc_kind},tc_types} (modules, heaps=:{hp_generic_heap}, error)
+		# ({gen_info_ptr,gen_type,gen_vars,gen_ident}, modules) = modules![gtc_generic.glob_module].com_generic_defs.[gtc_generic.glob_object.ds_index]
 		# ({gen_classes}, hp_generic_heap) = readPtr gen_info_ptr hp_generic_heap		
 		# opt_class_info = lookupGenericClassInfo gtc_kind gen_classes
 		# (tc_class, error) = case opt_class_info of 
@@ -3633,11 +3801,15 @@ where
 				# error = reportError fun_name.id_name fun_pos "no generic cases for this kind" error  
 				-> (TCGeneric gtc, error)
 			Yes class_info
+				#! class_arity = if (not gtc_kind=:KindArrow _) 1 (length gen_vars)
+				| length tc_types<>class_arity
+					# error = reportError fun_name.id_name fun_pos ("generic class "+++toString gen_ident.id_name+++" used with incorrect arity") error
+					-> (TCGeneric gtc, error)
 				# clazz =
 					{ glob_module = class_info.gci_module
 					, glob_object = 
 						{ ds_ident = genericIdentToClassIdent gtc_generic.glob_object.ds_ident.id_name gtc_kind 
-						, ds_arity = 1
+						, ds_arity = class_arity
 						, ds_index = class_info.gci_class
 						}
 					}
@@ -4928,15 +5100,17 @@ buildKindIndexedType ::
 		!*TypeHeaps !*Modules !*ErrorAdmin
 	-> (!SymbolType,		// instantiated type
 		![ATypeVar],		// fresh generic type variables
+		![[ATypeVar]],		// fresh copies of generic variables created for the generic arguments
 		!*TypeHeaps,!*Modules,!*ErrorAdmin)
 buildKindIndexedType st gtvs deps kind ident pos th modules error
 	#! (fresh_st, gatvs, th) = fresh_generic_type st gtvs th	
 
-	#! (kind_indexed_st, _, (th, modules, error)) = build_symbol_type fresh_st gatvs deps kind ident pos 1 (th, modules, error)
-	 	 
+	#! (kind_indexed_st, arg_gatvss, (th, modules, error))
+		= build_symbol_type fresh_st gatvs deps kind ident pos 1 (th, modules, error)
+
 	#! th = clearSymbolType kind_indexed_st th
 	#! th = clearSymbolType st th				// paranoja
-	= (kind_indexed_st, gatvs, th, modules, error)
+	= (kind_indexed_st, gatvs, arg_gatvss, th, modules, error)
 where
 	build_symbol_type ::
 			 !SymbolType 	// generic type, 
@@ -4948,8 +5122,7 @@ where
 			 !Int 			// current order (in the sense of the order of the kind)
 			 (!*TypeHeaps, !*Modules, !*ErrorAdmin)
 		-> ( !SymbolType	// new generic type
-			, ![ATypeVar]	// fresh copies of generic variables created for the 
-							// generic arguments
+			, ![[ATypeVar]]	// fresh copies of generic variables created for the generic arguments
 			, (!*TypeHeaps, !*Modules, !*ErrorAdmin))
 	build_symbol_type st _ _ KindConst _ _ _ (th, modules, error)	
 		= (st, [], (th, modules, error))
@@ -4980,7 +5153,7 @@ where
 				foldr (++) body_st.st_attr_env [st_attr_env \\ {st_attr_env} <- arg_sts])
 			, st_args_strictness = insert_n_lazy_values_at_beginning num_added_args body_st.st_args_strictness	 
 			}
-		= (new_st, flatten arg_gatvss, (th, modules, error))
+		= (new_st, /*flatten*/ arg_gatvss, (th, modules, error))
 
 	build_arg :: 
 			!SymbolType 		// current part of the generic type
@@ -5003,7 +5176,8 @@ where
 		#! (new_st, th) = applySubstInSymbolType st th
 		#! (new_st, forall_atvs, (th, modules, error)) 
 			= build_symbol_type new_st fresh_gatvs deps kind ident pos (inc order) (th, modules, error)	
-		#! (curry_st, th)	
+		# forall_atvs = flatten forall_atvs
+		#! (curry_st, th)
 			= curryGenericArgType1 new_st ("cur" +++ toString order +++ postfix) th
 		#! curry_st = adjust_forall curry_st forall_atvs
 
@@ -5021,6 +5195,7 @@ where
 			# (new_dep_st, th) = applySubstInSymbolType fresh_dep_st th
 			# (new_dep_st, forall_dep_atvs, (th, modules, error)) 
 				= build_symbol_type new_dep_st to_gatvs gen_deps kind gen_ident gen_pos (inc order) (th, modules, error)
+			# forall_dep_atvs = flatten forall_dep_atvs
 			# (curry_dep_st, th) = curryGenericArgType1 new_dep_st ("cur" +++ toString order +++ toString arg_num) th
 			# curry_dep_st = adjust_forall curry_dep_st forall_dep_atvs
 			= (curry_dep_st, (arg_num+1, th, modules, error))
@@ -5188,14 +5363,14 @@ adjust_forall curry_st=:{st_result} forall_atvs
 		}
 
 build_body :: !SymbolType ![ATypeVar] ![[ATypeVar]] !*TypeHeaps -> (!SymbolType, !*TypeHeaps)
-build_body st gatvs arg_gatvss  th
+build_body st gatvs arg_gatvss th
 	# th = clearSymbolType st th
 	# th = fold2St subst_gatv gatvs arg_gatvss th
 	# (st, th) = applySubstInSymbolType st th 
 	//# st = add_propagating_inequalities st gatvs arg_gatvss 
 	= (st, th)
 where
-	subst_gatv gatv=:{atv_variable} arg_gatvs th=:{th_vars}
+	subst_gatv {atv_variable} arg_gatvs th=:{th_vars}
 		#! type_args = [ makeAType (TV atv_variable) atv_attribute 
 						\\ {atv_variable, atv_attribute} <- arg_gatvs]
 		#! type = (CV atv_variable) :@: type_args
@@ -5259,6 +5434,7 @@ instance foldType Type where
 		fold_type (TFA tvs type) st = foldType on_type on_atype type st
 		fold_type (GTV _) st = st
 		fold_type (TV _) st = st
+		fold_type TAll st = st
 		fold_type t st = abort "foldType: does not match\n" ---> ("type", t)
 
 instance foldType AType where
@@ -5333,6 +5509,7 @@ instance mapTypeSt Type where
 			= (TFA tvs type, st)
 		map_type t=:(GTV _) st = (t, st)	
 		map_type t=:(TV _) st = (t, st)	
+		map_type TAll st = (TAll, st)
 		map_type t st
 			= abort "mapTypeSt: type does not match\n" ---> ("type", t)
 

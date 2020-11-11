@@ -45,7 +45,7 @@ instance == FunctionOrMacroIndex
 				| STE_Field !Ident // IC_Selector
 				| STE_Class
 				| STE_Member
-				| STE_Generic !Int /*arity*/
+				| STE_Generic !Int /* (#gen_vars<<1) + if arity<>0 1 0 */
 				| STE_GenericCase
 				| STE_GenericDeriveClass
 				| STE_Instance

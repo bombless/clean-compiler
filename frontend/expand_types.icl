@@ -103,6 +103,16 @@ addTypesOfDictionaries :: !{#CommonDefs} ![TypeContext] ![AType] -> [AType]
 addTypesOfDictionaries common_defs type_contexts type_args
 	= mapAppend (add_types_of_dictionary common_defs) type_contexts type_args
 where
+	add_types_of_dictionary common_defs {tc_class = TCClass {glob_module, glob_object={ds_index,ds_ident}}, tc_types}
+		# {class_arity, class_dictionary={ds_ident,ds_index}, class_cons_vars}
+				= common_defs.[glob_module].com_class_defs.[ds_index]
+		  dict_type_symb
+				= MakeTypeSymbIdent {glob_object = ds_index, glob_module = glob_module} ds_ident class_arity
+		  (dict_args,_) = mapSt (\type class_cons_vars
+								-> let at_attribute = if (class_cons_vars bitand 1<>0) TA_MultiOfPropagatingConsVar TA_Multi
+									in ({at_attribute = at_attribute, at_type = type}, class_cons_vars>>1)
+							) tc_types class_cons_vars
+		= {at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb dict_args}
 	add_types_of_dictionary common_defs {tc_class = TCGeneric {gtc_generic_dict={gi_module,gi_index}}, tc_types}
 		#! generict_dict_ident = predefined_idents.[PD_TypeGenericDict]
 		/*
@@ -115,20 +125,8 @@ where
 			Solution: plug a dummy dictinary type, defined in StdGeneric.
 			It is possible because all generic class have one class argument and one member.
 		*/
-		# dict_type_symb = MakeTypeSymbIdent {glob_object = gi_index, glob_module = gi_module} generict_dict_ident 1
-		# type_arg = {at_attribute = TA_Multi, at_type=hd tc_types}
-		= {at_attribute = TA_Multi, at_type = TA dict_type_symb [type_arg]}
-
-	add_types_of_dictionary common_defs {tc_class = TCClass {glob_module, glob_object={ds_index,ds_ident}}, tc_types}
-		# {class_arity, class_dictionary={ds_ident,ds_index}, class_cons_vars}
-				= common_defs.[glob_module].com_class_defs.[ds_index]
-		  dict_type_symb
-		  		= MakeTypeSymbIdent {glob_object = ds_index, glob_module = glob_module} ds_ident class_arity
-		  (dict_args,_) = mapSt (\type class_cons_vars
-								-> let at_attribute = if (class_cons_vars bitand 1<>0) TA_MultiOfPropagatingConsVar TA_Multi
-							   		in ({at_attribute = at_attribute, at_type = type}, class_cons_vars>>1)
-						   	) tc_types class_cons_vars
-		= {at_attribute = TA_Multi, /* at_annotation = AN_Strict, */ at_type = TA dict_type_symb dict_args}
+		# dict_type_symb = MakeTypeSymbIdent {glob_object = gi_index, glob_module = gi_module} generict_dict_ident (length tc_types)
+		= {at_attribute = TA_Multi, at_type = TA dict_type_symb [{at_attribute = TA_Multi, at_type = type} \\ type <-tc_types]}
 
 ::	ExpandTypeState =
 	{	ets_type_defs			:: !.{#{#CheckedTypeDef}}

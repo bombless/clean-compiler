@@ -1934,7 +1934,6 @@ where
 			  tc_class = { glob_object = MakeDefinedSymbol class_ident NoIndex (length types), glob_module = NoIndex }
 			= ([{ tc_class = tc_class, tc_types = types, tc_var = nilPtr } : contexts], pState)
 */
-/**/
 	want_context pState 
 		# (tc_classes, pState) = wantSepList "classes" CommaToken TypeContext try_tc_class pState
 		# (types, pState)	= wantList "type arguments" tryBrackType pState // tryBrackAType ??
@@ -1981,13 +1980,10 @@ where
 		= ({ tc_class = tc_class, tc_var = nilPtr, tc_types = types}, pState)
 	build_context types length_types tc_class=:(TCQualifiedIdent module_name ident_name) pState
 		= ({ tc_class = tc_class, tc_var = nilPtr, tc_types = types}, pState)
-	build_context types 1 (TCGeneric gtc=:{gtc_generic=gtc_generic=:{glob_object}}) pState
-		# gtc = { gtc & gtc_generic = {gtc_generic & glob_object = {glob_object & ds_arity = 1}}} 
-		= ({ tc_class = TCGeneric gtc, tc_var = nilPtr, tc_types = types }, pState)
-	build_context types length_types tc_class=:(TCGeneric _) pState
-		# pState = parseErrorSimple "type context" "generic class can have only one class argument" pState					
-		= (abort "No TypeContext", pState)
-/**/						 
+	build_context types length_types (TCGeneric gtc=:{gtc_generic=gtc_generic=:{glob_object}}) pState
+		# gtc & gtc_generic = {gtc_generic & glob_object = {glob_object & ds_arity = length_types}}
+		= ({tc_class = TCGeneric gtc, tc_var = nilPtr, tc_types = types}, pState)
+
 optionalCoercions :: !ParseState -> ([AttrInequality], ParseState)
 optionalCoercions pState 
 	# (token, pState) = nextToken TypeContext pState

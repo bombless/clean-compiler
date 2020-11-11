@@ -1356,9 +1356,10 @@ where
 	instance_def_to_dcl {ins_ident, ins_pos} (decl_index, decls)
 		= (inc decl_index, [Declaration {decl_ident = ins_ident, decl_pos = ins_pos, decl_kind = STE_Instance, decl_index = decl_index} : decls])
 
-	generic_def_to_dcl {gen_ident, gen_member_ident, gen_type={st_arity}, gen_pos} (decl_index, decls)
-		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic st_arity, decl_index = decl_index }
-		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic st_arity, decl_index = decl_index }
+	generic_def_to_dcl {gen_ident,gen_member_ident,gen_type={st_arity},gen_vars,gen_pos} (decl_index, decls)
+		#! generic_i = (length gen_vars<<1)+if (st_arity<>0) 1 0
+		# generic_decl = Declaration { decl_ident = gen_ident, decl_pos = gen_pos, decl_kind = STE_Generic generic_i, decl_index = decl_index }
+		# member_decl = Declaration { decl_ident = gen_member_ident, decl_pos = gen_pos, decl_kind = STE_Generic generic_i, decl_index = decl_index }
 		= (inc decl_index, [generic_decl, member_decl : decls]) 
 
 	gen_case_def_to_dcl {gc_gcf=GCF gc_ident _, gc_pos} (decl_index, decls)

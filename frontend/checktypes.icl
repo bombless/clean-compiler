@@ -334,11 +334,11 @@ addToAttributeEnviron _ _ attr_env error
 	= (attr_env, checkError "inconsistent attribution of type definition" "" error)
 
 retrieveGlobalGenericDefinition :: !SymbolTableEntry !Index -> (!Index, !Index, !Int)
-retrieveGlobalGenericDefinition {ste_kind = STE_Imported (STE_Generic arity) decl_index, ste_def_level, ste_index} mod_index
-	= (ste_index, decl_index, arity)
-retrieveGlobalGenericDefinition {ste_kind = STE_Generic arity,ste_def_level,ste_index} mod_index
+retrieveGlobalGenericDefinition {ste_kind = STE_Imported (STE_Generic generic_i) decl_index, ste_def_level, ste_index} mod_index
+	= (ste_index, decl_index, generic_i)
+retrieveGlobalGenericDefinition {ste_kind = STE_Generic generic_i,ste_def_level,ste_index} mod_index
 	| ste_def_level == cGlobalScope
-		= (ste_index, mod_index, arity)
+		= (ste_index, mod_index, generic_i)
 retrieveGlobalGenericDefinition _ mod_index
 	= (NotFound, mod_index ,-1)
 
@@ -375,21 +375,22 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
   	# gen_ident = gtc_generic.glob_object.ds_ident
 	# (entry, cs_symbol_table) = readPtr gen_ident.id_info cs.cs_symbol_table
   	# cs = { cs & cs_symbol_table = cs_symbol_table }
+	#! ds_arity = length tc_types
   	# clazz =
   		{ glob_module = -1
-		, glob_object = {ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = 1, ds_index = -1}
+		, glob_object = {ds_ident = genericIdentToClassIdent gen_ident.id_name gtc_kind, ds_arity = ds_arity, ds_index = -1}
 		}
-	# (generic_index, generic_module, generic_function_arity) = retrieveGlobalGenericDefinition entry mod_index
+	# (generic_index, generic_module, generic_i) = retrieveGlobalGenericDefinition entry mod_index
 	| generic_index <> NotFound
-		| gtc_generic.glob_object.ds_arity == 1
+		| gtc_generic.glob_object.ds_arity == if (not gtc_kind=:KindArrow _) 1 (generic_i>>1)
+			| generic_i<0
+				= abort "error in check_context_class"
 			# checked_gen = 
 				{ glob_module = generic_module
 				, glob_object = {gtc_generic.glob_object & ds_index = generic_index}					
 				}
-			| generic_function_arity<0
-				= abort "error in check_context_class"
 			#! generic_dict_index
-				= if (generic_function_arity==0 && not gtc_kind=:KindArrow _)
+				= if (generic_i bitand 1==0 && not gtc_kind=:KindArrow _)
 					PD_TypeGenericDict0
 					PD_TypeGenericDict
 			# ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[generic_dict_index]
@@ -397,9 +398,9 @@ check_context_class (TCGeneric gtc=:{gtc_generic, gtc_kind}) tc_types mod_index 
 			#! tc_class = TCGeneric {gtc & gtc_generic = checked_gen, gtc_class=clazz, gtc_generic_dict=generic_dict}
 			| not cs.cs_x.x_check_dynamic_types
 				= (tc_class, class_defs, modules, cs)
-				# cs = {cs & cs_error = checkError gen_ident "a generic context is not allowed in a dynamic type" cs.cs_error}
+				# cs & cs_error = checkError gen_ident "a generic context is not allowed in a dynamic type" cs.cs_error
 				= (tc_class, class_defs, modules, cs)
-			# cs_error = checkError gen_ident "generic used with wrong arity: generic always has one class argument" cs.cs_error  
+			# cs_error = checkError gen_ident "generic class used with incorrect arity" cs.cs_error
 			= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})
 		# cs_error = checkError gen_ident "generic undefined" cs.cs_error
 		= (TCGeneric {gtc & gtc_class=clazz}, class_defs, modules, {cs & cs_error = cs_error})

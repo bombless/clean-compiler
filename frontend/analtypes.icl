@@ -865,12 +865,13 @@ where
 			# as = fold2St (verify_kind_of_type modules) class_kinds tc_types as
 			= (class_infos, as)
 			= abort ("determine_kinds_of_type_context" ---> (ds_ident, class_kinds, tc_types))
-	determine_kinds_of_type_context modules {tc_class=TCGeneric {gtc_generic,gtc_kind},tc_types} (class_infos, as)
-		| length tc_types == 1
-			# as = verify_kind_of_type modules gtc_kind (hd tc_types) as 
-			= (class_infos, as)
-			= abort ("determine_kinds_of_type_context" ---> (gtc_generic.glob_object.ds_ident, gtc_kind, tc_types))
-			
+	determine_kinds_of_type_context modules {tc_class=TCGeneric _,tc_types=[tc_type]} (class_infos, as)
+		# as = verify_kind_of_type modules KindConst tc_type as
+		= (class_infos, as)
+	determine_kinds_of_type_context modules {tc_class=TCGeneric _,tc_types} (class_infos, as)
+		# as = foldSt (verify_kind_of_type modules KindConst) tc_types as
+		= (class_infos, as)
+
 	verify_kind_of_type modules req_kind type as
 		# (kind_of_type, as=:{as_kind_heap,as_error}) = determineKind modules type as
 		  {uki_kind_heap, uki_error} = unifyKinds kind_of_type (kindToKindInfo req_kind) {uki_kind_heap = as_kind_heap, uki_error = as_error}
@@ -1037,7 +1038,7 @@ where
 	new_kind :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
 	new_kind {tv_info_ptr} (type_var_heap, kind_heap)
 		# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
-		= (	type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
+		= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
 	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
