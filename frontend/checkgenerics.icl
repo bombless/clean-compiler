@@ -428,11 +428,12 @@ where
 		# cs & cs_symbol_table = cs_symbol_table
 		# (type_index, type_module) = retrieveGlobalDefinition entry STE_Type module_index
 		| type_index == NotFound
+			# type_cons & type_arity=0
 			# cs_error = checkError type_cons.type_ident "generic argument type undefined" cs.cs_error
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, {cs & cs_error=cs_error})
 		# (type_def, type_defs, modules)
 			= getTypeDef module_index {glob_module=type_module, glob_object=type_index} type_defs modules
-		# type_cons & type_index = { glob_object = type_index, glob_module = type_module }
+		# type_cons & type_index = {glob_object = type_index, glob_module = type_module}, type_arity=0
 		| type_synonym_with_arguments type_def.td_rhs type_def.td_arity
 			# cs = {cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error}
 			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
