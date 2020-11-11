@@ -2072,7 +2072,7 @@ where
 		= { th & th_vars = th_vars, th_attrs = th_attrs }
 	
 	subst_tv {tv_info_ptr} th_vars
-		= writePtr tv_info_ptr f(TVI_Type (TV class_var)) th_vars
+		= writePtr tv_info_ptr (TVI_Type (TV class_var)) th_vars
 
 	subst_av av {av_info_ptr} th_attrs
 		= writePtr av_info_ptr (AVI_Attr (TA_Var av)) th_attrs
