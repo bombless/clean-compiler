@@ -1233,6 +1233,12 @@ set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:TA
 		# type_var_heap = set_class_arg_pattern pattern_vars [atype] type_var_heap
 		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type type) type_var_heap
 		= set_class_args_types type_vars types type_var_heap
+set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [TempCV tv_number:@: atypes:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| n_pattern_vars==length atypes
+		# type_var_heap = set_class_arg_pattern pattern_vars atypes type_var_heap
+		# type_var_heap = writePtr bind_dst.tv_info_ptr (TVI_Type (TempV tv_number)) type_var_heap
+		= set_class_args_types type_vars types type_var_heap
 set_class_args_types (ClassArgPatternSameTypeVar pattern_vars type_vars) [type=:TA type_cons=:{type_arity} a_types:types] type_var_heap
 	#! n_pattern_vars = length pattern_vars
 	| type_arity==n_pattern_vars
@@ -1263,6 +1269,11 @@ set_class_args_types (ClassArgPatternSameTypeVar pattern_vars type_vars) [type=:
 	#! n_pattern_vars = length pattern_vars
 	| n_pattern_vars==1
 		# type_var_heap = set_class_arg_pattern pattern_vars [atype] type_var_heap
+		= set_class_args_types type_vars types type_var_heap
+set_class_args_types (ClassArgPatternSameTypeVar pattern_vars type_vars) [TempCV tv_number:@: atypes:types] type_var_heap
+	#! n_pattern_vars = length pattern_vars
+	| n_pattern_vars==length atypes
+		# type_var_heap = set_class_arg_pattern pattern_vars atypes type_var_heap
 		= set_class_args_types type_vars types type_var_heap
 set_class_args_types NoClassArgs _ type_var_heap
 	= type_var_heap
