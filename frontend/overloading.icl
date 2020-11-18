@@ -1577,6 +1577,11 @@ convertOverloadedCall defs contexts symbol expr_info_ptr appls (heaps,ptrs, erro
 expressionsToTypeCodeExpressions class_expressions
 	= map expressionToTypeCodeExpression class_expressions
 
+class_to_dictionary_type glob_module ds_index tc_types defs
+	# {class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
+	  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=class_dictionary.ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
+	= AttributedType (TA dict_type_symbol [AttributedType type \\ type <- tc_types])
+
 get_var_contexts (VarContext arg_n context arg_atype var_contexts) defs contexts error
 	# (cs,error) = get_var_context context contexts error 
 	  cs = [convert_TypeContext_to_DictionaryAndClassType c defs \\ c <- cs]
@@ -1597,11 +1602,10 @@ where
 		# error = sub_class_error ds_ident error
 		= (var_contexts,error)
 
-	convert_TypeContext_to_DictionaryAndClassType {tc_var,tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}},tc_types} defs
-		# {class_dictionary} = defs.[glob_module].com_class_defs.[ds_index]
-		  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=class_dictionary.ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
-		  class_type = TA dict_type_symbol [AttributedType type \\ type <- tc_types]
-		= {dc_var=tc_var,dc_class_type=AttributedType class_type}
+	convert_TypeContext_to_DictionaryAndClassType {tc_var,tc_class=TCClass {glob_module,glob_object={ds_index}},tc_types} defs
+		= {dc_var=tc_var,dc_class_type=class_to_dictionary_type glob_module ds_index tc_types defs}
+	convert_TypeContext_to_DictionaryAndClassType {tc_var,tc_class=TCGeneric {gtc_class={glob_module,glob_object={ds_index}}},tc_types} defs
+		= {dc_var=tc_var,dc_class_type=class_to_dictionary_type glob_module ds_index tc_types defs}
 get_var_contexts NoVarContexts defs contexts error
 	= (NoVarContexts,error)
 
@@ -2009,10 +2013,8 @@ where
 						  expr_heap = expr_heap <:= (dyn_ptr, EI_TypeOfDynamicPattern var_ptrs type_code_expr no_contexts)
 						-> convert_local_dynamics loc_dynamics (type_code_info, expr_heap, type_pattern_vars, var_heap, error)
 	where
-		add_types_of_dictionaries [{tc_var,tc_class=TCClass {glob_module,glob_object={ds_ident,ds_index}},tc_types}:dictionaries_and_contexts] atype common_defs
-			# {class_dictionary} = common_defs.[glob_module].com_class_defs.[ds_index]
-			  dict_type_symbol = MakeTypeSymbIdent {glob_module=glob_module,glob_object=class_dictionary.ds_index} class_dictionary.ds_ident class_dictionary.ds_arity
-			  class_type = AttributedType (TA dict_type_symbol [AttributedType type \\ type <- tc_types])
+		add_types_of_dictionaries [{tc_var,tc_class=TCClass {glob_module,glob_object={ds_index}},tc_types}:dictionaries_and_contexts] atype common_defs
+			# class_type = class_to_dictionary_type glob_module ds_index tc_types common_defs
 			= {at_attribute=TA_Multi, at_type=class_type --> add_types_of_dictionaries dictionaries_and_contexts atype common_defs}
 		add_types_of_dictionaries [] atype common_defs
 			= atype
