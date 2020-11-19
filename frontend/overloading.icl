@@ -2303,9 +2303,9 @@ where
 			| app_arg_n==arg_n
 				# (old_var_infos,var_heap) = add_class_vars_for_var_context context ui.ui_var_heap
 				  (app_arg,ui) = updateExpression group_index app_arg {ui & ui_var_heap=var_heap}
-				  (free_vars_and_types,local_vars,var_heap)
+				#! (free_vars_and_types,local_vars,var_heap)
 					= restore_old_var_infos_and_retrieve_class_vars context old_var_infos ui.ui_local_vars ui.ui_var_heap
-				  ui = {ui & ui_local_vars=local_vars,ui_var_heap=var_heap}
+				# ui = {ui & ui_local_vars=local_vars,ui_var_heap=var_heap}
 				= case app_arg of
 					expr @ args
 						| same_args args free_vars_and_types
