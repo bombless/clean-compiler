@@ -168,7 +168,7 @@ score` (Par i d)	= Max` i 0 d
 score` (Seq i d)	= Sum` i d
 score` (Dep f a)	= 1
 
-substitute_dep :: ![(!FunIndex,!ArgIndex)] !u:RefCount -> u:RefCount
+substitute_dep :: ![(FunIndex,ArgIndex)] !u:RefCount -> u:RefCount
 substitute_dep subs (Par i d)
 	= Par i [|substitute_dep subs rc \\ rc <|- d]
 substitute_dep subs (Seq i d)
@@ -343,7 +343,7 @@ where
 	,	ai_class_subst					:: !*ConsClassSubst
 	,	ai_next_var						:: !Int
 	,	ai_next_var_of_fun				:: !Int
-	,	ai_cases_of_vars_for_function	:: ![(!Bool,!Case)]
+	,	ai_cases_of_vars_for_function	:: ![(Bool,Case)]
 	,	ai_fun_heap						:: !*FunctionHeap
 	,	ai_fun_defs						:: !*{#FunDef}
 
@@ -527,8 +527,8 @@ instance consumerRequirements App where
 			| glob_object < size ai_cons_class
 				# (fun_class, ai) = ai!ai_cons_class.[glob_object]
 				| isComponentMember glob_object ai_group_members
-					= reqs_of_args glob_object 0 fun_class.cc_args app_args CPassive common_defs ai
-				= reqs_of_args (-1) 0 fun_class.cc_args app_args CPassive common_defs ai
+					= reqs_of_app_args_in_component glob_object 0 fun_class.cc_args app_args CPassive common_defs ai
+				= reqs_of_app_args fun_class.cc_args app_args CPassive common_defs ai
 			= consumerRequirements app_args common_defs ai
 
 		| (glob_module==stdStrict_module_ns.stdStrictLists_module_n || glob_module==stdStrict_module_ns.stdStrictMaybes_module_n)
@@ -538,32 +538,9 @@ instance consumerRequirements App where
 			# (cc, _, ai) = consumerRequirements app_arg common_defs ai
 			# ai = aiUnifyClassifications CActive cc ai
 			= consumerRequirements app_args common_defs ai
-/*
-// SPECIAL...
-		# num_specials = case imported_funs.[glob_module].[glob_object].ft_specials of
-			(SP_ContextTypes [sp:_])	-> length sp.spec_types
-			_	-> 0
-		| num_specials > 0 && num_specials <= length app_args
-			= activeArgs num_specials app_args common_defs ai
-			with
-				activeArgs 0 app_args common_defs ai
-					= consumerRequirements app_args common_defs ai			// treat remaining args normally...
-				activeArgs n [app_arg:app_args] common_defs ai
-					# (cc, _, ai)	= consumerRequirements app_arg common_defs ai
-					# ai			= aiUnifyClassifications CActive cc ai	// make args for which specials exist active...
-					= activeArgs (n-1) app_args common_defs ai
-// ...SPECIAL
-*/
-// ACTIVATE DICTIONARIES... [SUBSUMES SPECIAL]
 		# num_dicts = length imported_funs.[glob_module].[glob_object].ft_type.st_context
-
-		# num_specials = case imported_funs.[glob_module].[glob_object].ft_specials of
-			(SP_ContextTypes [sp:_])	-> length sp.spec_types
-			_	-> 0
-//		# num_dicts = num_dicts ---> ("NUM_DICTS",num_dicts,num_specials)
-
 		| num_dicts > 0 && num_dicts <= length app_args
-			= reqs_of_args (-1) 0 (repeatn num_dicts CActive ++ repeatn (imported_funs.[glob_module].[glob_object].ft_arity) CPassive) app_args CPassive common_defs ai
+			= reqs_of_app_args (repeatn num_dicts CActive ++ repeatn (imported_funs.[glob_module].[glob_object].ft_arity) CPassive) app_args CPassive common_defs ai
 /* wrong version...
 			= activeArgs num_dicts app_args common_defs ai
 			with
@@ -574,7 +551,6 @@ instance consumerRequirements App where
 					# ai			= aiUnifyClassifications CActive cc ai
 					= activeArgs (n-1) app_args common_defs ai
 ...*/
-// ...ACTIVATE DICTIONARIES
 		= consumerRequirements app_args common_defs ai
 	consumerRequirements {app_symb={symb_kind = SK_LocalMacroFunction glob_object,symb_ident}, app_args}
 			common_defs=:(ConsumerAnalysisRO {main_dcl_module_n})
@@ -582,8 +558,8 @@ instance consumerRequirements App where
 		| glob_object < size ai_cons_class
 			# (fun_class, ai) = ai!ai_cons_class.[glob_object]
 			| isComponentMember glob_object ai_group_members
-				= reqs_of_args glob_object 0 fun_class.cc_args app_args CPassive common_defs ai
-			= reqs_of_args (-1) 0 fun_class.cc_args app_args CPassive common_defs ai
+				= reqs_of_app_args_in_component glob_object 0 fun_class.cc_args app_args CPassive common_defs ai
+			= reqs_of_app_args fun_class.cc_args app_args CPassive common_defs ai
 		= consumerRequirements app_args common_defs ai
 	
 	// new alternative for generated function + reanalysis...
@@ -594,8 +570,8 @@ instance consumerRequirements App where
 			= readPtr fun_info_ptr ai.ai_fun_heap
 		# ai = {ai & ai_fun_heap = ai_fun_heap}
 		| isComponentMember index ai_group_members
-			= reqs_of_args index 0 cc_args app_args CPassive common_defs ai
-		= reqs_of_args (-1) 0 cc_args app_args CPassive common_defs ai
+			= reqs_of_app_args_in_component index 0 cc_args app_args CPassive common_defs ai
+		= reqs_of_app_args cc_args app_args CPassive common_defs ai
 
 	consumerRequirements {app_args} common_defs ai
 		=  not_an_unsafe_pattern (consumerRequirements app_args common_defs ai)
@@ -615,16 +591,11 @@ instance <<< (Ptr a)
 where
 	(<<<) file p = file <<< ptrToInt p
 
-reqs_of_args :: !Int !Int ![ConsClass] !.[Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!.Bool,!*AnalyseInfo)
-reqs_of_args _ _ _ [] cumm_arg_class _ ai
-	= (cumm_arg_class, False, ai)
-reqs_of_args _ _ [] _ cumm_arg_class _ ai
-	= (cumm_arg_class, False, ai)
-reqs_of_args fun_idx arg_idx [form_cc : ccs] [Var arg : args] cumm_arg_class common_defs ai
-	| fun_idx >= 0
-		# (act_cc, _, ai) = consumerRequirements` arg common_defs ai
-		  ai = aiUnifyClassifications form_cc act_cc ai
-		= reqs_of_args fun_idx (inc arg_idx) ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
+reqs_of_app_args_in_component :: !Int !Int ![ConsClass] !.[Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!.Bool,!*AnalyseInfo)
+reqs_of_app_args_in_component fun_idx arg_idx [form_cc : ccs] [Var arg : args] cumm_arg_class caro ai
+	# (act_cc, _, ai) = consumerRequirements` arg caro ai
+	  ai = aiUnifyClassifications form_cc act_cc ai
+	= reqs_of_app_args_in_component fun_idx (inc arg_idx) ccs args (combineClasses act_cc cumm_arg_class) caro ai
 where
 	consumerRequirements` {var_info_ptr,var_ident} _ ai
 		# (var_info, ai_var_heap)	= readPtr var_info_ptr ai.ai_var_heap
@@ -635,14 +606,21 @@ where
 				   ai				= { ai & ai_cur_ref_counts.[arg_position] = add_dep_count (fun_idx,arg_idx) ref_count }
 				-> (temp_var, False, ai)
 			_
-				-> abort "reqs_of_args [BoundVar]"
-
-reqs_of_args fun_idx arg_idx [form_cc : ccs] [arg : args] cumm_arg_class common_defs ai
-	# (act_cc, _, ai) = consumerRequirements arg common_defs ai
+				-> abort "reqs_of_app_args_in_component [BoundVar]"
+reqs_of_app_args_in_component fun_idx arg_idx [form_cc : ccs] [arg : args] cumm_arg_class caro ai
+	# (act_cc, _, ai) = consumerRequirements arg caro ai
 	  ai = aiUnifyClassifications form_cc act_cc ai
-	= reqs_of_args fun_idx (inc arg_idx) ccs args (combineClasses act_cc cumm_arg_class) common_defs ai
-reqs_of_args _ _ cc xp _ _ _
-	= abort "classify:reqs_of_args doesn't match"
+	= reqs_of_app_args_in_component fun_idx (inc arg_idx) ccs args (combineClasses act_cc cumm_arg_class) caro ai
+reqs_of_app_args_in_component _ _ _ _ cumm_arg_class _ ai
+	= (cumm_arg_class, False, ai)
+
+reqs_of_app_args :: ![ConsClass] ![Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!Bool,!*AnalyseInfo)
+reqs_of_app_args [form_cc : ccs] [arg : args] cumm_arg_class caro ai
+	# (act_cc, _, ai) = consumerRequirements arg caro ai
+	  ai = aiUnifyClassifications form_cc act_cc ai
+	= reqs_of_app_args ccs args (combineClasses act_cc cumm_arg_class) caro ai
+reqs_of_app_args _ _ cumm_arg_class _ ai
+	= (cumm_arg_class, False, ai)
 
 instance consumerRequirements Case where
 	consumerRequirements kees=:{case_expr,case_guards,case_default,case_info_ptr,case_explicit}
@@ -1602,7 +1580,7 @@ where
 	build_known t
 		= arrayAndElementsCopy (\e->(createArray (size e) False,e)) t
 
-	subst_non_zero :: ![(!FunIndex,!ArgIndex)] !FunIndex !ArgIndex !FunIndex !ArgIndex !*{*{#Bool}} !*{!RefCounts}-> *{!RefCounts}
+	subst_non_zero :: ![(FunIndex,ArgIndex)] !FunIndex !ArgIndex !FunIndex !ArgIndex !*{*{#Bool}} !*{!RefCounts}-> *{!RefCounts}
 	subst_non_zero iter fi ai fm am known rcs
 		| ai >= am
 			# fi = fi + 1
@@ -1623,7 +1601,7 @@ where
 			= subst_non_zero [(fi,ai):iter] fi (ai + 1) fm am known rcs
 		= subst_non_zero iter fi (ai + 1) fm am known rcs
 
-	fix :: ![(!FunIndex,!ArgIndex)] !RefCount -> RefCount
+	fix :: ![(FunIndex,ArgIndex)] !RefCount -> RefCount
 	fix subs rc
 		# rc = 	substitute_dep subs rc
 //					 ---> ("substitute",fi,ai)
