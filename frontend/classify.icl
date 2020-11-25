@@ -460,7 +460,7 @@ instance consumerRequirements Expression where
 		= (CPassive, False, ai)
 	consumerRequirements (RecordUpdate cons_symbol expression expressions) common_defs ai
 		# (cc, _, ai) = consumerRequirements expression common_defs ai
-		  (cc, _, ai) = consumerRequirements expressions common_defs ai
+		  (cc, _, ai) = reqs_of_binds expressions common_defs ai
 		= (CPassive, False, ai)
 	consumerRequirements (TupleSelect tuple_symbol arg_nr expr) common_defs ai
 		= consumerRequirements expr common_defs ai
@@ -591,6 +591,22 @@ instance <<< (Ptr a)
 where
 	(<<<) file p = file <<< ptrToInt p
 
+// special case to detect CAccumulating for selections of a variable
+reqs_of_app_arg_selection :: !Expression !ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!ConsClass,!*AnalyseInfo)
+reqs_of_app_arg_selection (Selection _ expr selectors) cumm_arg_class caro ai
+	# (cc,cumm_arg_class,ai) = reqs_of_app_arg_selection expr cumm_arg_class caro ai
+	  ai = aiUnifyClassifications CActive cc ai
+	  ai = requirementsOfSelectors selectors caro ai
+	= (CPassive,cumm_arg_class,ai)
+reqs_of_app_arg_selection (Var var) cumm_arg_class caro ai
+	# (cc,_,ai) = consumerRequirements var caro ai
+	| IsAVariable cc
+		= (cc,CAccumulating,ai)
+		= (cc,cumm_arg_class,ai)
+reqs_of_app_arg_selection expr cumm_arg_class caro ai
+	# (cc,_,ai) = consumerRequirements expr caro ai
+	= (cc,cumm_arg_class,ai)
+
 reqs_of_app_args_in_component :: !Int !Int ![ConsClass] !.[Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!.Bool,!*AnalyseInfo)
 reqs_of_app_args_in_component fun_idx arg_idx [form_cc : ccs] [Var arg : args] cumm_arg_class caro ai
 	# (act_cc, _, ai) = consumerRequirements` arg caro ai
@@ -607,6 +623,10 @@ where
 				-> (temp_var, False, ai)
 			_
 				-> abort "reqs_of_app_args_in_component [BoundVar]"
+reqs_of_app_args_in_component fun_idx arg_idx [form_cc : ccs] [arg=:Selection _ _ _ : args] cumm_arg_class caro ai
+	# (act_cc,cumm_arg_class,ai) = reqs_of_app_arg_selection arg cumm_arg_class caro ai
+	  ai = aiUnifyClassifications form_cc act_cc ai
+	= reqs_of_app_args_in_component fun_idx (inc arg_idx) ccs args cumm_arg_class caro ai
 reqs_of_app_args_in_component fun_idx arg_idx [form_cc : ccs] [arg : args] cumm_arg_class caro ai
 	# (act_cc, _, ai) = consumerRequirements arg caro ai
 	  ai = aiUnifyClassifications form_cc act_cc ai
@@ -615,6 +635,10 @@ reqs_of_app_args_in_component _ _ _ _ cumm_arg_class _ ai
 	= (cumm_arg_class, False, ai)
 
 reqs_of_app_args :: ![ConsClass] ![Expression] ConsClass ConsumerAnalysisRO !*AnalyseInfo -> *(!ConsClass,!Bool,!*AnalyseInfo)
+reqs_of_app_args [form_cc : ccs] [arg=:Selection _ _ _ : args] cumm_arg_class caro ai
+	# (act_cc,cumm_arg_class,ai) = reqs_of_app_arg_selection arg cumm_arg_class caro ai
+	  ai = aiUnifyClassifications form_cc act_cc ai
+	= reqs_of_app_args ccs args cumm_arg_class caro ai
 reqs_of_app_args [form_cc : ccs] [arg : args] cumm_arg_class caro ai
 	# (act_cc, _, ai) = consumerRequirements arg caro ai
 	  ai = aiUnifyClassifications form_cc act_cc ai
@@ -992,7 +1016,14 @@ instance consumerRequirements (!a,!b) | consumerRequirements a & consumerRequire
 		  (ccy, _, ai) = consumerRequirements y common_defs ai
 		= (combineClasses ccx ccy, False, ai)
 
-instance consumerRequirements [a] | consumerRequirements a where
+// for App or @ arguments
+instance consumerRequirements [Expression] where
+	consumerRequirements [x=:Selection _ _ _ : xs] common_defs ai
+		# (ccx, cumm_arg_class, ai) = reqs_of_app_arg_selection x CPassive common_defs ai
+		  (ccxs, _, ai) = consumerRequirements xs common_defs ai
+		| cumm_arg_class==CAccumulating
+			= (CAccumulating, False, ai)
+			= (combineClasses ccx ccxs, False, ai)
 	consumerRequirements [x : xs] common_defs ai
 		# (ccx,  _, ai) = consumerRequirements x  common_defs ai
 		  (ccxs, _, ai) = consumerRequirements xs common_defs ai
@@ -1000,9 +1031,13 @@ instance consumerRequirements [a] | consumerRequirements a where
 	consumerRequirements [] _ ai
 		= (CPassive, False, ai)
 
-instance consumerRequirements (Bind a b) | consumerRequirements a where
-	consumerRequirements {bind_src} common_defs ai
-		= consumerRequirements bind_src common_defs ai
+reqs_of_binds :: ![Bind Expression b] !ConsumerAnalysisRO !AnalyseInfo -> (!ConsClass, !UnsafePatternBool, !AnalyseInfo)
+reqs_of_binds [{bind_src} : xs] caro ai
+	# (ccx,  _, ai) = consumerRequirements bind_src caro ai
+	  (ccxs, _, ai) = reqs_of_binds xs caro ai
+	= (combineClasses ccx ccxs, False, ai)
+reqs_of_binds [] _ ai
+	= (CPassive, False, ai)
 
 //@ Analysis
 
