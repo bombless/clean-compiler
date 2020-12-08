@@ -820,7 +820,6 @@ pIsSafe			:== True
 				VI_ForwardClassVars !VarInfoPtr !VarInfo |
 				VI_ForwardTypeContextVar !VarInfoPtr |
 				VI_Forward !BoundVar |
-				VI_CaseOrStrictLetVar !VarInfoPtr | VI_StrictLetVar |
 				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
 				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
@@ -836,8 +835,6 @@ pIsSafe			:== True
 				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
 				VI_NotUsed |
-				VI_Labelled_Empty !{#Char} | // RWS debugging
-				VI_LocalLetVar | // RWS, mark Let vars during case transformation
 				..
 
 ::	TypeCodeVariableInfo
