@@ -80,9 +80,10 @@ where
 
 	eliminate_code_sharing_in_function dcl_functions main_dcl_module_n common_defs (TransformedBody body=:{tb_rhs}) (collected_imports, cs=:{cs_expr_heap,cs_var_heap})
 		# cii = {cii_dcl_functions=dcl_functions, cii_common_defs=common_defs, cii_main_dcl_module_n = main_dcl_module_n}
-		  {rcs_var_heap, rcs_expr_heap, rcs_imports} = weightedRefCount {rci_imported=cii, rci_depth=1} tb_rhs
-				{ rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap, rcs_free_vars = [],
-				  rcs_imports = collected_imports} 
+		  {rcs_var_heap, rcs_expr_heap, rcs_imports}
+			= weightedRefCount {rci_imported=cii, rci_depth=1, rci_has_default=False} tb_rhs
+				{rcs_free_vars = [], rcs_failing_cases_maybe_evaluated_vars = No, rcs_imports = collected_imports,
+				 rcs_var_heap = cs_var_heap, rcs_expr_heap = cs_expr_heap} 
 		  ds = { ds_lets = [], ds_var_heap = rcs_var_heap, ds_expr_heap = rcs_expr_heap}
 		  (tb_rhs, ds) = distributeLets {di_depth=1,di_explicit_case_depth=0} tb_rhs ds
 		  (tb_rhs, {ds_var_heap, ds_expr_heap}) = buildLetExpr tb_rhs ds
@@ -132,12 +133,14 @@ convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
 	}
 
 ::	RCInfo =
-	{	rci_imported	:: !CheckImportedInfo
+	!{	rci_imported	:: !CheckImportedInfo
 	,	rci_depth		:: !Int
+	,	rci_has_default :: !Bool
 	}
 
 ::	RCState =
 	{	rcs_free_vars	:: ![VarInfoPtr]
+	,	rcs_failing_cases_maybe_evaluated_vars :: !Optional [VarInfoPtr]	// Yes if has case that_may fail, contains free vars of failing cases expr
 	,	rcs_imports		:: ![SymbKind]
 	,	rcs_var_heap	:: !.VarHeap
 	,	rcs_expr_heap	:: !.ExpressionHeap
@@ -161,6 +164,7 @@ convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
 	{	rcc_all_variables		:: ![CountedVariable]
 	,	rcc_default_variables	:: ![CountedVariable]
 	,	rcc_pattern_variables	:: ![[CountedVariable]]
+	,	rcc_pattern_maybe_evaluated_vars :: ![VarInfoPtr]
 	}
 
 ::	CountedVariable =
@@ -224,10 +228,19 @@ where
 		  		# (ref_counts, rcs_var_heap) = mapSt get_ref_count let_lazy_binds rs.rcs_var_heap
 				  rcs_expr_heap = rs.rcs_expr_heap <:= (let_info_ptr, EI_LetTypeAndRefCounts let_type ref_counts)
 				  rcs_free_vars = remove_variables rs.rcs_free_vars let_lazy_binds
-				-> {rs & rcs_free_vars=rcs_free_vars, rcs_var_heap=rcs_var_heap, rcs_expr_heap=rcs_expr_heap}
+				  rcs_failing_cases_maybe_evaluated_vars
+					= case rs.rcs_failing_cases_maybe_evaluated_vars of
+						No -> No
+						Yes failing_cases_maybe_evaluated_vars -> Yes (remove_variables failing_cases_maybe_evaluated_vars let_lazy_binds)
+				-> {rs & rcs_free_vars=rcs_free_vars, rcs_failing_cases_maybe_evaluated_vars=rcs_failing_cases_maybe_evaluated_vars,
+						 rcs_var_heap=rcs_var_heap, rcs_expr_heap=rcs_expr_heap}
 			_
 				# rcs_free_vars = remove_variables rs.rcs_free_vars let_lazy_binds
-				-> {rs & rcs_free_vars=rcs_free_vars}
+				  rcs_failing_cases_maybe_evaluated_vars
+					= case rs.rcs_failing_cases_maybe_evaluated_vars of
+						No -> No
+						Yes failing_cases_maybe_evaluated_vars -> Yes (remove_variables failing_cases_maybe_evaluated_vars let_lazy_binds)
+				-> {rs & rcs_free_vars=rcs_free_vars, rcs_failing_cases_maybe_evaluated_vars=rcs_failing_cases_maybe_evaluated_vars}
 	where
 		remove_variables vars binds
 			= foldl remove_variable vars binds
@@ -293,38 +306,180 @@ addPatternVariable depth {cv_variable = var_info_ptr, cv_count = ref_count} (fre
 		_
 			-> (free_vars, var_heap)
 
-weightedRefCountOfCase rci=:{rci_depth} {case_expr, case_guards, case_default, case_info_ptr} (EI_CaseType case_type)
-			rs=:{ rcs_var_heap, rcs_expr_heap, rcs_imports }
-	# (local_vars, vars_and_heaps) = weighted_ref_count_in_case_patterns {rci & rci_depth=rci_depth+1} case_guards rcs_imports rcs_var_heap rcs_expr_heap
-	  (default_vars, (all_vars, rcs_imports, var_heap, expr_heap)) = weighted_ref_count_in_default {rci & rci_depth=rci_depth+1} case_default vars_and_heaps
-	  rs = { rs & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports }
+all_constructors_matched (AlgebraicPatterns global_type_index patterns) common_defs
+	= case common_defs.[global_type_index.gi_module].com_type_defs.[global_type_index.gi_index].td_rhs of
+		AlgType cons_symbols
+			-> same_length cons_symbols patterns
+		_
+			-> False
+where
+	same_length [_:l1] [_:l2] = same_length l1 l2
+	same_length [] [] = False
+	same_length _ _ = True
+all_constructors_matched (OverloadedListPatterns _ _ [_,_]) common_defs
+	= True
+all_constructors_matched case_guards common_defs
+	= False
+
+weightedRefCountOfCaseExpr :: !RCInfo !Expression !*RCState -> (![VarInfoPtr],!*RCState)
+weightedRefCountOfCaseExpr rci=:{rci_depth} case_expr rcs=:{rcs_free_vars=previous_free_vars}
+	# rcs = weightedRefCount {rci & rci_depth=rci_depth+1} case_expr {rcs & rcs_free_vars=[]}
+	  (free_vars_with_rc, var_heap) = foldSt (collect_free_variable (rci_depth+1)) rcs.rcs_free_vars ([], rcs.rcs_var_heap)
+	  (free_vars, var_heap) = foldSt (addPatternVariable rci_depth) free_vars_with_rc (previous_free_vars, var_heap)
+	= (rcs.rcs_free_vars,{rcs & rcs_free_vars=free_vars, rcs_var_heap=var_heap})
+where
+	collect_free_variable depth var_ptr (collected_vars, var_heap)
+		# (VI_LetVar lvi=:{lvi_count,lvi_depth,lvi_previous}, var_heap) = readPtr var_ptr var_heap
+		| depth == lvi_depth
+			= case lvi_previous of
+				[{plvi_depth, plvi_count, plvi_new} : lvi_previous ]
+					-> ([{cv_variable = var_ptr, cv_count = lvi_count} : collected_vars],
+						var_heap <:= (var_ptr, VI_LetVar {lvi & lvi_count = plvi_count, lvi_depth = plvi_depth,
+																lvi_new = plvi_new, lvi_previous = lvi_previous}))
+				[]
+					// doesn't happen ?
+					-> (collected_vars, var_heap)
+			= ([{cv_variable = var_ptr, cv_count = lvi_count} : collected_vars], var_heap)
+
+append_mark_and_remove_duplicates :: ![VarInfoPtr] ![VarInfoPtr] !*VarHeap -> (![VarInfoPtr],!*VarHeap)
+append_mark_and_remove_duplicates [var_info_ptr:var_info_ptrs] var_info_ptrs_t var_heap
+	= case readPtr var_info_ptr var_heap of
+		(VI_MarkedVar _,var_heap)
+			-> append_mark_and_remove_duplicates var_info_ptrs var_info_ptrs_t var_heap
+		(var_info,var_heap)
+			# var_heap = writePtr var_info_ptr (VI_MarkedVar var_info) var_heap
+			  (var_info_ptrs,var_heap) = append_mark_and_remove_duplicates var_info_ptrs var_info_ptrs_t var_heap
+			-> ([var_info_ptr:var_info_ptrs],var_heap)
+append_mark_and_remove_duplicates [] var_info_ptrs_t var_heap
+	= (var_info_ptrs_t,var_heap)
+
+append_mark_and_remove_duplicates_lists :: ![[VarInfoPtr]] ![VarInfoPtr] !*VarHeap -> (![VarInfoPtr],!*VarHeap)
+append_mark_and_remove_duplicates_lists [var_info_ptrs:var_info_ptrss] var_info_ptrs_t var_heap
+	# (var_info_ptrs,var_heap) = append_mark_and_remove_duplicates var_info_ptrs var_info_ptrs_t var_heap
+	= append_mark_and_remove_duplicates_lists var_info_ptrss var_info_ptrs var_heap
+append_mark_and_remove_duplicates_lists [] var_info_ptrs_t var_heap
+	= (var_info_ptrs_t,var_heap)
+
+remove_marks :: ![VarInfoPtr] !*VarHeap -> *VarHeap
+remove_marks [var_info_ptr:var_info_ptrs] var_heap
+	# (VI_MarkedVar previous_var_info,var_heap) = readPtr var_info_ptr var_heap
+	  var_heap = writePtr var_info_ptr previous_var_info var_heap
+	= remove_marks var_info_ptrs var_heap
+remove_marks [] var_heap
+	= var_heap
+
+append_patterns_maybe_evaluated_vars :: !(Optional [[VarInfoPtr]]) !*VarHeap
+	-> (!Optional [VarInfoPtr],![VarInfoPtr],!*VarHeap)
+append_patterns_maybe_evaluated_vars No var_heap
+	= (No,[],var_heap)
+append_patterns_maybe_evaluated_vars (Yes [pattern_maybe_evaluated_vars]) var_heap
+	= (No,pattern_maybe_evaluated_vars,var_heap)
+append_patterns_maybe_evaluated_vars (Yes maybe_evaluated_vars) var_heap
+	# (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates_lists maybe_evaluated_vars [] var_heap
+	  var_heap = remove_marks maybe_evaluated_vars var_heap
+	= (No,maybe_evaluated_vars,var_heap)
+
+option_list_to_list No = []
+option_list_to_list (Yes x) = x
+
+append_maybe_evaluated_vars_no_default :: ![VarInfoPtr] !(Optional [[VarInfoPtr]]) !(Optional [VarInfoPtr]) !(Optional [VarInfoPtr]) !*VarHeap
+	-> (!Optional [VarInfoPtr],![VarInfoPtr],!*VarHeap)
+append_maybe_evaluated_vars_no_default [] No No No var_heap
+	= (No,[],var_heap)
+append_maybe_evaluated_vars_no_default [] No No previous_failing_cases var_heap
+	= (previous_failing_cases,[],var_heap)
+append_maybe_evaluated_vars_no_default [] No default_failing_cases=:(Yes _) No var_heap
+	= (default_failing_cases,[],var_heap)
+append_maybe_evaluated_vars_no_default [] (Yes [pattern_maybe_evaluated_vars]) No No var_heap
+	= (Yes pattern_maybe_evaluated_vars,[],var_heap)
+append_maybe_evaluated_vars_no_default case_exp_vars No No No var_heap
+	= (Yes case_exp_vars,[],var_heap)
+append_maybe_evaluated_vars_no_default case_exp_vars patterns_failing_cases default_failing_cases previous_failing_cases var_heap
+	# (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates (option_list_to_list previous_failing_cases) [] var_heap
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates (option_list_to_list default_failing_cases) maybe_evaluated_vars var_heap
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates_lists (option_list_to_list patterns_failing_cases) maybe_evaluated_vars var_heap
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates case_exp_vars maybe_evaluated_vars var_heap
+	  var_heap = remove_marks maybe_evaluated_vars var_heap
+	= (Yes maybe_evaluated_vars,[],var_heap)
+
+append_maybe_evaluated_vars :: ![VarInfoPtr] !(Optional [[VarInfoPtr]]) !(Optional [VarInfoPtr]) !(Optional [VarInfoPtr]) !*VarHeap
+	-> (!Optional [VarInfoPtr],![VarInfoPtr],!*VarHeap)
+append_maybe_evaluated_vars [] No No No var_heap
+	= (No,[],var_heap)
+append_maybe_evaluated_vars [] No No previous_failing_cases var_heap
+	= (previous_failing_cases,[],var_heap)
+append_maybe_evaluated_vars [] No default_failing_cases=:(Yes _) No var_heap
+	= (default_failing_cases,[],var_heap)
+append_maybe_evaluated_vars [] (Yes [pattern_maybe_evaluated_vars]) No No var_heap
+	= (Yes pattern_maybe_evaluated_vars,pattern_maybe_evaluated_vars,var_heap)
+append_maybe_evaluated_vars case_exp_vars No No No var_heap
+	= (Yes case_exp_vars,[],var_heap)
+append_maybe_evaluated_vars case_exp_vars patterns_failing_cases default_failing_cases previous_failing_cases var_heap
+	# (patterns_evaluated_vars,var_heap) = append_mark_and_remove_duplicates_lists (option_list_to_list patterns_failing_cases) [] var_heap
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates (option_list_to_list previous_failing_cases) [] var_heap
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates (option_list_to_list default_failing_cases) maybe_evaluated_vars var_heap
+	  maybe_evaluated_vars = patterns_evaluated_vars++maybe_evaluated_vars
+	  (maybe_evaluated_vars,var_heap) = append_mark_and_remove_duplicates case_exp_vars maybe_evaluated_vars var_heap
+	  var_heap = remove_marks maybe_evaluated_vars var_heap
+	= (Yes maybe_evaluated_vars,patterns_evaluated_vars,var_heap)
+
+weightedRefCountOfCase :: !RCInfo !Case !ExprInfo !*RCState -> *RCState
+weightedRefCountOfCase rci=:{rci_depth,rci_imported,rci_has_default} {case_expr,case_guards,case_default,case_info_ptr,case_explicit}
+		(EI_CaseType case_type) rs=:{rcs_var_heap,rcs_expr_heap,rcs_imports}
+	# rhs_has_default = case_default=:Yes _ || if case_explicit False rci_has_default
+	  rhs_rci = {rci & rci_depth=rci_depth+1, rci_has_default=rhs_has_default}
+	  (local_vars, (all_vars, patterns_failing_cases, rcs_imports, var_heap, expr_heap))
+		= weighted_ref_count_in_case_patterns rhs_rci case_guards rcs_imports rcs_var_heap rcs_expr_heap
+	  (default_vars, default_failing_cases, (all_vars, rcs_imports, var_heap, expr_heap))
+		= weighted_ref_count_in_default rhs_rci case_default (all_vars, rcs_imports, var_heap, expr_heap)
+	  rs & rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_imports = rcs_imports
+
+	  case_does_not_fail = case_explicit ||
+							if case_default=:Yes _
+								default_failing_cases=:No
+								(patterns_failing_cases=:No && all_constructors_matched case_guards rci_imported.cii_common_defs)
+
 	  rs = weighted_ref_count_of_decons_expr rci case_guards rs
-	  rs = weightedRefCount rci case_expr rs
-	  (rcs_free_vars, rcs_var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rs.rcs_free_vars, rs.rcs_var_heap)
-	  rcs_expr_heap = rs.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type 
-	  		{ rcc_all_variables = all_vars, rcc_default_variables = default_vars, rcc_pattern_variables = local_vars })
-	= {rs & rcs_var_heap = rcs_var_heap, rcs_expr_heap = rcs_expr_heap, rcs_free_vars = rcs_free_vars}
+	  (expr_vars,rs)
+		= if case_does_not_fail
+			([],weightedRefCount rci case_expr rs)
+			(weightedRefCountOfCaseExpr rci case_expr rs)
+
+	  {rcs_failing_cases_maybe_evaluated_vars,rcs_var_heap} = rs
+	  (failing_cases_maybe_evaluated_vars,pattern_maybe_evaluated_vars,var_heap)
+		= if case_does_not_fail
+			(if (not rhs_has_default)
+				(No,[],rcs_var_heap)
+				(append_patterns_maybe_evaluated_vars patterns_failing_cases rcs_var_heap))
+			(if (not rhs_has_default)
+				(append_maybe_evaluated_vars_no_default expr_vars patterns_failing_cases default_failing_cases rcs_failing_cases_maybe_evaluated_vars rcs_var_heap)
+				(append_maybe_evaluated_vars expr_vars patterns_failing_cases default_failing_cases rcs_failing_cases_maybe_evaluated_vars rcs_var_heap))
+
+	  (rcs_free_vars, var_heap) = foldSt (addPatternVariable rci_depth) all_vars (rs.rcs_free_vars, var_heap)
+	  rcs_expr_heap = rs.rcs_expr_heap <:= (case_info_ptr, EI_CaseTypeAndRefCounts case_type
+			{rcc_all_variables=all_vars, rcc_default_variables=default_vars, rcc_pattern_variables=local_vars, rcc_pattern_maybe_evaluated_vars=pattern_maybe_evaluated_vars})
+	= {rs & rcs_failing_cases_maybe_evaluated_vars=failing_cases_maybe_evaluated_vars, rcs_free_vars=rcs_free_vars, rcs_var_heap=var_heap, rcs_expr_heap=rcs_expr_heap}
 	where
 		weighted_ref_count_in_default rci (Yes expr) info
 			= weightedRefCountInPatternExpr rci expr info
 		weighted_ref_count_in_default rci No info
-			= ([], info)
+			= ([], No, info)
 
 		weighted_ref_count_in_case_patterns rci (AlgebraicPatterns type patterns) collected_imports var_heap expr_heap
-			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], No, collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (BasicPatterns type patterns) collected_imports var_heap expr_heap
-			= mapSt (\{bp_expr} -> weightedRefCountInPatternExpr rci bp_expr) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (\{bp_expr} -> weightedRefCountAddPatternExpr rci bp_expr) patterns ([], No, collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (OverloadedListPatterns type _ patterns) collected_imports var_heap expr_heap
-			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], No, collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (DynamicPatterns patterns) collected_imports var_heap expr_heap
-			= mapSt (\{dp_rhs} -> weightedRefCountInPatternExpr rci dp_rhs) patterns ([], collected_imports, var_heap, expr_heap)
+			= mapSt (\{dp_rhs} -> weightedRefCountAddPatternExpr rci dp_rhs) patterns ([], No, collected_imports, var_heap, expr_heap)
 
 		weighted_ref_count_in_algebraic_pattern rci=:{rci_imported} {ap_expr,ap_symbol} wrcs_state
-			# (free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
-				= weightedRefCountInPatternExpr rci ap_expr wrcs_state
+			# (free_vars_with_rc, (all_free_vars, failing_cases, collected_imports, var_heap, expr_heap))
+				= weightedRefCountAddPatternExpr rci ap_expr wrcs_state
 			  (collected_imports, var_heap)
 				=	check_symbol rci_imported ap_symbol collected_imports var_heap
-			=	(free_vars_with_rc, (all_free_vars, collected_imports, var_heap, expr_heap))
+			=	(free_vars_with_rc, (all_free_vars, failing_cases, collected_imports, var_heap, expr_heap))
 			where
 				check_symbol {cii_main_dcl_module_n, cii_common_defs} {glob_module, glob_object={ds_index}} collected_imports var_heap
 					| glob_module <> cii_main_dcl_module_n
@@ -355,13 +510,30 @@ where
 	weightedRefCount {rci_imported} (RecordSelection selector _) rs
 		= checkRecordSelector rci_imported selector rs
 
-weightedRefCountInPatternExpr rci=:{rci_depth} pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
-	# {rcs_free_vars,rcs_var_heap,rcs_imports,rcs_expr_heap} = weightedRefCount rci pattern_expr
-				{ rcs_var_heap = var_heap, rcs_expr_heap = expr_heap, rcs_free_vars = [], rcs_imports = collected_imports}
+weightedRefCountAddPatternExpr :: !RCInfo !Expression !(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap)
+							   -> (![CountedVariable],!(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap))
+weightedRefCountAddPatternExpr rci pattern_expr (previous_free_vars, failing_cases, collected_imports, var_heap, expr_heap)
+	# (free_vars_with_rc, pattern_failing_cases, (all_free_vars, rcs_imports, rcs_var_heap, rcs_expr_heap))
+		= weightedRefCountInPatternExpr rci pattern_expr (previous_free_vars, collected_imports, var_heap, expr_heap)
+	  failing_cases = case pattern_failing_cases of
+						No -> failing_cases
+						Yes case_expr_vars
+							-> case failing_cases of
+								No -> Yes [case_expr_vars]
+								Yes case_expr_vars_list -> Yes [case_expr_vars:case_expr_vars_list] 
+	= (free_vars_with_rc, (all_free_vars, failing_cases, rcs_imports, rcs_var_heap, rcs_expr_heap))
+
+weightedRefCountInPatternExpr :: !RCInfo !Expression !(![CountedVariable],![SymbKind],!*VarHeap,!*ExpressionHeap)
+	   -> (![CountedVariable],!Optional [VarInfoPtr],!(![CountedVariable],![SymbKind],!*VarHeap,!*ExpressionHeap))
+weightedRefCountInPatternExpr rci=:{rci_depth} pattern_expr (previous_free_vars,collected_imports,var_heap,expr_heap)
+	# {rcs_free_vars,rcs_failing_cases_maybe_evaluated_vars,rcs_var_heap,rcs_imports,rcs_expr_heap}
+			= weightedRefCount rci pattern_expr
+				{rcs_free_vars = [], rcs_failing_cases_maybe_evaluated_vars = No, rcs_imports = collected_imports,
+				 rcs_var_heap = var_heap, rcs_expr_heap = expr_heap}
 	  (free_vars_with_rc, rcs_var_heap) = mapSt get_ref_count rcs_free_vars rcs_var_heap
 	  (previous_free_vars, rcs_var_heap) = foldSt (select_unused_free_variable rci_depth) previous_free_vars ([], rcs_var_heap)
 	  (all_free_vars, rcs_var_heap) = foldSt (collect_free_variable rci_depth) rcs_free_vars (previous_free_vars, rcs_var_heap)
-	= (free_vars_with_rc, (all_free_vars, rcs_imports, rcs_var_heap, rcs_expr_heap))
+	= (free_vars_with_rc, rcs_failing_cases_maybe_evaluated_vars, (all_free_vars, rcs_imports, rcs_var_heap, rcs_expr_heap))
 where
 	get_ref_count var_ptr var_heap
 		# (VI_LetVar {lvi_count}, var_heap) = readPtr var_ptr var_heap
@@ -462,6 +634,8 @@ where
 */
 
 ::	LetExpressionStatus	= LES_Untouched | LES_Moved | LES_Updated !Expression
+						| LES_MaybeEvaluatedAfterFail !LetExpressionStatus
+						| LES_MaybeEvaluatedAfterFailAndInDefault !LetExpressionStatus
 
 ::	LetExpressionInfo =
 	{	lei_count			:: !Int
@@ -610,7 +784,10 @@ instance distributeLets Case
 where
 	distributeLets di=:{di_depth,di_explicit_case_depth} kees=:{case_info_ptr,case_guards,case_default,case_expr,case_explicit} ds=:{ds_var_heap, ds_expr_heap}
 		# (EI_CaseTypeAndRefCounts type rcc, ds_expr_heap) = readPtr case_info_ptr ds_expr_heap
-		  {rcc_all_variables = tot_ref_counts, rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns} = rcc
+		  {rcc_all_variables = tot_ref_counts, rcc_default_variables = ref_counts_in_default, rcc_pattern_variables = ref_counts_in_patterns,
+		   rcc_pattern_maybe_evaluated_vars } = rcc
+		  ds_var_heap = foldSt mark_maybe_evaluated_after_fail rcc_pattern_maybe_evaluated_vars ds_var_heap
+		  ds_var_heap = foldSt mark_maybe_evaluated_after_fail_in_default ref_counts_in_default ds_var_heap
 		  new_depth = di_depth + 1
 		  (local_lets, ds_var_heap) = mark_local_let_vars new_depth tot_ref_counts ds_var_heap
 										  	// -*-> ("ref_counts", case_expr, tot_ref_counts, ref_counts_in_patterns)
@@ -620,6 +797,7 @@ where
 						# (local_vars,local_select_vars,var_heap) = foldSt (mark_local_let_var_of_explicit_case new_depth) tot_ref_counts ([],[],var_heap)
 						= foldSt (mark_local_let_select_var_of_explicit_case new_depth) local_select_vars (local_vars,var_heap)
 						= foldSt (mark_local_let_var new_depth) tot_ref_counts ([],var_heap)
+		  ds_var_heap = foldSt restore_lei_status rcc_pattern_maybe_evaluated_vars ds_var_heap
 		  new_di = {di & di_depth = new_depth, di_explicit_case_depth = if case_explicit new_depth di_explicit_case_depth}
 	 	  ds = {ds & ds_var_heap=ds_var_heap, ds_expr_heap=ds_expr_heap}
 		  (case_guards, ds)  = distribute_lets_in_patterns new_di ref_counts_in_patterns case_guards ds
@@ -634,6 +812,22 @@ where
 		  kees = { kees & case_info_ptr = case_info_ptr } // ->> ("case_kind", di_depth, kind, case_explicit, ptrToInt case_info_ptr)
 		= (kees, { ds & ds_expr_heap = ds_expr_heap, ds_var_heap = ds_var_heap})
 	where
+		mark_maybe_evaluated_after_fail var_info_ptr var_heap
+			# (var_info,var_heap) = readPtr var_info_ptr var_heap
+			= case var_info of
+				VI_LetExpression lei=:{lei_status}
+					-> writePtr var_info_ptr (VI_LetExpression {lei & lei_status=LES_MaybeEvaluatedAfterFail lei_status}) var_heap
+				_
+					-> var_heap
+
+		mark_maybe_evaluated_after_fail_in_default {cv_variable=var_info_ptr} var_heap
+			# (var_info,var_heap) = readPtr var_info_ptr var_heap
+			= case var_info of
+				VI_LetExpression lei=:{lei_status=LES_MaybeEvaluatedAfterFail old_lei_status}
+					-> writePtr var_info_ptr (VI_LetExpression {lei & lei_status=LES_MaybeEvaluatedAfterFailAndInDefault old_lei_status}) var_heap
+				_
+					-> var_heap
+
 		case_kind _ {case_guards, case_default, case_explicit, case_expr} var_heap
 			| is_guard case_guards case_default case_explicit case_expr
 				=	(CaseKindGuard, var_heap)
@@ -691,14 +885,14 @@ where
 			= ({ fv & fv_info_ptr = new_info_ptr }, var_heap <:= (fv_info_ptr, VI_CaseOrStrictLetVar new_info_ptr))
 
 		mark_local_let_var depth {cv_variable, cv_count} (local_vars, var_heap)
-			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_var}, var_heap) = readPtr cv_variable var_heap
-			| lei_count == cv_count && lei_depth==depth-1
+			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_status}, var_heap) = readPtr cv_variable var_heap
+			| lei_count == cv_count && lei_depth==depth-1 && not lei_status=:LES_MaybeEvaluatedAfterFailAndInDefault _
 				= ([(cv_variable, lei_count, lei_depth) : local_vars ], var_heap <:= (cv_variable, VI_LetExpression { lei & lei_depth = depth}))
 				= (local_vars, var_heap)
 
 		mark_local_let_var_of_explicit_case depth {cv_variable, cv_count} (local_vars,local_select_vars,var_heap)
-			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_expression}, var_heap) = readPtr cv_variable var_heap
-			| lei_count == cv_count && lei_depth==depth-1
+			# (VI_LetExpression lei=:{lei_count,lei_depth,lei_expression,lei_status}, var_heap) = readPtr cv_variable var_heap
+			| lei_count == cv_count && lei_depth==depth-1 && not lei_status=:LES_MaybeEvaluatedAfterFailAndInDefault _
 				= case lei_expression of
 					TupleSelect _ _ (Var var=:{var_ident,var_info_ptr})
 						# (var_info,var_heap) = readPtr var_info_ptr var_heap
@@ -738,6 +932,16 @@ where
 								-> (local_vars,var_heap <:= (cv_variable, VI_LetExpression {lei & lei_depth = old_depth}))
 						_
 								-> ([(cv_variable, lei_count, old_depth) : local_vars ],var_heap)
+
+		restore_lei_status var_info_ptr var_heap
+			# (var_info,var_heap) = readPtr var_info_ptr var_heap
+			= case var_info of
+				VI_LetExpression lei=:{lei_status=LES_MaybeEvaluatedAfterFail old_lei_status}
+					-> writePtr var_info_ptr (VI_LetExpression {lei & lei_status=old_lei_status}) var_heap
+				VI_LetExpression lei=:{lei_status=LES_MaybeEvaluatedAfterFailAndInDefault old_lei_status}
+					-> writePtr var_info_ptr (VI_LetExpression {lei & lei_status=old_lei_status}) var_heap
+				_
+					-> var_heap
 
 		reset_local_let_var (var_info_ptr, lei_count, lei_depth)  var_heap
 			# (VI_LetExpression lei, var_heap) = readPtr var_info_ptr var_heap
