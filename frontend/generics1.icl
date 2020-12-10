@@ -2045,13 +2045,25 @@ where
 			{ glob_module = pds_module
 			, glob_object = {ds_ident=pds_ident, ds_index=pds_def, ds_arity = 1}
 			}
-		# tc_class = TCGeneric 
-			{ gtc_generic=glob_def_sym
-			, gtc_kind = kind
-			, gtc_class = {glob_module=NoIndex,glob_object={ds_ident=makeIdent "<no generic class>", ds_index=NoIndex, ds_arity=1}}
-			, gtc_generic_dict = {gi_module=NoIndex, gi_index=NoIndex}
-			}
-		=({tc_class = tc_class, tc_types = [TV tv], tc_var = var_info_ptr}, gs_varh)	
+		| not kind=:KindArrow _
+			# tc_class = TCGeneric
+				{ gtc_generic = glob_def_sym
+				, gtc_kind = kind
+				, gtc_class = {glob_module=NoIndex,glob_object={ds_ident=makeIdent "<no generic class>", ds_index=NoIndex, ds_arity=1}}
+				, gtc_generic_dict = {gi_module=NoIndex, gi_index=NoIndex}
+				}
+			= ({tc_class = tc_class, tc_types = [TV tv], tc_var = var_info_ptr}, gs_varh)
+			# (KindArrow type_kinds) = kind
+			#! n_type_args = length type_kinds
+			# n_gen_vars = 2
+			# tc_types = repeatn n_gen_vars (CV tv :@: repeatn n_type_args {at_attribute=TA_Multi,at_type=TAll})
+			# tc_class = TCGeneric
+				{ gtc_generic = glob_def_sym
+				, gtc_kind = kind
+				, gtc_class = {glob_module=NoIndex,glob_object={ds_ident=makeIdent "<no generic class>", ds_index=NoIndex, ds_arity=n_gen_vars}}
+				, gtc_generic_dict = {gi_module=NoIndex, gi_index=NoIndex}
+				}
+			= ({tc_class = tc_class, tc_types = tc_types, tc_var = var_info_ptr}, gs_varh)
 
 replace_generic_vars_with_class_var :: SymbolType [ATypeVar] TypeVar *TypeHeaps -> (!SymbolType,!*TypeHeaps)
 replace_generic_vars_with_class_var st atvs class_var th
