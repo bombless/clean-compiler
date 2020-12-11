@@ -329,10 +329,11 @@ PD_TC__PackedArray	:== 314
 
 PD_TC__Maybe		:== 315
 PD_TC__StrictMaybe	:== 316
+PD_TC__UnboxedMaybe	:== 317
 
-PD_TC__Unit			:== 317
+PD_TC__Unit			:== 318
 
-PD_NrOfPredefSymbols		:== 318
+PD_NrOfPredefSymbols		:== 319
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

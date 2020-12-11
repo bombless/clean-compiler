@@ -199,6 +199,7 @@ predefined_idents
 
 					[PD_TC__Maybe] = i "TC__Maybe",
 					[PD_TC__StrictMaybe] = i "TC__StrictMaybe",
+					[PD_TC__UnboxedMaybe] = i "TC__UnboxedMaybe",
 
 					[PD_TC__Unit] = i "TC__Unit",
 

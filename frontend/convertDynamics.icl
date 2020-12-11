@@ -597,6 +597,8 @@ where
 					-> type_code_constructor_expression PD_TC__Maybe ci
 				PD_StrictMaybeTypeIndex
 					-> type_code_constructor_expression PD_TC__StrictMaybe ci
+				PD_UnboxedMaybeTypeIndex
+					-> type_code_constructor_expression PD_TC__UnboxedMaybe ci
 				PD_UnitTypeIndex
 					-> type_code_constructor_expression PD_TC__Unit ci
 	typeConstructor (GTT_Constructor fun_ident _) ci
