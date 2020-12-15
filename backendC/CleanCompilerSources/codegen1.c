@@ -5041,7 +5041,7 @@ static void repl_overloaded_cons_or_just_arguments (NodeP node_p,int *asp_p,int 
 
 	Build (node_p->node_decons_node,asp_p,bsp_p,&code_gen_node_ids);
 
-	*asp_p -= 2;
+	*asp_p -= 1;
 
 	ab_node_ids_p->free_node_ids=code_gen_node_ids.free_node_ids;
 	ab_node_ids_p->a_node_ids=code_gen_node_ids.a_node_ids;
@@ -5272,8 +5272,8 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 					if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1)){
 						GenPushA (asp-node_id_p->nid_a_index);
 						++asp;
-						
 						repl_overloaded_cons_or_just_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+						--asp;
 					} else
 						GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
 				} else
@@ -5289,8 +5289,8 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 				if (IsOverloadedConsOrJust (node->node_push_symbol->symb_kind) && (node->node_push_symbol->symb_head_strictness & 1)){
 					GenPushA (asp-node_id_p->nid_a_index);
 					++asp;
-						
 					repl_overloaded_cons_or_just_arguments (node,&asp,&bsp,save_states_p,ab_node_ids_p);
+					--asp;
 				} else
 #endif
 				GenPushArgs (asp-node_id_p->nid_a_index,a_size,a_size);
