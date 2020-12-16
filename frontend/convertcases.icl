@@ -3,6 +3,7 @@ implementation module convertcases
 import StdStrictLists,StdOverloadedList
 import syntax, compare_types, utilities, expand_types, general
 from checksupport import ::Component(..),::ComponentMembers(..)
+from containers import add_strictness
 
 :: VarInfo
 	| VI_LetVar !LetVarInfo
@@ -11,7 +12,12 @@ from checksupport import ::Component(..),::ComponentMembers(..)
 	| VI_StrictLetVar
 	| VI_CaseOrStrictLetVar !VarInfoPtr
 	| VI_MarkedVar !VarInfo
-	| VI_Labelled_Empty !{#Char}	// RWS debugging
+	| VI_BoundVar !AType
+	| VI_BoundDictionaryVar !AType
+	| VI_FreeVar !Ident !VarInfoPtr !Int !AType
+	| VI_FreeDictionaryVar !Ident !VarInfoPtr !Int !AType
+//	| VI_Labelled_Empty !{#Char}	// RWS debugging
+VI_Labelled_Empty _ :== VI_Empty
 
 :: ExprInfo
 	| EI_CaseTypeAndRefCounts !CaseType !RefCountsInCase
@@ -2035,11 +2041,14 @@ where
 				  (bound_vars, free_typed_vars, var_heap) = retrieve_variables cp_free_vars cp_var_heap
 				-> (False,bound_vars, free_typed_vars, cp_local_vars, expr, old_fv_info_ptr_values,var_heap)
 
-store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr},type):bound_vars] old_fv_info_ptr_values var_heap
+store_VI_BoundVar_in_bound_vars_and_save_old_values [({fv_info_ptr,fv_def_level},type):bound_vars] old_fv_info_ptr_values var_heap
 	# (old_fv_info_ptr_value,var_heap)=readPtr fv_info_ptr var_heap
-	# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
 	# (old_fv_info_ptr_values,var_heap) = store_VI_BoundVar_in_bound_vars_and_save_old_values bound_vars old_fv_info_ptr_values var_heap
-	= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
+	| fv_def_level<>DictionaryLevel
+		# var_heap=writePtr fv_info_ptr (VI_BoundVar type) var_heap
+		= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
+		# var_heap=writePtr fv_info_ptr (VI_BoundDictionaryVar type) var_heap
+		= ([old_fv_info_ptr_value:old_fv_info_ptr_values],var_heap)
 store_VI_BoundVar_in_bound_vars_and_save_old_values [] old_fv_info_ptr_values var_heap
 	= (old_fv_info_ptr_values,var_heap)
 
@@ -2047,9 +2056,14 @@ retrieve_variables cp_free_vars cp_var_heap
 	= foldSt retrieve_variable cp_free_vars ([], [], cp_var_heap)
 where
 	retrieve_variable (var_info_ptr, type) (bound_vars, free_typed_vars, var_heap)
-		# (VI_FreeVar name new_ptr count type, var_heap) = readPtr var_info_ptr var_heap
-		= ( [Var { var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
-			[({ fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count }, type) : free_typed_vars], var_heap)
+		# (var_info, var_heap) = readPtr var_info_ptr var_heap
+		= case var_info of
+			VI_FreeVar name new_ptr count type
+				-> ([Var {var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
+					[({fv_def_level = NotALevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count}, type) : free_typed_vars], var_heap)
+			VI_FreeDictionaryVar name new_ptr count type
+				-> ([Var {var_ident = name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} : bound_vars],
+					[({fv_def_level = DictionaryLevel, fv_ident = name, fv_info_ptr = new_ptr, fv_count = count}, type) : free_typed_vars], var_heap)
 
 new_case_function_and_restore_old_fv_info_ptr_values opt_id result_type rhs free_vars local_vars
 	bound_vars old_fv_info_ptr_values group_index common_defs cs
@@ -2063,23 +2077,27 @@ restore_old_fv_info_ptr_values [old_fv_info_ptr_value:old_fv_info_ptr_values] [(
 restore_old_fv_info_ptr_values [] bound_vars var_heap
 	= var_heap
 
-new_case_function opt_id result_type rhs free_vars local_vars group_index cs=:{cs_expr_heap}
-	# body = TransformedBody {tb_args=[var \\ (var, _) <- free_vars], tb_rhs=rhs}
-	  (_,type)
-		=	removeAnnotations
-			{	st_vars			= []
-			,	st_args			= [type \\ (_, type) <- free_vars]
-			,	st_args_strictness=NotStrict
-			,	st_arity		= length free_vars
-			,	st_result		= result_type
-			,	st_context		= []
-			,	st_attr_vars	= []
-			,	st_attr_env		= []
-			}
-	# (fun_ident,  (cs_next_fun_nr, cs_new_functions, cs_fun_heap))
+new_case_function :: (Optional Ident) AType Expression [(FreeVar,AType)] [FreeVar] Int *ConvertState -> (!SymbIdent,!*ConvertState)
+new_case_function opt_id result_type rhs free_vars local_vars group_index cs
+	# args = [var \\ (var, _) <- free_vars]
+	  st_args_strictness = make_dictionaries_strict args 0 NotStrict
+	  (_,args_types) = removeAnnotations [type \\ (_, type) <- free_vars]
+	  (_,result_type) = removeAnnotations result_type
+	  body = TransformedBody {tb_args=args, tb_rhs=rhs}
+	  type = {st_args = args_types, st_args_strictness = st_args_strictness, st_arity = length free_vars,
+	 		  st_result = result_type, st_vars = [], st_context = [], st_attr_vars = [], st_attr_env = []}
+	  (fun_ident, (cs_next_fun_nr, cs_new_functions, cs_fun_heap))
 			= newFunctionWithType opt_id body local_vars type group_index
 					(cs.cs_next_fun_nr, cs.cs_new_functions, cs.cs_fun_heap)
 	= (fun_ident, { cs & cs_fun_heap = cs_fun_heap, cs_next_fun_nr = cs_next_fun_nr, cs_new_functions = cs_new_functions })
+where
+	make_dictionaries_strict :: ![FreeVar] !Int !StrictnessList -> StrictnessList
+	make_dictionaries_strict [{fv_def_level = DictionaryLevel}:args] arg_n strictness
+		= make_dictionaries_strict args (arg_n+1) (add_strictness arg_n strictness)
+	make_dictionaries_strict [_:args] arg_n strictness
+		= make_dictionaries_strict args (arg_n+1) strictness
+	make_dictionaries_strict [] arg_n strictness
+		= strictness
 
 splitGuards :: CasePatterns -> [CasePatterns]
 splitGuards (AlgebraicPatterns index patterns)
@@ -2101,18 +2119,25 @@ instance copy BoundVar
 where
 	copy var=:{var_ident,var_info_ptr} cp_info=:{cp_var_heap}
 		# (var_info, cp_var_heap) = readPtr var_info_ptr cp_var_heap
-		  cp_info & cp_var_heap = cp_var_heap
 		= case var_info of
 			VI_FreeVar name new_info_ptr count type
-				-> ({ var & var_info_ptr = new_info_ptr },
-					{ cp_info & cp_var_heap = cp_info.cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
+				-> ({var & var_info_ptr = new_info_ptr},
+					{cp_info & cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar name new_info_ptr (inc count) type)})
 			VI_LocalVar
-				-> (var, cp_info)
+				-> (var, {cp_info & cp_var_heap = cp_var_heap})
 			VI_BoundVar type
-				# (new_info_ptr, cp_var_heap) = newPtr (VI_Labelled_Empty "copy [BoundVar]") cp_info.cp_var_heap
-				-> ({ var & var_info_ptr = new_info_ptr },
-					{ cp_info & cp_free_vars = [(var_info_ptr, type) : cp_info.cp_free_vars],
-								cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 1 type) })
+				# (new_info_ptr, cp_var_heap) = newPtr (VI_Labelled_Empty "copy [BoundVar]") cp_var_heap
+				-> ({var & var_info_ptr = new_info_ptr},
+					{cp_info & cp_free_vars = [(var_info_ptr, type) : cp_info.cp_free_vars],
+							   cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeVar var_ident new_info_ptr 1 type)})
+			VI_FreeDictionaryVar name new_info_ptr count type
+				-> ({var & var_info_ptr = new_info_ptr},
+					{cp_info & cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeDictionaryVar name new_info_ptr (inc count) type)})
+			VI_BoundDictionaryVar type
+				# (new_info_ptr, cp_var_heap) = newPtr (VI_Labelled_Empty "copy [BoundVar]") cp_var_heap
+				-> ({var & var_info_ptr = new_info_ptr},
+					{cp_info & cp_free_vars = [(var_info_ptr, type) : cp_info.cp_free_vars],
+							   cp_var_heap = cp_var_heap <:= (var_info_ptr, VI_FreeDictionaryVar var_ident new_info_ptr 1 type)})
 			_
 				-> abort "copy [BoundVar] (convertcases)"
 

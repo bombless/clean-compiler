@@ -1907,7 +1907,7 @@ where
 
 	retrieve_class_argument var_info_ptr (args, var_heap)
 		# (VI_ClassVar var_ident new_info_ptr count, var_heap) = readPtr var_info_ptr var_heap
-		= ([{fv_ident = var_ident, fv_info_ptr = new_info_ptr, fv_def_level = NotALevel, fv_count = count } : args], var_heap <:= (var_info_ptr, VI_Empty))
+		= ([{fv_ident = var_ident, fv_info_ptr = new_info_ptr, fv_def_level = DictionaryLevel, fv_count = count } : args], var_heap <:= (var_info_ptr, VI_Empty))
 
 	remove_error_contexts (AmbiguousContext {tc_var} error_contexts) var_heap
 		# var_heap = writePtr tc_var VI_Empty var_heap

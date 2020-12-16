@@ -239,6 +239,7 @@ NoIndex		:== -1
 
 ::  Level	:== Int
 NotALevel 	:==  -1
+DictionaryLevel :== -2
 
 ::	CollectedLocalDefs =
 	{	loc_functions	:: !IndexRange
@@ -813,7 +814,7 @@ pIsSafe			:== True
 				VI_RefFromArrayUpdate !Int ![Selection] |
 				VI_RefFromArrayUpdateToTupleSelector2 !Int ![Selection] !VarInfoPtr |
 				VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection] |
-				VI_FreeVar !Ident !VarInfoPtr !Int !AType | VI_BoundVar !AType | VI_LocalVar |
+				VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */

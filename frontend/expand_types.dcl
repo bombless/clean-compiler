@@ -45,4 +45,5 @@ instance substitute_special [a] | substitute_special a special a=AType; a=TypeCo
 
 class removeAnnotations a :: !a  -> (!Bool, !a)
 
-instance removeAnnotations Type,SymbolType
+instance removeAnnotations Type,AType,SymbolType
+instance removeAnnotations [t] | removeAnnotations t special t=AType
