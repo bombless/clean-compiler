@@ -529,6 +529,7 @@ where
 			# (type_heaps,var_heap) = foldSt (mark_specified_context derived_context) spec_context (type_heaps,var_heap)
 			  (derived_context,var_heap) = remove_specified_contexts derived_context var_heap
 			  (type_heaps,var_heap) = mark_TAll_contexts derived_context spec_context type_heaps var_heap
+			  var_heap = if (derived_context=:[]) var_heap (mark_specified_polymorphic_contexts spec_context derived_context var_heap)
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
 				= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
 			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
@@ -623,6 +624,50 @@ where
 			= (True,[cv_type:tc_types])
 	replace_TempCV_with_TempQV_by_TAll _ tc_types
 		= (False,tc_types)
+
+	mark_specified_polymorphic_contexts [spec_context=:{tc_class=TCGeneric {gtc_class={glob_module,glob_object={ds_index}}},tc_types}:spec_contexts] derived_contexts var_heap
+		| is_polymorpic_context tc_types
+			# var_heap = mark_polymorphic_context derived_contexts spec_context var_heap
+			= mark_specified_polymorphic_contexts spec_contexts derived_contexts var_heap
+			= mark_specified_polymorphic_contexts spec_contexts derived_contexts var_heap
+	where
+		is_polymorpic_context [TempCV _:@:cv_arg_types:types] = is_polymorphic_cv_args cv_arg_types && is_polymorpic_context types
+		is_polymorpic_context types = types=:[]
+
+		is_polymorphic_cv_args [{at_type=TAll}:types] = is_polymorphic_cv_args types
+		is_polymorphic_cv_args types = types=:[]
+
+		mark_polymorphic_context [tc=:{tc_class,tc_var,tc_types} : tcs] spec_tc var_heap
+			| tc_class==spec_tc.tc_class && equal_polymorpic_context tc_types spec_tc.tc_types
+				# (tc_var_info,var_heap) = readPtr tc_var var_heap
+				# var_heap = if (tc_var_info=:VI_Empty) (writePtr tc_var VI_ContextSpecified var_heap) var_heap
+				| spec_tc.tc_var == tc_var
+					= mark_polymorphic_context tcs spec_tc var_heap
+					# (spec_tc_var_info,var_heap) = readPtr spec_tc.tc_var var_heap
+					# spec_tc_var_info
+						= case spec_tc_var_info of
+							VI_ForwardClassVar _
+								-> VI_ForwardClassVars tc_var spec_tc_var_info
+							VI_ForwardClassVars _ _
+								-> VI_ForwardClassVars tc_var spec_tc_var_info
+							_
+								-> VI_ForwardClassVar tc_var
+					# var_heap = writePtr spec_tc.tc_var spec_tc_var_info var_heap
+					= mark_polymorphic_context tcs spec_tc var_heap
+				= mark_polymorphic_context tcs spec_tc var_heap
+		where
+			equal_polymorpic_context [TempCV type_var_n:@:cv_arg_types:tc_types] [TempCV spec_type_var_n:@:spec_cv_arg_types:spec_tc_types]
+				= type_var_n==spec_type_var_n && length cv_arg_types==length spec_cv_arg_types && equal_polymorpic_context tc_types spec_tc_types
+			equal_polymorpic_context [] []
+				= True
+			equal_polymorpic_context _ _
+				= False
+		mark_polymorphic_context [] spec_tc var_heap
+			= var_heap
+	mark_specified_polymorphic_contexts [_:spec_contexts] derived_contexts var_heap
+		= mark_specified_polymorphic_contexts spec_contexts derived_contexts var_heap
+	mark_specified_polymorphic_contexts [] derived_contexts var_heap
+		= var_heap
 
 	clean_up_lifted_type_context tc=:{tc_var,tc_types} (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 		| (sreadPtr tc_var var_heap)=:VI_ContextSpecified
@@ -1185,7 +1230,7 @@ where
 	equiv _ _ heaps
 		= (False, heaps)
 
-set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> !*TypeVarHeap
+set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> *TypeVarHeap
 set_class_args_types (ClassArg {tv_info_ptr} class_args) [type:types] type_var_heap
 	= set_class_args_types class_args types (writePtr tv_info_ptr (TVI_Type type) type_var_heap)
 set_class_args_types (ClassArgPattern bind_dst pattern_vars type_vars) [type=:TA type_cons=:{type_arity} a_types:types] type_var_heap
