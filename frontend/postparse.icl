@@ -343,10 +343,8 @@ where
 			= ([bind:node_defs], ca)
 		collect_functions_in_node_defs [] ca
 			= ([], ca)
-// RWS ... +++ remove recollection
 	collectFunctions locals icl_module ca
-		=	(locals, ca)
-// ... RWS
+		= (locals, ca)
 
 instance collectFunctions (NodeDef a) | collectFunctions a
 where
@@ -1797,8 +1795,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} generic_fun_
 		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
 		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases], def_macros = [macro : c_defs.def_macros]
 		= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] def_counts=:{type_count} ca
-	# def_counts & type_count=type_count+1
+reorganiseDefinitions icl_module [PD_Derive derive_defs : defs] def_counts ca
 	#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 	#! c_defs = { c_defs & def_generic_cases = derive_defs ++ c_defs.def_generic_cases}
 	= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
