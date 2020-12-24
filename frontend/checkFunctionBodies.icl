@@ -383,6 +383,8 @@ checkFunctionBodies (GenerateInstanceBody generic_ident optional_member_ident) f
 			No -> (No,cs)
 			Yes member_ident -> get_optional_member_ident_index member_ident e_input.ei_mod_index cs
 	= (GenerateInstanceBodyLocalMacro generic_ident generic_index optional_member_ident_global_index, [], e_state, e_info, cs)
+checkFunctionBodies fb=:(GenerateGenericBody _) function_ident_for_errors e_input e_state e_info cs
+	= (fb, [], e_state, e_info, cs)
 checkFunctionBodies  _ function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap, es_fun_defs} e_info cs
 	= abort ("checkFunctionBodies " +++ toString function_ident_for_errors +++ "\n")
 

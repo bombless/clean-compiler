@@ -488,6 +488,12 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
 					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
 				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
+			gc=:{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunDefAndIndices fun_def derived_function_indices}}
+				# gc = {gc & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndexAndIndices next_fun_index derived_function_indices}}
+				  gencase_defs & [gci]=gc
+				  (fun_defs,gencase_defs,class_defs,symbol_table,error,dcl_modules)
+					= convert_generic_instances (gci+1) (next_fun_index+1) gencase_defs class_defs symbol_table error dcl_modules
+				-> ([fun_def : fun_defs],gencase_defs,class_defs,symbol_table,error,dcl_modules)
 			gc=:{gc_gcf=GCFC _ gcfc_class_ident=:{id_info},gc_type_cons,gc_pos}
 				# (entry,symbol_table) = readPtr id_info symbol_table
 				-> case entry.ste_kind of

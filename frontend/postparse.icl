@@ -159,6 +159,12 @@ reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ide
 				 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 	= ([fun_def:fun_defs], node_defs, ca)
+reorganiseLocalDefinitions [PD_DeriveFunction pos function_ident type_cons : defs] ca
+	# fun_body = GenerateGenericBody type_cons
+	  fun_def = {fun_ident = function_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+				 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
+	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+	= ([fun_def:fun_defs], node_defs, ca)
 reorganiseLocalDefinitions [] ca
 	= ([], [], ca)
 
@@ -169,6 +175,57 @@ collect_functions_in_node_defs [bind : node_defs] icl_module ca
 	= ([bind:node_defs], ca)
 collect_functions_in_node_defs [] icl_module ca
 	= ([], ca)
+
+collect_generic_function :: FunDef Ident TypeCons Bool *CollectAdmin -> (!FunDef,![Int],!*CollectAdmin)
+collect_generic_function fun_def=:{fun_body = ParsedBody bodies,fun_arity,fun_info} gident type_cons icl_module ca
+	# (bodies,derived_function_indices,ca) = collect_generic_functions_of_parsed_bodies bodies icl_module ca
+	| derived_function_indices=:[]
+		= ({fun_def & fun_body = ParsedBody bodies}, [], ca)
+		# fun_info & fi_properties = fun_info.fi_properties bitor FI_HasLocalGenerate
+		= ({fun_def & fun_body = ParsedBody bodies,fun_info=fun_info}, derived_function_indices, ca)
+where
+	collect_generic_functions_of_parsed_bodies [pb=:{pb_rhs={rhs_alts,rhs_locals}}:pbs] icl_module ca
+		# (rhs_alts, ca) = collectFunctions rhs_alts icl_module ca
+		  (rhs_locals,derived_function_indices,ca) = collect_functions_of_generic_local_defs rhs_locals icl_module ca
+		  (pbs,derived_function_indices2,ca) = collect_generic_functions_of_parsed_bodies pbs icl_module ca
+		  pb & pb_rhs = {rhs_alts=rhs_alts,rhs_locals=rhs_locals}
+		= ([pb:pbs],derived_function_indices++derived_function_indices2,ca)
+	collect_generic_functions_of_parsed_bodies [] icl_module ca
+		= ([],[],ca)
+
+	collect_functions_of_generic_local_defs :: LocalDefs Bool *CollectAdmin -> (!LocalDefs,![Int],!*CollectAdmin)
+	collect_functions_of_generic_local_defs (LocalParsedDefs []) icl_module ca
+		= (NoCollectedLocalDefs,[],ca)
+	collect_functions_of_generic_local_defs (LocalParsedDefs locals) icl_module ca
+		# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions locals ca
+		  (node_defs, ca) = collect_functions_in_node_defs node_defs icl_module ca
+		  (fun_defs,derived_function_indices,ca) = collect_functions_of_generic_local_functions fun_defs 0 icl_module ca
+		#! function_index = ca.ca_fun_count
+		# derived_function_indices = [derived_function_index+function_index \\ derived_function_index<-derived_function_indices]
+		  (range, ca) = addFunctionsRange fun_defs ca
+		= (CollectedLocalDefs {loc_functions = range, loc_nodes = node_defs, loc_in_icl_module=icl_module}, derived_function_indices, ca)
+	where
+		collect_functions_of_generic_local_functions [fun_def=:{fun_body = ParsedBody bodies}:fun_defs] derived_function_index icl_module ca
+			# (fun_defs,fun_properties,ca) = collect_functions_of_generic_local_functions fun_defs (derived_function_index+1) icl_module ca
+			  (bodies,ca) = collectFunctions bodies icl_module ca
+			= ([{fun_def & fun_body = ParsedBody bodies}:fun_defs],fun_properties,ca)
+		collect_functions_of_generic_local_functions [fun_def=:{fun_body = GenerateGenericBody gc_type_cons,fun_pos,fun_ident}:fun_defs] derived_function_index icl_module ca
+			# (fun_defs,derived_function_indices,ca) = collect_functions_of_generic_local_functions fun_defs (derived_function_index+1) icl_module ca
+			# fun_def & fun_arity=fun_arity
+			| fun_ident.id_name==gident.id_name && equal_derivable_TypeCons gc_type_cons type_cons
+				= ([fun_def:fun_defs],[derived_function_index:derived_function_indices],ca)
+				# ca = postParseError fun_pos "not the same name and type as generic instance definition" ca
+				= ([fun_def:fun_defs],[derived_function_index:derived_function_indices],ca)
+		collect_functions_of_generic_local_functions [] derived_function_index icl_module ca
+			= ([],[],ca)
+	collect_functions_of_generic_local_defs locals icl_module ca
+		= (locals,[],ca)
+
+	equal_derivable_TypeCons (TypeConsSymb {type_ident=x}) (TypeConsSymb {type_ident=y}) = x==y
+	equal_derivable_TypeCons (TypeConsQualifiedIdent xmod xname) (TypeConsQualifiedIdent ymod yname) = xmod == ymod && xname == yname
+	equal_derivable_TypeCons _ _ = False
+collect_generic_function fun_def=:{fun_body = GenerateInstanceBody _ _} gindent type_cons icl_module ca
+	= (fun_def, [], ca)
 
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
 
@@ -368,9 +425,11 @@ instance collectFunctions ScannedInstanceAndMembers where
 		= ({inst & sim_members = sim_members }, ca)
 
 instance collectFunctions GenericCaseDef where
-	collectFunctions gc=:{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunDef fun_def}} icl_module ca
-		# (fun_def, ca) = collectFunctions fun_def icl_module ca 
-		= ({gc & gc_gcf = GCF gc_ident {gcf & gcf_body=GCB_FunDef fun_def}}, ca)
+	collectFunctions gc=:{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunDef fun_def,gcf_gident},gc_type_cons} icl_module ca
+		# (fun_def, derived_function_indices, ca) = collect_generic_function fun_def gcf_gident gc_type_cons icl_module ca
+		| derived_function_indices=:[]
+			= ({gc & gc_gcf = GCF gc_ident {gcf & gcf_body=GCB_FunDef fun_def}}, ca)
+			= ({gc & gc_gcf = GCF gc_ident {gcf & gcf_body=GCB_FunDefAndIndices fun_def derived_function_indices}}, ca)
 	collectFunctions gc=:{gc_gcf=GCF _ {gcf_body=GCB_None}} icl_module ca
 		= (gc, ca)
 	collectFunctions gc=:{gc_gcf=GCFC _ _} icl_module ca

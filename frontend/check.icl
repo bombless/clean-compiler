@@ -2386,11 +2386,6 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 	# (n_functions,icl_functions) = usize icl_functions
 	# optional_icl_to_dcl_index_table_for_functions = compute_icl_to_dcl_index_table_for_functions dcl_icl_conversions n_functions
 	# class_instances = renumber_member_indexes_of_class_instances optional_icl_to_dcl_index_table_for_functions class_instances
-	# gencase_defs = renumber_members_of_gencases optional_icl_to_dcl_index_table_for_functions gencase_defs
-
-	# icl_common = {icl_common & com_instance_defs = class_instances, com_gencase_defs = gencase_defs, com_type_defs = type_defs}
-	# (macro_and_function_local_defs,icl_functions)
-		= renumber_icl_function_definitions_as_dcl_definitions optional_icl_to_dcl_index_table_for_functions macro_and_function_local_defs icl_functions
 
 	#! dcl_instances = dcl_mod.dcl_instances
 	#! n_exported_global_functions=dcl_mod.dcl_sizes.[cFunctionDefs]
@@ -2403,6 +2398,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 	# n_dcl_gencases = dcl_gencases.ir_to-dcl_gencases.ir_from
 	# n_dcl_type_funs = dcl_type_funs.ir_to-dcl_type_funs.ir_from
 	# local_functions_index_offset = n_dcl_instances + n_dcl_gencases + n_dcl_specials + n_dcl_type_funs
+
+	# gencase_defs = renumber_members_of_gencases optional_icl_to_dcl_index_table_for_functions local_functions_index_offset gencase_defs
+
+	# icl_common = {icl_common & com_instance_defs = class_instances, com_gencase_defs = gencase_defs, com_type_defs = type_defs}
+	# (macro_and_function_local_defs,icl_functions)
+		= renumber_icl_function_definitions_as_dcl_definitions optional_icl_to_dcl_index_table_for_functions macro_and_function_local_defs icl_functions
 
 	# optional_macro_conversions
 		= case optional_macro_conversions of
@@ -2506,6 +2507,12 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 				= case (dcl_gencase,icl_gencase) of
 					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun,gcf_generic_info=dcl_generic_info,gcf_generic_instance_deps=dcl_generic_instance_deps}},
 					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndex icl_fun,gcf_generic_info=icl_generic_info,gcf_generic_instance_deps=icl_generic_instance_deps}})
+						#! new_table = {new_table & [dcl_fun] = icl_fun}
+						# (icl_gencases, error)
+							= compare_icl_and_dcl_generic_info icl_generic_info dcl_generic_info icl_generic_instance_deps dcl_generic_instance_deps icl_gencase dcl_gencase icl_index icl_gencases error
+						-> (new_table, icl_gencases, error)
+					({gc_gcf=GCF _ {gcf_body = GCB_FunIndex dcl_fun,gcf_generic_info=dcl_generic_info,gcf_generic_instance_deps=dcl_generic_instance_deps}},
+					 {gc_gcf=GCF _ {gcf_body = GCB_FunIndexAndIndices icl_fun _,gcf_generic_info=icl_generic_info,gcf_generic_instance_deps=icl_generic_instance_deps}})
 						#! new_table = {new_table & [dcl_fun] = icl_fun}
 						# (icl_gencases, error)
 							= compare_icl_and_dcl_generic_info icl_generic_info dcl_generic_info icl_generic_instance_deps dcl_generic_instance_deps icl_gencase dcl_gencase icl_index icl_gencases error
@@ -2662,25 +2669,31 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						= renumber_member_indexes_of_class_instances (class_inst_index+1) class_instances
 						= class_instances
 
-		renumber_members_of_gencases No gencases
+		renumber_members_of_gencases No local_functions_index_offset gencases
 			= gencases
-		renumber_members_of_gencases (Yes function_conversion_table) gencases
-			= renumber_gencase_members 0 gencases
+		renumber_members_of_gencases (Yes function_conversion_table) local_functions_index_offset gencases
+			= renumber_gencase_members 0 local_functions_index_offset gencases
 		where
-			renumber_gencase_members gencase_index gencases
+			renumber_gencase_members gencase_index local_functions_index_offset gencases
 				| gencase_index < size gencases
 					# (gencase,gencases) = gencases![gencase_index]
 					= case gencase of
 						{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndex icl_index}}
 							# dcl_index = function_conversion_table.[icl_index]
-							# gencase = {gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}}
-							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (inc gencase_index) gencases
+							  gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndex dcl_index}
+							  gencases & [gencase_index] = gencase
+							-> renumber_gencase_members (inc gencase_index) local_functions_index_offset gencases
+						{gc_gcf=GCF gc_ident gcf=:{gcf_body=GCB_FunIndexAndIndices icl_index derive_fun_indices}}
+							# dcl_index = function_conversion_table.[icl_index]
+							  derive_fun_indices = [derive_fun_index+local_functions_index_offset \\ derive_fun_index<-derive_fun_indices]
+							  gencase & gc_gcf=GCF gc_ident {gcf & gcf_body = GCB_FunIndexAndIndices dcl_index derive_fun_indices}
+							  gencases & [gencase_index] = gencase
+							-> renumber_gencase_members (inc gencase_index) local_functions_index_offset gencases
 						{gc_gcf=GCFS gcfs}
 							# gcfs = renumber_gcfs gcfs function_conversion_table
-							# gencase = {gencase & gc_gcf=GCFS gcfs}
-							# gencases = {gencases & [gencase_index] = gencase}
-							-> renumber_gencase_members (gencase_index+1) gencases
+							  gencase & gc_gcf=GCFS gcfs
+							  gencases & [gencase_index] = gencase
+							-> renumber_gencase_members (gencase_index+1) local_functions_index_offset gencases
 					= gencases
 
 			renumber_gcfs [!gcf=:{gcf_body=GCB_FunIndex icl_index}:gcfs!] function_conversion_table
@@ -3061,7 +3074,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 		# (predef_symbols_for_transform, cs_predef_symbols) = get_predef_symbols_for_transform cs_predef_symbols
 		  (groups, icl_functions, macro_defs, var_heap, expr_heap, cs_symbol_table, cs_error)
-				= partitionateAndLiftFunctions (icl_global_functions_ranges++icl_generic_ranges) (icl_instances_ranges++icl_type_fun_ranges)
+				= partitionateAndLiftFunctions icl_global_functions_ranges icl_generic_ranges (icl_instances_ranges++icl_type_fun_ranges)
 		  				main_dcl_module_n predef_symbols_for_transform icl_mod.icl_functions macro_defs
 									  			heaps.hp_var_heap heaps.hp_expression_heap cs_symbol_table cs_error
 

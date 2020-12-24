@@ -271,6 +271,7 @@ GlobalOrClassDefsContext	:== 6 // cGlobalContext bitor ClassDefsContext
 ClassOrInstanceDefsContext	:== 12 // ClassDefsContext bitor InstanceDefsContext
 WhereOfMemberDefsContext	:== 16
 MemberOrWhereOfMemberDefsContext :== 28 // ClassOrInstanceDefsContext bitor WhereOfMemberDefsContext
+WhereOfGenericFunctionContext :== 32
 /*
 	A cClassOrInstanceDefsContext is a further restriction on a
 	local context, because no local node defs are allowed
@@ -486,6 +487,9 @@ try_definition parseContext DeriveToken pos pState
 	| isMemberOrWhereOfMemberDefsContext parseContext
 		# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
 		= (True, derive_instance_def, pState)
+	| parseContext bitand WhereOfGenericFunctionContext<>0
+		# (derive_instance_def, pState) = wantDeriveLocalGenericDefinition parseContext pos pState
+		= (True, derive_instance_def, pState)
 		= (False,abort "no def(2)",parseError "definition" No "derive declarations are only at the global level" pState)
 try_definition parseContext InstanceToken pos pState
 	| ~(isGlobalContext parseContext)
@@ -565,13 +569,13 @@ where
 	wantMemberRhs :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
 	wantMemberRhs localsExpected definingSymbol pState
 		# (alts, definingSymbol, pState) = want_LetsFunctionBody definingSymbol localsExpected pState
-		  (locals, pState) = optionalMemberLocals WhereToken localsExpected pState
+		  (locals, pState) = optionalMemberLocals localsExpected pState
 		= ({ rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
 	where
-		optionalMemberLocals :: !Token !Bool !ParseState -> (!LocalDefs, !ParseState)
-		optionalMemberLocals dem_token localsExpected pState
+		optionalMemberLocals :: !Bool !ParseState -> (!LocalDefs, !ParseState)
+		optionalMemberLocals localsExpected pState
 		    # (off_token, pState) = nextToken FunctionContext pState
-			| dem_token == off_token
+			| off_token=:WhereToken
 				= wantMemberLocals pState
 			# (ss_useLayout, pState) = accScanState UseLayout pState
 			| off_token =: CurlyOpenToken && ~ ss_useLayout && localsExpected
@@ -763,7 +767,7 @@ wantGenericFunctionDefinition name parseContext pos pState
 
 	# (ss_useLayout, pState) = accScanState UseLayout pState
 	# localsExpected = has_args || isGlobalContext parseContext || ~ ss_useLayout
-    # (rhs, _, pState) = wantRhs localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
+	# (rhs, _, pState) = wantRhsGeneric localsExpected (ruleDefiningRhsSymbol parseContext has_args) pState
 
 	# generic_case =
 		{ gc_pos = pos
@@ -779,6 +783,28 @@ wantGenericFunctionDefinition name parseContext pos pState
 					gcf_generic_instance_deps = AllGenericInstanceDependencies }
 		}
 	= (True, PD_GenericCase generic_case generic_fun_ident, pState)
+where
+	wantRhsGeneric :: !Bool !RhsDefiningSymbol !ParseState -> (!Rhs, !RhsDefiningSymbol, !ParseState) // FunctionAltDefRhs
+	wantRhsGeneric localsExpected definingSymbol pState
+		# (alts, definingSymbol, pState) = want_LetsFunctionBody definingSymbol localsExpected pState
+		  (locals, pState) = optionalLocalsGeneric localsExpected pState
+		= ({rhs_alts = alts, rhs_locals = locals}, definingSymbol, pState)
+
+	optionalLocalsGeneric :: !Bool !ParseState -> (!LocalDefs, !ParseState)
+	optionalLocalsGeneric localsExpected pState
+	    # (off_token, pState) = nextToken FunctionContext pState
+		| off_token=:WhereToken
+			= wantLocalsGeneric pState
+		# (ss_useLayout, pState) = accScanState UseLayout pState
+		| off_token =: CurlyOpenToken && ~ ss_useLayout && localsExpected
+			= wantLocalsGeneric (tokenBack pState)
+			= (LocalParsedDefs [], tokenBack pState)
+
+	wantLocalsGeneric :: !ParseState -> (LocalDefs, !ParseState)
+	wantLocalsGeneric pState
+		# pState			= wantBeginGroup "local definitions" pState
+		  (defs, pState)	= wantDefinitions (cLocalContext bitor WhereOfGenericFunctionContext) pState
+		= (LocalParsedDefs defs, wantEndLocals pState)
 
 wantForeignExportDefinition pState
 	# (token, pState) = nextToken GeneralContext pState
@@ -2345,6 +2371,28 @@ get_type_cons (TQualifiedIdent module_id ident_name []) pState
 get_type_cons type pState
 	# pState = parseError "generic type" No "type constructor" pState
 	= (ErroneousTypeCons, pState)
+
+wantDeriveLocalGenericDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
+wantDeriveLocalGenericDefinition parseContext pos pState
+	# (token, pState) = nextToken TypeContext pState
+	= case token of
+		IdentToken name
+			# (ok, {at_type=type}, pState) = trySimpleType TA_None pState
+			# (type_cons, pState) = get_derivable_type_cons type pState
+			# (function_ident, pState) = stringToIdent name IC_Expression pState
+ 			# pState = wantEndOfDefinition "derive definition" pState
+			-> (PD_DeriveFunction pos function_ident type_cons, pState)
+		_
+			-> (PD_Erroneous, parseError "Generic Definition" (Yes token) "<identifier>" pState)
+where
+	get_derivable_type_cons :: !Type !*ParseState -> (!TypeCons, !*ParseState)
+	get_derivable_type_cons (TA type_symb []) pState
+		= (TypeConsSymb type_symb, pState)
+	get_derivable_type_cons (TQualifiedIdent module_id ident_name []) pState
+		= (TypeConsQualifiedIdent module_id ident_name, pState)
+	get_derivable_type_cons type pState
+		# pState = parseError "generic type" No "derivable type constructor" pState
+		= (ErroneousTypeCons, pState)
 
 wantDeriveInstanceDefinition :: !ParseContext !Position !*ParseState -> (!ParsedDefinition, !*ParseState)
 wantDeriveInstanceDefinition parseContext pos pState

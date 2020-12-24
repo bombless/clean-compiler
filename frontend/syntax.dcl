@@ -278,6 +278,7 @@ cIsNotAFunction :== False
 	| 	PD_GenericCase GenericCaseDef Ident
 	|	PD_Derive [GenericCaseDef]
 	|	PD_DeriveInstanceMember Position Ident Ident !Int !(Optional Ident)
+	|	PD_DeriveFunction !Position !Ident !TypeCons
 	|	PD_Erroneous
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
@@ -515,9 +516,11 @@ instance == GenericDependency
 :: GenericCaseBody 
 	= GCB_None 									// to be generated
 	| GCB_FunIndex !Index
+	| GCB_FunIndexAndIndices !Index ![Index]
 	| GCB_FunAndMacroIndex !Index !Index
 	| GCB_MacroIndex !Index
 	| GCB_FunDef !FunDef
+	| GCB_FunDefAndIndices !FunDef ![Index]
 	| GCB_ParsedBody ![ParsedExpr] !Rhs
 
 ::	GenericInstanceDependencies
@@ -700,6 +703,7 @@ FI_UnusedUsed :== 128			// used in module trans
 FI_HasTypeCodes :== 256
 FI_FusedMember :== 512			// used in module trans to mark fused versions of instance members
 FI_DefaultMemberWithDerive :== 1024
+FI_HasLocalGenerate :== 2048
 
 ::	FunInfo =
 	{	fi_calls			:: ![FunCall]
@@ -744,6 +748,7 @@ FI_DefaultMemberWithDerive :== 1024
 					| Expanding ![FreeVar] // the parameters of the newly generated function
 					| GeneratedBody // the body will be generated automatically - for generics
 					| GenerateInstanceBody !Ident !(Optional Ident)
+					| GenerateGenericBody !TypeCons
 					| GenerateInstanceBodyChecked !Ident !GlobalIndex !(Optional IdentGlobalIndex)
 					| GenerateInstanceBodyLocalMacro !Ident !GlobalIndex !(Optional IdentGlobalIndex)
 					| PartitioningGenerateInstanceBodyLocalMacro !Ident !GlobalIndex !(Optional IdentGlobalIndex) !Int 

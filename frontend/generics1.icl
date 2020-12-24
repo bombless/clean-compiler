@@ -344,11 +344,16 @@ where
 					TransformedBody _ 
 						// does not need a generic representation
 						-> (funs_and_groups, gs)
-					GeneratedBody	
+					GeneratedBody
 						// needs a generic representation
 						# generic_bimap = gs.gs_predefs.psd_predefs_a.[PD_GenericBimap]
 						#! is_generic_bimap = gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
 						-> build_generic_type_rep glob_module glob_object (not is_generic_bimap) is_generic_bimap gc_ident.id_name gc_pos funs_and_groups gs
+			GCF gc_ident {gcf_body=GCB_FunIndexAndIndices _ _,gcf_generic}
+				// needs a generic representation
+				# generic_bimap = gs.gs_predefs.psd_predefs_a.[PD_GenericBimap]
+				#! is_generic_bimap = gcf_generic.gi_module==generic_bimap.pds_module && gcf_generic.gi_index==generic_bimap.pds_def
+				-> build_generic_type_rep glob_module glob_object (not is_generic_bimap) is_generic_bimap gc_ident.id_name gc_pos funs_and_groups gs
 			GCFS gcfs
 				# ({pds_module=generic_bimap_module,pds_def=generic_bimap_index},gs) = gs!gs_predefs.psd_predefs_a.[PD_GenericBimap]
 				#! build_type_rep = Any (\ {gcf_generic={gi_module,gi_index}} -> not (gi_module==generic_bimap_module && gi_index==generic_bimap_index)) gcfs
@@ -2595,6 +2600,14 @@ where
 			= build_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
 									dcl_functions st1 st2
 		build_main_instance module_index
+				{gc_gcf=GCF gc_ident {gcf_body = GCB_FunIndexAndIndices fun_index local_fun_indices,gcf_kind,gcf_generic,gcf_generic_info}, gc_type, gc_type_cons,gc_pos}
+				(dcl_functions, st1, st2)
+			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
+			#! generic_info_index = index_gen_cons_with_info_type gc_type gs_predefs
+			# st2 = build_local_main_instances_ ins_type gc_ident local_fun_indices gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index st2
+			= build_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
+									dcl_functions st1 st2
+		build_main_instance module_index
 				{gc_gcf=GCFS gcfs,gc_type,gc_type_cons,gc_pos}
 				(dcl_functions, st1, st2)
 			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
@@ -2663,6 +2676,34 @@ where
 											fun_type_with_generic_info generic_info_index generic_info grc_generic_instance_deps st
 				= (dcl_functions, ins_info, st)
 
+		build_local_main_instances_ :: InstanceType Ident [Int] TypeKind GlobalIndex TypeCons Position Int !*SpecializeState -> *SpecializeState
+		build_local_main_instances_ ins_type gc_ident fun_indices gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index
+								st=:{ss_modules=modules,ss_heaps=heaps,ss_error=error}
+			# (gen_info_ptr, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_info_ptr
+			  ({gen_classes,gen_rep_conses}, hp_generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
+			  heaps & hp_generic_heap=hp_generic_heap
+			  (Yes class_info) = lookupGenericClassInfo gcf_kind gen_classes
+			| generic_info_index>=0
+				= {st & ss_error = reportError gc_ident.id_name gc_pos "cannot derive a local function for this type" error}
+			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+			# (ins_type,hp_type_heaps,hp_var_heap,error)
+				= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+					heaps.hp_type_heaps heaps.hp_var_heap error
+			# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
+			# st & ss_modules=modules, ss_heaps=heaps, ss_error=error
+			= update_functions fun_indices ins_type member_def st
+		where
+			update_functions [fun_index:fun_indices] ins_type member_def st=:{ss_heaps=heaps,ss_error=error,ss_funs=funs}
+				#! (fun_type, heaps, error)
+					= determine_type_of_member_instance member_def ins_type heaps error
+				# ({fun_ident},funs) = funs![fun_index]
+				# st & ss_heaps=heaps, ss_error=error, ss_funs=funs
+				#! st = update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic
+												fun_type generic_info_index -1 AllGenericInstanceDependencies st
+				= update_functions fun_indices ins_type member_def st
+			update_functions [] ins_type member_def st
+				= st
+
 	build_shorthand_instances_in_modules :: !Index
 			!*{#CommonDefs} !*{#DclModule} (FunsAndGroups, (!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
 		-> (!*{#CommonDefs}, *{#DclModule},(FunsAndGroups, (!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
@@ -2704,6 +2745,8 @@ where
 		# fun_index
 			= case gcf_body of
 				GCB_FunIndex fun_index
+					-> fun_index
+				GCB_FunIndexAndIndices fun_index _
 					-> fun_index
 				GCB_FunAndMacroIndex fun_index macro_index
 					-> fun_index
@@ -2984,7 +3027,8 @@ where
 						-> {st & ss_error=error}
 					# fun = {fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = Yes symbol_type, fun_arity=fun_arity}
 					-> {st & ss_funs.[fun_index] = fun}
-			GeneratedBody		// derived case
+			_	// derived case
+			  | fun_body=:GeneratedBody || fun_body=:GenerateGenericBody _
 				#! (TransformedBody {tb_args, tb_rhs}, st)
 					= buildGenericCaseBody gs_main_module gc_pos gc_type_cons gc_ident generic_info_index gcf_generic gs_predefs st
 				| length tb_args>32
@@ -4087,6 +4131,8 @@ where
 		  generic_heap = writePtr gen_info_ptr {gen_info & gen_rep_conses=gen_rep_conses} heaps.hp_generic_heap
 		  st & ss_heaps = {heaps & hp_generic_heap = generic_heap}
 		= (main_module_index,fun_index,gen_rep_conses,st)
+	get_function_or_copied_macro_index (GCB_FunIndexAndIndices fun_index _) module_index main_module_index local_fun_index gen_info_ptr gen_cons_index gen_rep_conses st
+		= (module_index,fun_index,gen_rep_conses,st)
 
 	copy_generic_case_macro :: !Int !Int !(Optional SymbolType) !Int !Int !GenericInstanceDependencies !Int !*SpecializeState -> (!Int,!*SpecializeState)
 	copy_generic_case_macro macro_module_index macro_index optional_fun_type gen_cons_index generic_info generic_instance_deps main_module_index st

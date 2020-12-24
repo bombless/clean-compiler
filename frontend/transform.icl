@@ -1230,13 +1230,14 @@ combine_consecutive_ranges [range]
 combine_consecutive_ranges []
 	= [!!]
 
-partitionateAndLiftFunctions :: ![IndexRange] ![IndexRange] !Index !PredefSymbolsForTransform
+partitionateAndLiftFunctions :: ![IndexRange] ![IndexRange] ![IndexRange] !Index !PredefSymbolsForTransform
 											   !*{#FunDef} !*{#*{#FunDef}} !*VarHeap !*ExpressionHeap !*SymbolTable !*ErrorAdmin
 								-> (!*{!Group},!*{#FunDef},!*{#*{#FunDef}},!*VarHeap,!*ExpressionHeap,!*SymbolTable,!*ErrorAdmin)
-partitionateAndLiftFunctions ranges1 ranges2 main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
+partitionateAndLiftFunctions ranges1 generic_ranges ranges2 main_dcl_module_n predef_symbols_for_transform fun_defs macro_defs var_heap symbol_heap symbol_table error
 	# ranges1 = remove_empty_ranges ranges1
+	  generic_ranges = remove_empty_ranges generic_ranges
 	  ranges2 = remove_empty_ranges ranges2
-	  combined_ranges = combine_consecutive_ranges (sortBy (\ {ir_from=f1} {ir_from=f2} = f1<f2) (ranges1++ranges2))
+	  combined_ranges = combine_consecutive_ranges (sortBy (\ {ir_from=f1} {ir_from=f2} = f1<f2) (ranges1++generic_ranges++ranges2))
 	  max_fun_nr = cMAXINT
 	  partitioning_info = {	ps_var_heap = var_heap, ps_symbol_heap = symbol_heap, ps_symbol_table = symbol_table, ps_fun_defs=fun_defs, ps_macro_defs=macro_defs,
 							ps_error = error, ps_deps = [], ps_next_num = 0, ps_next_group = 0, ps_groups = [],
@@ -1244,7 +1245,9 @@ partitionateAndLiftFunctions ranges1 ranges2 main_dcl_module_n predef_symbols_fo
 	  pi = {pi_predef_symbols_for_transform=predef_symbols_for_transform,pi_main_dcl_module_n=main_dcl_module_n,
 			pi_reset_body_of_rhs_macros=False,pi_global_function_ranges=combined_ranges}
 	  partitioning_info	= partitionate_functions_in_ranges max_fun_nr pi ranges1 partitioning_info
+	  partitioning_info	= partitionate_generic_functions_without_derive_in_ranges max_fun_nr pi generic_ranges partitioning_info
 	  partitioning_info & ps_next_group = 1000000000
+	  partitioning_info	= partitionate_generic_functions_with_derive_in_ranges max_fun_nr pi generic_ranges partitioning_info
 	  partitioning_info	= partitionate_functions_in_ranges max_fun_nr pi ranges2 partitioning_info
 	  {ps_groups,ps_symbol_table,ps_var_heap,ps_symbol_heap,ps_fun_defs,ps_macro_defs,ps_error,ps_unexpanded_dcl_macros} = partitioning_info
 	  (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
@@ -1262,6 +1265,28 @@ where
 
 		partitionate_global_function max_fun_nr pi=:{pi_main_dcl_module_n} fun_index ps
 			= partitionate_function pi_main_dcl_module_n max_fun_nr fun_index pi ps
+
+	partitionate_generic_functions_without_derive_in_ranges max_fun_nr pi ranges partitioning_info
+		= foldSt (partitionate_generic_functions_without_derive max_fun_nr pi) ranges partitioning_info
+	where
+		partitionate_generic_functions_without_derive max_fun_nr pi {ir_from,ir_to} ps
+			= iFoldSt (partitionate_generic_function_without_derive max_fun_nr pi) ir_from ir_to ps
+
+		partitionate_generic_function_without_derive max_fun_nr pi=:{pi_main_dcl_module_n} fun_index ps
+			| ps.ps_fun_defs.[fun_index].fun_info.fi_properties bitand FI_HasLocalGenerate==0
+				= partitionate_function pi_main_dcl_module_n max_fun_nr fun_index pi ps
+				= ps
+
+	partitionate_generic_functions_with_derive_in_ranges max_fun_nr pi ranges partitioning_info
+		= foldSt (partitionate_generic_functions_with_derive max_fun_nr pi) ranges partitioning_info
+	where
+		partitionate_generic_functions_with_derive max_fun_nr pi {ir_from,ir_to} ps
+			= iFoldSt (partitionate_generic_function_with_derive max_fun_nr pi) ir_from ir_to ps
+
+		partitionate_generic_function_with_derive max_fun_nr pi=:{pi_main_dcl_module_n} fun_index ps
+			| ps.ps_fun_defs.[fun_index].fun_info.fi_properties bitand FI_HasLocalGenerate<>0
+				= partitionate_function pi_main_dcl_module_n max_fun_nr fun_index pi ps
+				= ps
 
 get_predef_symbols_for_transform :: !PredefinedSymbols -> PredefSymbolsForTransform
 get_predef_symbols_for_transform predef_symbols
@@ -1359,6 +1384,9 @@ partitionate_called_function mod_index max_fun_nr fun_index pi ps
 			-> try_to_close_group max_fun_nr (-1) fun_index fun_number min_dep pi ps
 		PartitioningGenerateInstanceBodyLocalMacro _ _ _ fun_number
 			-> (fun_number, ps)
+		GenerateGenericBody _
+			// do not allocate a group, it will be allocated during the generic phase
+			-> (max_fun_nr, ps)
 
 index_in_ranges index [!{ir_from, ir_to}:ranges!]
 	= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
