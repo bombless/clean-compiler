@@ -1241,9 +1241,11 @@ partitionateAndLiftFunctions ranges1 ranges2 main_dcl_module_n predef_symbols_fo
 	  partitioning_info = {	ps_var_heap = var_heap, ps_symbol_heap = symbol_heap, ps_symbol_table = symbol_table, ps_fun_defs=fun_defs, ps_macro_defs=macro_defs,
 							ps_error = error, ps_deps = [], ps_next_num = 0, ps_next_group = 0, ps_groups = [],
 							ps_unexpanded_dcl_macros=[] }
-	  partitioning_info	= partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges1 partitioning_info
+	  pi = {pi_predef_symbols_for_transform=predef_symbols_for_transform,pi_main_dcl_module_n=main_dcl_module_n,
+			pi_reset_body_of_rhs_macros=False,pi_global_function_ranges=combined_ranges}
+	  partitioning_info	= partitionate_functions_in_ranges max_fun_nr pi ranges1 partitioning_info
 	  partitioning_info & ps_next_group = 1000000000
-	  partitioning_info	= partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges2 partitioning_info
+	  partitioning_info	= partitionate_functions_in_ranges max_fun_nr pi ranges2 partitioning_info
 	  {ps_groups,ps_symbol_table,ps_var_heap,ps_symbol_heap,ps_fun_defs,ps_macro_defs,ps_error,ps_unexpanded_dcl_macros} = partitioning_info
 	  (reversed_ps_groups,fun_defs) = remove_macros_from_groups_and_reverse ps_groups ps_fun_defs []
 	  groups = {{group_members = group} \\ group <- reversed_ps_groups}
@@ -1252,17 +1254,14 @@ partitionateAndLiftFunctions ranges1 ranges2 main_dcl_module_n predef_symbols_fo
 where
 	remove_empty_ranges ranges = [range\\range<-ranges | range.ir_from<>range.ir_to]
 
-	partitionate_functions_in_ranges main_dcl_module_n max_fun_nr combined_ranges ranges partitioning_info
-		= foldSt (partitionate_functions main_dcl_module_n max_fun_nr combined_ranges) ranges partitioning_info
+	partitionate_functions_in_ranges max_fun_nr pi ranges partitioning_info
+		= foldSt (partitionate_functions max_fun_nr pi) ranges partitioning_info
+	where
+		partitionate_functions max_fun_nr pi {ir_from,ir_to} ps
+			= iFoldSt (partitionate_global_function max_fun_nr pi) ir_from ir_to ps
 
-	partitionate_functions mod_index max_fun_nr combined_ranges {ir_from,ir_to} ps
-		= iFoldSt (partitionate_global_function mod_index max_fun_nr combined_ranges) ir_from ir_to ps
-
-	partitionate_global_function mod_index max_fun_nr combined_ranges fun_index ps
-		# pi = {pi_predef_symbols_for_transform=predef_symbols_for_transform,pi_main_dcl_module_n=main_dcl_module_n,pi_reset_body_of_rhs_macros=False,
-				pi_global_function_ranges=combined_ranges}
-		# (_,ps) = partitionate_function mod_index max_fun_nr fun_index pi ps
-		= ps
+		partitionate_global_function max_fun_nr pi=:{pi_main_dcl_module_n} fun_index ps
+			= partitionate_function pi_main_dcl_module_n max_fun_nr fun_index pi ps
 
 get_predef_symbols_for_transform :: !PredefinedSymbols -> PredefSymbolsForTransform
 get_predef_symbols_for_transform predef_symbols
@@ -1290,7 +1289,7 @@ restore_unexpanded_dcl_macros [(macro_module_index,macro_index,macro_def):unexpa
 restore_unexpanded_dcl_macros [] macro_defs
 	= macro_defs
 
-partitionate_function :: Int Int !Int PartitioningInfo !*PartitioningState -> (!Int,!*PartitioningState)
+partitionate_function :: Int Int !Int PartitioningInfo !*PartitioningState -> *PartitioningState
 partitionate_function mod_index max_fun_nr fun_index pi ps
 	# (fun_def, ps) = ps!ps_fun_defs.[fun_index]
 	= case fun_def.fun_body of
@@ -1300,25 +1299,22 @@ partitionate_function mod_index max_fun_nr fun_index pi ps
 					(max_fun_nr,
 						{ ps & ps_fun_defs={ ps.ps_fun_defs & [fun_index] = { fun_def & fun_body = PartitioningFunction body fun_number }},
 							   ps_next_num = inc fun_number, ps_deps = [FunctionOrIclMacroIndex fun_index : ps.ps_deps] })
-			-> try_to_close_group max_fun_nr (-1) fun_index fun_number min_dep pi ps
+			# (_,ps) = try_to_close_group max_fun_nr (-1) fun_index fun_number min_dep pi ps
+			-> ps
 		PartitioningFunction _ fun_number
-			-> (fun_number, ps)
+			-> ps
 		TransformedBody _
 			| fun_def.fun_info.fi_group_index == NoIndex
-				# ps =  add_called_macros fun_def.fun_info.fi_calls ps
-				-> (max_fun_nr,
-//					-> (max_fun_nr, ({ fun_defs & [fun_index] = {fun_def & fun_info.fi_group_index = -2-ps.ps_next_group }},
-						{ps & ps_fun_defs.[fun_index] = {fun_def & fun_info.fi_group_index = ps.ps_next_group },
-							  ps_next_group = inc ps.ps_next_group, ps_groups = [ [FunctionOrIclMacroIndex fun_index] : ps.ps_groups]}
-//							{ps & ps_next_group = ps.ps_next_group}
-						)
-				-> (max_fun_nr, ps)
+				# ps = add_called_macros fun_def.fun_info.fi_calls ps
+				-> {ps & ps_fun_defs.[fun_index] = {fun_def & fun_info.fi_group_index = ps.ps_next_group },
+						 ps_next_group = inc ps.ps_next_group, ps_groups = [ [FunctionOrIclMacroIndex fun_index] : ps.ps_groups]}
+				-> ps
 		GeneratedBody
 			// do not allocate a group, it will be allocated during the generic phase
-			-> (max_fun_nr, ps)
+			-> ps
 		GenerateInstanceBodyChecked _ _ _
 			// do not allocate a group, it will be allocated during the generic phase
-			-> (max_fun_nr, ps)
+			-> ps
 
 partitionate_called_function :: Int Int !Int PartitioningInfo !*PartitioningState -> (!Int,!*PartitioningState)
 partitionate_called_function mod_index max_fun_nr fun_index pi ps

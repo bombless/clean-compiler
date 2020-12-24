@@ -111,6 +111,65 @@ MakeNewGenericImpOrDefFunction name arity body kind prio opt_type pos
 	:== { fun_ident = name, fun_arity = arity, fun_priority = prio, fun_type = opt_type, fun_kind = kind,
 		  fun_body = ParsedBody body, fun_pos = pos, fun_lifted = 0, fun_info = {EmptyFunInfo & fi_properties = FI_GenericFun} }
 
+reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[NodeDef ParsedExpr],*CollectAdmin)
+reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
+	# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+	= (fun_defs, [{ nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
+reorganiseLocalDefinitions [PD_Function pos name is_infix [] {rhs_alts, rhs_locals} FK_NodeDefOrFunction : defs] ca
+	# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+	= (fun_defs, [{ nd_dst = PE_Ident name, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
+reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
+	# prio = if is_infix DefaultPriority NoPrio
+	  fun_arity = length args
+	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
+	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+	  fun = MakeNewImpOrDefFunction name fun_arity [{pb_args = args, pb_rhs = rhs, pb_position = pos} : bodies] fun_kind prio No pos
+	= ([fun : fun_defs], node_defs, ca)
+reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
+	= case defs of
+		[PD_Function pos name is_infix args rhs fun_kind : othe]
+			| fun_kind=:FK_Caf
+				# ca = postParseError pos "No typespecification for local graph definitions allowed" ca
+				-> reorganiseLocalDefinitions (tl defs) ca
+			| belongsToTypeSpec name1 prio name is_infix
+				# fun_arity = determineArity args type
+				# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
+				  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+				  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type pos1
+				-> ([fun : fun_defs], node_defs, ca)
+				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+		[PD_NodeDef pos pattern=:(PE_Ident id) rhs : defs]
+			| not (belongsToTypeSpec name1 prio id False)
+				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+			| arity type<>0
+				-> reorganiseLocalDefinitions defs (postParseError pos "this alternative has not enough arguments" ca)
+			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			  fun = MakeNewImpOrDefFunction id 0
+							[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
+							(FK_Function cNameNotLocationDependent) prio type pos1
+			-> ([fun : fun_defs], node_defs, ca)
+		_
+			-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
+  where
+	arity (Yes {st_arity}) = st_arity
+	arity No = 2 // it was specified as infix
+reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
+	# fun_body = GenerateInstanceBody generic_ident optional_member_ident
+	  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+				 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
+	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+	= ([fun_def:fun_defs], node_defs, ca)
+reorganiseLocalDefinitions [] ca
+	= ([], [], ca)
+
+collect_functions_in_node_defs :: [NodeDef ParsedExpr] Bool *CollectAdmin -> ([NodeDef ParsedExpr],*CollectAdmin)
+collect_functions_in_node_defs [bind : node_defs] icl_module ca
+	# (bind, ca) = collectFunctions bind icl_module ca
+	  (node_defs, ca) = collect_functions_in_node_defs node_defs icl_module ca
+	= ([bind:node_defs], ca)
+collect_functions_in_node_defs [] icl_module ca
+	= ([], ca)
+
 class collectFunctions a :: a Bool !*CollectAdmin -> (a, !*CollectAdmin)
 
 instance collectFunctions ParsedExpr
@@ -280,69 +339,10 @@ where
 		= (NoCollectedLocalDefs, ca)
 	collectFunctions (LocalParsedDefs locals) icl_module ca
 		# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions locals ca
-		  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
+		  (node_defs, ca) = collect_functions_in_node_defs node_defs icl_module ca
 		  (fun_defs, ca) = collectFunctions fun_defs icl_module ca
 		  (range, ca) = addFunctionsRange fun_defs ca
 		= (CollectedLocalDefs { loc_functions = range, loc_nodes = node_defs, loc_in_icl_module=icl_module }, ca)
-	where
-		reorganiseLocalDefinitions :: [ParsedDefinition] *CollectAdmin -> ([FunDef],[NodeDef ParsedExpr],*CollectAdmin)
-		reorganiseLocalDefinitions [PD_NodeDef pos pattern {rhs_alts,rhs_locals} : defs] ca
-			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-			= (fun_defs, [{ nd_dst = pattern, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
-		reorganiseLocalDefinitions [PD_Function pos name is_infix [] {rhs_alts, rhs_locals} FK_NodeDefOrFunction : defs] ca
-			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-			= (fun_defs, [{ nd_dst = PE_Ident name, nd_alts = rhs_alts, nd_locals = rhs_locals, nd_position = pos } : node_defs], ca)
-		reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : defs] ca
-			# prio = if is_infix DefaultPriority NoPrio
-			  fun_arity = length args
-			  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-			  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
-			= ([ fun : fun_defs ], node_defs, ca)
-		reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
-			= case defs of
-				[PD_Function pos name is_infix args rhs fun_kind : othe] // PK ..
-					| fun_kind == FK_Caf 
-						# ca = postParseError pos "No typespecification for local graph definitions allowed" ca // .. PK
-						-> reorganiseLocalDefinitions (tl defs) ca
-					| belongsToTypeSpec name1 prio name is_infix
-						# fun_arity = determineArity args type
-						# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
-						  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-						  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type pos1
-						-> ([fun : fun_defs], node_defs, ca)
-						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
-				[PD_NodeDef pos pattern=:(PE_Ident id) rhs : defs]
-					| not (belongsToTypeSpec name1 prio id False)
-						-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
-					| arity type<>0
-						-> reorganiseLocalDefinitions defs (postParseError pos "this alternative has not enough arguments" ca)
-					# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-					  fun = MakeNewImpOrDefFunction id 0 
-					  				[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
-					  				(FK_Function cNameNotLocationDependent) prio type pos1
-					-> ([fun : fun_defs], node_defs, ca)
-				_
-					-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
-		  where
-			arity (Yes {st_arity}) = st_arity
-			arity No = 2 // it was specified as infix
-		reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
-			# fun_body = GenerateInstanceBody generic_ident optional_member_ident
-			  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
-						 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
-			  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-			= ([fun_def:fun_defs], node_defs, ca)
-		reorganiseLocalDefinitions [] ca
-			= ([], [], ca)
-
-		collect_functions_in_node_defs :: [NodeDef ParsedExpr] *CollectAdmin -> ([NodeDef ParsedExpr],*CollectAdmin)
-		collect_functions_in_node_defs [ bind : node_defs ] ca
-			# (bind, ca) = collectFunctions bind icl_module ca
-			  (node_defs, ca) = collect_functions_in_node_defs node_defs ca
-			= ([bind:node_defs], ca)
-		collect_functions_in_node_defs [] ca
-			= ([], ca)
 	collectFunctions locals icl_module ca
 		= (locals, ca)
 
