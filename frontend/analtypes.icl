@@ -634,7 +634,10 @@ where
 			= foldSt (init_type_def_infos modules) group (False, as_td_infos, as_type_var_heap, as_kind_heap)
 		  as & as_td_infos = as_td_infos, as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap
 		| has_abstract_type
-			= as
+			# group_without_abstract_type_defs = [gi \\ gi<-group | is_not_abstract_type_def gi modules]
+			| group_without_abstract_type_defs=:[]
+				= as
+				= anal_not_abstract_type_defs_in_group modules group_without_abstract_type_defs 0 as
 			= anal_not_abstract_type_defs_in_group modules group cIsHyperStrict as
 
 	anal_not_abstract_type_defs_in_group modules group type_properties as
@@ -675,6 +678,13 @@ where
 		  					tdi_group_vars = [ i \\ _ <- td_args & i <- [0..]],
 		  					tdi_properties = properties bitor cIsAnalysed  }
 		= {type_def_infos & [gi_module].[gi_index] = new_tdi}
+
+	is_not_abstract_type_def {gi_module,gi_index} modules
+		= case modules.[gi_module].com_type_defs.[gi_index].td_rhs of
+			AbstractType _ -> False
+			AbstractSynType _ _ -> False
+			AbstractNewType properties _ -> False
+			_ -> True
 
 	newKindVariables td_args (type_var_heap, as_kind_heap)
 		= mapSt new_kind td_args (type_var_heap, as_kind_heap)
