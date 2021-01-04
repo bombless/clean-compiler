@@ -293,6 +293,8 @@ where
 
 	is_synonym_or_new_type (SynType _)	= True
 	is_synonym_or_new_type (NewType _)	= True
+	is_synonym_or_new_type (AbstractSynType _ _) = True
+	is_synonym_or_new_type (AbstractNewType _ _) = True
 	is_synonym_or_new_type _			= False
 
 	update_type_def_infos group_nr group_members tds type_def_infos
