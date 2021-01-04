@@ -630,21 +630,24 @@ analyseTypeDefs modules groups dcl_types dcl_mod_index type_def_infos type_var_h
 	= check_left_root_attribution_of_typedefs modules groups as_td_infos as_type_var_heap as_error
 where
 	anal_type_defs_in_group modules group as=:{as_td_infos,as_type_var_heap,as_kind_heap}
-		# (is_abstract_type, as_td_infos, as_type_var_heap, as_kind_heap)
+		# (has_abstract_type, as_td_infos, as_type_var_heap, as_kind_heap)
 			= foldSt (init_type_def_infos modules) group (False, as_td_infos, as_type_var_heap, as_kind_heap)
-		  as = {as & as_td_infos = as_td_infos, as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
-		| is_abstract_type
+		  as & as_td_infos = as_td_infos, as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap
+		| has_abstract_type
 			= as
-			# (type_properties, conds, as) = foldSt (anal_type_def modules) group (cIsHyperStrict, {con_top_var_binds = [], con_var_binds = []}, as)
-			  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
-			  as_kind_heap = unify_var_binds conds.con_var_binds as_kind_heap
-			  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
-			  (as_kind_heap, as_td_infos, as_error)
-				= update_type_def_infos modules type_properties normalized_top_vars group kinds_in_group kind_var_store as_kind_heap as_td_infos as.as_error
-			  as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos, as_error = as_error
-			= foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
+			= anal_not_abstract_type_defs_in_group modules group cIsHyperStrict as
 
-	init_type_def_infos modules gi=:{gi_module,gi_index} (is_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
+	anal_not_abstract_type_defs_in_group modules group type_properties as
+		# (type_properties, conds, as) = foldSt (anal_type_def modules) group (type_properties, {con_top_var_binds = [], con_var_binds = []}, as)
+		  (kinds_in_group, (as_kind_heap, as_td_infos))	= mapSt determine_kinds group (as.as_kind_heap, as.as_td_infos)
+		  as_kind_heap = unify_var_binds conds.con_var_binds as_kind_heap
+		  (normalized_top_vars, (kind_var_store, as_kind_heap)) = normalize_top_vars conds.con_top_var_binds 0 as_kind_heap
+		  (as_kind_heap, as_td_infos, as_error)
+			= update_type_def_infos modules type_properties normalized_top_vars group kinds_in_group kind_var_store as_kind_heap as_td_infos as.as_error
+		  as & as_kind_heap = as_kind_heap, as_td_infos = as_td_infos, as_error = as_error
+		= foldSt (check_dcl_properties modules dcl_types dcl_mod_index type_properties) group as
+
+	init_type_def_infos modules gi=:{gi_module,gi_index} (has_abstract_type, type_def_infos, as_type_var_heap, kind_heap)
 		# {td_args,td_rhs} = modules.[gi_module].com_type_defs.[gi_index]
 		= case td_rhs of
 			AbstractType properties
@@ -658,13 +661,13 @@ where
 				-> (True, type_def_infos, as_type_var_heap, kind_heap)
 			ExtensibleAlgType _
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
-				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
+				-> (has_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)
 			AlgConses _ _
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindConstVariables td_args (as_type_var_heap, kind_heap)
-				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)				
+				-> (has_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)
 			_
 				# (tdi_kinds, (as_type_var_heap, kind_heap)) = newKindVariables td_args (as_type_var_heap, kind_heap)
-				-> (is_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)
+				-> (has_abstract_type, {type_def_infos & [gi_module].[gi_index].tdi_kinds = tdi_kinds}, as_type_var_heap, kind_heap)
 
 	init_abstract_type_def properties td_args gi_module gi_index type_def_infos
 		# (tdi, type_def_infos) = type_def_infos![gi_module,gi_index]
