@@ -32,12 +32,12 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
+	#! support_dynamics = tcl_file=:Yes _
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
-		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos hash_table error files
+		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos support_dynamics hash_table error files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]
-	#! support_dynamics = case tcl_file of Yes _ -> True ; No -> False
 	# (ok, mod, global_fun_range, mod_functions, optional_dcl_mod, modules, dcl_module_n_in_cache,hash_table, error, files)
 		= scanModule mod cached_module_idents support_dynamics hash_table error search_paths modtimefunction files
 

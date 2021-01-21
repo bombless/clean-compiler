@@ -37,6 +37,7 @@ Conventions:
 
 PS_SkippingMask :== 1
 PS_DynamicTypeUsedMask :== 4
+PS_SupportDynamics :== 8
 
 /*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
@@ -304,9 +305,9 @@ isMemberOrWhereOfMemberDefsContext parseContext	:== parseContext bitand MemberOr
 cWantIclFile :== True
 cWantDclFile :== False
 
-wantModule :: !*File !{#Char} !Bool !Ident !Position !*HashTable !*File !*Files
-	-> (!Bool,!Bool,!ParsedModule, !*HashTable, !*File, !*Files)
-wantModule file modification_time iclmodule file_id=:{id_name} import_file_position hash_table error files
+wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*Files
+							 -> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
+wantModule file modification_time iclmodule file_id=:{id_name} import_file_position support_dynamics hash_table error files
 	# scanState = openScanner file id_name file_name_extension
 	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
 	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
@@ -323,7 +324,7 @@ where
 		| succ
 			# pState				=	{ ps_scanState = scanState
 										, ps_error = { pea_file = error, pea_ok = True }
-										, ps_flags = 0
+										, ps_flags = if support_dynamics PS_SupportDynamics 0
 										, ps_hash_table = hash_table
 										}
 			  pState				= verify_name mod_name id_name file_name pState
@@ -3553,7 +3554,14 @@ where
 	try CharTypeToken	 pState	= (Yes BT_Char			, pState)
 	try BoolTypeToken	 pState	= (Yes BT_Bool			, pState)
 	try RealTypeToken	 pState	= (Yes BT_Real			, pState)
-	try DynamicTypeToken pState	= (Yes BT_Dynamic		, {pState & ps_flags=pState.ps_flags bitor PS_DynamicTypeUsedMask})
+	try DynamicTypeToken pState
+							| pState.ps_flags bitand PS_DynamicTypeUsedMask<>0
+								= (Yes BT_Dynamic		, pState)
+							# pState & ps_flags=pState.ps_flags bitor PS_DynamicTypeUsedMask
+							| pState.ps_flags bitand PS_SupportDynamics<>0
+								= (Yes BT_Dynamic		, pState)
+								# pState = parseErrorSimpleNoSkipping "Dynamic used but support for dynamics not enabled" pState
+								= (Yes BT_Dynamic		, pState)
 	try FileTypeToken	 pState = (Yes BT_File			, pState)
 	try WorldTypeToken	 pState = (Yes BT_World			, pState)
 	try _				 pState = (No					, tokenBack pState)
@@ -5577,7 +5585,6 @@ parseErrorSimple :: !{# Char} !{# Char} !ParseState -> ParseState
 parseErrorSimple act msg pState
 	| pState.ps_flags bitand PS_SkippingMask<>0
 		= pState
-	| otherwise // not pState.ps_skipping
 		# (pos,pState) 	= getPosition pState
 		  (filename,pState=:{ps_error={pea_file}})	= getFilename pState
 		  pea_file 	= 	pea_file
@@ -5590,6 +5597,15 @@ parseErrorSimple act msg pState
 		= { pState	& ps_flags = pState.ps_flags bitor PS_SkippingMask
 					, ps_error = { pea_file = pea_file, pea_ok = False }
 		  }
+
+parseErrorSimpleNoSkipping :: !{# Char} !ParseState -> ParseState
+parseErrorSimpleNoSkipping msg pState
+	| pState.ps_flags bitand PS_SkippingMask<>0
+		= pState
+		# (pos,pState) = getPosition pState
+		  (filename,pState=:{ps_error={pea_file}}) = getFilename pState
+		  pea_file = pea_file <<< "Parse error [" <<< filename <<< "," <<< pos <<< "]: " <<< msg <<< '\n'
+		= {pState & ps_error = {pea_file = pea_file, pea_ok = False}}
 
 getFileAndLineNr :: !ParseState -> (!String, !Int, !ParseState)
 getFileAndLineNr pState =: {ps_scanState}
