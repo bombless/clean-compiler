@@ -44,15 +44,7 @@ where
 	currentToken (ScanState scan_state)
 		# (token,scan_state) = currentToken scan_state
 		= (token,ScanState scan_state) 
-/*
-instance insertToken ScanState
-where
-	insertToken token context (ScanState scan_state) = ScanState (insertToken token context scan_state)
 
-instance replaceToken ScanState
-where
-	replaceToken token (ScanState scan_state) = ScanState (replaceToken token scan_state)
-*/
 instance getPosition ScanState
 where
 	getPosition (ScanState scan_state)
@@ -393,7 +385,6 @@ class tokenBack state :: !*state -> *state
 instance tokenBack RScanState
 where
 	tokenBack scanState=:{ss_tokenBuffer, ss_input}
-		| isEmptyBuffer ss_tokenBuffer = abort "tokenBack with empty token buffer"
 		# (tok, buf) = get ss_tokenBuffer
 		=	{ scanState
 			& ss_tokenBuffer	= buf
@@ -408,23 +399,7 @@ where currentToken scanState=:{ss_tokenBuffer}
 			= (ErrorToken "dummy", scanState)
 			# (ltok,ss_tokenBuffer) = head ss_tokenBuffer
 			= (ltok.lt_token, {scanState & ss_tokenBuffer=ss_tokenBuffer})
-/*
-class insertToken state :: !Token !ScanContext !*state -> *state
 
-instance insertToken RScanState
-where
-	insertToken t c scanState
-		#	(pos, scanState=:{ss_input}) = getPosition scanState
-		=	{ scanState
-			& ss_input = PushedToken
-							{ lt_position	= pos
-							, lt_index		= pos.fp_col
-							, lt_token		= t
-							, lt_context	= c
-							}
-							ss_input
-			}
-*/
 notContextDependent :: !Token -> Bool
 notContextDependent token
  = case token of
@@ -449,17 +424,7 @@ notContextDependent token
 	WhereToken			-> True
 	WithToken			-> True
 	_					-> False
-/*
-class replaceToken state :: !Token !*state -> *state
 
-instance replaceToken RScanState
-where
-	replaceToken tok scanState=:{ss_tokenBuffer}
-		# (longToken,buffer) = get ss_tokenBuffer
-		= { scanState
-		  & ss_tokenBuffer = store { longToken & lt_token = tok } buffer
-		  }
-*/
 SkipWhites :: !Input -> (!Optional String, !Char, !Input)
 SkipWhites {inp_stream=OldLine i line stream,inp_pos={fp_line,fp_col},inp_tabsize,inp_filename}
 	| i<size line
@@ -1892,9 +1857,9 @@ checkOffside :: !FilePosition !Int !Token !RScanState -> (Token,RScanState)
 checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 	| (ss_scanOptions bitand ScanOptionUseLayoutBit) == 0
 		=	(token, scanState)  //-->> (token,pos,"No layout rule applied")
-	| isEmpty ss_offsides
+	| ss_offsides=:[]
 		=	newOffside token scanState  //-->> "Empty offside stack"
-	#	(os_col, new_def)	= hd ss_offsides
+	#	[(os_col, new_def):_] = ss_offsides
 		col					= pos.fp_col
 	| col == os_col && canBeOffside token
 		# scanState	= tokenBack scanState
@@ -1911,7 +1876,10 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 					scanState.ss_tokenBuffer
 			}
 		  )	-->> (token,"NewDefinitionToken generated col==os && canBeOffside",pos,ss_offsides)
-	| col < os_col && token <> InToken
+	| token =: InToken
+//		= (token, { scanState & ss_offsides = tl ss_offsides })
+		= (token, scanState) // PK: parser removes offsides
+	| col < os_col
 		# (n,os_col,new_def,offsides) = scan_offsides 0 col os_col new_def ss_offsides
 		  scanState	= { scanState & ss_offsides = offsides } //-->> (n,"end groups",offsides,new_def)
 		  scanState	= snd (newOffside token scanState)
@@ -1933,15 +1901,16 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 							->	scanState
 		= gen_end_groups n scanState
 		with
-			newToken		= EndGroupToken
 			scan_offsides n col os_col new_def []
 				= (n, os_col, new_def, [])
 			scan_offsides n col _ new_def offsides=:[(os_col,b):r]
 				| col < os_col
 					= scan_offsides (inc n) col os_col b r
 					= (n, os_col, new_def, offsides)
+
 			gen_end_groups n scanState
-		  	  #	scanState	= tokenBack scanState	// push current token back
+			  #	newToken = EndGroupToken
+				scanState	= tokenBack scanState	// push current token back
 		  		scanState	=	{ scanState
 								& ss_tokenBuffer
 									= store 
@@ -1956,18 +1925,11 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 			 	// # (new_offsides, scanState) = scanState!ss_offsides // for tracing XXX
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
 			  	= gen_end_groups (dec n) scanState
-	| token == InToken
-//		= (token, { scanState & ss_offsides = tl ss_offsides })
-		= (token, scanState) // PK: parser removes offsides
 		= newOffside token scanState
 where
 	newOffside token scanState=:{ss_offsides,ss_scanOptions}
 	| definesOffside token
-		&& ((ss_scanOptions bitand ScanOptionNoNewOffsideForSeqLetBit)==0
-			|| (case token of
-				SeqLetToken _ -> False
-				_ -> True
-			))
+		&& (ss_scanOptions bitand ScanOptionNoNewOffsideForSeqLetBit==0 || not token=:SeqLetToken _)
 		#	( _, scanState )		= nextToken FunctionContext scanState
 			( os_pos, scanState )	= getPosition scanState // next token defines offside position
 			scanState				= tokenBack scanState
