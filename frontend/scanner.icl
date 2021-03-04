@@ -1915,18 +1915,18 @@ where
 	newOffside token scanState=:{ss_offsides,ss_scanOptions}
 	| definesOffside token
 		&& (ss_scanOptions bitand ScanOptionNoNewOffsideForSeqLetBit==0 || not token=:SeqLetToken _)
-		#	( _, scanState )		= nextToken FunctionContext scanState
-			( os_pos, scanState )	= getPosition scanState // next token defines offside position
-			scanState				= tokenBack scanState
-			os						= os_pos.fp_col
-		|	os == 1
+		# (l_token, token_buffer) = get scanState.ss_tokenBuffer // to prevent tokenBuffer overflow
+		  scanState & ss_tokenBuffer = token_buffer
+		  ( _, scanState ) = nextToken FunctionContext scanState
+		  ( os_pos, scanState )	= getPosition scanState // next token defines offside position
+		  scanState = insertBeforeStoredToken l_token scanState
+		  os = os_pos.fp_col
+		| os == 1
 			# newToken = ErrorToken "groups should not start in column 1"
 			  l_token = {lt_position = pos, lt_index = index, lt_token = newToken, lt_context = FunctionContext}
 			= (newToken, insertBeforeStoredToken l_token scanState)
-		// otherwise // os <> 1
 			= (token, {scanState & ss_offsides = [(os, needsNewDefinitionToken token) : ss_offsides]})
 				// -->> (token,pos,"New offside defined at ",os_pos,[ (os, token == CaseToken) : ss_offsides ])
-	// otherwise // ~ (definesOffside token)
 	= (token, scanState) -->> (token,pos," not offside")
 
 definesOffside :: !Token -> Bool
