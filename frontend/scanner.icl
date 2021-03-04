@@ -400,6 +400,17 @@ where currentToken scanState=:{ss_tokenBuffer}
 			# (ltok,ss_tokenBuffer) = head ss_tokenBuffer
 			= (ltok.lt_token, {scanState & ss_tokenBuffer=ss_tokenBuffer})
 
+insertBeforeStoredToken :: !LongToken !RScanState -> RScanState
+insertBeforeStoredToken l_token scanState=:{ss_tokenBuffer=Buffer1 x,ss_input}
+	# ss_tokenBuffer = Buffer1 l_token
+	= {scanState & ss_tokenBuffer = ss_tokenBuffer, ss_input = PushedToken x ss_input}
+insertBeforeStoredToken l_token scanState=:{ss_tokenBuffer=Buffer2 x y,ss_input}
+	# ss_tokenBuffer = Buffer2 l_token y
+	= {scanState & ss_tokenBuffer = ss_tokenBuffer, ss_input = PushedToken x ss_input}
+insertBeforeStoredToken l_token scanState=:{ss_tokenBuffer=Buffer3 x y z,ss_input}
+	# ss_tokenBuffer = Buffer3 l_token y z
+	= {scanState & ss_tokenBuffer = ss_tokenBuffer, ss_input = PushedToken x ss_input}
+
 notContextDependent :: !Token -> Bool
 notContextDependent token
  = case token of
@@ -1862,20 +1873,10 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 	#	[(os_col, new_def):_] = ss_offsides
 		col					= pos.fp_col
 	| col == os_col && canBeOffside token
-		# scanState	= tokenBack scanState
-		  newToken	= NewDefinitionToken
-		= (	newToken
-		  ,	{ scanState
-			& ss_tokenBuffer
-				= store 
-					{	lt_position		= pos
-					,	lt_index		= index
-					,	lt_token		= newToken
-					,	lt_context		= FunctionContext
-					}
-					scanState.ss_tokenBuffer
-			}
-		  )	-->> (token,"NewDefinitionToken generated col==os && canBeOffside",pos,ss_offsides)
+		# newToken = NewDefinitionToken
+		  l_token = {lt_position = pos, lt_index = index, lt_token = newToken, lt_context = FunctionContext}
+		= (newToken, insertBeforeStoredToken l_token scanState)
+		  -->> (token,"NewDefinitionToken generated col==os && canBeOffside",pos,ss_offsides)
 	| token =: InToken
 //		= (token, { scanState & ss_offsides = tl ss_offsides })
 		= (token, scanState) // PK: parser removes offsides
@@ -1885,18 +1886,10 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 		  scanState	= snd (newOffside token scanState)
 		  scanState	= case new_def && col == os_col && canBeOffside token of
   						True
-							#	scanState	= tokenBack scanState
-								newToken	= NewDefinitionToken
-							->	{ scanState
-								& ss_tokenBuffer
-									= store 
-										{	lt_position		= pos
-										,	lt_index		= index
-										,	lt_token		= newToken
-										,	lt_context		= FunctionContext
-										}
-										scanState.ss_tokenBuffer
-								} -->> ("new definition generated",token)
+							# newToken = NewDefinitionToken
+							  l_token = {lt_position = pos, lt_index = index, lt_token = newToken, lt_context = FunctionContext}
+							-> insertBeforeStoredToken l_token scanState
+								-->> ("new definition generated",token)
 						False
 							->	scanState
 		= gen_end_groups n scanState
@@ -1910,17 +1903,9 @@ checkOffside pos index token scanState=:{ss_offsides,ss_scanOptions,ss_input}
 
 			gen_end_groups n scanState
 			  #	newToken = EndGroupToken
-				scanState	= tokenBack scanState	// push current token back
-		  		scanState	=	{ scanState
-								& ss_tokenBuffer
-									= store 
-										{	lt_position		= pos
-										,	lt_index		= index
-										,	lt_token		= newToken
-										,	lt_context		= FunctionContext
-										}
-										scanState.ss_tokenBuffer
-								} -->> ("end group generated",pos) // insert EndGroupToken 
+				l_token = {lt_position = pos, lt_index = index, lt_token = newToken, lt_context = FunctionContext}
+				scanState = insertBeforeStoredToken l_token scanState
+								-->> ("end group generated",pos) // insert EndGroupToken 
 			  | n == 1
 			 	// # (new_offsides, scanState) = scanState!ss_offsides // for tracing XXX
 			  	= (newToken, scanState) // -->> ("new offsides",new_offsides)
@@ -1935,26 +1920,12 @@ where
 			scanState				= tokenBack scanState
 			os						= os_pos.fp_col
 		|	os == 1
-			#	scanState			= tokenBack scanState
-				newToken			= ErrorToken "groups should not start in column 1"
-			=	( newToken
-				, 	{ scanState
-					& ss_tokenBuffer
-						= store 
-							{	lt_position		= pos
-							,	lt_index		= index
-							,	lt_token		= newToken
-							,	lt_context		= FunctionContext
-							}
-							scanState.ss_tokenBuffer
-					}
-				)
+			# newToken = ErrorToken "groups should not start in column 1"
+			  l_token = {lt_position = pos, lt_index = index, lt_token = newToken, lt_context = FunctionContext}
+			= (newToken, insertBeforeStoredToken l_token scanState)
 		// otherwise // os <> 1
-			=	( token
-				, { scanState
-				  & ss_offsides = [ (os, needsNewDefinitionToken token) : ss_offsides ]
-				  }
-				) // -->> (token,pos,"New offside defined at ",os_pos,[ (os, token == CaseToken) : ss_offsides ])
+			= (token, {scanState & ss_offsides = [(os, needsNewDefinitionToken token) : ss_offsides]})
+				// -->> (token,pos,"New offside defined at ",os_pos,[ (os, token == CaseToken) : ss_offsides ])
 	// otherwise // ~ (definesOffside token)
 	= (token, scanState) -->> (token,pos," not offside")
 
