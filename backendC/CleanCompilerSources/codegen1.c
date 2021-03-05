@@ -4377,7 +4377,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 	first_arg=node->node_arguments;
 	match_b_stack_top_element=0;
 
-	if (first_arg->arg_node->node_kind==CaseNode && first_arg->arg_next!=NULL && first_arg->arg_next->arg_node->node_kind==CaseNode){
+	if (first_arg!=NULL && first_arg->arg_node->node_kind==CaseNode && first_arg->arg_next!=NULL && first_arg->arg_next->arg_node->node_kind==CaseNode){
 		if (node->node_state.state_type==SimpleState && (node->node_state.state_kind==OnA || node->node_state.state_kind==StrictOnA)){
 			int first_case_symbol_kind;
 			Symbol symbol;

@@ -555,7 +555,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 			/* to do: if non failing case for every constructor, default not reachable */
 
 #if 1 /* added 8-4-1999 */
-			if (node->node_arguments->arg_next==NULL && node->node_arguments->arg_node->node_kind==CaseNode
+			if (node->node_arguments!=NULL && node->node_arguments->arg_next==NULL && node->node_arguments->arg_node->node_kind==CaseNode
 				&& (node->node_arguments->arg_node->node_symbol->symb_kind==tuple_symb
 					|| (node->node_arguments->arg_node->node_symbol->symb_kind==definition && 
 						node->node_arguments->arg_node->node_symbol->symb_def->sdef_kind==RECORDTYPE)))
