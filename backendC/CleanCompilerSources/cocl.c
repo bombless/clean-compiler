@@ -122,6 +122,7 @@ int ParseCommandArgs (int argc, char **argv)
 	OptimizeInstanceCalls=False;
 #endif
 	Dynamics=False;
+	TclFile=False;
 
 	StrictDoAnnots			= False;
 	StrictDepth				= 10;/* 8; */
@@ -185,6 +186,8 @@ int ParseCommandArgs (int argc, char **argv)
 				AddStrictnessToExportedFunctionTypes=True;
 			else if (strcmp (argv_i,"-dynamics") == 0)
 				Dynamics=True;
+			else if (strcmp (argv_i,"-tcl") == 0)
+				TclFile=True;
 #ifdef NO_OPTIMIZE_INSTANCE_CALLS
 			else if (strcmp (argv_i,"-oic") == 0)
 				OptimizeInstanceCalls=True;

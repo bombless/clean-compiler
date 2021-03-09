@@ -25,14 +25,15 @@ defaultFrontEndOptions
 	= { feo_up_to_phase = FrontEndPhaseAll,
 		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False } }
 
-frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
-	-> (!Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps)
-frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types predef_symbols hash_table modtimefunction files error io out tcl_file heaps
+frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !Bool (ModTimeFunction *Files)
+																		 !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !(Optional *File) !*Heaps
+	-> (!Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols,!*HashTable,!*Files,!*File,!*File,!*File, !Optional *File, !*Heaps)
+frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_modules cached_dcl_macros list_inferred_types support_dynamics modtimefunction
+		predef_symbols hash_table files error io out tcl_file heaps
 	| case opt_file_dir_time of No -> True; _ -> False
 		# error = moduleCouldNotBeImportedError True mod_ident NoPos error
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
-	#! support_dynamics = tcl_file=:Yes _
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
 		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos support_dynamics hash_table error files
 	| not ok

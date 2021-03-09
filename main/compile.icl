@@ -116,11 +116,11 @@ abc_file_name_in_clean_system_files_folder mod_dir mod_name error files
 	,	listTypes :: ListTypesOption
 	,	fusion_options :: !FusionOptions
 	,	compile_for_dynamics	:: !Bool
-	,	dump_core				:: !Bool
+	,	generate_tcl_file :: !Bool
 	}
 
 StdErrPathName :== "_stderr_"
-StdOutPathName :== "_stderr_"
+StdOutPathName :== "_stdout_"
 
 InitialCoclOptions =
 	{	moduleName=	""
@@ -134,7 +134,7 @@ InitialCoclOptions =
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
 	,	fusion_options = {compile_with_fusion = False, generic_fusion = False, strip_unused = False}
 	,	compile_for_dynamics	= False
-	,	dump_core				= False
+	,	generate_tcl_file = False
 	}
 
 :: DclCache = {
@@ -196,8 +196,6 @@ parseCommandLine [arg1=:"-fusion":args] options
 parseCommandLine [arg1=:"-generic_fusion":args] options
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.generic_fusion = True}
 	= ([arg1:args],modules,options)
-parseCommandLine [arg1=:"-dump":args] options
-	= parseCommandLine args {options & dump_core = True}
 parseCommandLine [arg1=:"-strip":args] options
 	= parseCommandLine args {options & fusion_options.strip_unused = True}
 parseCommandLine ["-generics":args] options
@@ -211,6 +209,9 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
+parseCommandLine [arg1=:"-tcl":args] options
+	# (args,modules,options) = parseCommandLine args {options & generate_tcl_file = True, compile_for_dynamics = True}
+	= ([arg1:args],modules,options)
 parseCommandLine [arg : args] options
 	| arg.[0] == '-'
 		# (args,modules,options)=	parseCommandLine args options
@@ -285,7 +286,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 	# (optional_tcl_opened, tcl_file, error, files)
 		= case mbModPath of
 			Yes mod_path
-				| options.compile_for_dynamics
+				| options.generate_tcl_file
 					-> openTclFile mod_path options.moduleName error files
 			_
 				-> 	(True,No,error,files)
@@ -304,10 +305,9 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 				(Yes options.listTypes.lto_showAttributes)
 				No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		= frontEndInterface opt_file_dir_time
-			{feo_up_to_phase=FrontEndPhaseAll
-			,feo_fusion=options.fusion_options
-			} moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types predef_symbols hash_table fmodificationtime files error io out tcl_file heaps 
+		= frontEndInterface opt_file_dir_time {feo_up_to_phase=FrontEndPhaseAll,feo_fusion=options.fusion_options}
+			moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types options.compile_for_dynamics fmodificationtime
+			predef_symbols hash_table files error io out tcl_file heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)

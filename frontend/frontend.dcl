@@ -41,5 +41,6 @@ instance == ListTypesKind
 
 defaultFrontEndOptions :: FrontEndOptions // used by sparkle, because FrontEndOptions in trunk and itask branch differ
 
-frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !*PredefinedSymbols !*HashTable (ModTimeFunction *Files) !*Files !*File !*File !*File !(Optional *File) !*Heaps
-	-> ( !Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols, !*HashTable, !*Files, !*File, !*File, !*File, !Optional *File, !*Heaps) 
+frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !Bool (ModTimeFunction *Files)
+																		 !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !(Optional *File) !*Heaps
+	-> (!Optional *FrontEndSyntaxTree,!*{#*{#FunDef}},!{#DclModule},!Int,!*PredefinedSymbols,!*HashTable,!*Files,!*File,!*File,!*File, !Optional *File, !*Heaps)

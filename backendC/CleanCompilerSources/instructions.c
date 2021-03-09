@@ -84,9 +84,9 @@ static void error_in_function (char *m)
 #define N_Dynamics				11
 #define N_DoGenericFusion		12
 #define N_DoCallGraphProfiling	13
+#define N_TclFile				14
 
-#define MINIMUM_N_OPTIONS 9
-#define N_OPTIONS 14
+#define N_OPTIONS 15
 
 static void ConvertOptionsToString (char *optstring)
 {
@@ -105,15 +105,14 @@ static void ConvertOptionsToString (char *optstring)
 	optstring[N_DoWarning]            = DoWarning ? '1' : '0';
 	optstring[N_System]               = '0';
 
-	if (DoFusion || ObjectSizes[RealObj]!=2 || Dynamics || DoGenericFusion || DoCallGraphProfiling){
-		optstring[N_DoFusion] = DoFusion ? '1' : '0';
-		optstring[N_Do64BitArch] = ObjectSizes[RealObj]!=2 ? '1' : '0';
-		optstring[N_Dynamics] = Dynamics ? '1' : '0';
-		optstring[N_DoGenericFusion] = DoGenericFusion ? '1' : '0';
-		optstring[N_DoCallGraphProfiling] = DoCallGraphProfiling ? '1' : '0';
-		optstring[N_OPTIONS]='\0';
-	} else
-		optstring[MINIMUM_N_OPTIONS]='\0';
+	optstring[N_DoFusion] = DoFusion ? '1' : '0';
+	optstring[N_Do64BitArch] = ObjectSizes[RealObj]!=2 ? '1' : '0';
+	optstring[N_Dynamics] = Dynamics ? '1' : '0';
+	optstring[N_DoGenericFusion] = DoGenericFusion ? '1' : '0';
+	optstring[N_DoCallGraphProfiling] = DoCallGraphProfiling ? '1' : '0';
+	optstring[N_TclFile] = TclFile ? '1' : '0';
+
+	optstring[N_OPTIONS]='\0';
 }
 
 #define D_PREFIX "d"
