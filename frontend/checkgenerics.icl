@@ -378,7 +378,17 @@ where
 				_
 					# cs & cs_error = checkError type_def.td_ident "type synonym not allowed" cs.cs_error
 					-> (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
-			= (TA type_cons [], TypeConsSymb type_cons, type_defs, modules, heaps, cs)
+		#! type = TA type_cons []
+		#! type_cons = TypeConsSymb type_cons
+		| type_module==cPredefinedModuleIndex
+			| type_index==PD_UnboxedListTypeIndex || type_index==PD_UnboxedTailStrictListTypeIndex
+				# cs & cs_x.x_needed_modules=cs.cs_x.x_needed_modules bitor cNeedStdStrictLists
+				= (type, type_cons, type_defs, modules, heaps, cs)
+			| type_index==PD_UnboxedMaybeTypeIndex
+				# cs & cs_x.x_needed_modules=cs.cs_x.x_needed_modules bitor cNeedStdStrictMaybes
+				= (type, type_cons, type_defs, modules, heaps, cs)
+				= (type, type_cons, type_defs, modules, heaps, cs)
+			= (type, type_cons, type_defs, modules, heaps, cs)
 	check_instance_type module_index (TA type_cons=:{type_ident={id_name=PD_UnboxedArray_String,id_info}} [element_type]) type_defs modules heaps cs
 		# (entry, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		# cs & cs_symbol_table = cs_symbol_table
