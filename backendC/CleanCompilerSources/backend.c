@@ -463,6 +463,9 @@ BEDeclareDclModule (int moduleIndex, CleanString name, CleanString modificationT
 	dclModule->dm_n_function_symbols = gBEState.be_modules[moduleIndex].bem_nFunctions;
 
 	AddOpenDefinitionModule (dclModule);
+
+	if (moduleIndex == main_dcl_module_n)
+		im_def_module=dclModule;
 } /* BEDeclareDclModule */
 
 void
