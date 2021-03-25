@@ -3177,7 +3177,12 @@ wantAType pState
 
 wantAType_strictness_ignored :: !ParseState -> (!AType,!ParseState)
 wantAType_strictness_ignored pState
-	# (succ, atype, pState)	= tryAType_strictness_ignored TA_None pState
+	# (token, pState) = nextToken TypeContext pState
+	= wantAType_strictness_ignoredT token pState
+
+wantAType_strictness_ignoredT :: !Token !ParseState -> (!AType,!ParseState)
+wantAType_strictness_ignoredT token pState
+	# (succ, atype, pState)	= tryAType_strictness_ignoredT token pState
 	| succ
 		= (atype, pState)
 		= (atype, attributed_and_annotated_type_error pState)
@@ -3206,7 +3211,7 @@ tryAType pState
 	# (token, pState)		= nextToken TypeContext pState
 	| token =: ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
-		  atype = make_curry_type TA_None types rtype
+		  atype = make_curry_type types rtype
 		| isEmpty vars
 			= ( True, atype, pState)
 			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
@@ -3216,34 +3221,34 @@ tryAType pState
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
 
-tryAType_strictness_ignored :: !TypeAttribute !ParseState -> (!Bool,!AType,!ParseState)
-tryAType_strictness_ignored attr pState
-	# (vars , pState)		= optionalUniversalQuantifiedVariables pState
+tryAType_strictness_ignoredT :: !Token !ParseState -> (!Bool,!AType,!ParseState)
+tryAType_strictness_ignoredT token pState
+	# (vars , pState)		= optionalUniversalQuantifiedVariablesT token pState
 	# (types, pState)		= parseList tryBrackAType_strictness_ignored pState
 	| isEmpty types
 		| isEmpty vars
-			= (False, {at_attribute = attr, at_type = TE}, pState)
+			= (False, {at_attribute = TA_None, at_type = TE}, pState)
 			# (token, pState) = nextToken TypeContext pState
-			= (False, {at_attribute = attr, at_type = TFA vars TE}
+			= (False, {at_attribute = TA_None, at_type = TFA vars TE}
 			  , parseError "annotated type" (Yes token) "type" (tokenBack pState))
 	# (token, pState)		= nextToken TypeContext pState
 	| token =: ArrowToken
 		# (rtype, pState)	= wantAType_strictness_ignored pState
-		  atype = make_curry_type attr types rtype
+		  atype = make_curry_type types rtype
 		| isEmpty vars
 			= ( True, atype, pState)
 			= ( True, { atype & at_type = TFA vars atype.at_type }, pState)
 	// otherwise (note that types is non-empty)
-	# (atype, pState) = convertAAType types attr (tokenBack pState)
+	# (atype, pState) = convertAAType types TA_None (tokenBack pState)
 	| isEmpty vars
 		= (True, atype, pState)
 		= (True, { atype & at_type = TFA vars atype.at_type }, pState)
 
-make_curry_type attr [t1] res_type
-	= {at_attribute = attr, at_type = t1 --> res_type}
-make_curry_type attr [t1:tr] res_type
-	= {at_attribute = attr, at_type = t1 --> make_curry_type TA_None tr res_type}
-make_curry_type _ _ _ = abort "make_curry_type: wrong assumption"
+make_curry_type [t1] res_type
+	= {at_attribute = TA_None, at_type = t1 --> res_type}
+make_curry_type [t1:tr] res_type
+	= {at_attribute = TA_None, at_type = t1 --> make_curry_type tr res_type}
+make_curry_type _ _ = abort "make_curry_type: wrong assumption"
 
 // Sjaak ...
 convertAAType :: ![AType] !TypeAttribute !ParseState -> (!AType,!ParseState)
@@ -3357,7 +3362,7 @@ trySimpleTypeT SquareOpenToken attr pState
   			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 
-	# (type, pState)	= wantAType_strictness_ignored (tokenBack pState)
+	# (type, pState)	= wantAType_strictness_ignoredT token pState
 	  (token, pState)	= nextToken TypeContext pState
 	| token =: SquareCloseToken
 		# list_symbol = makeListTypeSymbol head_strictness 1
@@ -3385,7 +3390,7 @@ trySimpleTypeT CurlyOpenToken attr pState
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
-			# (atype, pState)			= wantAType_strictness_ignored (tokenBack pState)
+			# (atype, pState)			= wantAType_strictness_ignoredT token pState
   			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
   			  array_symbol = makeUnboxedArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
@@ -3395,7 +3400,7 @@ trySimpleTypeT CurlyOpenToken attr pState
 			# array_symbol = makeStrictArraySymbol 0
 			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
-			# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
+			# (atype,pState)			= wantAType_strictness_ignoredT token pState
   			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
   			  array_symbol = makeStrictArraySymbol 1
   			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
@@ -3406,12 +3411,12 @@ trySimpleTypeT CurlyOpenToken attr pState
 			# array_symbol =  makePackedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 		// otherwise // token <> CurlyCloseToken
-			# (atype, pState) = wantAType_strictness_ignored (tokenBack pState)
+			# (atype, pState) = wantAType_strictness_ignoredT token pState
 			  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
 			  array_symbol    = makePackedArraySymbol 1
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
   	// otherwise
-		# (atype,pState)			= wantAType_strictness_ignored (tokenBack pState)
+		# (atype,pState)			= wantAType_strictness_ignoredT token pState
 		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
 		  array_symbol = makeLazyArraySymbol 1
 		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
@@ -3577,10 +3582,13 @@ optionalExistentialQuantifiedVariables pState
 optionalUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 optionalUniversalQuantifiedVariables pState
 	# (token, pState) = nextToken TypeContext pState
-	= case token of
-		ForAllToken
-			-> wantUniversalQuantifiedVariables pState 
-		_	-> ([], tokenBack pState)
+	= optionalUniversalQuantifiedVariablesT token pState
+
+optionalUniversalQuantifiedVariablesT :: !Token !*ParseState -> *(![ATypeVar],!*ParseState)
+optionalUniversalQuantifiedVariablesT ForAllToken pState
+	= wantUniversalQuantifiedVariables pState
+optionalUniversalQuantifiedVariablesT token pState
+	= ([], tokenBack pState)
 
 wantUniversalQuantifiedVariables :: !*ParseState -> *(![ATypeVar],!*ParseState)
 wantUniversalQuantifiedVariables pState

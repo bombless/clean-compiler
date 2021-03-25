@@ -42,7 +42,7 @@ cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !
 												   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 					-> (!SymbolType,!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 
-set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> !*TypeVarHeap
+set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> *TypeVarHeap
 
 equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
 
