@@ -3343,6 +3343,9 @@ trySimpleTypeT SquareOpenToken attr pState
 			wantHeadStrictness HashToken pState
 				# (token,pState) = nextToken TypeContext pState
 				= (HeadUnboxed,token,pState)
+			wantHeadStrictness (IdentToken "^") pState
+				# (token,pState) = nextToken TypeContext pState
+				= (HeadLazy,token,pState)
 			wantHeadStrictness token pState
 				= (HeadLazy,token,pState)
 	| token =: SquareCloseToken
@@ -3361,20 +3364,27 @@ trySimpleTypeT SquareOpenToken attr pState
 			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
   			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
 			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
-
-	# (type, pState)	= wantAType_strictness_ignoredT token pState
-	  (token, pState)	= nextToken TypeContext pState
-	| token =: SquareCloseToken
-		# list_symbol = makeListTypeSymbol head_strictness 1
-		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
-	| token=:ExclamationToken
-		# (token,pState) = nextToken TypeContext pState
-		| token==SquareCloseToken
-			# list_symbol = makeTailStrictListTypeSymbol head_strictness 1
+	| head_strictness==HeadLazy && token =: (IdentToken "^!")
+		# (next_token,pState) = nextToken TypeContext pState
+		| next_token =: SquareCloseToken
+			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
+			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+		= want_list_type_with_argument token head_strictness (tokenBack pState)
+	= want_list_type_with_argument token head_strictness pState
+where
+	want_list_type_with_argument :: !Token !Int !ParseState -> (!ParseResult, !AType, !ParseState)
+	want_list_type_with_argument token head_strictness pState
+		# (type, pState)	= wantAType_strictness_ignoredT token pState
+		  (token, pState)	= nextToken TypeContext pState
+		| token =: SquareCloseToken
+			# list_symbol = makeListTypeSymbol head_strictness 1
 			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
-			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
-
-	// otherwise // token <> SquareCloseToken
+		| token=:ExclamationToken
+			# (token,pState) = nextToken TypeContext pState
+			| token==SquareCloseToken
+				# list_symbol = makeTailStrictListTypeSymbol head_strictness 1
+				= (ParseOk, {at_attribute = attr, at_type = TA list_symbol [type]}, pState)
+				= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 		= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
 trySimpleTypeT OpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
@@ -4207,11 +4217,20 @@ wantListPatternWithoutDefinitions pState
 			= (makeNilExpression head_strictness cIsAPattern,pState)
 	| head_strictness==HeadUnboxedAndTailStrict
 		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| head_strictness==HeadLazy && (case token of (IdentToken "!!") -> True; _ -> False)
-		# (next_token,pState) = nextToken FunctionContext pState
-		| next_token==SquareCloseToken
-			= (makeTailStrictNilExpression HeadStrict cIsAPattern,pState)
-			= want_LGraphExpr token [] head_strictness (tokenBack pState)
+	| head_strictness==HeadLazy
+		= case token of
+			IdentToken "!!"
+				# (next_token,pState) = nextToken FunctionContext pState
+				| next_token==SquareCloseToken
+					-> (makeTailStrictNilExpression HeadStrict cIsAPattern,pState)
+					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+			IdentToken "^!"
+				# (next_token,pState) = nextToken FunctionContext pState
+				| next_token==SquareCloseToken
+					-> (makeTailStrictNilExpression HeadLazy cIsAPattern,pState)
+					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+			_
+				-> want_LGraphExpr token [] head_strictness pState
 		= want_LGraphExpr token [] head_strictness pState
 	where
 		want_LGraphExpr token acc head_strictness pState
@@ -4304,11 +4323,20 @@ wantListExp is_pattern pState
 			= (makeNilExpression head_strictness is_pattern,pState)
 	| head_strictness==HeadUnboxedAndTailStrict
 		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| head_strictness==HeadLazy && (case token of (IdentToken "!!") -> True; _ -> False)
-		# (next_token,pState) = nextToken FunctionContext pState
-		| next_token==SquareCloseToken
-			= (makeTailStrictNilExpression HeadStrict is_pattern,pState)
-			= want_LGraphExpr token [] head_strictness (tokenBack pState)
+	| head_strictness==HeadLazy
+		= case token of
+			IdentToken "!!"
+				# (next_token,pState) = nextToken FunctionContext pState
+				| next_token==SquareCloseToken
+					-> (makeTailStrictNilExpression HeadStrict is_pattern,pState)
+					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+			IdentToken "^!"
+				# (next_token,pState) = nextToken FunctionContext pState
+				| next_token==SquareCloseToken
+					-> (makeTailStrictNilExpression HeadLazy is_pattern,pState)
+					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+			_
+				-> want_LGraphExpr token [] head_strictness pState
 		= want_LGraphExpr token [] head_strictness pState
 	where
 		want_LGraphExpr token acc head_strictness pState
@@ -4477,6 +4505,9 @@ want_head_strictness (SeqLetToken strict) pState
 want_head_strictness BarToken pState
 	# (token,pState) = nextToken FunctionContext pState
 	= (HeadOverloaded,token,pState)
+want_head_strictness (IdentToken "^") pState
+	# (token,pState) = nextToken FunctionContext pState
+	= (HeadLazy,token,pState)
 want_head_strictness token pState
 	= (HeadLazy,token,pState)
 
