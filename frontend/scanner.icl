@@ -630,7 +630,7 @@ Scan c0=:'_' input=:{inp_stream=OldLine i line stream,inp_pos} co
 				| i<size && line.[i] == '_'
 					= scan_underscores (i+1) size line
 					= i
-	| end_i<size && IsIdentChar line.[end_i] co
+	| end_i<size && IsIdentChar line.[end_i]
 		= replaceIdentToken (ScanIdentFast (end_i-i+1) {input & inp_stream=OldLine end_i line stream} co)
 		with
 			replaceIdentToken :: (Token, *state) -> (Token, *state)
@@ -748,8 +748,7 @@ Scan 'A' input TypeContext
 							= ScanIdentFast 1 (charBack input) TypeContext
 Scan c    input co
 	| IsDigit c				= ScanNumeral 0 input [c]
-	| IsIdentChar c	co	
-		= ScanIdentFast 1 input co
+	| IsIdentChar c			= ScanIdentFast 1 input co
 	| isSpecialChar c		= ScanOperator 0 input [c] co
 							= (ErrorToken ScanErrIllegal, input)
 
@@ -758,13 +757,13 @@ ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,i
 	| i+3>size line
 		= ScanOperator 0 input ['?'] co
 	| line.[i]=='J' && line.[i+1]=='u' && line.[i+2]=='s' && line.[i+3]=='t'
-		&& (i+4==size line || not (IsIdentChar line.[i+4] FunctionContext))
+		&& (i+4==size line || not (IsIdentChar line.[i+4]))
 		# inp_pos & fp_col = inp_pos.fp_col + 4
 		  input = {inp_stream = OldLine (i+4) line stream, inp_pos = inp_pos,
 				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
 		= (MaybeIdentToken StrictJustToken, input)
 	| line.[i]=='N' && line.[i+1]=='o' && line.[i+2]=='n' && line.[i+3]=='e'
-		&& (i+4==size line || not (IsIdentChar line.[i+4] FunctionContext))
+		&& (i+4==size line || not (IsIdentChar line.[i+4]))
 		# inp_pos & fp_col = inp_pos.fp_col + 4
 		  input = {inp_stream = OldLine (i+4) line stream, inp_pos = inp_pos,
 				   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
@@ -773,13 +772,13 @@ ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,i
 		= ScanOperator 0 input ['?'] co
 	| line.[i]=='#'
 		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
 			= (MaybeIdentToken UnboxedJustToken, input)
 		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
@@ -787,13 +786,13 @@ ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,i
 			= ScanOperator 0 input ['?'] co
 	| line.[i]=='|'
 		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
 			= (MaybeIdentToken OverloadedJustToken, input)
 		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
@@ -801,13 +800,13 @@ ScanQuestionMark input=:{inp_stream=OldLine i line stream,inp_pos,inp_filename,i
 			= ScanOperator 0 input ['?'] co
 	| line.[i]=='^'
 		| line.[i+1]=='J' && line.[i+2]=='u' && line.[i+3]=='s' && line.[i+4]=='t'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
 			= (MaybeIdentToken LazyJustToken, input)
 		| line.[i+1]=='N' && line.[i+2]=='o' && line.[i+3]=='n' && line.[i+4]=='e'
-			&& (i+5==size line || not (IsIdentChar line.[i+5] FunctionContext))
+			&& (i+5==size line || not (IsIdentChar line.[i+5]))
 			# inp_pos & fp_col = inp_pos.fp_col + 5
 			  input = {inp_stream = OldLine (i+5) line stream, inp_pos = inp_pos,
 					   inp_filename = inp_filename, inp_tabsize = inp_tabsize}
@@ -859,14 +858,29 @@ ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} ModuleNameCont
 	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
 	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
 	= (IdentToken (line % (i-n,end_i-1)), input)
-ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
-	# end_i = ScanIdentCharsInString i line co
+ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co=:TypeContext
+	# end_i = ScanTypeIdentCharsInString i line
 		with
-			ScanIdentCharsInString :: !Int !{#Char} !ScanContext -> Int
-			ScanIdentCharsInString i line co
+			ScanTypeIdentCharsInString :: !Int !{#Char} -> Int
+			ScanTypeIdentCharsInString i line
 				| i<size line
-					| IsIdentChar line.[i] co
-						= ScanIdentCharsInString (i+1) line co
+					| IsIdentChar line.[i]
+						= ScanTypeIdentCharsInString (i+1) line
+					| line.[i]=='^'
+						= i+1
+						= i
+					= i
+	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
+	# input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
+	= CheckReservedIdent co (line % (i-n,end_i-1)) input
+ScanIdentFast n input=:{inp_stream=OldLine i line stream,inp_pos} co
+	# end_i = ScanIdentCharsInString i line
+		with
+			ScanIdentCharsInString :: !Int !{#Char} -> Int
+			ScanIdentCharsInString i line
+				| i<size line
+					| IsIdentChar line.[i]
+						= ScanIdentCharsInString (i+1) line
 						= i
 					= i
 	# pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
@@ -958,8 +972,6 @@ CheckFunctContext s input
 	"from"		->	(FromToken			, input)
 	"let" 	    #	(strict, input) = determineStrictness input
 				->	(LetToken strict, input)
-//	"Let" 	    #	(strict, input) = determineStrictness input
-//				->	(SeqLetToken strict	, input)
 	"in"  	    ->	(InToken			, input)
 	"dynamic"  	->	(DynamicToken		, input)
 	"code"		->	(CodeToken			, input)
@@ -1445,12 +1457,11 @@ hexDigitToInt 'f' = 15
 hexDigitToInt 'F' = 15
 hexDigitToInt c   = digitToInt c
 
-IsIdentChar :: !Char !ScanContext -> Bool
-IsIdentChar  c	_ | isAlphanum c	= True
-IsIdentChar '_'	_ 					= True
-IsIdentChar '`'	_					= True
-IsIdentChar '^'	TypeContext			= True
-IsIdentChar  _	_					= False
+IsIdentChar :: !Char -> Bool
+IsIdentChar  c  | isAlphanum c	= True
+IsIdentChar '_' = True
+IsIdentChar '`' = True
+IsIdentChar  _  = False
 
 IsModuleNameChar :: !Char -> Bool
 IsModuleNameChar  c	| isAlphanum c	= True

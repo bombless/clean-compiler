@@ -2950,8 +2950,6 @@ where
 			_
 				-> (MakeTypeVar erroneousIdent, parseError "Type variable" (Yes token) "<type variable>" pState)
 
-// Sjaak 210801 ...
-
 adjustAttribute :: !TypeAttribute Type *ParseState -> (!TypeAttribute, !*ParseState)
 adjustAttribute attr (TV {tv_ident}) pState
 	= adjustAttributeOfTypeVariable attr tv_ident pState
@@ -2966,34 +2964,6 @@ adjustAttributeOfTypeVariable TA_Anonymous {id_name} pState
 	= (TA_Var (makeAttributeVar ident), pState)
 adjustAttributeOfTypeVariable attr _ pState
 	= (attr, pState)
-
-// ... Sjaak 210801
-
-stringToType :: !String !ParseState -> (!Type, !ParseState)
-stringToType name pState
-	| isLowerCaseName name
-		= nameToTypeVar name pState
-		# (id, pState) = stringToIdent name IC_Type pState
-		= (TA (MakeNewTypeSymbIdent id 0) [], pState)
-/*	| isUpperCaseName name
-		= (TA (MakeNewTypeSymbIdent id 0) [], pState)
-		= nameToTypeVar name pState
-*/
-/*
-stringToAType :: !String !Annotation !TypeAttribute !ParseState -> (!AType, !ParseState)
-stringToAType name annot attr pState
-	# (id, pState) = stringToIdent name IC_Type pState
-	| isUpperCaseName name
-		= ({ at_annotation = annot, at_attribute = attr, at_type = TA (MakeNewTypeSymbIdent id 0) []}, pState)
-		# (type_var, pState) = nameToTypeVar name pState
-		= build_attributed_type_var attr annot type_var name pState
-where
-	build_attributed_type_var TA_Anonymous annot type_var type_var_name pState
-		# (attr_id, pState) = stringToIdent type_var_name IC_TypeAttr pState
-		= ({ at_annotation = annot, at_attribute = TA_Var (makeAttributeVar attr_id), at_type = type_var }, pState)
-	build_attributed_type_var attr annot type_var _ pState
-		= ({ at_annotation = annot, at_attribute = attr, at_type = type_var }, pState)
-*/
 
 instance want SAType
 where
@@ -3360,9 +3330,9 @@ trySimpleTypeT (IdentToken id) attr pState
 		# (typevar, pState)	= nameToTypeVar id pState
 		  (attr, pState)	= adjustAttribute attr typevar pState
 		= (ParseOk, {at_attribute = attr, at_type = typevar}, pState)
-	| otherwise // | isUpperCaseName id || isFunnyIdName id
-	# (type, pState) = stringToType id pState
-	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
+		# (id, pState) = stringToIdent id IC_Type pState
+		  type = TA (MakeNewTypeSymbIdent id 0) []
+		= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT SquareOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
 	# (head_strictness,token,pState) = wantHeadStrictness token pState
