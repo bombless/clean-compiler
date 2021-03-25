@@ -131,6 +131,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	BackSlashToken			//		\
 	|	DoubleBackSlashToken	//		\\
 	|	LeftArrowToken			//		<-
+	|	LeftArrowWithExclamationToken	//	<-
 	|	LeftArrowColonToken		//		<-:
 	|	LeftArrowWithBarToken	//		<|-
 	|	DotDotToken				//		..
@@ -651,19 +652,31 @@ Scan c0=:'<' input co
 	# (eof, c1, input)		= ReadNormalChar input
 	| eof 					= (IdentToken "<", input)
 	| c1 <> '-'
-		| c1<>'|'
+		| c1=='|'
+			# (eof, c2, input)	= ReadNormalChar input
+			| eof
+				= (IdentToken "<|",input)
+			| c2=='-'
+				# (eof, c3, input)	= ReadNormalChar input
+				| eof				= (LeftArrowWithBarToken, input)
+				| isSpecialChar c3	= ScanOperator 3 input [c3, c2, c1, c0] co
+									= (LeftArrowWithBarToken, charBack input)
+			| isSpecialChar c2
+				= ScanOperator 2 input [c2, c1, c0] co
+				= (IdentToken "<|", charBack input)
+		| c1=='!'
+			# (eof, c2, input)	= ReadNormalChar input
+			| eof
+				= (IdentToken "<!",input)
+			| c2=='-'
+				# (eof, c3, input)	= ReadNormalChar input
+				| eof				= (LeftArrowWithExclamationToken, input)
+				| isSpecialChar c3	= ScanOperator 3 input [c3, c2, c1, c0] co
+									= (LeftArrowWithExclamationToken, charBack input)
+			| isSpecialChar c2
+				= ScanOperator 2 input [c2, c1, c0] co
+				= (IdentToken "<!", charBack input)
 			= ScanOperator 0 (charBack input) [c0] co
-		# (eof, c2, input)	= ReadNormalChar input
-		| eof
-			= (IdentToken "<|",input)
-		| c2=='-'
-			# (eof, c3, input)	= ReadNormalChar input
-			| eof				= (LeftArrowWithBarToken, input)
-			| isSpecialChar c3	= ScanOperator 3 input [c3, c2, c1, c0] co
-								= (LeftArrowWithBarToken, charBack input)
-		| isSpecialChar c2
-			= ScanOperator 2 input [c2, c1, c0] co
-			= (IdentToken "<|", charBack input)
 	# (eof, c2, input)		= ReadNormalChar input
 	| eof					= (LeftArrowToken, input)
 	| c2 == ':'	
@@ -1653,6 +1666,7 @@ where
 	toString BackSlashToken				= "\\"
 	toString DoubleBackSlashToken		= "\\\\"
 	toString LeftArrowToken				= "<-"
+	toString LeftArrowWithExclamationToken = "<!-"
 	toString LeftArrowColonToken		= "<-:"
 	toString LeftArrowWithBarToken		= "<|-"
 	toString DotDotToken				= ".."

@@ -1322,7 +1322,7 @@ instance toString 	KindInfo
 
 ::	ArrayKind = OverloadedArray | StrictArray | UnboxedArray | PackedArray;
 
-::	GeneratorKind = IsListGenerator | IsOverloadedListGenerator | IsArrayGenerator
+::	GeneratorKind = IsListGenerator | IsStrictListGenerator | IsOverloadedListGenerator | IsArrayGenerator
 			
 :: LineAndColumn = {lc_line :: !Int, lc_column :: !Int}
 

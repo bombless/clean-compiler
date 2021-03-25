@@ -455,8 +455,14 @@ transformLambda lam_ident args rhs pos
 	= MakeNewImpOrDefFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
 
 makeConsExpressionForGenerator :: GeneratorKind ParsedExpr ParsedExpr -> ParsedExpr
+makeConsExpressionForGenerator IsListGenerator a1 a2
+	#! cons_id = predefined_idents.[PD_ConsSymbol]
+	= PE_List [PE_Ident cons_id, a1, a2]
+makeConsExpressionForGenerator IsStrictListGenerator a1 a2
+	#! cons_id = predefined_idents.[PD_StrictConsSymbol]
+	= PE_List [PE_Ident cons_id, a1, a2]
 makeConsExpressionForGenerator gen_kind a1 a2
-	#! cons_id = predefined_idents.[case gen_kind of IsListGenerator -> PD_ConsSymbol ; _ -> PD_OverloadedConsSymbol]
+	#! cons_id = predefined_idents.[PD_OverloadedConsSymbol]
 	= PE_List [PE_Ident cons_id, a1, a2]
 
 makeNilExpression :: Int -> ParsedExpr
@@ -492,9 +498,6 @@ get_predef_id predef_index :== predefined_idents.[predef_index]
 is_zero_expression (PE_Basic (BVI "0")) = True
 is_zero_expression (PE_Basic (BVInt 0)) = True
 is_zero_expression _ = False
-
-is_overloaded_list_generator IsOverloadedListGenerator = True
-is_overloaded_list_generator _ = False
 
 transformGenerator :: Generator String IndexGenerator *CollectAdmin -> (!TransformedGenerator,!IndexGenerator,!Int,!*CollectAdmin)
 transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
@@ -562,7 +565,8 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 				  					(PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]),n2)
 			-> (transformed_generator,Yes (i,[size_expression:size_expressions]),0,ca)
 transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_exp to_exp), gen_pattern, gen_position} qual_filename index_generator ca
-	| is_overloaded_list_generator gen_kind || pd_from_to_index==PD_FromTo
+	| gen_kind=:IsOverloadedListGenerator || (pd_from_to_index==PD_FromTo  && not gen_kind=:IsStrictListGenerator)
+										  || (pd_from_to_index==PD_FromToS && not gen_kind=:IsListGenerator)
 		# (n, ca) = prefixAndPositionToIdentExp "g_s" gen_position ca
 		  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 	 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
@@ -632,7 +636,8 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 					}
 			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp), gen_pattern, gen_position} qual_filename index_generator ca
-	| is_overloaded_list_generator gen_kind || pd_from_index==PD_From
+	| gen_kind=:IsOverloadedListGenerator || (pd_from_index==PD_From  && not gen_kind=:IsStrictListGenerator)
+										  || (pd_from_index==PD_FromS && not gen_kind=:IsListGenerator)
 		# (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 		  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
 		| is_zero_expression from_exp
@@ -934,20 +939,26 @@ makeUpdateOrSizeComprehension transformed_qualifiers success identExprs result_e
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsArrayGenerator}
 	= pattern_will_always_match gen_pattern
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_FromTo PD_FromTo (PE_Basic (BVInt 0)) to_exp)}
-	= pattern_will_always_match gen_pattern	
+	= pattern_will_always_match gen_pattern
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
-	= pattern_will_always_match gen_pattern	
+	= pattern_will_always_match gen_pattern
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsStrictListGenerator,gen_expr=PE_Sequ (SQ_FromTo PD_FromToS (PE_Basic (BVInt 0)) to_exp)}
+	= pattern_will_always_match gen_pattern
+size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsStrictListGenerator,gen_expr=PE_Sequ (SQ_From PD_FromS from_exp)}
+	= pattern_will_always_match gen_pattern
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_FromTo _ (PE_Basic (BVInt 0)) to_exp)}
-	= pattern_will_always_match gen_pattern	
+	= pattern_will_always_match gen_pattern
 size_of_generator_can_be_computed_quickly {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
-	= pattern_will_always_match gen_pattern	
+	= pattern_will_always_match gen_pattern
 size_of_generator_can_be_computed_quickly _
 	= False
 
 size_of_generators_can_be_computed_quickly qualifiers=:[qualifier=:{qual_generators,qual_filter=No}]
 	= All size_of_generator_can_be_computed_quickly qual_generators && not (All is_from_generator qual_generators)
 	where
-		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
+		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
+			= True
+		is_from_generator {gen_pattern,gen_kind=IsStrictListGenerator,gen_expr=PE_Sequ (SQ_From PD_FromS from_exp)}
 			= True
 		is_from_generator {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 			= True

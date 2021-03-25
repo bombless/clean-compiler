@@ -333,6 +333,7 @@ where
 		= file <<< gen_pattern <<< (gen_kind_to_string gen_kind) <<< gen_expr
 	where
 		gen_kind_to_string IsListGenerator = "<-"
+		gen_kind_to_string IsStrictListGenerator = "<!-"
 		gen_kind_to_string IsOverloadedListGenerator = "<|-"
 		gen_kind_to_string IsArrayGenerator = "<-:"
 
