@@ -153,6 +153,9 @@ instance currentToken ScanState
 class getPosition state :: !*state -> (!FilePosition,!*state)  // Position of current Token (or Char)
 instance getPosition ScanState
 
+class getCurrentAndPrevious2Positions state :: !*state -> (!FilePosition,!FilePosition,!FilePosition,!*state)
+instance getCurrentAndPrevious2Positions ScanState
+
 fopenInSearchPaths :: !{#Char} !{#Char} !SearchPaths !Int (ModTimeFunction *Files) !*Files -> (Optional (*File, {#Char}, {#Char}),!*Files) 
 
 openScanner :: !*File !String !String -> ScanState

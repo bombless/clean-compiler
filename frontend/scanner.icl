@@ -51,6 +51,11 @@ where
 		# (position,scan_state) = getPosition scan_state
 		= (position,ScanState scan_state)
 
+instance getCurrentAndPrevious2Positions ScanState
+where
+	getCurrentAndPrevious2Positions scanState=:(ScanState {ss_tokenBuffer=Buffer3 x y z})
+		= (x.lt_position, y.lt_position, z.lt_position, scanState)
+
 ::	* RScanState =
 	{	ss_input		::	ScanInput
 	,	ss_offsides		::	! [(Int, Bool) ]	// (column, defines newDefinition)

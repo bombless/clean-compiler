@@ -2206,7 +2206,7 @@ where
 									gcf_generic_info = gcf_generic_info, gcf_body = GCB_None, gcf_kind = KindError,
 									gcf_generic_instance_deps = generic_instance_deps}
 			}
-		= (derive_def, token, pState) 
+		= (derive_def, token, pState)
 
 	want_derive_class_types :: Ident !*ParseState -> ([GenericCaseDef], !*ParseState)			
 	want_derive_class_types class_ident pState
@@ -3312,13 +3312,7 @@ trySimpleType_strictness_ignored attr pState
 	= (result==ParseOk,atype,pState)
 
 is_tail_strict_list_or_nil pState
-	# (square_close_position, pState) = getPosition pState
-	# pState=tokenBack pState
-	# (exclamation_position, pState) = getPosition pState
-	# pState=tokenBack pState
-	# (square_open_position, pState) = getPosition pState
-	# (exclamation_token,pState) = nextToken TypeContext pState
-	# (square_close_token,pState) = nextToken TypeContext pState
+	# (square_close_position,exclamation_position,square_open_position,pState) = getCurrentAndPrevious2Positions pState
 	| exclamation_position.fp_col+1==square_close_position.fp_col && exclamation_position.fp_line==square_close_position.fp_line
 		&& (square_open_position.fp_col+1<>exclamation_position.fp_col || square_open_position.fp_line<>exclamation_position.fp_line)
 		= (True,pState)
@@ -4189,7 +4183,7 @@ wantListPatternWithoutDefinitions pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token=:ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
+	| token=:ExclamationToken && head_strictness<=HeadUnboxed
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness cIsAPattern,pState)
@@ -4286,7 +4280,7 @@ wantListExp is_pattern pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
 	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token=:ExclamationToken && (head_strictness<>HeadOverloaded && head_strictness<>HeadUnboxedAndTailStrict)
+	| token=:ExclamationToken && head_strictness<=HeadUnboxed
 		# (token, pState) = nextToken FunctionContext pState
 		| token==SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness is_pattern,pState)
@@ -5492,6 +5486,12 @@ where
 instance getPosition ParseState
 where
 	getPosition pState = accScanState getPosition pState
+
+instance getCurrentAndPrevious2Positions ParseState
+where
+	getCurrentAndPrevious2Positions pState=:{ps_scanState}
+		# (p1,p2,p3,ps_scanState) = getCurrentAndPrevious2Positions ps_scanState
+		= (p1,p2,p3,{pState & ps_scanState = ps_scanState})
 
 warnIfStrictAnnot NoAnnot pState = pState
 warnIfStrictAnnot (StrictAnnotWithPosition position) pState = parseWarningWithPosition "" "! ignored" position pState
