@@ -919,8 +919,9 @@ checkExpression free_vars (PE_Generic id=:{id_name,id_info} kind) e_input e_stat
 checkExpression free_vars (PE_TypeSignature array_kind expr) e_input e_state e_info cs
 	# (expr,free_vars,e_state,e_info,cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  predef_array_index = case array_kind of
-								UnboxedArray -> PD_UnboxedArrayType
+								LazyArray -> PD_LazyArrayType
 								StrictArray -> PD_StrictArrayType
+								UnboxedArray -> PD_UnboxedArrayType
 								PackedArray -> PD_PackedArrayType
 	  ({pds_module,pds_def},cs) = cs!cs_predef_symbols.[predef_array_index]
 	#! strict_array_ident = predefined_idents.[predef_array_index]

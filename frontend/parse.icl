@@ -4777,6 +4777,8 @@ wantRecordOrArrayExp is_pattern pState
 			-> want_array_elems UnboxedArray pState
 		CurlyCloseToken
 			-> (PE_ArrayDenot OverloadedArray [], pState)
+		IdentToken "^"
+			-> want_array_elems LazyArray pState
 		_
 			# (opt_type, pState) = try_type_specification token pState
 			-> case opt_type of

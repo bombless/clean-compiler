@@ -1320,7 +1320,7 @@ instance toString 	KindInfo
 	
 ::	ModuleIdent:==Ident
 
-::	ArrayKind = OverloadedArray | StrictArray | UnboxedArray | PackedArray;
+::	ArrayKind = LazyArray | StrictArray | UnboxedArray | PackedArray | OverloadedArray;
 
 ::	GeneratorKind = IsListGenerator | IsStrictListGenerator | IsOverloadedListGenerator | IsArrayGenerator
 			
