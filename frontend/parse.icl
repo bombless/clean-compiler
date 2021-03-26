@@ -4606,19 +4606,22 @@ wantQualifiers pState
 where
 	want_qualifier :: !ParseState -> (!Qualifier, !ParseState)
 	want_qualifier pState
-		# (qual_position, pState) = getPosition pState
+		# (file_position, pState) = getPosition pState
 		  (qual_filename, pState) = accScanState getFilename pState
 		  (lhs_expr, pState) = wantPattern pState
 		  (token, pState) = nextToken FunctionContext pState
+		#! qual_position = toLineAndColumn file_position
 		= case token of
 			LeftArrowToken
-				-> want_generators IsListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+				-> want_generators IsListGenerator qual_position qual_filename lhs_expr pState
 			LeftArrowWithExclamationToken
-				-> want_generators IsStrictListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
-			LeftArrowColonToken
-				-> want_generators IsArrayGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+				-> want_generators IsStrictListGenerator qual_position qual_filename lhs_expr pState
+			LeftArrowWithCaretToken
+				-> want_generators IsListGenerator qual_position qual_filename lhs_expr pState
 			LeftArrowWithBarToken
-				-> want_generators IsOverloadedListGenerator (toLineAndColumn qual_position) qual_filename lhs_expr pState
+				-> want_generators IsOverloadedListGenerator qual_position qual_filename lhs_expr pState
+			LeftArrowColonToken
+				-> want_generators IsArrayGenerator qual_position qual_filename lhs_expr pState
 			_
 				-> ({qual_generators = [], qual_let_defs=LocalParsedDefs [], qual_filter = No, qual_position = {lc_line = 0, lc_column = 0}, qual_filename = "" },
 					parseError "comprehension: qualifier" (Yes token) "qualifier(s)" pState)

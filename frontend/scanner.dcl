@@ -50,9 +50,10 @@ instance <<< FilePosition
 	|	BackSlashToken			//		\
 	|	DoubleBackSlashToken	//		\\
 	|	LeftArrowToken			//		<-
-	|	LeftArrowWithExclamationToken	//	<-
-	|	LeftArrowColonToken		//		<-:
+	|	LeftArrowWithExclamationToken	//	<!-
+	|	LeftArrowWithCaretToken	//		<^-
 	|	LeftArrowWithBarToken	//		<|-
+	|	LeftArrowColonToken		//		<-:
 	|	DotDotToken				//		..
 	|	AndToken				//		&
 	|	HashToken				//		#

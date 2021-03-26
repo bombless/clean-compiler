@@ -136,9 +136,10 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	BackSlashToken			//		\
 	|	DoubleBackSlashToken	//		\\
 	|	LeftArrowToken			//		<-
-	|	LeftArrowWithExclamationToken	//	<-
-	|	LeftArrowColonToken		//		<-:
+	|	LeftArrowWithExclamationToken	//	<!-
+	|	LeftArrowWithCaretToken	//		<^-
 	|	LeftArrowWithBarToken	//		<|-
+	|	LeftArrowColonToken		//		<-:
 	|	DotDotToken				//		..
 	|	AndToken				//		&
 	|	HashToken				//		#
@@ -681,6 +682,18 @@ Scan c0=:'<' input co
 			| isSpecialChar c2
 				= ScanOperator 2 input [c2, c1, c0] co
 				= (IdentToken "<!", charBack input)
+		| c1=='^'
+			# (eof, c2, input)	= ReadNormalChar input
+			| eof
+				= (IdentToken "<^",input)
+			| c2=='-'
+				# (eof, c3, input)	= ReadNormalChar input
+				| eof				= (LeftArrowWithCaretToken, input)
+				| isSpecialChar c3	= ScanOperator 3 input [c3, c2, c1, c0] co
+									= (LeftArrowWithCaretToken, charBack input)
+			| isSpecialChar c2
+				= ScanOperator 2 input [c2, c1, c0] co
+				= (IdentToken "<^", charBack input)
 			= ScanOperator 0 (charBack input) [c0] co
 	# (eof, c2, input)		= ReadNormalChar input
 	| eof					= (LeftArrowToken, input)
@@ -1683,8 +1696,9 @@ where
 	toString DoubleBackSlashToken		= "\\\\"
 	toString LeftArrowToken				= "<-"
 	toString LeftArrowWithExclamationToken = "<!-"
-	toString LeftArrowColonToken		= "<-:"
+	toString LeftArrowWithCaretToken	= "<^-"
 	toString LeftArrowWithBarToken		= "<|-"
+	toString LeftArrowColonToken		= "<-:"
 	toString DotDotToken				= ".."
 	toString AndToken					= "&"
 	toString HashToken					= "#"
