@@ -38,6 +38,7 @@ Conventions:
 PS_SkippingMask :== 1
 PS_DynamicTypeUsedMask :== 4
 PS_SupportDynamics :== 8
+PS_ListDefaultStrict :== 16
 
 /*
 appScanState :: (ScanState -> ScanState) !ParseState -> ParseState
@@ -76,6 +77,8 @@ HeadStrict:==1
 HeadUnboxed:==2
 HeadOverloaded:==3;
 HeadUnboxedAndTailStrict:==4;
+
+PS_flags_to_default_head_strictness ps_flags :== (ps_flags>>4) bitand 1 // PS_ListDefaultStrict :== 16
 
 makeListTypeSymbol :: Int Int -> TypeSymbIdent
 makeListTypeSymbol head_strictness arity
@@ -329,7 +332,8 @@ where
 										}
 			  pState				= verify_name mod_name id_name file_name pState
 		  	  (mod_ident, pState)	= stringToIdent mod_name (IC_Module NoQualifiedIdents) pState
-		  	  pState				= check_layout_rule pState
+			  (token, pState)		= parse_defaults pState
+			  pState				= check_layout_rule token pState
 		  	  (defs, pState)		= want_definitions (SetGlobalContext iclmodule) pState
 			  {ps_scanState,ps_hash_table,ps_error,ps_flags}
 			  						= pState
@@ -393,9 +397,29 @@ where
 	  						<<< "\" does not match file name: \"" <<< file_name <<<"\"\n"
 			= { pState & ps_error = { pea_file = pea_file, pea_ok = False }}
 
-	check_layout_rule pState
-		# (token, pState)	= nextToken GeneralContext pState
-		  use_layout		= token <> SemicolonToken && token <> EndOfFileToken // '&& token <> EndOfFileToken' to handle end groups of empty modules
+	parse_defaults pState
+		# (token, pState) = nextToken GeneralContext pState
+		| not token=:WithToken
+			= (token, pState)
+		# (token, pState) = nextToken GeneralContext pState
+		| not token=:SquareOpenToken
+			# pState = parseError "want defaults" (Yes token) "[" pState
+			= nextToken GeneralContext pState
+		# (token, pState) = nextToken GeneralContext pState
+		| token=:SquareCloseToken
+			= nextToken GeneralContext pState
+		| not token=:ExclamationToken
+			# pState = parseError "want defaults" (Yes token) "! or ]" pState
+			= nextToken GeneralContext pState
+		# (token, pState) = nextToken GeneralContext pState
+		| not token=:SquareCloseToken
+			# pState = parseError "want defaults" (Yes token) "]" pState
+			= nextToken GeneralContext pState
+			# pState & ps_flags=pState.ps_flags bitor PS_ListDefaultStrict
+			= nextToken GeneralContext pState
+
+	check_layout_rule token pState
+		# use_layout		= not token=:SemicolonToken && not token=:EndOfFileToken // '&& token <> EndOfFileToken' to handle end groups of empty modules
 		| use_layout		= appScanState (setUseLayout use_layout) (tokenBack pState)
 							= appScanState (setUseLayout use_layout) pState
 
@@ -3334,44 +3358,58 @@ trySimpleTypeT (IdentToken id) attr pState
 		= (ParseOk, {at_attribute = attr, at_type = type}, pState)
 trySimpleTypeT SquareOpenToken attr pState
 	# (token, pState) = nextToken TypeContext pState
-	# (head_strictness,token,pState) = wantHeadStrictness token pState
-		with
-			wantHeadStrictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
-			wantHeadStrictness ExclamationToken pState
-				# (token,pState) = nextToken TypeContext pState
-				= (HeadStrict,token,pState)
-			wantHeadStrictness HashToken pState
-				# (token,pState) = nextToken TypeContext pState
-				= (HeadUnboxed,token,pState)
-			wantHeadStrictness (IdentToken "^") pState
-				# (token,pState) = nextToken TypeContext pState
-				= (HeadLazy,token,pState)
-			wantHeadStrictness token pState
-				= (HeadLazy,token,pState)
-	| token =: SquareCloseToken
-		| head_strictness==HeadStrict
-			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
-			| tail_strict
-				# list_symbol = makeTailStrictListTypeSymbol HeadLazy 0
-		  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)					
-				# list_symbol = makeListTypeSymbol head_strictness 0
-		  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
-		# list_symbol = makeListTypeSymbol head_strictness 0
-  		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
-	| token=:ExclamationToken
+	= case token of
+		ExclamationToken
+			# (token,pState) = nextToken TypeContext pState
+			| token=:SquareCloseToken
+				# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+				| tail_strict
+					#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+					-> tail_strict_list_type head_strictness attr pState
+					-> list_type HeadStrict attr pState
+				-> want_tail_strict_list_type_or_list_type_with_argument token HeadStrict attr pState
+		HashToken
+			# (token,pState) = nextToken TypeContext pState
+			| token=:SquareCloseToken
+				-> list_type HeadUnboxed attr pState
+				-> want_tail_strict_list_type_or_list_type_with_argument token HeadUnboxed attr pState
+		IdentToken "^"
+			# (token,pState) = nextToken TypeContext pState
+			| token=:SquareCloseToken
+				-> list_type HeadLazy attr pState
+				-> want_tail_strict_list_type_or_list_type_with_argument token HeadLazy attr pState
+		SquareCloseToken
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> list_type head_strictness attr pState
+		IdentToken "^!"
+			# (next_token,pState) = nextToken TypeContext pState
+			| next_token =: SquareCloseToken
+				-> tail_strict_list_type HeadLazy attr pState
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> want_list_type_with_argument token head_strictness (tokenBack pState)
+		_
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> want_list_type_with_argument token head_strictness pState
+where
+	want_tail_strict_list_type_or_list_type_with_argument :: !Token !Int !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
+	want_tail_strict_list_type_or_list_type_with_argument ExclamationToken head_strictness attr pState
 		# (token,pState) = nextToken TypeContext pState
 		| token=:SquareCloseToken
-			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
-  			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+			= tail_strict_list_type head_strictness attr pState
 			= (ParseFailWithError, {at_attribute = attr, at_type = TE}, parseError "List type" (Yes token) "]" pState)
-	| head_strictness==HeadLazy && token =: (IdentToken "^!")
-		# (next_token,pState) = nextToken TypeContext pState
-		| next_token =: SquareCloseToken
-			# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
-			= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
-		= want_list_type_with_argument token head_strictness (tokenBack pState)
-	= want_list_type_with_argument token head_strictness pState
-where
+	want_tail_strict_list_type_or_list_type_with_argument token head_strictness attr pState
+		= want_list_type_with_argument token head_strictness pState
+
+	list_type :: !Int !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
+	list_type head_strictness attr pState
+		# list_symbol = makeListTypeSymbol head_strictness 0
+		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+
+	tail_strict_list_type :: !Int !TypeAttribute !ParseState -> (!ParseResult, !AType, !ParseState)
+	tail_strict_list_type head_strictness attr pState
+		# list_symbol = makeTailStrictListTypeSymbol head_strictness 0
+		= (ParseOk, {at_attribute = attr, at_type = TA list_symbol []}, pState)
+
 	want_list_type_with_argument :: !Token !Int !ParseState -> (!ParseResult, !AType, !ParseState)
 	want_list_type_with_argument token head_strictness pState
 		# (type, pState)	= wantAType_strictness_ignoredT token pState
@@ -4199,40 +4237,63 @@ wantListPatternWithoutDefinitions :: !ParseState -> (ParsedExpr, !ParseState)
 wantListPatternWithoutDefinitions pState
 	# pState=appScanState setNoNewOffsideForSeqLetBit pState
 	# (token, pState) = nextToken FunctionContext pState
-	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
-	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token=:ExclamationToken && head_strictness<=HeadUnboxed
+	# pState=appScanState clearNoNewOffsideForSeqLetBit pState
+	= case token of
+		ExclamationToken
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+				| tail_strict
+					#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+					-> (makeTailStrictNilExpression head_strictness cIsAPattern,pState)
+					-> (makeNilExpression HeadStrict cIsAPattern,pState)
+				-> want_tail_strict_nil_or_LGraphExpr token HeadStrict pState
+		SeqLetToken strict
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				| strict
+					-> (makeTailStrictNilExpression HeadUnboxed cIsAPattern,pState)
+					-> (makeNilExpression HeadUnboxed cIsAPattern,pState)
+				| strict
+					-> (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+					-> want_tail_strict_nil_or_LGraphExpr token HeadUnboxed pState
+		BarToken
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				-> (makeNilExpression HeadOverloaded cIsAPattern,pState)
+				-> want_LGraphExpr token [] HeadOverloaded pState
+		SquareCloseToken
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> (makeNilExpression head_strictness cIsAPattern,pState)
+		IdentToken "^"
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				-> (makeNilExpression HeadLazy cIsAPattern,pState)
+				-> want_tail_strict_nil_or_LGraphExpr token HeadLazy pState
+		IdentToken "!!"
+			# (next_token,pState) = nextToken FunctionContext pState
+			| next_token=:SquareCloseToken
+				-> (makeTailStrictNilExpression HeadStrict cIsAPattern,pState)
+				#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+				-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+		IdentToken "^!"
+			# (next_token,pState) = nextToken FunctionContext pState
+			| next_token=:SquareCloseToken
+				-> (makeTailStrictNilExpression HeadLazy cIsAPattern,pState)
+				#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+				-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+		_
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> want_LGraphExpr token [] head_strictness pState
+where
+	want_tail_strict_nil_or_LGraphExpr ExclamationToken head_strictness pState
 		# (token, pState) = nextToken FunctionContext pState
 		| token=:SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness cIsAPattern,pState)
 			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| token=:SquareCloseToken
-		| head_strictness==HeadUnboxedAndTailStrict
-			= (makeTailStrictNilExpression HeadUnboxed cIsAPattern,pState)
-		| head_strictness==HeadStrict
-			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
-			| tail_strict
-				= (makeTailStrictNilExpression HeadLazy cIsAPattern,pState)
-				= (makeNilExpression head_strictness cIsAPattern,pState)
-			= (makeNilExpression head_strictness cIsAPattern,pState)
-	| head_strictness==HeadUnboxedAndTailStrict
-		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| head_strictness==HeadLazy
-		= case token of
-			IdentToken "!!"
-				# (next_token,pState) = nextToken FunctionContext pState
-				| next_token=:SquareCloseToken
-					-> (makeTailStrictNilExpression HeadStrict cIsAPattern,pState)
-					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
-			IdentToken "^!"
-				# (next_token,pState) = nextToken FunctionContext pState
-				| next_token=:SquareCloseToken
-					-> (makeTailStrictNilExpression HeadLazy cIsAPattern,pState)
-					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
-			_
-				-> want_LGraphExpr token [] head_strictness pState
+	want_tail_strict_nil_or_LGraphExpr token head_strictness pState
 		= want_LGraphExpr token [] head_strictness pState
-where
+
 	want_LGraphExpr (CharListToken chars) acc head_strictness pState
 		= want_list (add_chars (fromString chars) acc) head_strictness pState
 	want_LGraphExpr token acc head_strictness pState
@@ -4305,39 +4366,62 @@ wantListExp is_pattern pState
 	# pState=appScanState setNoNewOffsideForSeqLetBit pState
 	# (token, pState) = nextToken FunctionContext pState
 	# pState=appScanState clearNoNewOffsideForSeqLetBit pState	
-	# (head_strictness,token,pState) = want_head_strictness token pState
-	| token=:ExclamationToken && head_strictness<=HeadUnboxed
+	= case token of
+		ExclamationToken
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				# (tail_strict,pState) = is_tail_strict_list_or_nil pState
+				| tail_strict
+					#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+					-> (makeTailStrictNilExpression head_strictness is_pattern,pState)
+					-> (makeNilExpression HeadStrict is_pattern,pState)
+				-> want_tail_strict_nil_or_LGraphExpr token HeadStrict pState
+		SeqLetToken strict
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				| strict
+					-> (makeTailStrictNilExpression HeadUnboxed is_pattern,pState)
+					-> (makeNilExpression HeadUnboxed is_pattern,pState)
+				| strict
+					-> (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
+					-> want_tail_strict_nil_or_LGraphExpr token HeadUnboxed pState
+		BarToken
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				-> (makeNilExpression HeadOverloaded is_pattern,pState)
+				-> want_LGraphExpr token [] HeadOverloaded pState
+		SquareCloseToken
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> (makeNilExpression head_strictness is_pattern,pState)
+		IdentToken "^"
+			# (token,pState) = nextToken FunctionContext pState
+			| token=:SquareCloseToken
+				-> (makeNilExpression HeadLazy is_pattern,pState)
+				-> want_tail_strict_nil_or_LGraphExpr token HeadLazy pState
+		IdentToken "!!"
+			# (next_token,pState) = nextToken FunctionContext pState
+			| next_token=:SquareCloseToken
+				-> (makeTailStrictNilExpression HeadStrict is_pattern,pState)
+				#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+				-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+		IdentToken "^!"
+			# (next_token,pState) = nextToken FunctionContext pState
+			| next_token=:SquareCloseToken
+				-> (makeTailStrictNilExpression HeadLazy is_pattern,pState)
+				#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+				-> want_LGraphExpr token [] head_strictness (tokenBack pState)
+		_
+			#! head_strictness = PS_flags_to_default_head_strictness pState.ps_flags
+			-> want_LGraphExpr token [] head_strictness pState
+where
+	want_tail_strict_nil_or_LGraphExpr ExclamationToken head_strictness pState
 		# (token, pState) = nextToken FunctionContext pState
 		| token=:SquareCloseToken
 			= (makeTailStrictNilExpression head_strictness is_pattern,pState)
 			= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| token=:SquareCloseToken
-		| head_strictness==HeadUnboxedAndTailStrict
-			= (makeTailStrictNilExpression HeadUnboxed is_pattern,pState)
-		| head_strictness==HeadStrict
-			# (tail_strict,pState) = is_tail_strict_list_or_nil pState
-			| tail_strict
-				= (makeTailStrictNilExpression HeadLazy is_pattern,pState)
-				= (makeNilExpression head_strictness is_pattern,pState)
-			= (makeNilExpression head_strictness is_pattern,pState)
-	| head_strictness==HeadUnboxedAndTailStrict
-		= (PE_Empty,parseError "list" (Yes token) (toString SquareCloseToken) pState)
-	| head_strictness==HeadLazy
-		= case token of
-			IdentToken "!!"
-				# (next_token,pState) = nextToken FunctionContext pState
-				| next_token=:SquareCloseToken
-					-> (makeTailStrictNilExpression HeadStrict is_pattern,pState)
-					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
-			IdentToken "^!"
-				# (next_token,pState) = nextToken FunctionContext pState
-				| next_token=:SquareCloseToken
-					-> (makeTailStrictNilExpression HeadLazy is_pattern,pState)
-					-> want_LGraphExpr token [] head_strictness (tokenBack pState)
-			_
-				-> want_LGraphExpr token [] head_strictness pState
+	want_tail_strict_nil_or_LGraphExpr token head_strictness pState
 		= want_LGraphExpr token [] head_strictness pState
-where
+
 	want_LGraphExpr (CharListToken chars) acc head_strictness pState
 		= want_list (add_chars (fromString chars) acc) head_strictness pState
 	want_LGraphExpr token acc head_strictness pState
@@ -4492,24 +4576,6 @@ where
 			gen_tail_strict_cons_nodes [] exp
 				= exp
 
-want_head_strictness :: Token *ParseState -> *(!Int,!Token,!*ParseState)
-want_head_strictness ExclamationToken pState
-	# (token,pState) = nextToken FunctionContext pState
-	= (HeadStrict,token,pState)
-want_head_strictness (SeqLetToken strict) pState
-	# (token,pState) = nextToken FunctionContext pState
-	| strict
-		= (HeadUnboxedAndTailStrict,token,pState);
-		= (HeadUnboxed,token,pState)
-want_head_strictness BarToken pState
-	# (token,pState) = nextToken FunctionContext pState
-	= (HeadOverloaded,token,pState)
-want_head_strictness (IdentToken "^") pState
-	# (token,pState) = nextToken FunctionContext pState
-	= (HeadLazy,token,pState)
-want_head_strictness token pState
-	= (HeadLazy,token,pState)
-
 add_chars [] 			acc	= acc
 add_chars ['\\',c1,c2,c3:r] acc
 	| c1>='0' && c1<='7'
@@ -4612,7 +4678,9 @@ where
 		#! qual_position = toLineAndColumn file_position
 		= case token of
 			LeftArrowToken
-				-> want_generators IsListGenerator qual_position qual_filename lhs_expr pState
+				| pState.ps_flags bitand PS_ListDefaultStrict==0
+					-> want_generators IsListGenerator qual_position qual_filename lhs_expr pState
+					-> want_generators IsStrictListGenerator qual_position qual_filename lhs_expr pState
 			LeftArrowWithExclamationToken
 				-> want_generators IsStrictListGenerator qual_position qual_filename lhs_expr pState
 			LeftArrowWithCaretToken
