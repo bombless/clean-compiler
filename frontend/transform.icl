@@ -623,16 +623,16 @@ instance unfold DynamicPattern
 where
 	unfold guard=:{dp_var,dp_rhs,dp_type} us
 		# (dyn_info, us_symbol_heap) = readPtr dp_type us.us_symbol_heap
+		  (new_dp_type,us_symbol_heap)
+			= case dyn_info of
+				EI_DynamicCopy new_dp_type _
+					-> (new_dp_type,us_symbol_heap)
+				_
+					-> newPtr dyn_info us_symbol_heap
 		  us & us_symbol_heap=us_symbol_heap
-		= case dyn_info of
-			EI_DynamicCopy new_dp_type _
-				# (dp_var, us) = unfold dp_var us
-				  (dp_rhs, us) = unfold dp_rhs us
-				= ({guard & dp_var = dp_var, dp_rhs = dp_rhs, dp_type=new_dp_type}, us)
-			_
-				# (dp_var, us) = unfold dp_var us
-				  (dp_rhs, us) = unfold dp_rhs us
-				= ({guard & dp_var = dp_var, dp_rhs = dp_rhs}, us)
+		  (dp_var, us) = unfold dp_var us
+		  (dp_rhs, us) = unfold dp_rhs us
+		= ({guard & dp_var = dp_var, dp_rhs = dp_rhs, dp_type=new_dp_type}, us)
 
 instance unfold [a] | unfold a
 where
