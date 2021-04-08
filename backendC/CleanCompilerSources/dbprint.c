@@ -760,8 +760,7 @@ static void PrintAttribute (AttributeKind attr, File file)
 	else if (attr == UniqueAttr)
 		FPutC ('*', file);
 	else
-		fprintf (file, "%d", attr - UniqueAttr, file);
-
+		fprintf (file, "%d", attr - UniqueAttr);
 }
 
 void PrintTypeAlt (TypeAlts type_alts, File file)
