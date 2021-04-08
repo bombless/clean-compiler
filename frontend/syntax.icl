@@ -314,7 +314,7 @@ where
 	(<<<) file (BasicPatterns type patterns) = file <<< " " <<<patterns
 	(<<<) file (AlgebraicPatterns type patterns) = file <<< patterns
 	(<<<) file (DynamicPatterns patterns) = file <<< patterns
-	(<<<) file (OverloadedListPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< ' ' <<< patterns
+	(<<<) file (OverloadedPatterns type decons_expr patterns) = file <<< ' ' <<< decons_expr <<< ' ' <<< patterns
 	(<<<) file (NewTypePatterns type patterns) = file <<< patterns
 	(<<<) file NoPattern = file 
 

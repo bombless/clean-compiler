@@ -502,7 +502,7 @@ where
 		= find_calls fc_info pats fc_state
 	find_calls fc_info (DynamicPatterns pats) fc_state
 		= find_calls fc_info pats fc_state
-	find_calls fc_info (OverloadedListPatterns _ expr pats) fc_state
+	find_calls fc_info (OverloadedPatterns _ expr pats) fc_state
 		= find_calls fc_info pats (find_calls fc_info expr fc_state)
 	find_calls fc_info (NoPattern) fc_state
 		= fc_state

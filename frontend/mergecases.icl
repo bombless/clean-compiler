@@ -72,13 +72,13 @@ where
 								-> (No, var_heap, symbol_heap)	
 						No
 							-> (No, var_heap, symbol_heap)
-				OverloadedListPatterns type decons_expr [overloaded_list_pattern]
+				OverloadedPatterns type decons_expr [overloaded_list_pattern]
 					# (split_result, var_heap, symbol_heap) = split_case split_var_info_ptr overloaded_list_pattern.ap_expr var_heap symbol_heap
 					-> case split_result of
 						Yes split_case
 							| not split_case.case_explicit
 								# (cees,symbol_heap) = push_expression_into_guards_and_default
-														( \ guard_expr -> { this_case & case_guards = OverloadedListPatterns type decons_expr [{ overloaded_list_pattern & ap_expr = guard_expr }] } )
+														( \ guard_expr -> { this_case & case_guards = OverloadedPatterns type decons_expr [{ overloaded_list_pattern & ap_expr = guard_expr }] } )
 															split_case symbol_heap
 								-> (Yes cees, var_heap, symbol_heap)
 								-> (No, var_heap, symbol_heap) 	
@@ -172,9 +172,9 @@ where
 		push_expression_into_guards split_case=:{case_guards=BasicPatterns type patterns} symbol_heap
 			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
 			= ({split_case & case_guards=BasicPatterns type new_patterns},symbol_heap)
-		push_expression_into_guards split_case=:{case_guards=OverloadedListPatterns type decons_expr patterns} symbol_heap
+		push_expression_into_guards split_case=:{case_guards=OverloadedPatterns type decons_expr patterns} symbol_heap
 			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
-			= ({split_case & case_guards=OverloadedListPatterns type decons_expr new_patterns},symbol_heap)
+			= ({split_case & case_guards=OverloadedPatterns type decons_expr new_patterns},symbol_heap)
 		push_expression_into_guards split_case=:{case_guards=NewTypePatterns type patterns} symbol_heap
 			# (new_patterns,symbol_heap) = push_expression_into_patterns patterns symbol_heap
 			= ({split_case & case_guards=NewTypePatterns type new_patterns},symbol_heap)
@@ -235,9 +235,9 @@ where
 			# (bp_expr, var_heap, expr_heap) = rebuild_let_expression lad bp_expr var_heap expr_heap
 			  (patterns, var_heap, expr_heap) = push_let_expression_into_basic_pattern lad patterns var_heap expr_heap
 			= ([{pattern & bp_expr = bp_expr} : patterns], var_heap, expr_heap)
-	push_let_expression_into_guards lad (OverloadedListPatterns type decons_expr patterns) var_heap expr_heap
+	push_let_expression_into_guards lad (OverloadedPatterns type decons_expr patterns) var_heap expr_heap
 		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
-		= (OverloadedListPatterns type decons_expr patterns, var_heap, expr_heap)
+		= (OverloadedPatterns type decons_expr patterns, var_heap, expr_heap)
 	push_let_expression_into_guards lad (NewTypePatterns type patterns) var_heap expr_heap
 		# (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
 		= (NewTypePatterns type patterns, var_heap, expr_heap)
@@ -268,7 +268,7 @@ where
 			# (merged_patterns, var_heap, symbol_heap, error) = merge_basic_patterns patterns1 patterns2 var_heap symbol_heap error
 			= (BasicPatterns basic_type1 merged_patterns, var_heap, symbol_heap, error) 
 			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(OverloadedListPatterns type1 decons_expr1 patterns1) (OverloadedListPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
+	merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
 		| type1 == type2
 			= merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 		= case (type1,type2) of
@@ -300,7 +300,7 @@ where
 	merge_guards guards=:(DynamicPatterns  patterns1) (DynamicPatterns  patterns2) var_heap symbol_heap error
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
 		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
-	merge_guards guards=:(AlgebraicPatterns type1=:{gi_module,gi_index} patterns1) (OverloadedListPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
+	merge_guards guards=:(AlgebraicPatterns type1=:{gi_module,gi_index} patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
 		| gi_module==cPredefinedModuleIndex
 			| type2=:OverloadedList _ _ _
 				| gi_index==PD_ListTypeIndex
@@ -325,7 +325,7 @@ where
 					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(OverloadedListPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2=:{gi_module,gi_index} patterns2) var_heap symbol_heap error
+	merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2=:{gi_module,gi_index} patterns2) var_heap symbol_heap error
 		| gi_module==cPredefinedModuleIndex
 			| type1=:OverloadedList _ _ _
 				| gi_index==PD_ListTypeIndex
@@ -359,7 +359,7 @@ where
 
 	merge_overloaded_list_patterns type decons_expr patterns1 patterns2 var_heap symbol_heap error
 		# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
-		= (OverloadedListPatterns type decons_expr merged_patterns, var_heap, symbol_heap, error) 
+		= (OverloadedPatterns type decons_expr merged_patterns, var_heap, symbol_heap, error)
 
 	merge_algebraic_or_overloaded_list_patterns patterns [] var_heap symbol_heap error
 		= (patterns, var_heap, symbol_heap, error)

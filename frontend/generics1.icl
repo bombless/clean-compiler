@@ -1355,19 +1355,19 @@ where
 				| type_def_index==PD_UnboxedListTypeIndex
 					# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
 					  heaps & hp_expression_heap=expression_heap
-					  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+					  case_patterns = OverloadedPatterns unboxed_list decons_expr case_alts
 					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 					-> (case_expr, heaps, error)
 				| type_def_index==PD_UnboxedTailStrictListTypeIndex
 					# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
 					  heaps & hp_expression_heap=expression_heap
-					  case_patterns = OverloadedListPatterns unboxed_list decons_expr case_alts
+					  case_patterns = OverloadedPatterns unboxed_list decons_expr case_alts
 					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 					-> (case_expr, heaps, error)
 				| type_def_index==PD_UnboxedMaybeTypeIndex
 					# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
 					  heaps & hp_expression_heap=expression_heap
-					  case_patterns = OverloadedListPatterns unboxed_maybe from_just_expr case_alts
+					  case_patterns = OverloadedPatterns unboxed_maybe from_just_expr case_alts
 					  (case_expr, heaps) = buildCaseExpr arg_expr case_patterns heaps
 					-> (case_expr, heaps, error)
 			_
@@ -4885,19 +4885,19 @@ build_bimap_unboxed_list_case :: !GlobalIndex !Expression ![AlgebraicPattern] !B
 build_bimap_unboxed_list_case global_type_def_index arg alg_patterns case_explicit predefs heaps
 	# (unboxed_list,decons_expr,expression_heap) = make_unboxed_list heaps.hp_expression_heap predefs.psd_predefs_a
 	  heaps & hp_expression_heap=expression_heap
-	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
+	= build_bimap_unboxed_case (OverloadedPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
 
 build_bimap_unboxed_tail_strict_list_case :: !GlobalIndex !Expression ![AlgebraicPattern] !Bool PredefinedSymbolsData !*Heaps -> (!Expression,!*Heaps)
 build_bimap_unboxed_tail_strict_list_case global_type_def_index arg alg_patterns case_explicit predefs heaps
 	# (unboxed_list,decons_expr,expression_heap) = make_unboxed_tail_strict_list heaps.hp_expression_heap predefs.psd_predefs_a
 	  heaps & hp_expression_heap=expression_heap
-	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
+	= build_bimap_unboxed_case (OverloadedPatterns unboxed_list decons_expr alg_patterns) arg case_explicit heaps
 
 build_bimap_unboxed_maybe_case :: !GlobalIndex !Expression ![AlgebraicPattern] !Bool PredefinedSymbolsData !*Heaps -> (!Expression,!*Heaps)
 build_bimap_unboxed_maybe_case global_type_def_index arg alg_patterns case_explicit predefs heaps
 	# (unboxed_maybe,from_just_expr,expression_heap) = make_unboxed_maybe heaps.hp_expression_heap predefs.psd_predefs_a
 	  heaps & hp_expression_heap=expression_heap
-	= build_bimap_unboxed_case (OverloadedListPatterns unboxed_maybe from_just_expr alg_patterns) arg case_explicit heaps
+	= build_bimap_unboxed_case (OverloadedPatterns unboxed_maybe from_just_expr alg_patterns) arg case_explicit heaps
 
 build_bimap_newtype_case :: !GlobalIndex !Expression ![AlgebraicPattern] !*Heaps -> (!Expression,!*Heaps)
 build_bimap_newtype_case global_type_def_index arg alg_patterns heaps
@@ -6355,7 +6355,7 @@ where
 	fold_guards f (BasicPatterns gi bps) st = foldSt (foldExpr f) [bp_expr\\{bp_expr}<-bps] st
 	fold_guards f (DynamicPatterns dps) st = foldSt (foldExpr f) [dp_rhs\\{dp_rhs}<-dps] st
 	fold_guards f (NewTypePatterns gi aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
-	fold_guards f (OverloadedListPatterns _ _ aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
+	fold_guards f (OverloadedPatterns _ _ aps) st = foldSt (foldExpr f) [ap_expr\\{ap_expr}<-aps] st
 	fold_guards f NoPattern st = st
 foldExpr f expr=:(Selection _ expr1 _) st
 	# st = f expr st
@@ -6459,7 +6459,7 @@ where
 		collect (BasicPatterns _ bps) = []
 		collect (DynamicPatterns dps) = [dp_var \\ {dp_var}<-dps]
 		collect (NewTypePatterns _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
-		collect (OverloadedListPatterns _ _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
+		collect (OverloadedPatterns _ _ aps) = flatten [ap_vars\\{ap_vars}<-aps]
 		collect NoPattern = []
 	collect_vars expr st = st		
 

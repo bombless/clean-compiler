@@ -1112,7 +1112,7 @@ where
 				= find_var_position_in_basic_patterns basic_patterns
 			find_var_position_in_basic_patterns []
 				= (False,NoPos)
-		find_var_position_in_case_guards (OverloadedListPatterns _ _ algebraic_patterns)
+		find_var_position_in_case_guards (OverloadedPatterns _ _ algebraic_patterns)
 			= find_var_position_in_algebraic_patterns algebraic_patterns
 		find_var_position_in_case_guards (NewTypePatterns _ algebraic_patterns)
 			= find_var_position_in_algebraic_patterns algebraic_patterns

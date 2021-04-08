@@ -515,7 +515,7 @@ where
 		# (all_closed_let_vars, rms) = refMarkOfAlternative free_vars [] sel def case_expr bp_expr all_closed_let_vars rms
 		= (inc pattern_depth, all_closed_let_vars, rms)
 
-refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedListPatterns type _ patterns, case_explicit, case_default} rms
+refMarkOfCase free_vars sel def {case_expr, case_guards=OverloadedPatterns type _ patterns, case_explicit, case_default} rms
 	= refMarkOfAlgebraicOrOverloadedListCase free_vars sel def case_expr patterns case_explicit case_default rms 
 
 refMarkOfCase free_vars sel def {case_expr, case_guards=NewTypePatterns type patterns, case_explicit, case_default} rms 

@@ -151,19 +151,19 @@ make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
 		# pd_cons_index=cons_symbol.glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
 		| pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedNilSymbol
 			# (unboxed_list,decons_expr,expr_heap,cs) = make_unboxed_list expr_heap cs
-			= (OverloadedListPatterns unboxed_list decons_expr alg_patterns,expr_heap,cs)
+			= (OverloadedPatterns unboxed_list decons_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_UnboxedTailStrictNilSymbol
 			# (unboxed_tail_strict_list,decons_expr,expr_heap,cs) = make_unboxed_tail_strict_list expr_heap cs
-			= (OverloadedListPatterns unboxed_tail_strict_list decons_expr alg_patterns,expr_heap,cs)
+			= (OverloadedPatterns unboxed_tail_strict_list decons_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol
 			# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list expr_heap cs
-			= (OverloadedListPatterns overloaded_list decons_expr alg_patterns,expr_heap,cs)
+			= (OverloadedPatterns overloaded_list decons_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol
 			# (unboxed_maybe,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
-			= (OverloadedListPatterns unboxed_maybe from_just_expr alg_patterns,expr_heap,cs)
+			= (OverloadedPatterns unboxed_maybe from_just_expr alg_patterns,expr_heap,cs)
 		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
 			# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
-			= (OverloadedListPatterns overloaded_maybe from_just_expr alg_patterns,expr_heap,cs)
+			= (OverloadedPatterns overloaded_maybe from_just_expr alg_patterns,expr_heap,cs)
 			= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
 		= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
 
@@ -1015,49 +1015,49 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 		| pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedNilSymbol
 			# (unboxed_list,decons_expr,expr_heap,cs) = make_unboxed_list expr_heap cs
 			= case pattern_scheme of
-				OverloadedListPatterns (UnboxedList _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
-					-> (OverloadedListPatterns unboxed_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (OverloadedList _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+				OverloadedPatterns (UnboxedList _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
+					-> (OverloadedPatterns unboxed_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (OverloadedList _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_UnboxedConsSymbol PD_UnboxedNilSymbol cs
-					-> (OverloadedListPatterns unboxed_list decons_expr [pattern : alg_patterns], OverloadedListPatterns unboxed_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_list decons_expr [pattern : alg_patterns], OverloadedPatterns unboxed_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				NoPattern
-					-> (OverloadedListPatterns unboxed_list decons_expr [pattern], OverloadedListPatterns unboxed_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_list decons_expr [pattern], OverloadedPatterns unboxed_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 
 		| pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_UnboxedTailStrictNilSymbol
 			# (unboxed_tail_strict_list,decons_expr,expr_heap,cs) = make_unboxed_tail_strict_list expr_heap cs
 			= case pattern_scheme of
-				OverloadedListPatterns (UnboxedTailStrictList _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
-					-> (OverloadedListPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (OverloadedList _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+				OverloadedPatterns (UnboxedTailStrictList _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
+					-> (OverloadedPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (OverloadedList _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol cs
-					-> (OverloadedListPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], OverloadedListPatterns unboxed_tail_strict_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], OverloadedPatterns unboxed_tail_strict_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				NoPattern
-					-> (OverloadedListPatterns unboxed_tail_strict_list decons_expr [pattern], OverloadedListPatterns unboxed_tail_strict_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_tail_strict_list decons_expr [pattern], OverloadedPatterns unboxed_tail_strict_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 		
 		| pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol
 			= case pattern_scheme of
-				OverloadedListPatterns (OverloadedList _ _ _) _ _
+				OverloadedPatterns (OverloadedList _ _ _) _ _
 					# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list expr_heap cs
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
-					-> (OverloadedListPatterns overloaded_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (UnboxedList _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
+					-> (OverloadedPatterns overloaded_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (UnboxedList _ _ _) _ _
 					# (unboxed_list,decons_expr,expr_heap,cs) = make_unboxed_list expr_heap cs
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_UnboxedConsSymbol PD_UnboxedNilSymbol cs
-					-> (OverloadedListPatterns unboxed_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (UnboxedTailStrictList _ _ _) _ _
+					-> (OverloadedPatterns unboxed_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (UnboxedTailStrictList _ _ _) _ _
 					# (unboxed_tail_strict_list,decons_expr,expr_heap,cs) = make_unboxed_tail_strict_list expr_heap cs
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (pattern,cs) = replace_overloaded_symbol_in_pattern pattern PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol cs
-					-> (OverloadedListPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_tail_strict_list decons_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				AlgebraicPatterns alg_type=:{gi_module,gi_index} _
 					| gi_module==cPredefinedModuleIndex
 						| gi_index==PD_ListTypeIndex
@@ -1080,34 +1080,34 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 				NoPattern
 					# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list expr_heap cs
-					-> (OverloadedListPatterns overloaded_list decons_expr [pattern], OverloadedListPatterns overloaded_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns overloaded_list decons_expr [pattern], OverloadedPatterns overloaded_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol
 			# (unboxed_maybe,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
 			= case pattern_scheme of
-				OverloadedListPatterns (UnboxedMaybe _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
-					-> (OverloadedListPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (OverloadedMaybe _ _ _) _ _
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+				OverloadedPatterns (UnboxedMaybe _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
+					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (OverloadedMaybe _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (alg_patterns,cs) = replace_overloaded_maybe_symbols_in_patterns alg_patterns PD_UnboxedJustSymbol PD_UnboxedNothingSymbol cs
-					-> (OverloadedListPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], OverloadedListPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], OverloadedPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				NoPattern
-					-> (OverloadedListPatterns unboxed_maybe from_just_expr [pattern], OverloadedListPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern], OverloadedPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
 			= case pattern_scheme of
-				OverloadedListPatterns (OverloadedMaybe _ _ _) _ _
+				OverloadedPatterns (OverloadedMaybe _ _ _) _ _
 					# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
-					-> (OverloadedListPatterns overloaded_maybe from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (UnboxedMaybe _ _ _) _ _
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
+					-> (OverloadedPatterns overloaded_maybe from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+				OverloadedPatterns (UnboxedMaybe _ _ _) _ _
 					# (unboxed_list,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
-					# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 					# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_UnboxedJustSymbol PD_UnboxedNothingSymbol cs
-					-> (OverloadedListPatterns unboxed_list from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns unboxed_list from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				AlgebraicPatterns alg_type=:{gi_module,gi_index} _
 					| gi_module==cPredefinedModuleIndex
 						| gi_index==PD_MaybeTypeIndex
@@ -1122,7 +1122,7 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 				NoPattern
 					# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
-					-> (OverloadedListPatterns overloaded_maybe from_just_expr [pattern], OverloadedListPatterns overloaded_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
+					-> (OverloadedPatterns overloaded_maybe from_just_expr [pattern], OverloadedPatterns overloaded_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 			= case pattern_scheme of
@@ -1132,22 +1132,22 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 						-> (AlgebraicPatterns global_type_index [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 						# cs & cs_error = checkErrorWithOptionalPosition cons_symbol.glob_object.ds_ident pos "incompatible types of patterns" cs.cs_error
 						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
-				OverloadedListPatterns (OverloadedList _ _ _) _ _
+				OverloadedPatterns (OverloadedList _ _ _) _ _
 					| global_type_index.gi_module==cPredefinedModuleIndex
 						| global_type_index.gi_index==PD_ListTypeIndex
-							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+							# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_ConsSymbol PD_NilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 						| global_type_index.gi_index==PD_StrictListTypeIndex
-							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+							# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_StrictConsSymbol PD_StrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 						| global_type_index.gi_index==PD_TailStrictListTypeIndex
-							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+							# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_TailStrictConsSymbol PD_TailStrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 						| global_type_index.gi_index==PD_StrictTailStrictListTypeIndex
-							# alg_patterns = alg_patterns_of_OverloadedListPatterns_or_NoPattern patterns
+							# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
 							# (alg_patterns,cs) = replace_overloaded_symbols_in_patterns alg_patterns PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol cs
 							-> (AlgebraicPatterns global_type_index [pattern:alg_patterns], AlgebraicPatterns global_type_index [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 							-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
@@ -1170,8 +1170,8 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 		alg_patterns_of_AlgebraicPatterns_or_NoPattern (AlgebraicPatterns _ alg_patterns) = alg_patterns
 		alg_patterns_of_AlgebraicPatterns_or_NoPattern NoPattern = []
 
-		alg_patterns_of_OverloadedListPatterns_or_NoPattern (OverloadedListPatterns _ _ alg_patterns) = alg_patterns
-		alg_patterns_of_OverloadedListPatterns_or_NoPattern NoPattern = []
+		alg_patterns_of_OverloadedPatterns_or_NoPattern (OverloadedPatterns _ _ alg_patterns) = alg_patterns
+		alg_patterns_of_OverloadedPatterns_or_NoPattern NoPattern = []
 
 		illegal_combination_of_patterns_error cons_symbol cs
 			= { cs & cs_error = checkError cons_symbol.glob_object.ds_ident "illegal combination of patterns" cs.cs_error }

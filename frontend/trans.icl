@@ -254,7 +254,7 @@ where
 					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
 				BasicPatterns _ _
 					-> ti // no variables occur
-				OverloadedListPatterns _ _ patterns
+				OverloadedPatterns _ _ patterns
 					# (EI_CaseType {ct_cons_types},ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 					  ti_var_heap = store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types patterns ti.ti_var_heap
 					-> { ti & ti_symbol_heap = ti_symbol_heap, ti_var_heap = ti_var_heap }
@@ -448,13 +448,13 @@ where
 		# guard_exprs	= [ bp_expr \\ {bp_expr} <- case_guards ]
 		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
 		= (BasicPatterns basic_type [ { case_guard & bp_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
-	lift_patterns default_exists (OverloadedListPatterns type decons_expr case_guards) case_info_ptr outer_case ro ti
+	lift_patterns default_exists (OverloadedPatterns type decons_expr case_guards) case_info_ptr outer_case ro ti
 		# guard_exprs	= [ ap_expr \\ {ap_expr} <- case_guards ]
 		  (EI_CaseType {ct_cons_types},symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  var_heap = store_type_info_of_alg_pattern_in_pattern_variables ct_cons_types case_guards ti.ti_var_heap
 		  ti = {ti & ti_symbol_heap=symbol_heap,ti_var_heap=var_heap}
 		  (guard_exprs_with_case, ti) = lift_patterns_2 default_exists guard_exprs outer_case ro ti
-		= (OverloadedListPatterns type decons_expr [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
+		= (OverloadedPatterns type decons_expr [ { case_guard & ap_expr=guard_expr } \\ case_guard<-case_guards & guard_expr<-guard_exprs_with_case], ti)
 
 	lift_patterns_2 False [guard_expr] outer_case ro ti
 		// if no default pattern exists, then the outer case expression does not have to be copied for the last pattern
@@ -621,7 +621,7 @@ where
 				= match_and_instantiate_algebraic_type linearities cons_index app_args guards cons_types case_default ro ti
 			match_and_instantiate_algebraic_type _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedList _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
+	match_and_instantiate linearities cons_index app_args (OverloadedPatterns (OverloadedList _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
 		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  ti & ti_symbol_heap=ti_symbol_heap
 		= match_and_instantiate_overloaded_list linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
@@ -645,7 +645,7 @@ where
 									= abort "equal_list_contructor"
 			match_and_instantiate_overloaded_list _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-	match_and_instantiate linearities cons_index app_args (OverloadedListPatterns (OverloadedMaybe _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
+	match_and_instantiate linearities cons_index app_args (OverloadedPatterns (OverloadedMaybe _ _ _) _ algebraicPatterns) case_info_ptr case_default ro ti
 		# (EI_CaseType {ct_cons_types}, ti_symbol_heap) = readExprInfo case_info_ptr ti.ti_symbol_heap
 		  ti & ti_symbol_heap=ti_symbol_heap
 		= match_and_instantiate_overloaded_maybe linearities cons_index app_args algebraicPatterns ct_cons_types case_default ro ti
@@ -680,7 +680,7 @@ where
 			  (may_be_match_expr, ti) = match_and_instantiate_overloaded_cons type aci_linearity_of_patterns app_args case_guards ct_cons_types case_default ro ti
 			= expr_or_never_matching_case may_be_match_expr case_ident ti
 	where
-		match_and_instantiate_overloaded_nil (OverloadedListPatterns _ _ algebraicPatterns) case_default ro ti
+		match_and_instantiate_overloaded_nil (OverloadedPatterns _ _ algebraicPatterns) case_default ro ti
 			= match_and_instantiate_nil algebraicPatterns case_default ro ti
 		match_and_instantiate_overloaded_nil (AlgebraicPatterns _ algebraicPatterns) case_default ro ti
 			= match_and_instantiate_nil algebraicPatterns case_default ro ti
@@ -711,7 +711,7 @@ where
 		//					= abort "match_and_instantiate_overloaded_cons_boxed_match"
 				match_and_instantiate_overloaded_cons_boxed_match _ app_args [] case_default ro ti
 					= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
-		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedListPatterns _ _ algebraicPatterns) cons_types case_default ro ti
+		match_and_instantiate_overloaded_cons cons_function_type linearities app_args (OverloadedPatterns _ _ algebraicPatterns) cons_types case_default ro ti
 			= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args algebraicPatterns case_default ro ti
 			where
 				match_and_instantiate_overloaded_cons_overloaded_match [!linearity:linearities!] app_args
@@ -729,7 +729,7 @@ where
 					= transform case_default { ro & ro_root_case_mode = NotRootCase } ti
 	
 		/*
-		match_and_instantiate_overloaded_cons linearities app_args (OverloadedListPatterns _ (App {app_args=[],app_symb={symb_kind=SK_Function {glob_module=decons_module,glob_object=deconsindex}}}) algebraicPatterns) case_default ro ti
+		match_and_instantiate_overloaded_cons linearities app_args (OverloadedPatterns _ (App {app_args=[],app_symb={symb_kind=SK_Function {glob_module=decons_module,glob_object=deconsindex}}}) algebraicPatterns) case_default ro ti
 			= match_and_instantiate_overloaded_cons_overloaded_match linearities app_args algebraicPatterns case_default ro ti
 			where
 				match_and_instantiate_overloaded_cons_overloaded_match [linearity:linearities] app_args 
@@ -1213,7 +1213,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees) ro
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
 			-> Case {kees & case_guards = BasicPatterns bt filtered_case_guards, case_default = filtered_default }
-		OverloadedListPatterns i decons_expr alg_patterns
+		OverloadedPatterns i decons_expr alg_patterns
 			| not (any (is_never_matching_case o get_alg_rhs) alg_patterns) && not (is_never_matching_default case_default)
 				-> keesExpr // frequent case: all subexpressions can't fail
 			# filtered_case_guards = filter (not o is_never_matching_case o get_alg_rhs) alg_patterns
@@ -1221,7 +1221,7 @@ removeNeverMatchingSubcases keesExpr=:(Case kees) ro
 				-> neverMatchingCase never_ident
 			| is_default_only filtered_default filtered_case_guards
 				-> fromYes case_default
-			-> Case {kees & case_guards = OverloadedListPatterns i decons_expr filtered_case_guards, case_default = filtered_default }
+			-> Case {kees & case_guards = OverloadedPatterns i decons_expr filtered_case_guards, case_default = filtered_default }
 		_	-> abort "removeNeverMatchingSubcases does not match"
 where
 	get_filtered_default y=:(Yes c_default)
@@ -1276,10 +1276,10 @@ where
 	transform (BasicPatterns type patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		= (BasicPatterns type patterns, ti)
-	transform (OverloadedListPatterns type decons_expr patterns) ro ti
+	transform (OverloadedPatterns type decons_expr patterns) ro ti
 		# (patterns, ti) = transform patterns ro ti
 		# (decons_expr, ti) = transform decons_expr ro ti
-		= (OverloadedListPatterns type decons_expr patterns, ti)
+		= (OverloadedPatterns type decons_expr patterns, ti)
 	transform NoPattern ro ti
 		= (NoPattern, ti)
 	transform _ ro ti
@@ -3039,9 +3039,9 @@ where
 	add_arguments_guards (DynamicPatterns dpats) extra_args new_result_type ro ti
 		# (dpats, ti)	= add_arguments_dpats dpats extra_args new_result_type ro ti
 		= (DynamicPatterns dpats, ti)
-	add_arguments_guards (OverloadedListPatterns type decons_expr apats) extra_args new_result_type ro ti
+	add_arguments_guards (OverloadedPatterns type decons_expr apats) extra_args new_result_type ro ti
 		# (apats, ti)	= add_arguments_apats apats extra_args new_result_type ro ti
-		= (OverloadedListPatterns type decons_expr apats, ti)
+		= (OverloadedPatterns type decons_expr apats, ti)
 	add_arguments_guards NoPattern extra_args _ ro ti
 		= (NoPattern, ti)
 	
@@ -4870,7 +4870,7 @@ where
 		= foldSt clearVariables alg_patterns fvi
 	clearVariables (BasicPatterns _ basic_patterns) fvi
 		= foldSt clearVariables basic_patterns fvi
-	clearVariables (OverloadedListPatterns _ _ alg_patterns) fvi
+	clearVariables (OverloadedPatterns _ _ alg_patterns) fvi
 		= foldSt clearVariables alg_patterns fvi
 
 instance clearVariables BasicPattern
@@ -4980,7 +4980,7 @@ where
 			where
 				free_variables_of_basic_pattern {bp_expr} fvi
 					= freeVariables bp_expr fvi
-			free_variables_of_guards (OverloadedListPatterns _ _ alg_patterns) fvi
+			free_variables_of_guards (OverloadedPatterns _ _ alg_patterns) fvi
 				= foldSt free_variables_of_alg_pattern alg_patterns fvi
 		
 			free_variables_of_alg_pattern {ap_vars, ap_expr} fvi=:{fvi_variables}
@@ -5757,10 +5757,10 @@ copyCasePatterns (AlgebraicPatterns type patterns) opt_result_type ci cs
 copyCasePatterns (BasicPatterns type patterns) opt_result_type ci cs
 	# (patterns, cs) = copyBasicPatterns patterns opt_result_type ci cs
 	= (BasicPatterns type patterns, cs)
-copyCasePatterns (OverloadedListPatterns type decons_expr patterns) opt_result_type ci cs
+copyCasePatterns (OverloadedPatterns type decons_expr patterns) opt_result_type ci cs
 	# (patterns, cs) = copyAlgebraicPatterns patterns opt_result_type ci cs
 	# (decons_expr, cs) = copy decons_expr ci cs
-	= (OverloadedListPatterns type decons_expr patterns, cs)
+	= (OverloadedPatterns type decons_expr patterns, cs)
 copyCasePatterns (NewTypePatterns type patterns) opt_result_type ci cs
 	# (patterns, cs) = copyAlgebraicPatterns patterns opt_result_type ci cs
 	= (NewTypePatterns type patterns, cs)

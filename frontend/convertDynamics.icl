@@ -348,9 +348,9 @@ instance convertDynamics CasePatterns where
 	convertDynamics cinp (AlgebraicPatterns type alts) ci
 		# (alts, ci) = convertDynamics cinp alts ci
 		= (AlgebraicPatterns type alts, ci)
-	convertDynamics cinp (OverloadedListPatterns type decons alts) ci
+	convertDynamics cinp (OverloadedPatterns type decons alts) ci
 		# (alts, ci) = convertDynamics cinp alts ci
-		= (OverloadedListPatterns type decons alts, ci)
+		= (OverloadedPatterns type decons alts, ci)
 
 convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident}}
 					{dyn_expr, dyn_type_code} ci

@@ -1839,7 +1839,7 @@ where
 			  case_info = EI_CaseType {ct_pattern_type = pattern_type, ct_result_type = goal_type, ct_cons_types = []}
 			= (case_info, (reqs, {ts & ts_expr_heap = ts_expr_heap}))
 
-		requirements_of_guarded_expressions (OverloadedListPatterns alg_type decons_expr=:(App {app_symb,app_info_ptr}) patterns) match_expr case_info_ptr ti=:{ti_common_defs,ti_functions} pattern_type opt_pattern_ptr goal_type reqs ts
+		requirements_of_guarded_expressions (OverloadedPatterns alg_type decons_expr=:(App {app_symb,app_info_ptr}) patterns) match_expr case_info_ptr ti=:{ti_common_defs,ti_functions} pattern_type opt_pattern_ptr goal_type reqs ts
 			# (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
 			  ts & ts_var_heap = ts_var_heap
 			  (cons_types, result_type, context, new_attr_env, ts) = freshOverloadedPatternType alg_type position patterns ti_common_defs ti_functions ts

@@ -688,14 +688,14 @@ instance consumerRequirements Case where
 		= (combineClasses ccgs ccd, not safe, ai)
 	  where
 		handle_overloaded_list_patterns
-					(OverloadedListPatterns (OverloadedList _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns)
+					(OverloadedPatterns (OverloadedList _ _ _) decons_expr=:(App {app_symb={symb_kind=SK_Function _},app_args=[app_arg]}) patterns)
 					ai
 						// decons_expr will be optimized to a decons_u Selector in transform
 						# (cc, _, ai)	= consumerRequirements app_arg ro ai
 						# ai = aiUnifyClassifications CActive cc ai
 						= ai
 		handle_overloaded_list_patterns
-					(OverloadedListPatterns _ decons_expr _) ai
+					(OverloadedPatterns _ decons_expr _) ai
 						# (_,_,ai) = consumerRequirements decons_expr ro ai
 						= ai
 		handle_overloaded_list_patterns
@@ -721,7 +721,7 @@ instance consumerRequirements Case where
 			= (appearance_loop all_sorted_constructors constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns common_defs has_default (BasicPatterns BT_Bool _) constructors_and_unsafe_bits
 			= (appearance_loop [0,1] constructors_and_unsafe_bits, not (multimatch_loop has_default constructors_and_unsafe_bits))
-		inspect_patterns common_defs has_default (OverloadedListPatterns _ _ _) constructors_and_unsafe_bits
+		inspect_patterns common_defs has_default (OverloadedPatterns _ _ _) constructors_and_unsafe_bits
 			= (check_n_safe_pattern_constructors constructors_and_unsafe_bits 2, not (multimatch_loop has_default constructors_and_unsafe_bits))
 		inspect_patterns _ _ _ _
 			= (False, False)
@@ -788,7 +788,7 @@ where
 				-> True
 //			BasicPatterns (BT_String _) basic_patterns)
 //				-> [ string \\ {bp_value=BVS string}<-basic_patterns ] ---> ("BasicPatterns String")
-			OverloadedListPatterns overloaded_list _ algebraic_patterns
+			OverloadedPatterns overloaded_list _ algebraic_patterns
 				-> True
 			_
 				-> False
@@ -803,7 +803,7 @@ where
 				-> [int \\ {bp_value=BVInt int}<-basic_patterns ]
 //			BasicPatterns (BT_String _) basic_patterns
 //				-> [string \\ {bp_value=BVS string}<-basic_patterns]
-			OverloadedListPatterns overloaded_list _ algebraic_patterns
+			OverloadedPatterns overloaded_list _ algebraic_patterns
 				-> [glob_object.ds_index \\ {ap_symbol={glob_object}}<-algebraic_patterns]
 
 	sort constr_indices pattern_exprs
@@ -825,7 +825,7 @@ get_pattern_exprs_and_bind_pattern_vars (AlgebraicPatterns type patterns) ai
 get_pattern_exprs_and_bind_pattern_vars (BasicPatterns type patterns) ai
 	# pattern_exprs = [bp_expr \\ {bp_expr}<-patterns]
 	= (pattern_exprs,ai)
-get_pattern_exprs_and_bind_pattern_vars (OverloadedListPatterns type _ patterns) ai
+get_pattern_exprs_and_bind_pattern_vars (OverloadedPatterns type _ patterns) ai
 	# pattern_exprs = [ap_expr \\ {ap_expr}<-patterns]
 	  pattern_vars = flatten [ ap_vars \\ {ap_vars}<-patterns]
 	  (ai_next_var, ai_next_var_of_fun, ai_var_heap)
@@ -1407,7 +1407,7 @@ where
 
 get_linearity_info cc_linear_bits (AlgebraicPatterns _ algebraic_patterns) var_heap
 	= get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
-get_linearity_info cc_linear_bits (OverloadedListPatterns _ _ algebraic_patterns) var_heap
+get_linearity_info cc_linear_bits (OverloadedPatterns _ _ algebraic_patterns) var_heap
 	= get_linearity_info_of_patterns cc_linear_bits algebraic_patterns var_heap
 get_linearity_info cc_linear_bits _ var_heap
 	= ([!!], var_heap)
@@ -1536,7 +1536,7 @@ count_case_locals (AlgebraicPatterns _ patterns) n
 count_case_locals (BasicPatterns _ patterns) n
 	# pattern_exprs		= [ bp_expr \\ {bp_expr} <- patterns ]
 	= foldSt count_locals pattern_exprs n
-count_case_locals (OverloadedListPatterns _ _ patterns) n
+count_case_locals (OverloadedPatterns _ _ patterns) n
 	# pattern_exprs		= [ ap_expr \\ {ap_expr} <- patterns ]
 	  pattern_vars		= flatten [ ap_vars \\ {ap_vars} <- patterns ]
 	= foldSt count_locals pattern_exprs (foldSt count_case_guard_locals pattern_vars n)
@@ -1836,7 +1836,7 @@ instance producerRequirements CasePatterns where
 		= producerRequirements patterns prs
 	producerRequirements (BasicPatterns type patterns) prs
 		= producerRequirements patterns prs
-	producerRequirements (OverloadedListPatterns _ _ patterns) prs
+	producerRequirements (OverloadedPatterns _ _ patterns) prs
 		= producerRequirements patterns prs
 	producerRequirements (DynamicPatterns patterns) prs
 		//...disallow for now...

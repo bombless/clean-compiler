@@ -322,7 +322,7 @@ where
 	same_length [_:l1] [_:l2] = same_length l1 l2
 	same_length [] [] = False
 	same_length _ _ = True
-all_constructors_matched (OverloadedListPatterns _ _ [_,_]) common_defs
+all_constructors_matched (OverloadedPatterns _ _ [_,_]) common_defs
 	= True
 all_constructors_matched case_guards common_defs
 	= False
@@ -475,7 +475,7 @@ weightedRefCountOfCase rci=:{rci_depth,rci_imported,rci_has_default} {case_expr,
 			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], No, collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (BasicPatterns type patterns) collected_imports var_heap expr_heap
 			= mapSt (\{bp_expr} -> weightedRefCountAddPatternExpr rci bp_expr) patterns ([], No, collected_imports, var_heap, expr_heap)
-		weighted_ref_count_in_case_patterns rci (OverloadedListPatterns type _ patterns) collected_imports var_heap expr_heap
+		weighted_ref_count_in_case_patterns rci (OverloadedPatterns type _ patterns) collected_imports var_heap expr_heap
 			= mapSt (weighted_ref_count_in_algebraic_pattern rci) patterns ([], No, collected_imports, var_heap, expr_heap)
 		weighted_ref_count_in_case_patterns rci (DynamicPatterns patterns) collected_imports var_heap expr_heap
 			= mapSt (\{dp_rhs} -> weightedRefCountAddPatternExpr rci dp_rhs) patterns ([], No, collected_imports, var_heap, expr_heap)
@@ -494,7 +494,7 @@ weightedRefCountOfCase rci=:{rci_depth,rci_imported,rci_has_default} {case_expr,
 												cons_type_ptr (collected_imports, var_heap)
 						= (collected_imports, var_heap)
 
-	 	weighted_ref_count_of_decons_expr rci (OverloadedListPatterns _ decons_exp _) rs
+		weighted_ref_count_of_decons_expr rci (OverloadedPatterns _ decons_exp _) rs
 	 		= weightedRefCount rci decons_exp rs;
 	 	weighted_ref_count_of_decons_expr rci case_guards rs
 	 		= rs;
@@ -870,9 +870,9 @@ where
 			distribute_lets_in_basic_pattern di (ref_counts,pattern) ds
 				# (bp_expr, ds) = distribute_lets_in_pattern_expr di ref_counts pattern.bp_expr ds
 				= ({ pattern & bp_expr = bp_expr }, ds)
-		distribute_lets_in_patterns di ref_counts (OverloadedListPatterns conses decons_expr patterns) heaps
+		distribute_lets_in_patterns di ref_counts (OverloadedPatterns conses decons_expr patterns) heaps
 			# (patterns, heaps) = mapSt (distribute_lets_in_alg_pattern di) (exactZip ref_counts patterns) heaps
-			= (OverloadedListPatterns conses decons_expr patterns, heaps)
+			= (OverloadedPatterns conses decons_expr patterns, heaps)
 
 		distribute_lets_in_alg_pattern di (ref_counts,pattern) ds=:{ds_var_heap}
 			# (ap_vars, ds_var_heap) = mapSt refresh_variable pattern.ap_vars ds_var_heap
@@ -1220,7 +1220,7 @@ instance findSplitCases Case where
 				= split_alts si use_outer_alt alts ss
 			split_guards si use_outer_alt (BasicPatterns _ alts) ss
 				= split_alts si use_outer_alt alts ss
-			split_guards si use_outer_alt (OverloadedListPatterns _ _ alts) ss
+			split_guards si use_outer_alt (OverloadedPatterns _ _ alts) ss
 				= split_alts si use_outer_alt alts ss
 
 			split_alts :: SplitInfo (Optional SplitInfo) [a] *SplitState -> *SplitState | findSplitCases a
@@ -1679,10 +1679,10 @@ instance splitIt CasePatterns where
 		# (alts1, alts2)
 			=	splitIt alt_nr alts
 		=	(BasicPatterns type alts1, BasicPatterns type alts2)
-	splitIt alt_nr (OverloadedListPatterns type decons alts)
+	splitIt alt_nr (OverloadedPatterns type decons alts)
 		# (alts1, alts2)
 			=	splitIt alt_nr alts
-		=	(OverloadedListPatterns type decons alts1, OverloadedListPatterns type decons alts2)
+		=	(OverloadedPatterns type decons alts1, OverloadedPatterns type decons alts2)
 
 instance splitIt [a] where
 	splitIt alt_nr l
@@ -1720,10 +1720,10 @@ convertRootCasesCasePatterns ci (AlgebraicPatterns gi patterns) arg_types cs
 	# (patterns, cs)
 		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
 	=	(AlgebraicPatterns gi patterns, cs)
-convertRootCasesCasePatterns ci (OverloadedListPatterns type decons_expr patterns) arg_types cs
+convertRootCasesCasePatterns ci (OverloadedPatterns type decons_expr patterns) arg_types cs
 	# (patterns, cs)
 		=	convertRootCasesAlgebraicPatterns ci (exactZip patterns arg_types) cs
-	=	(OverloadedListPatterns type decons_expr patterns, cs)
+	=	(OverloadedPatterns type decons_expr patterns, cs)
 
 convertRootCasesAlgebraicPatterns :: ConvertInfo [(AlgebraicPattern, [AType])] *ConvertState -> ([AlgebraicPattern], *ConvertState)
 convertRootCasesAlgebraicPatterns ci l cs
@@ -2014,7 +2014,7 @@ where
 		=	(True, defoult)
 	case_is_degenerate {case_guards = BasicPatterns _ [], case_default=Yes defoult}
 		=	(True, defoult)
-	case_is_degenerate {case_guards = OverloadedListPatterns _ _ [], case_default=Yes defoult}
+	case_is_degenerate {case_guards = OverloadedPatterns _ _ [], case_default=Yes defoult}
 		=	(True, defoult)
 	case_is_degenerate _
 		=	(False, undef)
@@ -2104,8 +2104,8 @@ splitGuards (AlgebraicPatterns index patterns)
 	=	[AlgebraicPatterns index [pattern] \\ pattern <- patterns]
 splitGuards (BasicPatterns basicType patterns)
 	=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
-splitGuards (OverloadedListPatterns type decons_expr patterns)
-	=	[OverloadedListPatterns type decons_expr [pattern] \\ pattern <- patterns]
+splitGuards (OverloadedPatterns type decons_expr patterns)
+	=	[OverloadedPatterns type decons_expr [pattern] \\ pattern <- patterns]
 
 ::	CopyState =
 	{	cp_free_vars	:: ![(VarInfoPtr,AType)]
@@ -2242,10 +2242,10 @@ where
 	copy (BasicPatterns type patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		= (BasicPatterns type patterns, cp_info) 
-	copy (OverloadedListPatterns type decons_expr patterns) cp_info
+	copy (OverloadedPatterns type decons_expr patterns) cp_info
 		# (patterns, cp_info) = copy patterns cp_info
 		# (decons_expr, cp_info) = copy decons_expr cp_info
-		= (OverloadedListPatterns type decons_expr patterns, cp_info) 
+		= (OverloadedPatterns type decons_expr patterns, cp_info)
 
 instance copy AlgebraicPattern
 where

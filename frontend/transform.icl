@@ -171,10 +171,10 @@ where
 	lift (BasicPatterns type patterns) ls
 		# (patterns, ls) = lift patterns ls
 		= (BasicPatterns type patterns, ls)
-	lift (OverloadedListPatterns type decons_expr patterns) ls
+	lift (OverloadedPatterns type decons_expr patterns) ls
 		# (patterns, ls) = lift patterns ls
 		# (decons_expr, ls) = lift decons_expr ls
-		= (OverloadedListPatterns type decons_expr patterns, ls)
+		= (OverloadedPatterns type decons_expr patterns, ls)
 	lift (NewTypePatterns type patterns) ls
 		# (patterns, ls) = lift patterns ls
 		= (NewTypePatterns type patterns, ls)
@@ -595,10 +595,10 @@ where
 	unfold (BasicPatterns type patterns) us
 		# (patterns, us) = unfold patterns us
 		= (BasicPatterns type patterns, us)
-	unfold (OverloadedListPatterns type decons_expr patterns) us
+	unfold (OverloadedPatterns type decons_expr patterns) us
 		# (patterns, us) = unfold patterns us
 		# (decons_expr, us) = unfold decons_expr us
-		= (OverloadedListPatterns type decons_expr patterns, us)
+		= (OverloadedPatterns type decons_expr patterns, us)
 	unfold (NewTypePatterns type patterns) us
 		# (patterns, us) = unfold patterns us
 		= (NewTypePatterns type patterns, us)
@@ -1165,7 +1165,7 @@ where
 					= has_no_curried_macro_Expression bp_expr && has_no_curried_macro_BasicPatterns patterns
 				has_no_curried_macro_BasicPatterns []
 					= True
-			has_no_curried_macro_CasePatterns (OverloadedListPatterns type decons_expr patterns)
+			has_no_curried_macro_CasePatterns (OverloadedPatterns type decons_expr patterns)
 				= has_no_curried_macro_AlgebraicPatterns patterns
 			has_no_curried_macro_CasePatterns (NewTypePatterns type patterns)
 				= has_no_curried_macro_AlgebraicPatterns patterns
@@ -1802,8 +1802,8 @@ where
 							=	[AlgebraicPatterns index [pattern] \\ pattern <- patterns]
 						split_patterns (BasicPatterns basicType patterns)
 							=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
-						split_patterns (OverloadedListPatterns  overloaded_list_type decons_expr patterns)
-							=	[OverloadedListPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns]
+						split_patterns (OverloadedPatterns overloaded_list_type decons_expr patterns)
+							=	[OverloadedPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns]
 						split_patterns (NewTypePatterns index patterns)
 							=	[NewTypePatterns index [pattern] \\ pattern <- patterns]
 						split_patterns (DynamicPatterns patterns)
@@ -1833,9 +1833,9 @@ where
 	expand (BasicPatterns type patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (BasicPatterns type patterns, ei) 
-	expand (OverloadedListPatterns type decons_expr patterns) ei
+	expand (OverloadedPatterns type decons_expr patterns) ei
 		# (patterns, ei) = expand patterns ei
-		= (OverloadedListPatterns type decons_expr patterns, ei) 
+		= (OverloadedPatterns type decons_expr patterns, ei)
 	expand (NewTypePatterns type patterns) ei
 		# (patterns, ei) = expand patterns ei
 		= (NewTypePatterns type patterns, ei) 
@@ -2306,9 +2306,9 @@ where
 	collectVariables (BasicPatterns type patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
 		= (BasicPatterns type patterns, free_vars, dynamics, cos)
-	collectVariables (OverloadedListPatterns type decons_expr patterns) free_vars dynamics cos
+	collectVariables (OverloadedPatterns type decons_expr patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
-		= (OverloadedListPatterns type decons_expr patterns, free_vars, dynamics, cos)
+		= (OverloadedPatterns type decons_expr patterns, free_vars, dynamics, cos)
 	collectVariables (NewTypePatterns type patterns) free_vars dynamics cos
 		# (patterns, free_vars, dynamics, cos) = collectVariables patterns free_vars dynamics cos
 		= (NewTypePatterns type patterns, free_vars, dynamics, cos)
@@ -2579,7 +2579,7 @@ where
 		= reset_free_var_heap_pointers patterns var_heap
 	reset_free_var_heap_pointers (BasicPatterns type patterns) var_heap
 		= reset_free_var_heap_pointers patterns var_heap
-	reset_free_var_heap_pointers (OverloadedListPatterns type decons_expr patterns) var_heap
+	reset_free_var_heap_pointers (OverloadedPatterns type decons_expr patterns) var_heap
 		= reset_free_var_heap_pointers patterns (reset_free_var_heap_pointers decons_expr var_heap)
 	reset_free_var_heap_pointers (NewTypePatterns type patterns) var_heap
 		= reset_free_var_heap_pointers patterns var_heap

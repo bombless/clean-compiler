@@ -1406,7 +1406,7 @@ instance e_corresponds CasePatterns where
 		o`	e_corresponds dcl_patterns icl_patterns
 	e_corresponds (NewTypePatterns _ dcl_patterns) (NewTypePatterns _ icl_patterns)
 		=	e_corresponds dcl_patterns icl_patterns
-	e_corresponds (OverloadedListPatterns dcl_alg_type _ dcl_patterns) (OverloadedListPatterns icl_alg_type _ icl_patterns)
+	e_corresponds (OverloadedPatterns dcl_alg_type _ dcl_patterns) (OverloadedPatterns icl_alg_type _ icl_patterns)
 		=	e_corresponds dcl_patterns icl_patterns
 	e_corresponds (DynamicPatterns dcl_patterns) (DynamicPatterns icl_patterns)
 		=	e_corresponds dcl_patterns icl_patterns

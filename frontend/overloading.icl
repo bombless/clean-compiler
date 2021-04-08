@@ -2676,10 +2676,10 @@ where
 	updateExpression group_index (BasicPatterns type patterns) ui
 		# (patterns, ui) = updateExpression group_index patterns ui
 		= (BasicPatterns type patterns, ui)
-	updateExpression group_index (OverloadedListPatterns type decons_expr patterns) ui
+	updateExpression group_index (OverloadedPatterns type decons_expr patterns) ui
 		# (patterns, ui) = updateExpression group_index patterns ui
 		# (decons_expr, ui) = updateExpression group_index decons_expr ui
-		= (OverloadedListPatterns type decons_expr patterns, ui)
+		= (OverloadedPatterns type decons_expr patterns, ui)
 	updateExpression group_index (DynamicPatterns patterns) ui
 		# (patterns, ui) = updateExpression group_index patterns ui
 		= (DynamicPatterns patterns, ui)

@@ -1127,10 +1127,10 @@ instance checkMacro CasePatterns where
 		# (patterns, ea)
 			=	checkMacro topLevel patterns ea	
 		=	(DynamicPatterns patterns, ea)
-	checkMacro topLevel (OverloadedListPatterns type decons patterns) ea
+	checkMacro topLevel (OverloadedPatterns type decons patterns) ea
 		# (patterns, ea)
 			=	checkMacro topLevel patterns ea	
-		=	(OverloadedListPatterns type decons patterns, ea)
+		=	(OverloadedPatterns type decons patterns, ea)
 	checkMacro _ NoPattern ea
 		=	(NoPattern, ea)
 

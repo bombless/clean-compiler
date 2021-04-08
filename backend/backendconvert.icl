@@ -601,7 +601,7 @@ instance declareVars CasePatterns where
 		=	declareVars patterns dvInput
 	declareVars (BasicPatterns _ patterns) dvInput
 		=	declareVars patterns dvInput
-	declareVars (OverloadedListPatterns _ decons_expr patterns) dvInput
+	declareVars (OverloadedPatterns _ decons_expr patterns) dvInput
 		=	declareVars patterns dvInput
 
 instance declareVars AlgebraicPattern where
@@ -2322,8 +2322,8 @@ instance convertCases CasePatterns where
 		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
 	convertCases (BasicPatterns _ patterns) aliasDummyId var default_case main_dcl_module_n
 		=	convertCases patterns aliasDummyId var default_case main_dcl_module_n
-	convertCases (OverloadedListPatterns _ decons_expr patterns) aliasDummyId var default_case main_dcl_module_n
-		=	convertOverloadedListPatterns patterns decons_expr aliasDummyId var default_case main_dcl_module_n
+	convertCases (OverloadedPatterns _ decons_expr patterns) aliasDummyId var default_case main_dcl_module_n
+		=	convertOverloadedPatterns patterns decons_expr aliasDummyId var default_case main_dcl_module_n
 	// +++ other patterns ???
 
 instance convertCases [a] | convertCase a where
@@ -2438,7 +2438,7 @@ instance convertCase BasicPattern where
 				(convertRhsStrictNodeIds bp_expr)
 				(convertRootExpr aliasDummyId bp_expr main_dcl_module_n)
 
-convertOverloadedListPatterns patterns decons_expr aliasDummyId var optionalCase main_dcl_module_n
+convertOverloadedPatterns patterns decons_expr aliasDummyId var optionalCase main_dcl_module_n
 	=	sfoldr (beArgs o convertOverloadedListPattern decons_expr (localRefCounts patterns optionalCase))
 				(convertDefaultCase optionalCase aliasDummyId main_dcl_module_n) patterns
 where

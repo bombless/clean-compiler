@@ -1447,7 +1447,7 @@ cIsNotStrict	:== False
 				| BasicPatterns !BasicType [BasicPattern]
 				| NewTypePatterns !GlobalIndex ![AlgebraicPattern]
 				| DynamicPatterns [DynamicPattern]						/* auxiliary */
-				| OverloadedListPatterns !OverloadedPatternType !Expression ![AlgebraicPattern]
+				| OverloadedPatterns !OverloadedPatternType !Expression ![AlgebraicPattern]
 				| NoPattern											/* auxiliary */
 
 ::	OverloadedPatternType

@@ -130,7 +130,7 @@ instance sequence CasePatterns where
 		=	sequence patterns
 	sequence (BasicPatterns _ patterns)
 		=	sequence patterns
-	sequence (OverloadedListPatterns _ decons_expr patterns)
+	sequence (OverloadedPatterns _ decons_expr patterns)
 		=	sequence patterns
 
 instance sequence AlgebraicPattern where
