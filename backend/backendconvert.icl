@@ -1643,8 +1643,6 @@ convertAttribution TA_MultiOfPropagatingConsVar
 // this is a work around for caching / attribute heap bug
 convertAttribution _
 	=	return BENoUniAttr
-convertAttribution attr
-	=	abort "backendconvert, convertAttribution: unknown TypeAttribute" // <<- attr
 
 convertAnnotTypeNode :: AType -> BEMonad BETypeNodeP
 convertAnnotTypeNode {at_type, at_attribute}
