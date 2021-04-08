@@ -7,7 +7,7 @@
 # include <stdio.h>
 # include <stdlib.h>
 # include <stdarg.h>
-# include <strings.h>
+# include <string.h>
 
 /*
 	Clean string
@@ -23,19 +23,18 @@ typedef struct clean_string {long length; char chars [1]; } *CleanString;
 # define Clean(ignore)
 # include "ipc.h"
 
-static void
-log (char *format, ...)
-{
 #ifdef DEBUG
+static void
+add_to_log (char *format, ...)
+{
 	va_list ap;
 
 	va_start (ap, format);
 	(void) fputs("                        cocl: ", stderr);
 	(void) vfprintf(stderr, format, ap);
 	va_end(ap);
-#else /* ifndef DEBUG */
-#endif
 }
+#endif
 
 static char *
 ConvertCleanString (CleanString string)
@@ -55,24 +54,6 @@ static FILE *commands, *results;
 static char *command_buffer_p=NULL;
 static int command_buffer_size=0;
 
-static void
-crash (void)
-{
-	int	*p;
-
-	p	= NULL;
-	log ("crashing\n");
-	*p	= 0;
-} /* crash */
-
-static void
-hang (void)
-{
-	log ("hanging\n");
-	for (;;)
-		;
-} /* hang */
-
 int open_pipes (CleanString commands_clean, CleanString results_clean)
 {
 	char *commands_name, *results_name;
@@ -82,13 +63,17 @@ int open_pipes (CleanString commands_clean, CleanString results_clean)
 
     if ((commands = fopen(commands_name, "r")) == NULL)
     {
-		log("commands = %s\n",commands_name);
+#ifdef DEBUG
+		add_to_log("commands = %s\n",commands_name);
+#endif
 		perror("fopen commands");
 		return -1;
     }
     if ((results = fopen(results_name, "w")) == NULL)
     {
-		log("results = %s\n",results_name);
+#ifdef DEBUG
+		add_to_log("results = %s\n",results_name);
+#endif
 		perror("fopen results");
 		return -1;
     }
@@ -97,7 +82,9 @@ int open_pipes (CleanString commands_clean, CleanString results_clean)
 
 int get_command_length (void)
 {
-	log ("reading command\n");
+#ifdef DEBUG
+	add_to_log ("reading command\n");
+#endif
 
 	if (command_buffer_p==NULL){
 		command_buffer_p = malloc (1024);
@@ -133,7 +120,9 @@ int get_command_length (void)
 
 		command_buffer_p[n_chars]='\0';
 
-		log ("command = %s", command_buffer_p);
+#ifdef DEBUG
+		add_to_log ("command = %s", command_buffer_p);
+#endif
 
 		return n_chars;
 	}
@@ -141,7 +130,10 @@ int get_command_length (void)
 
 int get_command (CleanString cleanString)
 {
-	log ("%s\n", command_buffer_p);
+#ifdef DEBUG
+	add_to_log ("%s\n", command_buffer_p);
+#endif
+
 	strncpy (cleanString->chars, command_buffer_p, cleanString->length);
 	return (0);
 }
