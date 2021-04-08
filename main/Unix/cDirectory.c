@@ -60,8 +60,6 @@ static int unix_error_to_clean_error(int errCode)
 
 static int openSearch(const char *path, int length)
 {
-    int     i;
-    
     gPathLength = length;
     gPath   = (char*) malloc(gPathLength+NAME_MAX+2);
     if (!gPath) {
@@ -79,19 +77,6 @@ static int openSearch(const char *path, int length)
         gGroupId    = getgid();
         return NoDirError;
         };
-}
-
-int findNextFileC (int);
-
-int findFirstFileC(CleanString cs_path)
-{
-    int errCode;
-    
-    errCode = openSearch(CleanStringCharacters(cs_path), CleanStringLength(cs_path));
-    if (errCode)
-        return errCode;
-    else
-        return findNextFileC(0);
 }
 
 void getCommonFileInfoC(int also_get_file_name,
@@ -144,6 +129,17 @@ int findNextFileC(int dummy)
     return 0;
 }
 
+int findFirstFileC(CleanString cs_path)
+{
+    int errCode;
+
+    errCode = openSearch(CleanStringCharacters(cs_path), CleanStringLength(cs_path));
+    if (errCode)
+        return errCode;
+    else
+        return findNextFileC(0);
+}
+
 int getPlatformIdC(int dummy)
 {
 #define UnixPlatform 0 
@@ -186,7 +182,7 @@ void closeSearchC()
 
 int findSingleFileC(CleanString cs_path)
 {
-    int err,i,length;
+    int i,length;
     char *path_chars;
     
     gFileStat.st_size   = 0;
