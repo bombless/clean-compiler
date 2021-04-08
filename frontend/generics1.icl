@@ -1257,7 +1257,7 @@ where
 		# name_expr = makeStringExpr name
 		= buildPredefConsApp PD_CGenTypeCons [name_expr] predefs heaps
 
-make_unboxed_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedPatternType,!Expression,!*ExpressionHeap)
 make_unboxed_list expr_heap predef_symbols
 	# stdStrictLists_index = predef_symbols.[PD_StdStrictLists].pds_def
 	  nil_u_index = predef_symbols.[PD_nil_u].pds_def
@@ -1269,7 +1269,7 @@ make_unboxed_list expr_heap predef_symbols
 	  unboxed_list = UnboxedList stdStrictLists_index decons_u_index nil_u_index
 	= (unboxed_list,decons_expr,expr_heap)
 
-make_unboxed_tail_strict_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_tail_strict_list :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedPatternType,!Expression,!*ExpressionHeap)
 make_unboxed_tail_strict_list expr_heap predef_symbols
 	# stdStrictLists_index = predef_symbols.[PD_StdStrictLists].pds_def
 	  nil_uts_index = predef_symbols.[PD_nil_uts].pds_def
@@ -1281,7 +1281,7 @@ make_unboxed_tail_strict_list expr_heap predef_symbols
 	  unboxed_list = UnboxedTailStrictList stdStrictLists_index decons_uts_index nil_uts_index
 	= (unboxed_list,decons_expr,expr_heap)
 
-make_unboxed_maybe :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedListType,!Expression,!*ExpressionHeap)
+make_unboxed_maybe :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedPatternType,!Expression,!*ExpressionHeap)
 make_unboxed_maybe expr_heap predef_symbols
 	# stdStrictMaybes_index = predef_symbols.[PD_StdStrictMaybes].pds_def
 	  nothing_u_index = predef_symbols.[PD_nothing_u].pds_def

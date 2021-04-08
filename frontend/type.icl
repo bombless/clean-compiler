@@ -1042,16 +1042,16 @@ fresh_overloaded_maybe_type [{ap_symbol}:patterns] pd_just_symbol pd_nothing_sym
 			# argument_types = [tst_result]
 			= (argument_types,result_type,tst_context,tst_attr_env,ts)
 
-freshOverloadedListType :: !OverloadedListType !CoercionPosition ![AlgebraicPattern] !{#CommonDefs} !{#{#FunType }} !*TypeState -> (![[AType]],!AType,![TypeContext],![AttrCoercion],!*TypeState)
-freshOverloadedListType (UnboxedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedPatternType :: !OverloadedPatternType !CoercionPosition ![AlgebraicPattern] !{#CommonDefs} !{#{#FunType }} !*TypeState -> (![[AType]],!AType,![TypeContext],![AttrCoercion],!*TypeState)
+freshOverloadedPatternType (UnboxedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_UnboxedConsSymbol PD_UnboxedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedListType (UnboxedTailStrictList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedPatternType (UnboxedTailStrictList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedListType (OverloadedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
+freshOverloadedPatternType (OverloadedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_OverloadedConsSymbol PD_OverloadedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedListType (UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index) pos patterns common_defs functions ts
+freshOverloadedPatternType (UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_maybe_type patterns PD_UnboxedJustSymbol PD_UnboxedNothingSymbol from_just_u_index nothing_u_index stdStrictMaybes_index pos functions common_defs ts
-freshOverloadedListType (OverloadedMaybe stdStrictMaybes_index from_just_index nothing_index) pos patterns common_defs functions ts
+freshOverloadedPatternType (OverloadedMaybe stdStrictMaybes_index from_just_index nothing_index) pos patterns common_defs functions ts
 	= fresh_overloaded_maybe_type patterns PD_OverloadedJustSymbol PD_OverloadedNothingSymbol from_just_index nothing_index stdStrictMaybes_index pos functions common_defs ts
 
 cWithFreshContextVars 		:== True
@@ -1841,8 +1841,8 @@ where
 
 		requirements_of_guarded_expressions (OverloadedListPatterns alg_type decons_expr=:(App {app_symb,app_info_ptr}) patterns) match_expr case_info_ptr ti=:{ti_common_defs,ti_functions} pattern_type opt_pattern_ptr goal_type reqs ts
 			# (position, ts_var_heap) = getPositionOfExpr match_expr ts.ts_var_heap
-			# ts = {ts & ts_var_heap = ts_var_heap}
-			# (cons_types, result_type, context, new_attr_env, ts) = freshOverloadedListType alg_type position patterns ti_common_defs ti_functions ts
+			  ts & ts_var_heap = ts_var_heap
+			  (cons_types, result_type, context, new_attr_env, ts) = freshOverloadedPatternType alg_type position patterns ti_common_defs ti_functions ts
 			  (used_cons_types, (reqs, ts)) = requirements_of_algebraic_patterns ti patterns cons_types goal_type [] (reqs, ts)
 			  ts_expr_heap = storeAttribute opt_pattern_ptr result_type.at_attribute ts.ts_expr_heap
 			  type_coercions = [{tc_demanded = result_type,tc_offered = pattern_type, tc_position = position,tc_coercible = True} : reqs.req_type_coercions]

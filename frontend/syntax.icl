@@ -1018,7 +1018,7 @@ instance == Annotation
 where
 	(==) a1 a2 = equal_constructor a1 a2
 
-instance == OverloadedListType
+instance == OverloadedPatternType
 where
 	(==) a1 a2 = equal_constructor a1 a2
 	
