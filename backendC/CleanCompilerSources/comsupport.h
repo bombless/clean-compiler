@@ -2,6 +2,9 @@
 #define MINIMUM(a,b)	(((a)<(b)) ? (a) : (b))
 #define MAXIMUM(a,b)	(((a)>(b)) ? (a) : (b))
 
+struct symbol_def;
+struct type_symbol;
+
 extern void StaticMessage_D_s (Bool error,struct symbol_def *symb_def_p,char *message);
 extern void StaticMessage_S_Ts (Bool error,struct symbol_def *symbol_p1,struct type_symbol *type_symbol_p2,char *message);
 extern void StaticMessage_S_s (Bool error,struct symbol_def *symbol_def_p,char *message);
