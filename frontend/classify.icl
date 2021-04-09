@@ -1608,7 +1608,7 @@ determine_linear_bits ref_counts
 substitute_dep_counts component_members ai_group_counts
 	#!	am						= size ai_group_counts.[0]
 		(known,ai_group_counts)	= build_known ai_group_counts
-	    ai_group_counts			= subst_non_zero [] 0 0 (lengthComponentMembers component_members) am known ai_group_counts
+	#	ai_group_counts			= subst_non_zero [] 0 0 (lengthComponentMembers component_members) am known ai_group_counts
 	= ai_group_counts
 where
 	build_known :: !*{!RefCounts} -> (!*{*{#Bool}},!*{!RefCounts})
