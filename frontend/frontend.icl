@@ -35,7 +35,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 	# (ok,dynamic_type_used,mod,hash_table,error,files)
-		= wantModule mod_file mod_time cWantIclFile mod_ident NoPos support_dynamics hash_table error files
+		= wantModule mod_file mod_time cWantIclFile mod_ident support_dynamics hash_table error files
 	| not ok
 		= (No,{},{},0,predef_symbols, hash_table, files, error, io, out, tcl_file, heaps)
 	# cached_module_idents = [dcl_mod.dcl_name \\ dcl_mod<-:cached_dcl_modules]

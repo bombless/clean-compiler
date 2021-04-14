@@ -308,9 +308,9 @@ isMemberOrWhereOfMemberDefsContext parseContext	:== parseContext bitand MemberOr
 cWantIclFile :== True
 cWantDclFile :== False
 
-wantModule :: !*File !{#Char} !Bool !Ident !Position !Bool !*HashTable !*File !*Files
-							 -> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
-wantModule file modification_time iclmodule file_id=:{id_name} import_file_position support_dynamics hash_table error files
+wantModule :: !*File !{#Char} !Bool !Ident !Bool !*HashTable !*File !*Files
+				   -> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
+wantModule file modification_time iclmodule file_id=:{id_name} support_dynamics hash_table error files
 	# scanState = openScanner file id_name file_name_extension
 	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
 	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files

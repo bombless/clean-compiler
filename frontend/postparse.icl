@@ -1134,7 +1134,7 @@ parseAndScanDclModule dcl_module import_file_position parsed_modules cached_modu
 		= (False, [MakeEmptyModule dcl_module MK_None: parsed_modules],files, ca)
 	# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 	# (parse_ok,dynamic_type_used,mod, ca_hash_table, err_file, files)
-		= wantModule mod_file mod_time cWantDclFile dcl_module import_file_position support_dynamics ca_hash_table ca_error.pea_file files
+		= wantModule mod_file mod_time cWantDclFile dcl_module support_dynamics ca_hash_table ca_error.pea_file files
 	# ca = {ca & ca_hash_table=ca_hash_table, ca_error={pea_file=err_file,pea_ok=True} }
 	| parse_ok
 		= scan_dcl_module dcl_module mod parsed_modules searchPaths modtimefunction files ca
@@ -1231,7 +1231,7 @@ where
 			= (False, No,NoIndex, [],cached_modules, files, ca)
 		# (Yes (mod_file,mod_dir,mod_time)) = opt_file_dir_time
 		# (parse_ok,dynamic_type_used,mod, hash_table, err_file, files)
-			= wantModule mod_file mod_time cWantDclFile mod_ident NoPos support_dynamics ca_hash_table ca_error.pea_file files
+			= wantModule mod_file mod_time cWantDclFile mod_ident support_dynamics ca_hash_table ca_error.pea_file files
 		# ca = {ca & ca_hash_table=hash_table, ca_error={pea_file=err_file,pea_ok=True}}
 		| not parse_ok
 			= (False, No,NoIndex, [],cached_modules, files, ca)
