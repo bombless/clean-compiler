@@ -3,6 +3,9 @@ implementation module comparedefimp
 from StdFunc import return
 import syntax, checksupport, compare_constructor, utilities, compare_types
 
+::	VarInfo
+	| VI_CorrespondenceNumber !Int
+
 compare_members_of_exported_classes :: !(Optional {#{#Int}}) !Int !Int !*(CommonDefsR b) !*{#DclModule} !*CheckState -> (!*(CommonDefsR b),!*{#DclModule},!*CheckState)
 compare_members_of_exported_classes (Yes conversion_table) n_specified_icl_classes n_specified_icl_members icl_common=:{com_class_defs} dcl_modules cs
 	| n_specified_icl_classes==0

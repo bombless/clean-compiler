@@ -788,20 +788,6 @@ pIsSafe			:== True
 ::	ImportedFunctions		:== [Global Index]
 ::	ImportedTypes			:== {#{# CheckedTypeDef}}
 
-::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
-
-:: 	AuxiliaryPattern
-		= AP_Algebraic !(Global DefinedSymbol) !GlobalIndex ![AuxiliaryPattern] !OptionalVariable
-		| AP_Variable !Ident !VarInfoPtr OptionalVariable
-		| AP_Basic !BasicValue OptionalVariable
-		| AP_NewType !(Global DefinedSymbol) !Index AuxiliaryPattern OptionalVariable
-		| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
-		| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
-		| AP_WildCard !OptionalVariable
-		| AP_Empty
-
-:: AP_Kind = APK_Constructor !GlobalIndex | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
-
 ::	VI_TypeInfo	= VITI_Empty
 				| VITI_Coercion		CoercionPosition
 				| ..
@@ -809,44 +795,24 @@ pIsSafe			:== True
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
 				VI_FAType ![ATypeVar] !AType !VI_TypeInfo |
 				VI_FATypeC ![ATypeVar] !AType ![TypeContext] !VI_TypeInfo | VI_FPC |
-				VI_UsedVar !Ident |
-				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr | VI_LiftedVariable !VarInfoPtr |
+				VI_Expression !Expression | VI_Variable !Ident !VarInfoPtr |
 				VI_Count !Int /* the reference count of a variable */ !Bool /* true if the variable is global, false otherwise */ |
 				VI_AccVar !ConsClass !ArgumentPosition /* used during fusion to determine accumulating parameters of functions */ |
 				VI_Alias !BoundVar /* used for resolving aliases just before type checking (in transform) */ |
 				 /* used during elimination and lifting of cases */
-				VI_RefFromTupleSel0 !Int |
-				VI_RefFromArrayUpdate !Int ![Selection] |
-				VI_RefFromArrayUpdateToTupleSelector2 !Int ![Selection] !VarInfoPtr |
-				VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection] |
 				VI_LocalVar |
 				VI_ClassVar !Ident !VarInfoPtr !Int | /* to hold dictionary variables during overloading */
 				VI_EmptyConstructorClassVar |
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_ForwardClassVars !VarInfoPtr !VarInfo |
 				VI_ForwardTypeContextVar !VarInfoPtr |
-				VI_Forward !BoundVar |
-				VI_CorrespondenceNumber !Int | /* it is assumed that this alternative is _only_ used in module comparedefimp */
 				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
 				VI_PropagationType !SymbolType | /* for storing the type with propagation environment of an imported function */
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */
 				VI_ExpandedMemberType !SymbolType !VarInfo /* VI_Empty or VI_ExpandedType */ | // only in sd_type_ptr
-				VI_Record ![AuxiliaryPattern] |
-				VI_Pattern !AuxiliaryPattern |
-				VI_TypeCodeVariable !TypeCodeVariableInfo |
-				VI_DynamicValueAlias !BoundVar |
-				VI_Body !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar] | /* used during fusion */
-				VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar] | /* used during fusion */
-				VI_Dictionary !SymbIdent ![Expression] !Type | /* used during fusion */
 				VI_Extended !ExtendedVarInfo !VarInfo |
-				VI_NotUsed |
 				..
-
-::	TypeCodeVariableInfo
-	= TCI_TypeVar !Expression
-	| TCI_TypePatternVar !Expression
-	| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
 
 ::	ExtendedVarInfo = EVI_VarType !AType
 

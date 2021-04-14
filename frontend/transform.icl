@@ -2,6 +2,13 @@ implementation module transform
 
 import syntax, utilities, mergecases
 
+::	VarInfo
+	| VI_LiftedVariable !VarInfoPtr
+	| VI_RefFromTupleSel0 !Int
+	| VI_RefFromArrayUpdate !Int ![Selection]
+	| VI_RefFromArrayUpdateToTupleSelector2 !Int ![Selection] !VarInfoPtr
+	| VI_RefFromArrayUpdateOfTupleElem2 !Int ![Selection]
+
 ::	LiftState =
 	{	ls_var_heap		:: !.VarHeap
 	,	ls_x 			:: !.LiftStateX

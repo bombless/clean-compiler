@@ -15,6 +15,24 @@ cEndWithSelection		:== False
 cCaseExplicit		:== True
 cCaseNotExplicit	:== False
 
+::	VarInfo
+	| VI_Record ![AuxiliaryPattern]
+	| VI_Pattern !AuxiliaryPattern
+
+:: 	AuxiliaryPattern
+	= AP_Algebraic !(Global DefinedSymbol) !GlobalIndex ![AuxiliaryPattern] !OptionalVariable
+	| AP_Variable !Ident !VarInfoPtr OptionalVariable
+	| AP_Basic !BasicValue OptionalVariable
+	| AP_NewType !(Global DefinedSymbol) !Index AuxiliaryPattern OptionalVariable
+	| AP_Dynamic !AuxiliaryPattern !DynamicType !OptionalVariable
+	| AP_Constant !AP_Kind !(Global DefinedSymbol) !Priority
+	| AP_WildCard !OptionalVariable
+	| AP_Empty
+
+::	OptionalVariable :== Optional (Bind Ident VarInfoPtr)
+
+::	AP_Kind = APK_Constructor !GlobalIndex | APK_NewTypeConstructor !Index | APK_Macro !Bool // is_dcl_macro
+
 ::	Dynamics		:== [ExprInfoPtr]
 
 ::	ExpressionState =

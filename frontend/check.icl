@@ -3951,21 +3951,6 @@ where
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
 
-instance <<< AuxiliaryPattern
-where
-	(<<<) file (AP_Algebraic symbol index patterns var)
-		= file <<< symbol <<< ' ' <<< patterns
-	(<<<) file (AP_Variable ident var_ptr var)
-		= file <<< ident
-	(<<<) file (AP_Basic val var)
-		= file <<< val
-	(<<<) file (AP_Constant kind symbol prio)
-		= file <<< symbol
-	(<<<) file (AP_WildCard _)
-		= file <<< '_'
-	(<<<) file AP_Empty
-		= file <<< "<?>"
-
 instance <<< Priority
 where
 	(<<<) file (Prio ass prio) = file <<< "##" <<< prio <<< ass <<< "##"

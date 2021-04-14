@@ -26,6 +26,14 @@ SwitchHOFusion				fuse dont_fuse :== fuse
 SwitchHOFusion`				fuse dont_fuse :== fuse
 SwitchStrictPossiblyAddLet  strict lazy    :== lazy//strict
 
+::	VarInfo
+	| VI_UsedVar !Ident
+	| VI_Forward !BoundVar
+	| VI_Body !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar]
+	| VI_ExpressionOrBody !Expression !SymbIdent !TransformedBody ![FreeVar] ![TypeVar] ![TypeVar]
+	| VI_Dictionary !SymbIdent ![Expression] !Type
+	| VI_NotUsed
+
 /*
 (-!->) infix
 (-!->) a b :== a  // ---> b

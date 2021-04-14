@@ -8,6 +8,15 @@ extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in St
 
 import type_io;
 
+::	VarInfo
+	| VI_TypeCodeVariable !TypeCodeVariableInfo
+	| VI_DynamicValueAlias !BoundVar
+
+::	TypeCodeVariableInfo
+	= TCI_TypeVar !Expression
+	| TCI_TypePatternVar !Expression
+	| TCI_SelectionsTypePatternVar ![(Expression,[Selection])]
+
 ::	*ConvertDynamicsState =
 	{	cds_fun_defs	:: !*{#FunDef}
 	,	cds_predef_symb	:: !*PredefinedSymbols
