@@ -69,8 +69,14 @@ stringPosition :: !String !Position -> StringPos
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 	special a={#Char},b={#Char}; a=Ident,b={#Char}
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
-checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
-checkErrorWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
+checkErrorIdentWithIdentPos :: !IdentPos !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a
+	special a={#Char};
+checkErrorIdentWithPosition :: !Ident !Position !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a
+	special a={#Char};
+checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a
+	special a={#Char};
+checkErrorWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a
+	special a={#Char};
 checkStringErrorWithPosition :: !{#Char} !Position !a !*ErrorAdmin -> *ErrorAdmin | <<< a
 	special a={#Char};
 checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;

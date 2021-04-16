@@ -374,7 +374,7 @@ where
 			# {ins_pos,ins_class_index,ins_members,ins_type,ins_member_types_and_functions} = instance_def
 			# ({class_members,class_ident}, class_defs, modules) = getClassDef ins_class_index x_main_dcl_module_n class_defs modules
 			| size class_members==0
-				# cs & cs_error = checkErrorWithIdentPos (newPosition class_ident ins_pos) "instance for class without members specified" cs.cs_error
+				# cs & cs_error = checkErrorWithPosition class_ident ins_pos "instance for class without members specified" cs.cs_error
 				= check_icl_instances (inc inst_index) instance_types n_icl_functions new_instance_members instance_defs class_defs member_defs generic_defs type_defs icl_functions modules var_heap type_heaps cs 
 			# (ins_members,ins_member_types_and_functions,instance_types,n_icl_functions,new_instance_members,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
 				= check_icl_instance_members 0 0 ins_class_index.gi_module ins_members ins_member_types_and_functions class_members class_ident ins_pos ins_type
@@ -931,7 +931,7 @@ where
 			ins_type ins_specials class_ident ins_pos member_defs modules type_heaps var_heap cs_error
 		| mem_offset == class_size
 			| class_size==0
-				# cs_error = checkErrorWithIdentPos (newPosition class_ident ins_pos) "instance for class without members specified" cs_error
+				# cs_error = checkErrorWithPosition class_ident ins_pos "instance for class without members specified" cs_error
 				=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 				=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 			# class_member = class_members.[mem_offset]
@@ -1624,7 +1624,7 @@ reorder_array array index_array
 	= {new_array & [index_array.[i]]=e \\ e<-:array & i<-[0..]}
 
 add_conflicting_definition_error decl_ident decl_pos error_admin
-	= checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) error_admin)
+	= checkErrorWithPosition decl_ident decl_pos "conflicting definition in implementation module" error_admin
 
 combineDclAndIclModule ::			    ModuleKind *{#DclModule}  [Declaration] (CollectedDefinitions a)  *{#Int}   *CheckState
 	-> (!CopiedDefinitions,!*Optional *{#*{#Int}},!*{#DclModule},![Declaration],!CollectedDefinitions a, !*{#Int}, !*CheckState);
@@ -1715,7 +1715,7 @@ where
 				# (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 					= add_dcl_declaration id_info entry decl def_index decl_index (conversion_table, icl_sizes, icl_defs, cs_symbol_table)
 				= ([ decl : moved_dcl_defs ],dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_symbol_table = cs_symbol_table })
-				# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+				# cs_error = checkErrorWithPosition decl_ident decl_pos "undefined in implementation module" cs.cs_error
 				= (moved_dcl_defs,dcl_cons_and_member_defs,conversion_table, icl_sizes, icl_defs, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 		| ste_def_level == cGlobalScope && ste_kind == decl_kind
 			# def_index = toInt decl_kind
@@ -1785,14 +1785,14 @@ where
 				  ({ste_kind,ste_index}, cs_symbol_table) = readPtr field.fs_ident.id_info cs.cs_symbol_table
 				| is_field ste_kind
 					= ({ new_fields & [field_nr] = { field & fs_index = ste_index }}, { cs & cs_symbol_table = cs_symbol_table })
-					# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition field.fs_ident pos) cs.cs_error)
+					# cs_error = checkErrorWithPosition field.fs_ident pos "conflicting definition in implementation module" cs.cs_error
 					= (new_fields, { cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table })
 
 			is_field (STE_Field _)	= True
 			is_field _				= False
 
 		abstract_type_error td_ident td_pos error
-			= checkError "abstract type not defined in implementation module" "" (setErrorAdmin (newPosition td_ident td_pos) error)
+			= checkErrorWithPosition td_ident td_pos "abstract type not defined in implementation module" error
 	add_dcl_definition {com_selector_defs} dcl=:(Declaration {decl_kind = STE_Field _, decl_index})
 			(new_type_defs, new_class_defs, new_cons_defs, new_selector_defs, new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
 		= (new_type_defs, new_class_defs, new_cons_defs, [ com_selector_defs.[decl_index] : new_selector_defs ], new_member_defs, new_generic_defs, copied_defs, conversion_table, icl_sizes, icl_decl_symbols, cs)
@@ -1859,7 +1859,7 @@ where
 			# icl_defs = [ Declaration { decl_ident=ds_ident,decl_index=icl_index,decl_kind=req_kind,decl_pos=pos} : icl_defs ]
 			# cs_symbol_table = NewEntry cs_symbol_table id_info req_kind icl_index cGlobalScope entry
 			= (ds_index,{ ds & ds_index = icl_index }, (conversion_table,icl_sizes,icl_defs,{ cs & cs_symbol_table = cs_symbol_table }))
-			# cs_error = checkError "conflicting definition in implementation module" "" (setErrorAdmin (newPosition ds_ident pos) cs.cs_error)
+			# cs_error = checkErrorWithPosition ds_ident pos "conflicting definition in implementation module" cs.cs_error
 			= (-1,{ ds & ds_index = ste_index }, (conversion_table,icl_sizes,icl_defs,{ cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table }))
 
 	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind=STE_Constructor,decl_index,decl_pos}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
@@ -1870,7 +1870,7 @@ where
 			# (conversion_table,icl_sizes,icl_defs,symbol_table)
 				= add_dcl_declaration id_info entry decl cConstructorDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
 			= ([dcl_common.com_cons_defs.[decl_index] : new_cons_defs],new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
-			# errors = checkErrorWithIdentPos (newPosition decl_ident decl_pos) " constructor already defined" errors
+			# errors = checkErrorWithPosition decl_ident decl_pos " constructor already defined" errors
 			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 	add_all_dcl_cons_and_members_to_conversion_table dcl_common decl=:(Declaration {decl_ident=decl_ident=:{id_info},decl_kind=STE_Member,decl_index,decl_pos}) (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 		| conversion_table.[cMemberDefs].[decl_index]>=0
@@ -1880,7 +1880,7 @@ where
 			# (conversion_table,icl_sizes,icl_defs,symbol_table)
 				= add_dcl_declaration id_info entry decl cMemberDefs decl_index (conversion_table,icl_sizes,icl_defs,symbol_table)
 			= (new_cons_defs,[dcl_common.com_member_defs.[decl_index] :  new_member_defs],conversion_table,icl_sizes,icl_defs,symbol_table,errors)
-			# errors = checkErrorWithIdentPos (newPosition decl_ident decl_pos) " member already defined" errors
+			# errors = checkErrorWithPosition decl_ident decl_pos " member already defined" errors
 			= (new_cons_defs,new_member_defs,conversion_table,icl_sizes,icl_defs,symbol_table,errors)
 
 	my_append front []
@@ -1909,7 +1909,7 @@ where
 			(function_conversion_table,macro_conversion_table,icl_defs,cs)
 		# (entry=:{ste_kind,ste_index,ste_def_level}, cs_symbol_table) = readPtr id_info cs.cs_symbol_table
 		| ste_kind == STE_Empty
-			# cs_error = checkError "undefined in implementation module" "" (setErrorAdmin (newPosition decl_ident decl_pos) cs.cs_error)
+			# cs_error = checkErrorWithPosition decl_ident decl_pos "undefined in implementation module" cs.cs_error
 			= (function_conversion_table,macro_conversion_table,icl_defs,{cs & cs_error = cs_error, cs_symbol_table = cs_symbol_table})
 		| ste_def_level == cGlobalScope && case ste_kind of
 											STE_FunctionOrMacro _
@@ -2210,8 +2210,7 @@ checkDclComponent components_importing_module_a expl_imp_indices mod_indices
 	  where
 		check_that mod_index {ei_module_n=imported_mod_index, ei_position} cs_error
 			| mod_index==imported_mod_index
-				= checkErrorWithIdentPos (newPosition import_ident ei_position)
-						"a dcl module cannot import from itself" cs_error
+				= checkErrorWithPosition import_ident ei_position "a dcl module cannot import from itself" cs_error
 			= cs_error
 	
 	collect_expl_imp_info component_nr mod_indices (expl_imp_infos, dcl_modules, cs)
@@ -2539,7 +2538,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 						| icl_generic_info<>dcl_generic_info
 							# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = icl_gencase
 							  error_message = "different generic info for "+++type_cons_to_string gc_type_cons+++" in implementation and definition module"
-							  error = checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+							  error = checkErrorWithPosition gcf_ident gc_pos error_message error
 							= (icl_gencases, error)
 							= case (dcl_generic_instance_deps,icl_generic_instance_deps) of
 								(AllGenericInstanceDependencies,AllGenericInstanceDependencies)
@@ -2551,7 +2550,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 								(_,AllGenericInstanceDependencies)
 									# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = dcl_gencase
 							 		  error_message = "restricting dependent generic functions not allow for type "+++type_cons_to_string gc_type_cons
-									  error = checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+									  error = checkErrorWithPosition gcf_ident gc_pos error_message error
 									-> (icl_gencases, error)
 								(GenericInstanceDependencies dcl_n_deps dcl_deps,GenericInstanceUsedArgs icl_n_deps icl_deps)
 									| icl_n_deps==dcl_n_deps
@@ -2587,7 +2586,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 							different_restriction_error icl_gencase error
 								# {gc_gcf=GCF gcf_ident _,gc_type_cons,gc_pos} = icl_gencase
 								  error_message = "different restriction of dependent generic functions for "+++type_cons_to_string gc_type_cons+++" in implementation and definition module"
-								= checkErrorWithIdentPos (newPosition gcf_ident gc_pos) error_message error
+								= checkErrorWithPosition gcf_ident gc_pos error_message error
 
 					build_conversion_table_for_generic_superclasses [!{gcf_body=GCB_FunIndex dcl_fun}:dcl_gcfs!] [!{gcf_body=GCB_FunIndex icl_fun}:icl_gcfs!] new_table
 						# new_table = {new_table & [dcl_fun] = icl_fun}												
@@ -3113,12 +3112,10 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 				STE_Imported STE_DclFunction mod_index
 					-> { cs & cs_predef_symbols.[PD_Start] = { pds_def = ste_index, pds_module = mod_index }}
 				_
-					-> case mod_kind of
-							MK_Main
-								# pos = newPosition predefined_idents.[PD_Start] (LinePos (mod_ident.id_name+++".icl") 1)
-								-> { cs & cs_error = checkErrorWithIdentPos pos " has not been declared" cs.cs_error }
-							_
-								-> cs
+					| mod_kind=:MK_Main
+						-> {cs & cs_error = checkErrorWithPosition predefined_idents.[PD_Start]
+							(LinePos (mod_ident.id_name+++".icl") 1) " has not been declared" cs.cs_error}
+						-> cs
 
 		check_predefined_module (Yes {mod_ident={id_info}}) support_dynamics modules macro_defs heaps cs=:{cs_symbol_table}
 			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
@@ -3273,9 +3270,9 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 								-> ([],cs)
 							Yes {st_args,st_args_strictness,st_arity,st_result,st_context}
 								| not (isEmpty st_context)
-									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (context not allowed)" cs.cs_error})
+									-> ([],{cs & cs_error = checkErrorWithPosition fun_ident fun_pos "error in type of foreign exported function (context not allowed)" cs.cs_error})
 								| not (first_n_are_strict st_arity st_args_strictness)
-									-> ([],{cs & cs_error = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in type of foreign exported function (strictness annotation missing)" cs.cs_error})
+									-> ([],{cs & cs_error = checkErrorWithPosition fun_ident fun_pos "error in type of foreign exported function (strictness annotation missing)" cs.cs_error})
 									-> ([{fe_fd_index=ste_index,fe_stdcall=pfe_stdcall}],cs)
 					= (foreign_export_fundef_index,fun_defs,cs)
 			check_foreign_export (STE_FunctionOrMacro _) [_,{ir_from, ir_to}:_] fun_defs cs
@@ -3295,10 +3292,10 @@ checkForeignExportedFunctionTypes :: ![ForeignExport] !*ErrorAdmin !*{#FunDef}
 												  -> (!*ErrorAdmin,!*{#FunDef})
 checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admin fun_defs
 	| not (check_foreign_export_type st_result.at_type)
-		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in result type for foreign exported function" error_admin
+		# error_admin = checkErrorWithPosition fun_ident fun_pos "error in result type for foreign exported function" error_admin
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 	| not (check_foreign_export_types st_args)
-		# error_admin = checkErrorWithIdentPos (newPosition fun_ident fun_pos) "error in argument type for foreign exported function" error_admin
+		# error_admin = checkErrorWithPosition fun_ident fun_pos "error in argument type for foreign exported function" error_admin
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 	where
@@ -3334,7 +3331,7 @@ checkForeignExportedFunctionTypes [] error_admin fun_defs
 check_dynamics_used_without_support_dynamics support_dynamics mod_ident cs
 	| not support_dynamics && (cs.cs_x.x_needed_modules bitand cNeedStdDynamic)<>0
 		# error_location = { ip_ident = {id_name="",id_info=nilPtr}/*mod_ident*/, ip_line = 1, ip_file = mod_ident.id_name+++".icl"}
-		= {cs & cs_error = popErrorAdmin (checkError "" ("dynamic used but support for dynamics not enabled") (pushErrorAdmin error_location cs.cs_error))}
+		= {cs & cs_error = checkErrorWithIdentPos error_location "dynamic used but support for dynamics not enabled" cs.cs_error}
 		= cs
 
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
@@ -3365,9 +3362,7 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 	missing_import_error pd mod_ident explanation extension cs
 		# pds_ident = predefined_idents.[pd]
 		  error_location = { ip_ident = mod_ident, ip_line = 1, ip_file = mod_ident.id_name+++extension}
-		  cs_error = pushErrorAdmin error_location cs.cs_error
-		  cs_error = checkError pds_ident ("not imported"+++explanation) cs_error
-		  cs_error = popErrorAdmin cs_error
+		  cs_error = checkErrorIdentWithIdentPos error_location pds_ident ("not imported"+++explanation) cs.cs_error
 		= { cs & cs_error = cs_error }
 
 arrayFunOffsetToPD_IndexTable :: !w:{# MemberDef} !v:{# PredefinedSymbol} -> (!{# Index}, !x:{#MemberDef}, !v:{#PredefinedSymbol}) , [w<=x]

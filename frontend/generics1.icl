@@ -1340,10 +1340,10 @@ where
 	build_expr_for_type_rhs type_def_mod type_def_index (AbstractNewType _ cons) arg_expr heaps error
 		= build_expr_for_newtype type_def_mod type_def_index cons arg_expr heaps error
 	build_expr_for_type_rhs type_def_mod type_def_index (AbstractType _) arg_expr  heaps error
-		#! error = checkErrorWithIdentPos (newPosition td_ident td_pos) "cannot build isomorphisms for an abstract type" error
+		#! error = checkErrorWithPosition td_ident td_pos "cannot build isomorphisms for an abstract type" error
 		= (EE, heaps, error)
 	build_expr_for_type_rhs type_def_mod type_def_index (SynType _) arg_expr  heaps error
-		#! error = checkErrorWithIdentPos (newPosition td_ident td_pos) "cannot build isomorphisms for a synonym type" error
+		#! error = checkErrorWithPosition td_ident td_pos "cannot build isomorphisms for a synonym type" error
 		= (EE, heaps, error)
 
 	// build conversion for constructors of a type def 	

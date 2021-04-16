@@ -2651,7 +2651,7 @@ where
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
 										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
-				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
+				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
 			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
@@ -2663,7 +2663,7 @@ where
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
 										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
-				  ts_error = check_caf_context (newPosition fun_ident fun_pos) fun_kind clean_fun_type ts_error
+				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
 				  th_attrs = ts_type_heaps.th_attrs
 				  (out, th_attrs)
 						= case list_inferred_types of
@@ -2700,9 +2700,9 @@ where
 				= take arity_diff args2 ++ args1
 				= args1
 
-	check_caf_context position FK_Caf {st_context=[_:_]} error
-		=	checkErrorWithIdentPos position "CAF cannot be overloaded" error
-	check_caf_context _ _ _ error
+	check_caf_context fun_ident fun_pos FK_Caf {st_context=[_:_]} error
+		=	checkErrorWithPosition fun_ident fun_pos "CAF cannot be overloaded" error
+	check_caf_context _ _ _ _ error
 		=	error
 
 addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
@@ -2919,21 +2919,21 @@ where
 		check_type_of_constructor_variable ins_pos common_defs type=:(TAS {type_index={glob_module,glob_object},type_arity} types _) (error, type_var_heap, td_infos)
 			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
 		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
-			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
 				type_var_heap, td_infos)
 //AA..
 /*
 		// ??? not sure if it is correct
 		check_type_of_constructor_variable ins_pos common_defs TArrow (error, type_var_heap, td_infos)
-			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
-				type_var_heap, td_infos)		
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
+				type_var_heap, td_infos)
 		check_type_of_constructor_variable ins_pos common_defs type=:(TArrow1 arg_type) (error, type_var_heap, td_infos)
-			= (checkErrorWithIdentPos (newPosition empty_id ins_pos) " instance type should be coercible" error,
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
 				type_var_heap, td_infos)		
 */
 //..AA				
 		check_type_of_constructor_variable ins_pos common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
-			= (checkError (newPosition empty_id ins_pos) " instance type should be coercible" error,
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
 				type_var_heap, td_infos)
 		check_type_of_constructor_variable ins_pos common_defs type state
 			= state
@@ -2945,8 +2945,7 @@ where
 				# ({sc_neg_vect}, type_var_heap, td_infos)
 					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
 				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)							
-				= (checkErrorWithIdentPos (newPosition empty_id ins_pos)
-					 " instance type should be coercible" error, type_var_heap, td_infos)
+				= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error, type_var_heap, td_infos)
 		where
 			check_sign type neg_signs arg_nr error
 				| arg_nr == 0

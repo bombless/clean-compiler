@@ -32,10 +32,10 @@ where
 		# dcl_class = dcl_class_defs.[dcl_class_index]
 		# icl_class = com_class_defs.[icl_class_index]
 		| size icl_class.class_members<>size dcl_class.class_members
-			# cs_error = checkError "different number of members in class definitions in implementation and definition module" "" (setErrorAdmin (newPosition icl_class.class_ident icl_class.class_pos) cs.cs_error)
+			# cs_error = checkErrorWithPosition icl_class.class_ident icl_class.class_pos "different number of members in class definitions in implementation and definition module" cs.cs_error
 			= {cs & cs_error=cs_error}
 		| size icl_class.class_macro_members<>size dcl_class.class_macro_members
-			# cs_error = checkError "different number of macro members in class definitions in implementation and definition module" "" (setErrorAdmin (newPosition icl_class.class_ident icl_class.class_pos) cs.cs_error)
+			# cs_error = checkErrorWithPosition icl_class.class_ident icl_class.class_pos "different number of macro members in class definitions in implementation and definition module" cs.cs_error
 			= {cs & cs_error=cs_error}
 			= check_member_names_of_exported_class 0 icl_class.class_members dcl_class.class_members icl_class.class_pos n_specified_icl_members member_conversion_table cs
 
@@ -48,7 +48,7 @@ where
 			# converted_dcl_index = member_conversion_table.[dcl_index];
 			| converted_dcl_index<0 || converted_dcl_index>=n_specified_icl_members
 				# dcl_ident = dcl_class_members.[member_n].ds_ident
-				# cs & cs_error = checkError "member of exported class missing in implementation module" "" (setErrorAdmin (newPosition dcl_ident icl_class_pos) cs.cs_error)
+				# cs & cs_error = checkErrorWithPosition dcl_ident icl_class_pos "member of exported class missing in implementation module" cs.cs_error
 				= check_member_names_of_exported_class (member_n+1) icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
 			= check_member_names_of_exported_class (member_n+1) icl_class_members dcl_class_members icl_class_pos n_specified_icl_members member_conversion_table cs
 			= cs
@@ -66,8 +66,8 @@ class_def_error		= "class definition in the impl module conflicts with the def m
 instance_def_error	= "instance definition in the impl module conflicts with the def module"
 generic_def_error	= "generic definition in the impl module conflicts with the def module"
 
-compareError message pos error_admin
-	= popErrorAdmin (checkError "" message (pushErrorAdmin pos error_admin))
+compareError message ident pos error_admin
+	= checkErrorWithPosition ident pos message error_admin
 
 compareTypeDefs ::  !{# Int} !{#Bool} !{# CheckedTypeDef} !{# ConsDef} !u:{# CheckedTypeDef} !v:{# ConsDef} !*CompareState
 	-> (!u:{# CheckedTypeDef}, !v:{# ConsDef}, !*CompareState) 
@@ -87,7 +87,7 @@ where
 			  (ok, icl_cons_defs, comp_st) = compare_rhs_of_types dcl_type_def.td_rhs icl_type_def.td_rhs dcl_cons_defs icl_cons_defs comp_st
 			| ok && dcl_type_def.td_arity==icl_type_def.td_arity && dcl_type_def.td_attribute==icl_type_def.td_attribute
 				= (icl_type_defs, icl_cons_defs, comp_st)
-				# comp_error = compareError type_def_error (newPosition icl_type_def.td_ident icl_type_def.td_pos) comp_st.comp_error
+				# comp_error = compareError type_def_error icl_type_def.td_ident icl_type_def.td_pos comp_st.comp_error
 				= (icl_type_defs, icl_cons_defs, { comp_st & comp_error = comp_error })
 			= (icl_type_defs, icl_cons_defs, comp_st)
 
@@ -194,7 +194,7 @@ where
 			  (ok, icl_member_defs, comp_st) = compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st
 			| ok
 				= (icl_class_defs, icl_member_defs, comp_st)
-				# comp_error = compareError class_def_error (newPosition icl_class_def.class_ident icl_class_def.class_pos) comp_st.comp_error
+				# comp_error = compareError class_def_error icl_class_def.class_ident icl_class_def.class_pos comp_st.comp_error
 				= (icl_class_defs, icl_member_defs, { comp_st & comp_error = comp_error })
 			= (icl_class_defs, icl_member_defs, comp_st)
 
@@ -311,7 +311,7 @@ where
 			= member_types_equal instance_member_types icl_instance_members icl_member_n icl_functions comp_st
 
 	instance_def_conflicts_error ident pos comp_st
-		= {comp_st & comp_error = compareError instance_def_error (newPosition ident pos) comp_st.comp_error }
+		= {comp_st & comp_error = compareError instance_def_error ident pos comp_st.comp_error }
 
 compareGenericDefs :: !{# Int} !{#Bool} !{# GenericDef} !u:{# GenericDef} !*CompareState -> (!u:{# GenericDef}, !*CompareState)
 compareGenericDefs dcl_sizes copied_from_dcl dcl_generic_defs icl_generic_defs comp_st
@@ -329,7 +329,7 @@ where
 			# (ok3, comp_st) = compare dcl_generic_def.gen_deps icl_generic_def.gen_deps comp_st			
 			| ok1 && ok2 && ok3
 				= (icl_generic_defs, comp_st)
-				# comp_error = compareError generic_def_error (newPosition icl_generic_def.gen_ident icl_generic_def.gen_pos) comp_st.comp_error
+				# comp_error = compareError generic_def_error icl_generic_def.gen_ident icl_generic_def.gen_pos comp_st.comp_error
 				= (icl_generic_defs, { comp_st & comp_error = comp_error })
 		| otherwise
 			= (icl_generic_defs, comp_st)
@@ -628,8 +628,6 @@ class t_corresponds a :: !a !a -> *TypesCorrespondMonad
 class e_corresponds a :: !a !a -> ExpressionsCorrespondMonad
 	// check for correspondence of expressions
 
-class getIdentPos a :: a -> IdentPos
-
 class CorrespondenceNumber a where
 	toCorrespondenceNumber :: .a -> OptionalCorrespondenceNumber
 	fromCorrespondenceNumber :: Int -> .a
@@ -784,10 +782,8 @@ init_class_args type_vars1 type_vars2 tc_state=:{tc_type_vars=tc_type_vars=:{hwn
 			= writePtr tv_info_ptr TVI_Empty heap
 
 generate_error message iclDef iclDefs tc_state error_admin
-	# ident_pos = getIdentPos iclDef
-	  error_admin = pushErrorAdmin ident_pos error_admin
-	  error_admin = checkError ident_pos.ip_ident message error_admin
-	= (iclDefs, tc_state, popErrorAdmin error_admin)
+	# error_admin = checkErrorIdentWithPosition iclDef.fun_ident iclDef.fun_pos iclDef.fun_ident message error_admin
+	= (iclDefs, tc_state, error_admin)
 
 compareMacrosWithConversion main_dcl_module_n conversions macro_range generic_case_def_macros icl_functions macro_defs var_heap expr_heap tc_state error_admin
 	#! n_icl_functions = size icl_functions
@@ -816,7 +812,7 @@ compareTwoMacroFuns :: !Int !Int !Int !*ExpressionsCorrespondState -> .Expressio
 compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_functions,ec_macro_defs,ec_main_dcl_module_n}
 	| macro_module_index<>ec_main_dcl_module_n
 		# (dcl_function,ec_macro_defs) = ec_macro_defs![macro_module_index,dclIndex]
-		= { ec_state & ec_macro_defs=ec_macro_defs,ec_error_admin = checkErrorWithIdentPos (getIdentPos dcl_function) ErrorMessage ec_state.ec_error_admin }
+		= {ec_state & ec_macro_defs=ec_macro_defs,ec_error_admin = checkErrorWithPosition dcl_function.fun_ident dcl_function.fun_pos ErrorMessage ec_state.ec_error_admin}
 	| iclIndex==NoIndex
 		= ec_state
 	# (dcl_function, ec_macro_defs) = ec_macro_defs![macro_module_index,dclIndex]
@@ -831,7 +827,7 @@ compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_funct
 	  			_	-> True
 	| not need_to_be_compared
 		= ec_state
-	# ident_pos = getIdentPos dcl_function
+	# ident_pos = newPosition dcl_function.fun_ident dcl_function.fun_pos
 	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
 	| (dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun
@@ -850,7 +846,7 @@ compare_generic_case_def_macro_and_function dclIndex iclIndex generic_info ec_st
 	  (icl_function, ec_icl_functions) = ec_icl_functions![iclIndex]
 	  ec_state & ec_icl_correspondences.[iclIndex]=dclIndex, ec_dcl_correspondences.[dclIndex]=iclIndex,
 				 ec_icl_functions = ec_icl_functions,ec_macro_defs=ec_macro_defs
-	  ident_pos = getIdentPos dcl_function
+	  ident_pos = newPosition dcl_function.fun_ident dcl_function.fun_pos
 	  ec_state & ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
 
 	  dcl_args_and_rhs = from_body dcl_function.fun_body
@@ -871,34 +867,6 @@ where
 		= (args,rhs)
 	remove_generic_info_arg args_and_rhs
 		= args_and_rhs
-
-instance getIdentPos (TypeDef a) where
-	getIdentPos {td_ident, td_pos}
-		= newPosition td_ident td_pos
-
-instance getIdentPos ConsDef where
-	getIdentPos {cons_ident, cons_pos}
-		= newPosition cons_ident cons_pos
-
-instance getIdentPos SelectorDef where
-	getIdentPos {sd_ident, sd_pos}
-		= newPosition sd_ident sd_pos
-
-instance getIdentPos ClassDef where
-	getIdentPos {class_ident, class_pos}
-		= newPosition class_ident class_pos
-
-instance getIdentPos MemberDef where
-	getIdentPos {me_ident, me_pos}
-		= newPosition me_ident me_pos
-
-instance getIdentPos ClassInstance where
-	getIdentPos {ins_ident, ins_pos}
-		= newPosition ins_ident ins_pos
-
-instance getIdentPos FunDef where
-	getIdentPos {fun_ident, fun_pos}
-		= newPosition fun_ident fun_pos
 
 instance CorrespondenceNumber VarInfo where
 	toCorrespondenceNumber (VI_CorrespondenceNumber number)

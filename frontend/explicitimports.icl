@@ -259,9 +259,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 		| need_all
 			# (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
-			  cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
-			  cs_error = checkError belong_ident ("of "+++eii_ident.id_name+++" not exported by module "+++module_name) cs_error
-			  cs_error = popErrorAdmin cs_error
+			  cs_error = checkErrorIdentWithPosition import_ident position belong_ident ("of "+++eii_ident.id_name+++" not exported by module "+++module_name) cs_error
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 			= (decls_accu, dcl_modules, eii_declaring_modules, visited_modules, cs_error)
 
@@ -345,9 +343,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 				# opt_nr_and_idents = [(i, ii_ident):opt_nr_and_idents]
 				-> (opt_nr_and_idents,cs_error,cs_symbol_table)
 			_
-				# cs_error = pushErrorAdmin (newPosition import_ident position) cs_error
-				  cs_error = checkError ii_ident ("does not belong to "+++eii_ident.id_name) cs_error
-				  cs_error = popErrorAdmin cs_error
+				# cs_error = checkErrorIdentWithPosition import_ident position ii_ident ("does not belong to "+++eii_ident.id_name) cs_error
 				-> get_opt_nr_and_idents idents position eii_ident opt_nr_and_idents cs_error cs_symbol_table
 	get_opt_nr_and_idents [] position eii_ident opt_nr_and_idents cs_error cs_symbol_table
 		= (opt_nr_and_idents,cs_error,cs_symbol_table)
@@ -537,9 +533,8 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set importing_mod
 		  (eii_ident, eii) = get_eei_ident eii
 		  expl_imp_info = {expl_imp_info & [ini_symbol_nr] = eii}
 		  (module_name,dcl_modules)=dcl_modules![imported_mod].dcl_name.id_name
-		  cs_error = popErrorAdmin (checkError eii_ident
-									("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by module "+++module_name)
-									(pushErrorAdmin (newPosition import_ident position) cs_error))
+		  cs_error = checkErrorIdentWithPosition import_ident position eii_ident
+						("not exported as a "+++impDeclToNameSpaceString ini_imp_decl +++" by module "+++module_name) cs_error
 		= report_not_exported_symbol_errors not_exported_symbols position expl_imp_info imported_mod dcl_modules cs_error
 	report_not_exported_symbol_errors [] position expl_imp_info imported_mod dcl_modules cs_error
 		= (expl_imp_info,dcl_modules,cs_error)
@@ -645,7 +640,7 @@ check_whether_ident_is_imported ident module_n symbol_index wanted_ste_kind cci 
 		= ccs
 		#! (ccs=:{box_ccs=box_ccs=:{ccs_symbol_table, ccs_error, ccs_heap_changes_accu}}) = ccs
 		#  {box_cci={cci_import_position}} = cci
-		   ccs_error = checkErrorWithIdentPos (newPosition { id_name="import", id_info=nilPtr } cci_import_position)
+		   ccs_error = checkErrorWithPosition {id_name="import", id_info=nilPtr} cci_import_position
 		   				(" "+++toString wanted_ste_kind+++" "+++toString ident.id_name+++" not imported") ccs_error
 		   // pretend that the unimported symbol was imported to prevent doubling error mesages
 		   ccs_symbol_table = writePtr ident.id_info { ste & ste_kind = STE_ExplImpSymbolNotImported module_n ste_kind } ccs_symbol_table

@@ -78,6 +78,15 @@ checkWarning id mess error=:{ea_file,ea_loc=[]}
 checkWarning id mess error=:{ea_file,ea_loc}
 	= { error & ea_file = ea_file <<< "Warning " <<< hd ea_loc <<< ": " <<< id  <<< " " <<< mess <<< '\n' }
 
+checkErrorIdentWithIdentPos :: !IdentPos !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
+checkErrorIdentWithIdentPos ident_pos id mess error=:{ea_file}
+	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ": " <<< id <<< ' ' <<< mess <<< '\n', ea_ok = False }
+
+checkErrorIdentWithPosition :: !Ident !Position !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
+checkErrorIdentWithPosition ident pos id mess error=:{ea_file}
+	# ident_pos = newPosition ident pos
+	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ": " <<< id  <<< ' ' <<< mess <<< '\n', ea_ok = False }
+
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorWithIdentPos ident_pos mess error=:{ea_file}
 	= { error & ea_file = ea_file <<< "Error " <<< ident_pos <<< ": " <<< mess <<< '\n', ea_ok = False }
@@ -406,7 +415,7 @@ where
 					-> addFieldToSelectorDefinition selector_id	{ glob_module = NoIndex, glob_object = decl_index } cs
 				_
 					-> cs
-			= { cs & cs_symbol_table = cs_symbol_table, cs_error = checkErrorWithIdentPos (newPosition ident decl_pos) "multiply defined" cs.cs_error}
+			= { cs & cs_symbol_table = cs_symbol_table, cs_error = checkErrorWithPosition ident decl_pos "multiply defined" cs.cs_error}
 
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
 removeImportedSymbolsFromSymbolTable (Declaration {decl_ident=decl_ident=:{id_info}, decl_index}) symbol_table

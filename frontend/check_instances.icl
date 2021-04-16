@@ -185,9 +185,9 @@ overlapping_instance_error :: !Int !Int !(Global Int) !{#CommonDefs} !*ErrorAdmi
 // almost same function as in module type
 overlapping_instance_error new_ins_module new_ins_index instance_index common_defs error
 	# {ins_ident,ins_pos} = common_defs.[new_ins_module].com_instance_defs.[new_ins_index]
-	  error = checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the next error" error
+	  error = checkErrorWithPosition ins_ident ins_pos " instance is overlapping with the instance in the next error" error
 	  {ins_ident,ins_pos} = common_defs.[instance_index.glob_module].com_instance_defs.[instance_index.glob_object]
-	= checkErrorWithIdentPos (newPosition ins_ident ins_pos) " instance is overlapping with the instance in the previous error" error
+	= checkErrorWithPosition ins_ident ins_pos " instance is overlapping with the instance in the previous error" error
 
 unify_instances :: ![Type] ![Type] !{#CommonDefs} [(TypeVarInfoPtr,TypeVarInfo)] !*TypeVarHeap -> (!Bool,[(TypeVarInfoPtr,TypeVarInfo)],!*TypeVarHeap)
 unify_instances [t1 : ts1] [t2 : ts2] common_defs subst tvh

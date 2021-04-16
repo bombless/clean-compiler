@@ -1028,8 +1028,7 @@ partitionate_dcl_macro mod_index predef_symbols_for_transform macro_index ps
 				# macros_pi = foldSt (visit_macro mod_index predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
 				-> expand_dcl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 			PartitioningMacro
-	  			# identPos = newPosition macro_def.fun_ident macro_def.fun_pos
-	 			-> { ps &  ps_error = checkError macro_def.fun_ident "recursive macro definition" (setErrorAdmin identPos ps.ps_error)  }
+	 			-> {ps & ps_error = checkErrorIdentWithPosition macro_def.fun_ident macro_def.fun_pos macro_def.fun_ident "recursive macro definition" ps.ps_error}
 	 		_
 	 			-> ps
 		= ps
@@ -1043,8 +1042,7 @@ partitionate_icl_macro mod_index predef_symbols_for_transform macro_index ps
 				# macros_pi = foldSt (visit_macro mod_index predef_symbols_for_transform) macro_def.fun_info.fi_calls ps
 				-> expand_icl_macro_if_simple mod_index macro_index macro_def predef_symbols_for_transform macros_pi
 	 		PartitioningMacro
-	  			# identPos = newPosition macro_def.fun_ident macro_def.fun_pos
-	 			-> { ps &  ps_error = checkError macro_def.fun_ident "recursive macro definition" (setErrorAdmin identPos ps.ps_error)  }
+	 			-> {ps & ps_error = checkErrorIdentWithPosition macro_def.fun_ident macro_def.fun_pos macro_def.fun_ident "recursive macro definition" ps.ps_error}
 	 		_
 	 			-> ps
 		= ps

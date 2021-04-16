@@ -1275,8 +1275,7 @@ checkLeftRootAttributionOfTypeDef common_defs {gi_module,gi_index} (td_infos, th
 	# (is_unique, (td_infos, th_vars))
 			= isUniqueTypeRhs common_defs gi_module td_rhs (td_infos, th_vars)
 	| is_unique
-		= (td_infos, th_vars, checkErrorWithIdentPos (newPosition td_ident td_pos) 
-								" left root * attribute expected" error)
+		= (td_infos, th_vars, checkErrorWithPosition td_ident td_pos " left root * attribute expected" error)
 		= (td_infos, th_vars, error)
 
 isUniqueTypeRhs common_defs mod_index (AlgType constructors) state
