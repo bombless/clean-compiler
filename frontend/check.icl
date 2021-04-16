@@ -21,7 +21,7 @@ where
 	check_type_class module_index opt_icl_info class_index (class_defs, member_defs, type_defs, modules, type_heaps, cs=:{cs_symbol_table,cs_error})
 		| has_to_be_checked module_index opt_icl_info class_index
 			# (class_def=:{class_ident,class_pos,class_args,class_context,class_members}, class_defs) = class_defs![class_index]
-			  cs = {cs & cs_error = setErrorAdmin (newPosition class_ident class_pos) cs_error }
+			  cs & cs_error = setErrorPosition class_ident class_pos cs_error
 			  (class_args, class_context, type_defs, class_defs, modules, type_heaps, cs)
 			  		= checkSuperClasses class_args class_context module_index type_defs class_defs modules type_heaps cs
 			  class_defs = { class_defs & [class_index] = { class_def & class_context = class_context, class_args = class_args }}
@@ -74,8 +74,7 @@ where
 		= (next_inst_index, collected_funtypes, collected_instances, type_defs, class_defs, modules, heaps, cs)
 	check_dcl_functions module_index [fun_type=:{ft_ident,ft_type,ft_pos,ft_specials} : fun_types] fun_index
 			next_inst_index collected_funtypes collected_instances type_defs class_defs modules heaps cs
-		# position = newPosition ft_ident ft_pos
-		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
+		# cs & cs_error = setErrorPosition ft_ident ft_pos cs.cs_error
 		  (ft_type, ft_specials, type_defs, class_defs, modules, hp_type_heaps, cs)
 		  		= checkFunctionType module_index ft_type ft_specials type_defs class_defs modules heaps.hp_type_heaps cs
 		  (spec_types, next_inst_index, collected_instances, heaps, cs_predef_symbols,cs_error)
@@ -116,8 +115,7 @@ where
 	check_function_types :: !DclInstanceMemberTypeAndFunctions !ModuleIndex !v:{#CheckedTypeDef} !w:{#ClassDef} !v:{#DclModule} !*Heaps !*CheckState
 															 -> (![FunType],!v:{#CheckedTypeDef},!w:{#ClassDef},!v:{#DclModule},!*Heaps,!*CheckState)
 	check_function_types (DclInstanceMemberTypes fun_type=:{ft_ident,ft_type,ft_pos,ft_specials} fun_types) module_index type_defs class_defs modules heaps cs
-		# position = newPosition ft_ident ft_pos
-		  cs = { cs & cs_error = setErrorAdmin position cs.cs_error }
+		# cs & cs_error = setErrorPosition ft_ident ft_pos cs.cs_error
 		  (ft_type, ft_specials, type_defs,  class_defs, modules, hp_type_heaps, cs)
 		  		= checkFunctionType module_index ft_type ft_specials type_defs class_defs modules heaps.hp_type_heaps cs
 		  (new_info_ptr, hp_var_heap) = newPtr VI_Empty heaps.hp_var_heap
@@ -179,8 +177,7 @@ where
 	check_class_member module_index opt_icl_info member_index (member_defs, type_defs, class_defs, modules, type_heaps, var_heap, cs)
 		# (member_def=:{me_ident,me_type,me_pos,me_class,me_default_implementation}, member_defs) = member_defs![member_index]
 		| has_to_be_checked opt_icl_info me_class
-			# position = newPosition me_ident me_pos
-			  cs & cs_error = setErrorAdmin position cs.cs_error
+			# cs & cs_error = setErrorPosition me_ident me_pos cs.cs_error
 			  (me_type, type_defs, class_defs, modules, type_heaps, cs)
 					= checkMemberType module_index me_type type_defs class_defs modules type_heaps cs
 			  (me_default_implementation,cs) = check_generic_default me_default_implementation module_index cs
@@ -260,7 +257,7 @@ where
 	check_instance :: !ClassInstance !Index !u:InstanceSymbols !*TypeHeaps !*CheckState -> (!ClassInstance, !u:InstanceSymbols, !*TypeHeaps, !*CheckState)
 	check_instance ins=:{ins_class_ident={ci_ident=Ident {id_name,id_info}},ins_pos,ins_ident} module_index is type_heaps cs=:{cs_symbol_table}
 		#  	({ste_index,ste_kind}, cs_symbol_table) = readPtr id_info cs_symbol_table
-		# 	cs = pushErrorAdmin (newPosition ins_ident ins_pos) { cs & cs_symbol_table = cs_symbol_table }
+		# 	cs = pushErrorPosition ins_ident ins_pos {cs & cs_symbol_table = cs_symbol_table}
 		#   (ins, is, type_heaps, cs) = case ste_kind of
 				STE_Class
 					# (class_def, is) = is!is_class_defs.[ste_index]
@@ -272,7 +269,7 @@ where
 		= (ins, is, type_heaps, popErrorAdmin cs)
 	check_instance ins=:{ins_class_ident={ci_ident=QualifiedIdent module_ident class_name},ins_pos,ins_ident}
 			module_index is type_heaps cs
-		# cs = pushErrorAdmin (newPosition ins_ident ins_pos) cs
+		# cs = pushErrorPosition ins_ident ins_pos cs
 		# (found,{decl_kind,decl_ident=type_ident,decl_index=class_index},cs) = search_qualified_ident module_ident class_name ClassNameSpaceN cs
 		| not found
 			# cs = {cs & cs_error = checkError ("'"+++module_ident.id_name+++"'."+++class_name) "class undefined" cs.cs_error}
@@ -393,7 +390,7 @@ where
 			# class_member = class_members.[class_member_n]
 			| instance_member_n < size ins_members
 				# ins_member = ins_members.[instance_member_n]
-				  cs = setErrorAdmin (newPosition class_ident ins_pos) cs
+				  cs = setErrorPosition class_ident ins_pos cs
 				| ins_member.cim_arity== -1 // already added by add_possible_default_instance
 					# (instance_member_n,ins_members,ins_member_types_and_functions,instance_types,member_defs,type_defs,icl_functions,modules,var_heap,type_heaps,cs)
 						= add_default_instance_or_report_error_for_exported_instance class_member member_mod_index ins_type ins_pos
@@ -936,7 +933,7 @@ where
 				=  ([], [], member_defs, modules, type_heaps, var_heap, cs_error)
 			# class_member = class_members.[mem_offset]
 			  ({me_ident,me_type,me_priority,me_class_vars}, member_defs, modules) = getMemberDef member_mod_index class_member.ds_index module_index member_defs modules
-			  cs_error = pushErrorAdmin (newPosition class_ident ins_pos) cs_error
+			  cs_error = pushErrorPosition class_ident ins_pos cs_error
 			  (instance_type, new_ins_specials, type_heaps, Yes (modules, _), cs_error)
 			  		= determineTypeOfMemberInstance me_type me_class_vars ins_type ins_specials type_heaps (Yes (modules, {}, cUndef)) cs_error
 			  (instance_type, new_ins_specials, member_types, modules, type_heaps, cs_error)
@@ -1163,7 +1160,7 @@ checkFunction :: !FunDef !Index !FunctionOrMacroIndex !Level !Int !*{#FunDef} !*
 checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind,fun_info={fi_properties}} mod_index fun_index def_level local_functions_index_offset
 			fun_defs e_info=:{ef_type_defs,ef_modules,ef_class_defs,ef_is_macro_fun} heaps=:{hp_var_heap,hp_expression_heap,hp_type_heaps,hp_generic_heap} cs=:{cs_error}			
 	# function_ident_for_errors = ident_for_errors_from_fun_symb_and_fun_kind fun_ident fun_kind
-	# cs = {cs & cs_error = pushErrorAdmin (newPosition function_ident_for_errors fun_pos) cs_error}
+	# cs = {cs & cs_error = pushErrorPosition function_ident_for_errors fun_pos cs_error}
 
 	  (fun_type, ef_type_defs, ef_class_defs, ef_modules, hp_var_heap, hp_type_heaps, cs)
 			= check_function_type fun_type mod_index (fun_kind == FK_Caf) ef_type_defs ef_class_defs ef_modules hp_var_heap hp_type_heaps cs
@@ -3221,7 +3218,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 							# icl_functions = {icl_functions & [index_of_member_fun] = function}
 							-> (icl_functions, type_heaps, cs_error)
 						# ({fun_ident,fun_pos},icl_functions) = icl_functions![index_of_member_fun]
-						  cs_error = pushErrorAdmin (newPosition fun_ident fun_pos) cs_error
+						  cs_error = pushErrorPosition fun_ident fun_pos cs_error
 						  cs_error = specified_member_type_incorrect_error err_code cs_error
 						  cs_error = popErrorAdmin cs_error
 						  icl_functions = {icl_functions & [index_of_member_fun].fun_type = Yes derived_symbol_type}
@@ -3439,7 +3436,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
   where
 	add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod modules_in_component_set imports_ikh
 			(mod_index, position) (decls_accu, visited_modules, dcl_modules, cs)
-		# cs = pushErrorAdmin (newPosition import_ident position) cs
+		# cs = pushErrorPosition import_ident position cs
 		  (decls_accu, visited_modules, dcl_modules, cs)
 		  		= add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set imports_ikh
 						mod_index (decls_accu, visited_modules, dcl_modules, cs)
@@ -3473,7 +3470,7 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 				(decls_accu, visited_modules, dcl_modules, cs)
 
 	add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod (decls, position) (decls_accu, dcl_modules, cs)
-		# cs = pushErrorAdmin (newPosition import_ident position) cs
+		# cs = pushErrorPosition import_ident position cs
 		  (decls_accu, dcl_modules, cs) = foldSt (add_expl_imp_declaration opt_macro_range importing_mod) decls (decls_accu, dcl_modules, cs)
 		= (decls_accu, dcl_modules, popErrorAdmin cs)		
 

@@ -26,25 +26,25 @@ where
 
 instance Erroradmin ErrorAdmin
 where
-	pushErrorAdmin pos error=:{ea_loc}
-		= { error & ea_loc = [pos : ea_loc] } 
+	pushErrorPosition ident pos error=:{ea_loc}
+		= {error & ea_loc = [newPosition ident pos : ea_loc]}
 	
-	setErrorAdmin pos error
-		= { error & ea_loc = [pos] } 
+	setErrorPosition ident pos error
+		= {error & ea_loc = [newPosition ident pos]}
 	
 	popErrorAdmin error=:{ea_loc = [_:ea_locs]}
-		=  { error & ea_loc = ea_locs }
+		=  {error & ea_loc = ea_locs}
 
 instance Erroradmin CheckState
 where
-	pushErrorAdmin pos cs=:{cs_error}
-		= {cs & cs_error = pushErrorAdmin pos cs_error } 
+	pushErrorPosition ident pos cs=:{cs_error}
+		= {cs & cs_error = pushErrorPosition ident pos cs_error}
 	
-	setErrorAdmin pos cs=:{cs_error}
-		= {cs & cs_error = setErrorAdmin pos cs_error }
+	setErrorPosition ident pos cs=:{cs_error}
+		= {cs & cs_error = setErrorPosition ident pos cs_error}
 	
 	popErrorAdmin cs=:{cs_error}
-		= {cs & cs_error = popErrorAdmin cs_error } //...PK
+		= {cs & cs_error = popErrorAdmin cs_error}
 
 newPosition :: !Ident !Position -> IdentPos
 newPosition id (FunPos file_name line_nr _)

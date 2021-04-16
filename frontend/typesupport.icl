@@ -296,6 +296,10 @@ errorHeading  error_kind err=:{ea_file,ea_loc = []}
 errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
 	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< loc <<< ':', ea_ok = False }
 
+errorHeadingWithStringPos :: !StringPos !String !*ErrorAdmin -> *ErrorAdmin
+errorHeadingWithStringPos string_pos error_kind err=:{ea_file}
+	= {err & ea_file = ea_file <<< error_kind <<< ' ' <<< string_pos <<< ':', ea_ok = False}
+
 contextError class_symb err
 	# err = errorHeading "Overloading error" err
 	= {err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}

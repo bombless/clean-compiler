@@ -251,12 +251,10 @@ where
 type_error =: "Type error"
 type_error_format =: { form_properties = cNoProperties, form_attr_position = No }
 
-cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[ip:_]}
+cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[{ip_file}:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
-			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
-			  err = errorHeading type_error err
-			  err = popErrorAdmin err
+			# err = errorHeadingWithStringPos {sp_file=ip_file, sp_name=id_name, sp_line=line} type_error err
 			  err = { err & ea_file = err.ea_file <<< " cannot unify demanded type with offered type:\n" }
 			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
 			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
@@ -295,12 +293,10 @@ cannot_unify t1 t2 position common_defs err
 	  ea_file = ea_file <<< " " <:: (type_error_format, t2, No) <<< "\n"
 	= { err & ea_file = ea_file}
 
-existentialError position=:(CP_Expression expr) err=:{ea_loc=[ip:_]} 
+existentialError position=:(CP_Expression expr) err=:{ea_loc=[{ip_file}:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
-			# err = pushErrorAdmin { ip & ip_ident.id_name = id_name, ip_line = line } err
-			  err = errorHeading type_error err
-			  err = popErrorAdmin err
+			# err = errorHeadingWithStringPos {sp_file=ip_file, sp_name=id_name, sp_line=line} type_error err
 			-> { err & ea_file = err.ea_file <<< " attribute variable could not be universally quantified"<<< '\n' }
 		_
 			# err = errorHeading type_error err
@@ -2438,8 +2434,7 @@ where
 	initial_symbol_type is_start_rule common_defs 
 				{fun_type=Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env},fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
 				(pre_def_symbols, ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error})
-		# fe_location = newPosition fun_ident fun_pos
-		  ts_error = setErrorAdmin fe_location ts_error
+		# ts_error = setErrorPosition fun_ident fun_pos ts_error
 		  (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
 				  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = Yes ts_error}
@@ -2645,7 +2640,7 @@ where
 	clean_up_and_check_function_type {fun_ident,fun_kind,fun_pos,fun_type = opt_fun_type} fun is_start_rule list_inferred_types defs type_contexts type_ptrs
 					coercion_env attr_partition type_var_env attr_var_env out ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
-		# ts = { ts & ts_error = setErrorAdmin (newPosition fun_ident fun_pos) ts.ts_error}
+		  ts & ts_error = setErrorPosition fun_ident fun_pos ts.ts_error
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
@@ -3097,10 +3092,10 @@ where
 	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
 		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
 	unify_requirements_within_one_position fun_ident ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
-		# ts_error = setErrorAdmin (newPosition fun_ident tcg_position) ts_error
+		# ts_error = setErrorPosition fun_ident tcg_position ts_error
 		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
 
-	build_initial_coercion_env [{fe_requirements={req_attr_coercions},fe_location} : reqs_list] coercion_env
+	build_initial_coercion_env [{fe_requirements={req_attr_coercions}} : reqs_list] coercion_env
 		= build_initial_coercion_env reqs_list (add_to_initial_coercion_env req_attr_coercions coercion_env)
 	build_initial_coercion_env [] coercion_env
 		= coercion_env
@@ -3135,7 +3130,7 @@ where
 
 	build_coercion_env_for_alternative fun_ident common_defs cons_var_vects {tcg_position, tcg_type_coercions}
 										(subst, coercion_env, type_signs, type_var_heap, error)
-		# error = setErrorAdmin (newPosition fun_ident tcg_position) error
+		# error = setErrorPosition fun_ident tcg_position error
 		= add_to_coercion_env tcg_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 
 	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
@@ -3305,7 +3300,7 @@ where
 		  temp_fun_type = type_of type
 		  ts_var_heap = makeBase fun_ident tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_ident fun_pos
-		  ts_error = setErrorAdmin fe_location ts_error
+		  ts_error = setErrorPosition fun_ident fun_pos ts_error
 //		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error}
 		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],

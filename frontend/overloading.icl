@@ -1807,7 +1807,7 @@ where
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
 			  var_heap = mark_FPC_arguments st_args tb_args var_heap
 			  
-			  error = setErrorAdmin (newPosition fun_ident fun_pos) error
+			  error = setErrorPosition fun_ident fun_pos error
 			  var_heap = store_ambiguous_and_missing_contexts_for_errors error_contexts var_heap
 
 			  (rev_variables,var_heap,error) = foldSt determine_class_argument st_context ([],var_heap,error)

@@ -475,8 +475,7 @@ checkTypeDef type_index module_index class_defs ts=:{ts_type_defs} ti=:{ti_type_
 	# (type_def, ts_type_defs) = ts_type_defs![type_index]
 	# {td_ident,td_pos,td_args,td_attribute,td_index} = type_def
 	| td_index == NoIndex
-		# position = newPosition td_ident td_pos
-		  cs_error = pushErrorAdmin position cs_error
+		# cs_error = pushErrorPosition td_ident td_pos cs_error
 		  (td_attribute, attr_vars, th_attrs) = determine_root_attribute td_attribute td_ident.id_name ti_type_heaps.th_attrs
 		  (type_vars, (attr_vars, ti_type_heaps, cs))
 		  		= addTypeVariablesToSymbolTable cGlobalScope td_args attr_vars { ti_type_heaps & th_attrs = th_attrs } { cs & cs_error = cs_error }

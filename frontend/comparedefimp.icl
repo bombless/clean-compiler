@@ -827,8 +827,7 @@ compareTwoMacroFuns macro_module_index dclIndex iclIndex ec_state=:{ec_icl_funct
 	  			_	-> True
 	| not need_to_be_compared
 		= ec_state
-	# ident_pos = newPosition dcl_function.fun_ident dcl_function.fun_pos
-	  ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
+	# ec_error_admin = pushErrorPosition dcl_function.fun_ident dcl_function.fun_pos ec_state.ec_error_admin
 	  ec_state = { ec_state & ec_error_admin = ec_error_admin }
 	| (dcl_function.fun_info.fi_properties bitand FI_IsMacroFun <> icl_function.fun_info.fi_properties bitand FI_IsMacroFun
 		&& (ec_state.ec_tc_state.tc_strictness_flags bitand CompareGenericCaseMacro==0 && dcl_function.fun_info.fi_properties bitand FI_IsMacroFun<>0)) ||
@@ -846,8 +845,7 @@ compare_generic_case_def_macro_and_function dclIndex iclIndex generic_info ec_st
 	  (icl_function, ec_icl_functions) = ec_icl_functions![iclIndex]
 	  ec_state & ec_icl_correspondences.[iclIndex]=dclIndex, ec_dcl_correspondences.[dclIndex]=iclIndex,
 				 ec_icl_functions = ec_icl_functions,ec_macro_defs=ec_macro_defs
-	  ident_pos = newPosition dcl_function.fun_ident dcl_function.fun_pos
-	  ec_state & ec_error_admin = pushErrorAdmin ident_pos ec_state.ec_error_admin
+	  ec_state & ec_error_admin = pushErrorPosition dcl_function.fun_ident dcl_function.fun_pos ec_state.ec_error_admin
 
 	  dcl_args_and_rhs = from_body dcl_function.fun_body
 	  icl_args_and_rhs = from_body icl_function.fun_body

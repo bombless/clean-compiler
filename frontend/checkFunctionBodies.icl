@@ -190,7 +190,7 @@ checkFunctionBodies :: !FunctionBody !Ident !.ExpressionInput !*ExpressionState 
 checkFunctionBodies (ParsedBody [{pb_args,pb_rhs={rhs_alts,rhs_locals}, pb_position} : bodies]) function_ident_for_errors e_input=:{ei_expr_level,ei_mod_index}
 		e_state=:{es_var_heap, es_fun_defs} e_info cs
 
-	# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
+	# cs = pushErrorPosition function_ident_for_errors pb_position cs
 	  (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 			= check_patterns pb_args {pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False} ([], [])
 				{ps_var_heap = es_var_heap, ps_fun_defs = es_fun_defs} e_info cs
@@ -239,7 +239,7 @@ where
 
 	check_function_bodies free_vars fun_args [{pb_args,pb_rhs={rhs_alts,rhs_locals},pb_position} : bodies]
 							e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_var_heap,es_fun_defs} e_info cs
-		# cs = pushErrorAdmin (newPosition function_ident_for_errors pb_position) cs
+		# cs = pushErrorPosition function_ident_for_errors pb_position cs
 		# (aux_patterns, (var_env, array_patterns), {ps_var_heap,ps_fun_defs}, e_info, cs)
 				= check_patterns pb_args { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
 					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
@@ -564,7 +564,7 @@ where
 
 	check_sequential_let :: [FreeVar] NodeDefWithLocals ExpressionInput *ExpressionState *ExpressionInfo *CheckState -> *(!Expression,!AuxiliaryPattern,!(![Ident],![ArrayPattern]),![FreeVar],!*ExpressionState,!*ExpressionInfo,!*CheckState);
 	check_sequential_let free_vars {ndwl_def={bind_src,bind_dst},ndwl_locals, ndwl_position} e_input=:{ei_expr_level,ei_mod_index,ei_local_functions_index_offset} e_state e_info cs
-		# cs = pushErrorAdmin (newPosition {id_name="<node definition>", id_info=nilPtr} ndwl_position) cs
+		# cs = pushErrorPosition {id_name="<node definition>", id_info=nilPtr} ndwl_position cs
 		  (loc_defs, (loc_env, loc_array_patterns), e_state, e_info, cs) = checkLhssOfLocalDefs ei_expr_level ei_mod_index ndwl_locals ei_local_functions_index_offset e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars bind_src e_input e_state e_info cs
 		  (src_expr, free_vars, e_state, e_info, cs)
@@ -753,7 +753,7 @@ where
 												 -> *(CasePatterns,CasePatterns,[(Bind Ident (Ptr VarInfo))],(Optional ((Optional FreeVar),Expression)),[FreeVar],*ExpressionState,*ExpressionInfo,*CheckState)
 	check_case_alt free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals},calt_position} patterns pattern_scheme pattern_variables defaul case_name 
 				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap,es_dynamics=outer_dynamics} e_info cs
-		# cs = pushErrorAdmin (newPosition {id_name="<case pattern>", id_info=nilPtr} calt_position) cs
+		# cs = pushErrorPosition {id_name="<case pattern>", id_info=nilPtr} calt_position cs
 		  (pattern, (var_env, array_patterns), {ps_fun_defs,ps_var_heap}, e_info, cs)
 				= checkPattern calt_pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], [])
 					{ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs} e_info cs
@@ -979,7 +979,7 @@ checkExpression free_vars (PE_Matches case_ident expr pattern position) e_input=
 	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
 	  {es_fun_defs,es_var_heap,es_expr_heap} = e_state
 	  ps = {ps_var_heap = es_var_heap,ps_fun_defs = es_fun_defs}
-	  cs = pushErrorAdmin (newPosition {id_name="<pattern>", id_info=nilPtr} position) cs
+	  cs = pushErrorPosition {id_name="<pattern>", id_info=nilPtr} position cs
 	  (pattern, (_/*var_env*/, _/*array_patterns*/), {ps_fun_defs,ps_var_heap}, e_info, cs)
 		= checkPattern pattern No { pi_def_level = ei_expr_level, pi_mod_index = ei_mod_index, pi_is_node_pattern = False } ([], []) ps e_info cs
 	  cs = popErrorAdmin cs
@@ -2252,7 +2252,7 @@ convertSubPattern AP_Empty result_expr pattern_position var_store expr_heap opt_
 	= convertSubPattern (AP_WildCard No) EE pattern_position var_store expr_heap opt_dynamics cs
 
 checkAndTransformPatternIntoBind free_vars [{nd_dst,nd_alts,nd_locals,nd_position} : local_defs] e_input=:{ei_expr_level,ei_mod_index} e_state e_info cs
-	# cs = pushErrorAdmin (newPosition {id_name="<node definition>", id_info=nilPtr} nd_position) cs
+	# cs = pushErrorPosition {id_name="<node definition>", id_info=nilPtr} nd_position cs
 	  (bind_src, free_vars, e_state, e_info, cs) = checkRhs free_vars nd_alts nd_locals
 			{e_input & ei_expr_level = ei_expr_level + 1} e_state e_info cs	
 	  (binds_of_bind, es_var_heap, es_expr_heap, e_info, cs)
@@ -2999,11 +2999,11 @@ determinePatternVariable No var_heap
 	# (new_info_ptr, var_heap) = newPtr VI_Empty var_heap
 	= ({ bind_src = newVarId "_x", bind_dst = new_info_ptr }, var_heap)
 
-pushErrorAdmin2 _ NoPos cs=:{cs_error={ea_loc=[top_of_stack:_]}}
+pushErrorAdmin2 _ NoPos cs=:{cs_error={ea_loc=ea_loc=:[top_of_stack:_]}}
 	// there is no position info, push current position to balance pop calls
-	= pushErrorAdmin top_of_stack cs
+	= {cs & cs_error.ea_loc=[top_of_stack:ea_loc]}
 pushErrorAdmin2 string pos=:(LinePos _ _) cs
-	= pushErrorAdmin (newPosition {id_name=string, id_info=nilPtr} pos) cs
+	= pushErrorPosition {id_name=string, id_info=nilPtr} pos cs
 
 allocate_bound_var :: !FreeVar !*ExpressionHeap -> (!BoundVar, !.ExpressionHeap)
 allocate_bound_var {fv_ident, fv_info_ptr} expr_heap

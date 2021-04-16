@@ -970,9 +970,8 @@ reset_body_of_rhs_macros ps_deps fun_defs macro_defs
 
 expand_simple_macro mod_index macro=:{fun_body = CheckedBody body, fun_info, fun_ident, fun_pos,fun_kind}
 		predef_symbols_for_transform ps=:{ps_symbol_table,ps_symbol_heap,ps_var_heap,ps_fun_defs,ps_macro_defs,ps_error}
-  	# identPos = newPosition fun_ident fun_pos
 	# es = { es_symbol_table = ps_symbol_table, es_var_heap = ps_var_heap,
-			 es_expression_heap = ps_symbol_heap, es_error = setErrorAdmin identPos ps_error,
+			 es_expression_heap = ps_symbol_heap, es_error = setErrorPosition fun_ident fun_pos ps_error,
 			 es_fun_defs=ps_fun_defs, es_macro_defs=ps_macro_defs, es_new_fun_def_numbers=[]
 		   }
 	# (tb_args, tb_rhs, local_vars, fi_calls, fi_dynamics,{es_symbol_table, es_var_heap, es_expression_heap, es_error,es_fun_defs,es_macro_defs})
@@ -1516,8 +1515,7 @@ where
 			| es.es_fun_defs.[fun_index].fun_info.fi_properties bitand FI_DefaultMemberWithDerive==0
 				# (fun_def,es) = es!es_fun_defs.[fun_index]
 				  {fun_ident,fun_body = PartitioningFunction body _, fun_info, fun_pos,fun_kind} = fun_def
-				  identPos = newPosition fun_ident fun_pos
-				  es & es_error = setErrorAdmin identPos es.es_error
+				  es & es_error = setErrorPosition fun_ident fun_pos es.es_error
 				  (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
 						= expandMacrosInBody fun_info.fi_calls body pi.pi_predef_symbols_for_transform pi.pi_reset_body_of_rhs_macros es
 				  fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},
@@ -1525,8 +1523,7 @@ where
 				= {es & es_fun_defs.[fun_index] = fun_def}
 				# (fun_def,es) = es!es_fun_defs.[fun_index]
 				  {fun_ident,fun_body = PartitioningFunction body _, fun_info, fun_pos,fun_kind} = fun_def
-				  identPos = newPosition fun_ident fun_pos
-				  es & es_error = setErrorAdmin identPos es.es_error
+				  es & es_error = setErrorPosition fun_ident fun_pos es.es_error
 				#! n_fun_defs_0 = size es.es_fun_defs
 				# (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
 						= expandMacrosInBody fun_info.fi_calls body pi.pi_predef_symbols_for_transform pi.pi_reset_body_of_rhs_macros es
@@ -1540,8 +1537,7 @@ where
 		expand_macros (DclMacroIndex macro_module_index fun_index) es
 			# (old_fun_def,es) = es!es_macro_defs.[macro_module_index,fun_index]
 			  {fun_ident,fun_body = PartitioningFunction body _, fun_info, fun_pos,fun_kind} = old_fun_def
-		  	  identPos = newPosition fun_ident fun_pos
-			#  es={ es & es_error = setErrorAdmin identPos es.es_error }
+			  es & es_error = setErrorPosition fun_ident fun_pos es.es_error
 			# (tb_args, tb_rhs, fi_local_vars, fi_calls,fi_dynamics, es)
 					= expandMacrosInBody fun_info.fi_calls body pi.pi_predef_symbols_for_transform pi.pi_reset_body_of_rhs_macros es
 			  fun_def = { old_fun_def & fun_body = TransformedBody { tb_args = tb_args, tb_rhs = tb_rhs},

@@ -29,7 +29,7 @@ where
 		
 	check_generic index mod_index gen_defs type_defs class_defs modules heaps cs
 		# (gen_def=:{gen_ident, gen_pos}, gen_defs) = gen_defs![index]
-		# cs = pushErrorAdmin (newPosition gen_ident gen_pos) cs
+		# cs = pushErrorPosition gen_ident gen_pos cs
 
 		# (gen_def, heaps) = alloc_gen_info gen_def heaps
 
@@ -230,7 +230,7 @@ where
 		# (case_def=:{gc_pos,gc_type,gc_gcf}, gen_case_defs) = gen_case_defs![index]
 		= case gc_gcf of
 			GCF gc_ident gcf=:{gcf_gident}
-				# cs = pushErrorAdmin (newPosition gc_ident gc_pos) cs
+				# cs = pushErrorPosition gc_ident gc_pos cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
 					= check_instance_type mod_index gc_type type_defs modules heaps cs
 				# (generic_gi, cs) = get_generic_index gcf_gident mod_index cs
@@ -242,7 +242,7 @@ where
 				# cs = popErrorAdmin cs
 				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
 			GCFS gcfs
-				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# cs = pushErrorPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
 				 	= check_instance_type mod_index gc_type type_defs modules heaps cs 
 				| not cs.cs_error.ea_ok
@@ -254,7 +254,7 @@ where
 				# gen_case_defs = {gen_case_defs & [index] = case_def}
 				-> (gen_case_defs, generic_defs, type_defs, class_defs, modules, heaps, cs)
 			GCFC _ gcfc_class_ident=:{id_info}
-				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# cs = pushErrorPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
 				 	= check_instance_type mod_index gc_type type_defs modules heaps cs 
 				| not cs.cs_error.ea_ok
@@ -283,7 +283,7 @@ where
 						  cs = popErrorAdmin cs
 						= (gen_case_defs,cs)
 			GCFCExcept _ gcfc_class_ident=:{id_info} except_class_names
-				# cs = pushErrorAdmin (newPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos) cs
+				# cs = pushErrorPosition {id_name="derive generic superclass",id_info=nilPtr} gc_pos cs
 				# (gc_type, gc_type_cons, type_defs, modules, heaps, cs)
 					= check_instance_type mod_index gc_type type_defs modules heaps cs
 				| not cs.cs_error.ea_ok

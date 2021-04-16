@@ -284,7 +284,7 @@ where
 			| mark < cMAXINT
 				| is_synonym_or_new_type td_rhs
 					# marks = { marks & [gi_module,gi_index] = cChecking }
-					  error = pushErrorAdmin (newPosition td_ident td_pos) error
+					  error = pushErrorPosition td_ident td_pos error
 					  (group, marks, error) = check_cyclic_type_defs td_used_types type_defs [td : group] marks error
 					  error = popErrorAdmin error
 					= (group, { marks & [gi_module,gi_index] = cMAXINT }, error)
@@ -705,7 +705,7 @@ where
 	anal_type_def modules gi=:{gi_module,gi_index} (group_properties, conds, as=:{as_error})
 		# {com_type_defs,com_cons_defs} = modules.[gi_module]
 		  {td_ident,td_pos,td_args,td_rhs} = com_type_defs.[gi_index]
-		  as_error = pushErrorAdmin (newPosition td_ident td_pos) as_error
+		  as_error = pushErrorPosition td_ident td_pos as_error
 		  (type_properties, (conds, as)) = anal_rhs_of_type_def modules com_cons_defs td_rhs (conds, {as & as_error = as_error})
 		= (combineTypeProperties group_properties type_properties, conds, {as & as_error = popErrorAdmin as.as_error })
 	where
@@ -833,7 +833,7 @@ where
 					= as
 			with
 				check_abstract_type spec_properties td_ident td_args td_pos as
-					# as_error = pushErrorAdmin (newPosition td_ident td_pos) as.as_error
+					# as_error = pushErrorPosition td_ident td_pos as.as_error
 					| check_coercibility spec_properties properties
 						| check_hyperstrictness spec_properties properties
 							| spec_properties bitand cIsNonCoercible == 0
@@ -935,7 +935,7 @@ where
 			  {class_args,class_context,class_members,class_arity,class_pos,class_ident} = com_class_defs.[class_index]
 			  (class_kind_vars, as_kind_heap) = fresh_kind_vars class_arity [] as.as_kind_heap
 			  (as_type_var_heap,as_kind_heap) = bind_kind_vars class_args class_kind_vars as.as_type_var_heap as_kind_heap
-			  as_error = pushErrorAdmin (newPosition class_ident class_pos) as.as_error
+			  as_error = pushErrorPosition class_ident class_pos as.as_error
 			  class_infos = { class_infos & [class_module,class_index] = cyclicClassInfoMark }
 			  (class_infos, as) = determine_kinds_of_context_classes class_context (class_infos,
 			  								{ as & as_kind_heap = as_kind_heap, as_type_var_heap = as_type_var_heap, as_error = as_error })
@@ -1105,7 +1105,7 @@ where
 		check_kinds_of_class_instance :: !{#CommonDefs} !ClassInstance  !*ClassDefInfos !*AnalyseState -> (!*ClassDefInfos, !*AnalyseState)
 		check_kinds_of_class_instance common_defs {ins_class_index,ins_class_ident={ci_ident=Ident class_ident,ci_arity},ins_ident,ins_pos,ins_type={it_vars,it_types,it_context}} class_infos
 					as=:{as_type_var_heap,as_kind_heap,as_error}
-			# as_error = pushErrorAdmin (newPosition ins_ident ins_pos) as_error
+			# as_error = pushErrorPosition ins_ident ins_pos as_error
 			  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVars it_vars as_type_var_heap as_kind_heap
 			  as = { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap, as_error = as_error }
 			  ins_class = {glob_module=ins_class_index.gi_module,glob_object={ds_index=ins_class_index.gi_index,ds_ident=class_ident,ds_arity=ci_arity}}
@@ -1121,7 +1121,7 @@ where
 	where
 		check_kinds_of_generic :: !{#CommonDefs} !GenericDef  !*ClassDefInfos !*GenericHeap !*AnalyseState -> (!*ClassDefInfos, !*GenericHeap, !*AnalyseState)
 		check_kinds_of_generic common_defs {gen_type, gen_ident, gen_pos, gen_vars, gen_info_ptr} class_infos gen_heap as					
-			# as = {as & as_error = pushErrorAdmin (newPosition gen_ident gen_pos) as.as_error}
+			# as = {as & as_error = pushErrorPosition gen_ident gen_pos as.as_error}
 			# (class_infos, as) = check_kinds_of_symbol_type common_defs gen_type class_infos as			
 			# (kinds, as) = mapSt retrieve_tv_kind gen_type.st_vars as
 			# as = check_kinds_of_generic_vars (take (length gen_vars) kinds) as
@@ -1173,7 +1173,7 @@ where
 		  (expression_heap,class_infos,as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap class_infos as
 		= case fun_type of
 			Yes symbol_type
-				# as_error = pushErrorAdmin (newPosition fun_ident fun_pos) as.as_error
+				# as_error = pushErrorPosition fun_ident fun_pos as.as_error
 				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos { as & as_error = as_error }
 				-> (icl_fun_defs, class_infos, expression_heap, { as & as_error = popErrorAdmin as.as_error })
 			No
@@ -1187,7 +1187,7 @@ where
 	where
 		check_kinds_of_dcl_fuction common_defs dcl_functions fun_index (class_infos, as)
 			# {ft_type,ft_ident,ft_pos} = dcl_functions.[fun_index]
-			  as_error = pushErrorAdmin (newPosition ft_ident ft_pos) as.as_error
+			  as_error = pushErrorPosition ft_ident ft_pos as.as_error
 			  (class_infos, as) = check_kinds_of_symbol_type common_defs ft_type class_infos {as & as_error = as_error}
 			= (class_infos, { as & as_error = popErrorAdmin as.as_error})
 

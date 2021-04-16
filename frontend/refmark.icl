@@ -854,9 +854,9 @@ where
 	# variables = tb_args ++ fi_local_vars
 	  (subst, type_def_infos, var_heap, expr_heap) = clear_occurrences variables subst type_def_infos var_heap expr_heap
 	  {rms_var_heap} = fullRefMarkOfRootOrLetExpr [tb_args] NotASelector No (tb_rhs ===> ("makeSharedReferencesNonUnique", fun_ident, tb_rhs)) [] var_heap
-	  position = newPosition fun_ident fun_pos
+	  error = setErrorPosition fun_ident fun_pos error
 	  (coercion_env, var_heap, expr_heap, error)
-		= make_shared_vars_non_unique variables fun_body coercion_env rms_var_heap expr_heap (setErrorAdmin position error)
+		= make_shared_vars_non_unique variables fun_body coercion_env rms_var_heap expr_heap error
 	#! var_heap = empty_occurrences variables var_heap
 	= (coercion_env, subst, type_def_infos, var_heap, expr_heap, error)
 	where

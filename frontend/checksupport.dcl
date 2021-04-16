@@ -57,8 +57,8 @@ cConversionTableSize	:== 10
 
 class Erroradmin state
 where
-	pushErrorAdmin :: !IdentPos *state -> *state
-	setErrorAdmin :: !IdentPos *state -> *state
+	pushErrorPosition :: !Ident !Position *state -> *state
+	setErrorPosition :: !Ident !Position *state -> *state
 	popErrorAdmin  :: *state -> *state
 
 instance Erroradmin ErrorAdmin, CheckState
