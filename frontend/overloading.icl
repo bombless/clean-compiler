@@ -1306,7 +1306,7 @@ where
 	specialized_types_in_context_match _ _ type_var_heap
 		= (False,type_var_heap);
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os
 	# (reduced_calls, contexts, coercion_env, type_pattern_vars, os) = foldSt (reduce_contexts_of_applications_in_function defs instance_info) ocs ([], [], coercion_env, [], os)
@@ -1319,10 +1319,10 @@ tryToSolveOverloading ocs main_dcl_module_n defs instance_info coercion_env os
 		= (contexts, coercion_env, type_pattern_vars, dict_types, {os & os_type_heaps = hp_type_heaps, os_symbol_heap = hp_expression_heap, os_var_heap = hp_var_heap, os_generic_heap = hp_generic_heap, os_error = os_error})
 		= ([], coercion_env, type_pattern_vars, [], os)
 where
-	reduce_contexts_of_applications_in_function :: {#CommonDefs} ClassInstanceInfo (.a, [ExprInfoPtr], .b, Index)
+	reduce_contexts_of_applications_in_function :: {#CommonDefs} ClassInstanceInfo (.a, [ExprInfoPtr], Index)
 		   ([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
 		-> ([(SymbIdent,Index,ExprInfoPtr,[ClassApplication])], ![TypeContext], !*Coercions, ![LocalTypePatternVariable], !*OverloadingState)
-	reduce_contexts_of_applications_in_function defs instance_info (opt_spec_contexts, expr_ptrs, pos, index) state
+	reduce_contexts_of_applications_in_function defs instance_info (opt_spec_contexts, expr_ptrs, index) state
 		= foldSt (reduce_contexts_of_application index defs instance_info) expr_ptrs state
 
 	reduce_contexts_of_application :: !Index !{#CommonDefs} !ClassInstanceInfo  !ExprInfoPtr
@@ -1430,9 +1430,9 @@ where
 		add_contexts_of_constructor [] new_contexts predef_symbols var_heap
 			= (new_contexts,[],predef_symbols,var_heap)
 
-	add_specified_contexts (Yes spec_context, expr_ptrs, pos, index) (contexts,var_heap)
+	add_specified_contexts (Yes spec_context, expr_ptrs, index) (contexts,var_heap)
 		= add_contexts spec_context contexts var_heap
-	add_specified_contexts (No, expr_ptrs, pos, index) (contexts,var_heap)
+	add_specified_contexts (No, expr_ptrs, index) (contexts,var_heap)
 		= (contexts,var_heap)
 
 	add_contexts contexts all_contexts var_heap

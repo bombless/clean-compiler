@@ -42,7 +42,7 @@ from check_instances import ::SortedInstances
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], IdentPos, Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
+tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
 	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
 
 ::	TypeCodeInfo =

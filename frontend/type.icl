@@ -3181,11 +3181,11 @@ where
 	collect_and_expand_overloaded_calls [{fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
 		# (_, context, subst) = arraySubst context subst
 		  subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs (subst, expr_heap)
-		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_location, fe_index) : calls]
+		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap)
 	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls subst_expr_heap
 		# subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs subst_expr_heap
-		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_location, fe_index) : calls]
+		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap) 
 
 	expand_type_contexts over_info_ptr (subst, expr_heap)
@@ -3301,8 +3301,7 @@ where
 		  ts_var_heap = makeBase fun_ident tb_args temp_fun_type.tst_args ts_var_heap
 		  fe_location = newPosition fun_ident fun_pos
 		  ts_error = setErrorPosition fun_ident fun_pos ts_error
-//		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error}
-		  ts = { ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env}
+		  ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
 		  			 req_attr_coercions = [], req_case_and_let_exprs = [] }
 		  (rhs_type, rhs_expr_ptr, (rhs_reqs, ts)) = requirements ti tb_rhs (reqs, ts)
