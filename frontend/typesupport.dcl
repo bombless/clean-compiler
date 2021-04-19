@@ -5,7 +5,7 @@ import checksupport,utilities
 from unitype import ::Coercions, ::CoercionTree, ::AttributePartition, CT_Empty
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
-errorHeadingWithStringPos :: !StringPos !String !*ErrorAdmin -> *ErrorAdmin
+errorHeadingWithPositionNameAndLine :: !String !Position !String !Int !*ErrorAdmin -> *ErrorAdmin
 
 (<::) infixl :: !*File !(!Format, !a, !Optional TypeVarBeautifulizer) -> *File | writeType a
 

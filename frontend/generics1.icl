@@ -5447,14 +5447,9 @@ where
 			= No
 	*/
 
-reportError name pos msg error=:{ea_file} 
-	# ea_file = ea_file <<< "Error " <<< (stringPosition name pos) <<< ":" <<< msg <<< '\n'
-	= { error & ea_file = ea_file , ea_ok = False }
+reportError name pos msg error
+	:== checkErrorWithStringPosition name pos msg error
 
-reportWarning name pos msg error=:{ea_file}
-	# ea_file = ea_file <<< "Warning " <<< (newPosition name pos) <<< ":" <<< msg <<< '\n'
-	= { error & ea_file = ea_file }
-	
 //	Type Helpers
 
 makeAType :: !Type !TypeAttribute -> AType

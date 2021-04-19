@@ -1713,7 +1713,7 @@ checkErrorWithOptionalPosition ident position error_message cs_error
 checkStringErrorWithOptionalPosition string NoPos error_message cs_error
 	= checkError string error_message cs_error
 checkStringErrorWithOptionalPosition string position error_message cs_error
-	= checkStringErrorWithPosition string position error_message cs_error
+	= checkErrorWithStringPosition string position error_message cs_error
 
 checkPattern :: !ParsedExpr !(Optional (Bind Ident VarInfoPtr)) !PatternInput !(![Ident], ![ArrayPattern]) !*PatternState !*ExpressionInfo !*CheckState
 									-> (!AuxiliaryPattern, !(![Ident], ![ArrayPattern]), !*PatternState, !*ExpressionInfo, !*CheckState)

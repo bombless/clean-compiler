@@ -25,7 +25,9 @@ cNeedStdStrictMaybes	:== 64
 	,	hp_generic_heap		::!.GenericHeap
 	}
 
-::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![IdentPos], ea_ok :: !Bool }
+::	ErrorPosition = { ep_ident :: !Ident, ep_position :: !Position }
+
+::	ErrorAdmin = { ea_file :: !.File, ea_loc :: ![ErrorPosition], ea_ok :: !Bool }
 
 ::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,cs_x :: !.CheckStateX }
 
@@ -63,7 +65,6 @@ where
 
 instance Erroradmin ErrorAdmin, CheckState
 
-newPosition :: !Ident !Position -> IdentPos 
 stringPosition :: !String !Position -> StringPos
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
@@ -77,7 +78,7 @@ checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a
 	special a={#Char};
 checkErrorWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a
 	special a={#Char};
-checkStringErrorWithPosition :: !{#Char} !Position !a !*ErrorAdmin -> *ErrorAdmin | <<< a
+checkErrorWithStringPosition :: !{#Char} !Position !a !*ErrorAdmin -> *ErrorAdmin | <<< a
 	special a={#Char};
 checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 
@@ -92,6 +93,7 @@ instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
 instance <<< IdentPos, StringPos
+writePositionModuleName :: !Position !*File -> *File
 
 ::	ExpressionInfo =
 	{	ef_type_defs		:: !.{# CheckedTypeDef}

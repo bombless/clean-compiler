@@ -291,14 +291,17 @@ where
 		= (cur, [t:ts], env)
 
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
-errorHeading  error_kind err=:{ea_file,ea_loc = []}
+errorHeading error_kind err=:{ea_file,ea_loc = []}
 	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }
-errorHeading  error_kind err=:{ea_file,ea_loc = [ loc : _ ]}
-	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< loc <<< ':', ea_ok = False }
+errorHeading error_kind err=:{ea_file,ea_loc = [{ep_ident,ep_position} : _ ]}
+	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< stringPosition ep_ident.id_name ep_position <<< ':', ea_ok = False }
 
-errorHeadingWithStringPos :: !StringPos !String !*ErrorAdmin -> *ErrorAdmin
-errorHeadingWithStringPos string_pos error_kind err=:{ea_file}
-	= {err & ea_file = ea_file <<< error_kind <<< ' ' <<< string_pos <<< ':', ea_ok = False}
+errorHeadingWithPositionNameAndLine :: !String !Position !String !Int !*ErrorAdmin -> *ErrorAdmin
+errorHeadingWithPositionNameAndLine error_kind pos ident_name line_n err=:{ea_file}
+	# ea_file = (writePositionModuleName pos (ea_file <<< error_kind <<< " [")) <<< ','
+	| line_n == cNotALineNumber
+		= {err & ea_file = ea_file <<< ident_name <<< "]:", ea_ok = False}
+		= {err & ea_file = ea_file <<< line_n <<< ',' <<< ident_name <<< "]:", ea_ok = False}
 
 contextError class_symb err
 	# err = errorHeading "Overloading error" err

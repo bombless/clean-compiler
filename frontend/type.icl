@@ -251,10 +251,10 @@ where
 type_error =: "Type error"
 type_error_format =: { form_properties = cNoProperties, form_attr_position = No }
 
-cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[{ip_file}:_]}
+cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[{ep_position}:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
-			# err = errorHeadingWithStringPos {sp_file=ip_file, sp_name=id_name, sp_line=line} type_error err
+			# err = errorHeadingWithPositionNameAndLine type_error ep_position id_name line err
 			  err = { err & ea_file = err.ea_file <<< " cannot unify demanded type with offered type:\n" }
 			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
 			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
@@ -293,10 +293,10 @@ cannot_unify t1 t2 position common_defs err
 	  ea_file = ea_file <<< " " <:: (type_error_format, t2, No) <<< "\n"
 	= { err & ea_file = ea_file}
 
-existentialError position=:(CP_Expression expr) err=:{ea_loc=[{ip_file}:_]}
+existentialError position=:(CP_Expression expr) err=:{ea_loc=[{ep_position}:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
-			# err = errorHeadingWithStringPos {sp_file=ip_file, sp_name=id_name, sp_line=line} type_error err
+			# err = errorHeadingWithPositionNameAndLine type_error ep_position id_name line err
 			-> { err & ea_file = err.ea_file <<< " attribute variable could not be universally quantified"<<< '\n' }
 		_
 			# err = errorHeading type_error err
@@ -2830,7 +2830,7 @@ where
 	{	fe_requirements	:: !Requirements
 	,	fe_context		:: !Optional [TypeContext]
 	,	fe_index		:: !Index
-	,	fe_location		:: !IdentPos
+	,	fe_ident		:: !Ident
 	}
 
 typeProgram :: !{! Group} !Int !*{# FunDef} !IndexRange  !(Optional Bool) !CommonDefs ![!GlobalInstanceIndex!] !{# DclModule} !NumberSet
@@ -3081,8 +3081,8 @@ where
 			= {err & ea_file = err.ea_file <<< "* annotated type " <<< type_name <<< " occurs non unique in inferred function type"<<< '\n'}
 
 	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
-	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] ti subst heaps ts_error
-		# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position ip_ident ti) (reverse req_type_coercion_groups) (subst, heaps, ts_error)
+	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] ti subst heaps ts_error
+		# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position fe_ident ti) (reverse req_type_coercion_groups) (subst, heaps, ts_error)
 		= unify_requirements_of_functions reqs_list ti subst heaps ts_error
 	unify_requirements_of_functions [] ti subst heaps ts_error
 		= (subst, heaps, ts_error)
@@ -3119,9 +3119,9 @@ where
 					-> (bitvects, subst)
 
 	build_coercion_env :: [FunctionRequirements] *{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!.{!Type},!.Coercions,!.{#.{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin);
-	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_location={ip_ident}} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		# (subst, coercion_env, type_signs, type_var_heap, error)
-			= foldSt (build_coercion_env_for_alternative ip_ident common_defs cons_var_vects)
+			= foldSt (build_coercion_env_for_alternative fe_ident common_defs cons_var_vects)
 					req_type_coercion_groups
 					(subst, coercion_env, type_signs, type_var_heap, error)
 		= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
@@ -3178,12 +3178,12 @@ where
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
-	collect_and_expand_overloaded_calls [{fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls (subst, expr_heap)
+	collect_and_expand_overloaded_calls [{fe_context=Yes context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_index}:reqs] calls (subst, expr_heap)
 		# (_, context, subst) = arraySubst context subst
 		  subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs (subst, expr_heap)
 		= collect_and_expand_overloaded_calls reqs [(Yes context, req_overloaded_calls, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap)
-	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_location, fe_index}:reqs] calls subst_expr_heap
+	collect_and_expand_overloaded_calls [{fe_context, fe_requirements={req_overloaded_calls,req_case_and_let_exprs}, fe_index}:reqs] calls subst_expr_heap
 		# subst_expr_heap = expand_case_or_let_types req_case_and_let_exprs subst_expr_heap
 		= collect_and_expand_overloaded_calls reqs [(fe_context, req_overloaded_calls, fe_index) : calls]
 				(foldSt expand_type_contexts req_overloaded_calls subst_expr_heap) 
@@ -3299,7 +3299,6 @@ where
 		  {fun_ident,fun_arity,fun_body=TransformedBody {tb_args,tb_rhs},fun_pos, fun_info, fun_type} = fd
 		  temp_fun_type = type_of type
 		  ts_var_heap = makeBase fun_ident tb_args temp_fun_type.tst_args ts_var_heap
-		  fe_location = newPosition fun_ident fun_pos
 		  ts_error = setErrorPosition fun_ident fun_pos ts_error
 		  ts & ts_var_heap = ts_var_heap, ts_error = ts_error, ts_fun_defs = ts_fun_defs, ts_fun_env = ts_fun_env
 		  reqs = { req_overloaded_calls = [], req_type_coercion_groups = [], req_type_coercions = [],
@@ -3310,7 +3309,7 @@ where
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
 		  type_coercion_group_from_accu = { tcg_type_coercions = req_type_coercions, tcg_position = fun_pos }
 		  req_type_coercion_groups = [type_coercion_group_from_accu:rhs_reqs.req_type_coercion_groups]
-		= ( { fe_location = fe_location, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
+		= ( { fe_ident = fun_ident, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
 			  fe_requirements = { rhs_reqs & req_type_coercions = [], req_type_coercion_groups = req_type_coercion_groups }
 		    },
 		    {ts & ts_expr_heap = ts_expr_heap})
