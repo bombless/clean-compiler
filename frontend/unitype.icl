@@ -1015,9 +1015,6 @@ uniquenessErrorVar free_var=:{fv_info_ptr} (TransformedBody {tb_args,tb_rhs}) me
 		LinePos file_name line_n
 			# ea_file = err.ea_file <<< "Uniqueness error " <<< {sp_file=file_name,sp_line=line_n,sp_name=free_var.fv_ident.id_name} <<< '\"' <<< mess <<< '\n'
 			-> { err & ea_file = ea_file, ea_ok = False}
-		FunPos file_name line_n fun_name
-			# ea_file = err.ea_file <<< "Uniqueness error " <<< {sp_file=file_name,sp_line=line_n,sp_name=free_var.fv_ident.id_name} <<< '\"' <<< mess <<< '\n'
-			-> { err & ea_file = ea_file, ea_ok = False}			
 		_
 			-> uniquenessError (CP_Expression (FreeVar free_var)) mess err
 

@@ -816,7 +816,6 @@ where
 
 instance <<< Position
 where
-	(<<<) file (FunPos file_name line func) = file <<< '[' <<< file_name <<< ',' <<< line <<< ',' <<< func <<< ']'
 	(<<<) file (LinePos file_name line) = file <<< '[' <<< file_name <<< ',' <<< line <<< ']'
 	(<<<) file _ = file
 

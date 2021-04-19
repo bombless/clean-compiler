@@ -1469,8 +1469,7 @@ instance == OverloadedPatternType
 	error handling
 */
 
-:: Position			= FunPos  FileName LineNr FunctName
-					| LinePos FileName LineNr
+:: Position			= LinePos FileName LineNr
 					| PreDefPos Ident
 					| NoPos
 

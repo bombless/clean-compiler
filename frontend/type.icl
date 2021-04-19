@@ -1981,8 +1981,6 @@ where
 		  where
 			is_same_position (LinePos _ line_nr1) (LinePos _ line_nr2)
 				= line_nr1==line_nr2
-			is_same_position (FunPos _ line_nr1 _) (FunPos _ line_nr2 _)
-				= line_nr1==line_nr2
 			is_same_position _ _
 				= False
 

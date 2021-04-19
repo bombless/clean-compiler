@@ -75,20 +75,14 @@ instance toParsedExpr Int where
 		=	PE_Basic (BVInt x)
 
 postParseError :: Position {#Char} *CollectAdmin -> *CollectAdmin
-postParseError pos msg ps=:{ca_error={pea_file}}
-	# (filename, line, funname) = get_file_and_line_nr pos
-	  pea_file	= pea_file <<< "Error [" <<< filename <<< "," <<< line
-	  pea_file	= case funname of
-	  				Yes name	-> pea_file <<< "," <<< name
-	  				No			-> pea_file
-	  pea_file	= pea_file <<< "]: " <<< msg <<< ".\n"
+postParseError (LinePos filename line_n) msg ps=:{ca_error={pea_file}}
+	# pea_file	= pea_file <<< "Error [" <<< filename <<< "," <<< line_n <<< "]: " <<< msg <<< ".\n"
 	= {ps & ca_error = { pea_file = pea_file, pea_ok = False }}
-where
-	get_file_and_line_nr :: Position -> (FileName, LineNr, Optional FunctName)
-	get_file_and_line_nr (FunPos filename linenr funname)
-		= (filename, linenr, Yes funname)
-	get_file_and_line_nr (LinePos filename linenr)
-		= (filename, linenr, No)
+
+postParseFunError :: Ident Position {#Char} *CollectAdmin -> *CollectAdmin
+postParseFunError {id_name=name} (LinePos filename line_n) msg ps=:{ca_error={pea_file}}
+	# pea_file = pea_file <<< "Error [" <<< filename <<< "," <<< line_n <<< "," <<< name <<< "]: " <<< msg <<< ".\n"
+	= {ps & ca_error = { pea_file = pea_file, pea_ok = False }}
 
 addFunctionsRange :: [FunDef] *CollectAdmin -> (IndexRange, *CollectAdmin)
 addFunctionsRange fun_defs ca
@@ -129,7 +123,7 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	= case defs of
 		[PD_Function pos name is_infix args rhs fun_kind : othe]
 			| fun_kind=:FK_Caf
-				# ca = postParseError pos "No typespecification for local graph definitions allowed" ca
+				# ca = postParseFunError name pos "No typespecification for local graph definitions allowed" ca
 				-> reorganiseLocalDefinitions (tl defs) ca
 			| belongsToTypeSpec name1 prio name is_infix
 				# fun_arity = determineArity args type
@@ -137,19 +131,19 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 				  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 				  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type pos1
 				-> ([fun : fun_defs], node_defs, ca)
-				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+				-> reorganiseLocalDefinitions defs (postParseFunError name pos "function body expected" ca)
 		[PD_NodeDef pos pattern=:(PE_Ident id) rhs : defs]
 			| not (belongsToTypeSpec name1 prio id False)
-				-> reorganiseLocalDefinitions defs (postParseError pos "function body expected" ca)
+				-> reorganiseLocalDefinitions defs (postParseFunError id pos "function body expected" ca)
 			| arity type<>0
-				-> reorganiseLocalDefinitions defs (postParseError pos "this alternative has not enough arguments" ca)
+				-> reorganiseLocalDefinitions defs (postParseFunError id pos "this alternative has not enough arguments" ca)
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 			  fun = MakeNewImpOrDefFunction id 0
 							[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
 							(FK_Function cNameNotLocationDependent) prio type pos1
 			-> ([fun : fun_defs], node_defs, ca)
 		_
-			-> reorganiseLocalDefinitions defs (postParseError pos1 "function body expected" ca)
+			-> reorganiseLocalDefinitions defs (postParseFunError name1 pos1 "function body expected" ca)
   where
 	arity (Yes {st_arity}) = st_arity
 	arity No = 2 // it was specified as infix
@@ -214,7 +208,7 @@ where
 			# fun_def & fun_arity=fun_arity
 			| fun_ident.id_name==gident.id_name && equal_derivable_TypeCons gc_type_cons type_cons
 				= ([fun_def:fun_defs],[derived_function_index:derived_function_indices],ca)
-				# ca = postParseError fun_pos "not the same name and type as generic instance definition" ca
+				# ca = postParseFunError fun_ident fun_pos "not the same name and type as generic instance definition" ca
 				= ([fun_def:fun_defs],[derived_function_index:derived_function_indices],ca)
 		collect_functions_of_generic_local_functions [] derived_function_index icl_module ca
 			= ([],[],ca)
@@ -1264,25 +1258,25 @@ collectFunctionBodies :: !Ident !Int !Priority !FunKind ![ParsedDefinition] !*Co
 	-> (![ParsedBody], !FunKind, ![ParsedDefinition], !*CollectAdmin)
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind all_defs=:[PD_Function pos name is_infix args rhs new_fun_kind : defs] ca
 	| belongsToTypeSpec fun_name fun_prio name is_infix
-		# (new_fun_kind, ca) = combine_fun_kinds pos fun_kind new_fun_kind ca
+		# (new_fun_kind, ca) = combine_fun_kinds fun_kind new_fun_kind name pos ca
 		  (bodies, new_fun_kind, rest_defs, ca) = collectFunctionBodies fun_name fun_arity fun_prio new_fun_kind defs ca
 		  act_arity	= length args
 		| fun_arity == act_arity
 			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, ca)
 			= ([{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ], new_fun_kind, rest_defs, 
-			    postParseError pos	("This alternative has " + toString act_arity +
+			    postParseFunError name pos ("This alternative has " + toString act_arity +
 			  						 (if (act_arity == 1)" argument instead of " " arguments instead of ") + toString fun_arity
 			  						) ca
 			  )
 		= ([], fun_kind, all_defs, ca)
 	where
-		combine_fun_kinds :: Position FunKind FunKind *CollectAdmin -> (FunKind, *CollectAdmin)
-		combine_fun_kinds pos FK_Unknown fun_kind ca
+		combine_fun_kinds :: FunKind FunKind Ident Position *CollectAdmin -> (FunKind, *CollectAdmin)
+		combine_fun_kinds FK_Unknown fun_kind name pos ca
 			= (fun_kind, ca)
-		combine_fun_kinds pos fun_kind new_fun_kind ca
+		combine_fun_kinds fun_kind new_fun_kind name pos ca
 			| fun_kind == new_fun_kind
 				= (fun_kind, ca)
-				= (fun_kind, postParseError pos "illegal combination of function alternatives" ca)
+				= (fun_kind, postParseFunError name pos "illegal combination of function alternatives" ca)
 collectFunctionBodies fun_name fun_arity fun_prio fun_kind defs ca
 	= ([], fun_kind, defs, ca)
 
@@ -1297,7 +1291,7 @@ collectGenericBodies all_defs=:[PD_GenericCase gc=:{gc_gcf=GCF gc_ident2 gcf} _ 
 			= ([body : bodies], generic_info, rest_defs, ca)
 			#! msg = "This generic alternative has " +++ toString gcf_arity +++ " argument" 
 					 +++ (if (gcf_arity <> 1) "s" "")+++" instead of " +++ toString gcf_arity1
-			#! ca = postParseError gc.gc_pos msg ca	
+			#! ca = postParseFunError gc_ident2 gc.gc_pos msg ca
 			= ([body : bodies], generic_info, rest_defs, ca)
 		= ([], 0, all_defs, ca)
 collectGenericBodies defs gc_ident1 gcf_arity1 gc_type_cons1 ca
@@ -1490,10 +1484,9 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 	= case defs of
 		[PD_Function pos name is_infix args rhs fun_kind : defs]
 			| fun_name <> name
-				-> reorganiseDefinitions icl_module defs def_counts (postParseError fun_pos ("function alternative for "+++fun_name.id_name+++" expected") ca)
+				-> reorganiseDefinitions icl_module defs def_counts (postParseFunError fun_name fun_pos ("function alternative for "+++fun_name.id_name+++" expected") ca)
 			| not (sameFixity prio is_infix)
-				-> reorganiseDefinitions icl_module defs def_counts (postParseError fun_pos "infix of type specification and alternative should match" ca)
-			//	| belongsToTypeSpec fun_name prio name is_infix
+				-> reorganiseDefinitions icl_module defs def_counts (postParseFunError fun_name fun_pos "infix of type specification and alternative should match" ca)
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 				  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No fun_pos
@@ -1503,9 +1496,8 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 					-> (fun_defs, { c_defs & def_macros = [ fun : c_defs.def_macros]}, imports, imported_objects,foreign_exports, ca)
 				  	# (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
 					-> ([ fun : fun_defs ], c_defs, imports, imported_objects,foreign_exports, ca)
-			//	-> reorganiseDefinitions icl_module defs cons_count sel_count mem_count (postParseError fun_pos "function body expected (1)" ca)
 		_
-			-> reorganiseDefinitions icl_module defs def_counts (postParseError fun_pos "function alternative expected (2)" ca)
+			-> reorganiseDefinitions icl_module defs def_counts (postParseFunError fun_name fun_pos "function alternative expected (2)" ca)
 reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_arity}) specials : defs] def_counts ca
 	# (bodies, fun_kind, defs, ca) = collectFunctionBodies name st_arity prio FK_Unknown defs ca
 	  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
@@ -1513,14 +1505,14 @@ reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_a
 		# fun_type = MakeNewFunctionType name st_arity prio fun_type pos specials nilPtr
 		  c_defs = { c_defs & def_funtypes = [ fun_type : c_defs.def_funtypes ]}
 		| icl_module
-			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, postParseError pos "function body expected" ca)
+			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, postParseFunError name pos "function body expected" ca)
 			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
 		# fun = MakeNewImpOrDefFunction name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
 		| icl_module
 			| case fun_kind of FK_Macro -> True; _ -> False
-				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseError pos "macro with function type not allowed" ca)		  
+				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseFunError name pos "macro with function type not allowed" ca)
 				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, ca)		  
-			= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseError pos "function body not allowed in definition module" ca)
+			= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseFunError name pos "function body not allowed in definition module" ca)
 reorganiseDefinitions icl_module [PD_Type type_def=:{td_rhs = ConsList cons_defs} : defs] def_counts=:{cons_count,type_count} ca
 	# (cons_symbs, cons_count) = determine_symbols_of_conses cons_defs cons_count
 	  def_counts & cons_count=cons_count, type_count=type_count+1
@@ -1719,9 +1711,9 @@ where
 							= check_symbols_of_class_members defs type_context macro_count ca
 					  macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio No fun_pos
 					-> (mem_defs,[macro : mem_macros],default_members_without_type,macro_members,new_macro_count,ca)
-					-> check_symbols_of_class_members defs type_context macro_count (postParseError fun_pos "macro body expected" ca)
+					-> check_symbols_of_class_members defs type_context macro_count (postParseFunError fun_name fun_pos "macro body expected" ca)
 			_
-				-> check_symbols_of_class_members defs type_context macro_count (postParseError fun_pos "macro body expected" ca)
+				-> check_symbols_of_class_members defs type_context macro_count (postParseFunError fun_name fun_pos "macro body expected" ca)
 	check_symbols_of_class_members [PD_Function fun_pos name is_infix args rhs fun_kind : defs] type_context macro_count ca
 		# prio = if is_infix (Prio NoAssoc 9) NoPrio
 		  fun_arity = length args
@@ -1741,8 +1733,8 @@ where
 				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
 				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
-	check_symbols_of_class_members [PD_DeriveInstanceMember pos _ _ _ _ : defs] type_context macro_count ca
-		= check_symbols_of_class_members defs type_context macro_count (postParseError pos "member type missing" ca)
+	check_symbols_of_class_members [PD_DeriveInstanceMember pos member_ident _ _ _ : defs] type_context macro_count ca
+		= check_symbols_of_class_members defs type_context macro_count (postParseFunError member_ident pos "member type missing" ca)
 	check_symbols_of_class_members [def : _] type_context macro_count ca
 		= abort "postparse.check_symbols_of_class_members: unknown def"  // <<- def
 	check_symbols_of_class_members [] type_context macro_count ca
@@ -1760,7 +1752,7 @@ where
 				# (mem_defs,ca) = add_default_member mem_defs name ca
 				= ([mem_def:mem_defs],ca)
 		add_default_member [] name ca
-			# ca = postParseError fun_pos "type missing of default implementation" ca
+			# ca = postParseFunError name fun_pos "type missing of default implementation" ca
 			= ([],ca)
 	add_default_members_without_type [] mem_defs ca
 		= (mem_defs,ca)
@@ -1804,7 +1796,7 @@ where
 					  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type fun_pos
 					-> ([ fun : fun_defs ], ca)
 			_
-				-> collect_member_instances defs (postParseError fun_pos "function body expected" ca)
+				-> collect_member_instances defs (postParseFunError fun_name fun_pos "function body expected" ca)
 	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
 		# fun_body = GenerateInstanceBody generic_ident optional_member_ident
 		  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
@@ -1822,7 +1814,7 @@ where
   				  (fun_types, ca) = collect_member_instance_types defs ca
 				-> ([fun_type : fun_types], ca)
 			No
-				-> collect_member_instance_types defs (postParseError fun_pos "function body expected" ca)
+				-> collect_member_instance_types defs (postParseFunError fun_name fun_pos "function body expected" ca)
 	collect_member_instance_types [] ca
 	    = ([], ca)
 reorganiseDefinitions icl_module [PD_Instances class_instances : defs] def_counts ca

@@ -478,7 +478,7 @@ try_definition parseContext (IdentToken name) pos pState
 			# pState = tokenBack pState
 			# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
 			  (token, pState) = nextToken FunctionContext pState
-			  (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
+			  (def, pState) = want_rhs_of_def parseContext lhs token pos pState
 			-> (True, def, pState)
 try_definition parseContext ImportToken pos pState
 	| ~(isGlobalContext parseContext)
@@ -531,7 +531,7 @@ try_definition parseContext token pos pState
 	| isLhsStartToken token
 		# (lhs, pState) = want_lhs_of_def token pState
 	      (token, pState) = nextToken FunctionContext pState
-	      (def, pState) = want_rhs_of_def parseContext lhs token (determine_position lhs pos) pState
+	      (def, pState) = want_rhs_of_def parseContext lhs token pos pState
 		= (True, def, pState)
 	= (False, abort "no def(1)", tokenBack pState)
 
@@ -549,7 +549,7 @@ where
 	try_class_or_instance_definition parseContext (IdentToken name) pos pState
 		# (lhs, pState) = want_lhs_of_def (IdentToken name) pState
 	      (token, pState) = nextToken FunctionContext pState
-	      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token (determine_position lhs pos) pState
+	      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token pos pState
 		= (True, def, pState)
 	try_class_or_instance_definition parseContext DeriveToken pos pState
 		# (derive_instance_def, pState) = wantDeriveInstanceDefinition parseContext pos pState
@@ -558,7 +558,7 @@ where
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
 		      (token, pState) = nextToken FunctionContext pState
-		      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token (determine_position lhs pos) pState
+		      (def, pState) = want_rhs_of_class_or_instance_def parseContext lhs token pos pState
 			= (True, def, pState)
 			= try_definition parseContext token pos pState
 
@@ -612,9 +612,6 @@ where
 			# pState			= wantBeginGroup "local definitions" pState
 			  (defs, pState)	= wantDefinitions (cLocalContext bitor WhereOfMemberDefsContext) pState
 			= (LocalParsedDefs defs, wantEndLocals pState)
-
-determine_position (Yes (name, _), _)	(LinePos f l) = FunPos f l name.id_name
-determine_position lhs           		pos           = pos
 
 want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
 want_lhs_of_def token pState
@@ -958,12 +955,9 @@ where
 		| isLhsStartToken token
 			# (lhs, pState) = want_lhs_of_def token pState
 			  (token, pState) = nextToken FunctionContext pState
-			  (def, pState) = want_rhs_of_instance_member_def lhs token (determine_position lhs pos) pState
+			  (def, pState) = want_rhs_of_instance_member_def lhs token pos pState
 			= (True, def, pState)
 		= (False, abort "no def(1)", tokenBack pState)
-	where
-		determine_position (Yes (name, _))	(LinePos f l) = FunPos f l name.id_name
-		determine_position lhs          	pos           = pos
 
 	want_lhs_of_def :: !Token !ParseState -> (!Optional (Ident, Bool), !ParseState)
 	want_lhs_of_def token pState
@@ -4194,7 +4188,7 @@ trySimpleNonLhsExpressionT BackSlashToken pState
 	# (lam_ident, pState)	= internalIdent (toString backslash) pState
 	  (file_name, line_nr, pState)
 	  						= getFileAndLineNr pState
-	  position				= FunPos file_name line_nr lam_ident.id_name
+	  position				= LinePos file_name line_nr
 	  (lam_args, pState) 	= wantList "arguments" trySimplePattern pState
 	  (token, pState)		= nextToken FunctionContext pState
 	= case token of

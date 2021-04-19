@@ -47,8 +47,6 @@ where
 		= {cs & cs_error = popErrorAdmin cs_error}
 
 stringPosition :: !String !Position -> StringPos
-stringPosition id (FunPos file_name line_nr _)
-	= { sp_name = id, sp_line = line_nr, sp_file = file_name }
 stringPosition id (LinePos file_name line_nr)
 	= { sp_name = id, sp_line = line_nr, sp_file = file_name }
 stringPosition id (PreDefPos file_name)
@@ -57,8 +55,6 @@ stringPosition id NoPos
 	= { sp_name = id, sp_line = cNotALineNumber, sp_file = "???" }
 
 writePositionModuleName :: !Position !*File -> *File
-writePositionModuleName (FunPos file_name _ _) file
-	= file <<< file_name
 writePositionModuleName (LinePos file_name _) file
 	= file <<< file_name
 writePositionModuleName (PreDefPos file_name) file
