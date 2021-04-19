@@ -1536,8 +1536,6 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 			=	BEIsNotACaf // <<- ("backendconvert, cafness: unknown fun kind", funKind)
 
 		positionToLineNumber :: Position -> Int
-		positionToLineNumber (FunPos  _ lineNumber _)
-			=	lineNumber
 		positionToLineNumber (LinePos _ lineNumber)
 			=	lineNumber
 		positionToLineNumber _
