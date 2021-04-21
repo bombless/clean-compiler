@@ -107,8 +107,8 @@ predefined_idents
 					[PD_just_u] = i "_cJust_u",
 					[PD_from_just_u] = i "_eJust_u",
 
-					[PD_none] = i "_nothing",
-					[PD_none_u] = i "_nothing_u",
+					[PD_none] = i "_none",
+					[PD_none_u] = i "_none_u",
 
 					[PD_MaybeClass] = i "Maybe",
 					[PD_UMaybeClass] = i "UMaybe",
