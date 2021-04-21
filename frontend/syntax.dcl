@@ -1420,8 +1420,8 @@ cIsNotStrict	:== False
 	= UnboxedList !Index !Index !Index // StdStrictLists module index, decons_u index, nil_u index
 	| UnboxedTailStrictList !Index !Index !Index // StdStrictLists module index, decons_uts index, nil_uts index
 	| OverloadedList !Index !Index !Index // StdStrictLists module index, decons index, nil index
-	| OverloadedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just index, nothing index
-	| UnboxedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just_u index, nothing_u index
+	| OverloadedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just index, none index
+	| UnboxedMaybe !Index !Index !Index // StdStrictMaybes module index, from_just_u index, none_u index
 
 instance == OverloadedPatternType
 

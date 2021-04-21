@@ -1317,7 +1317,7 @@ void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex)
 	symbol_p->symb_tail_strictness=0;
 }
 
-void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex)
+void BEAdjustOverloadedNoneFunction (int functionIndex,int moduleIndex)
 {
 	SymbolP symbol_p;
 

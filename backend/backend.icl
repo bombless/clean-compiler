@@ -216,11 +216,11 @@ BEAdjustOverloadedNilFunction a0 a1 a2 = code {
 }
 // void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
 
-BEAdjustOverloadedNothingFunction :: !Int !Int !BackEnd -> BackEnd;
-BEAdjustOverloadedNothingFunction a0 a1 a2 = code {
-	ccall BEAdjustOverloadedNothingFunction "II:V:p"
+BEAdjustOverloadedNoneFunction :: !Int !Int !BackEnd -> BackEnd;
+BEAdjustOverloadedNoneFunction a0 a1 a2 = code {
+	ccall BEAdjustOverloadedNoneFunction "II:V:p"
 }
-// void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex);
+// void BEAdjustOverloadedNoneFunction (int functionIndex,int moduleIndex);
 
 BEOverloadedConsSymbol :: !Int !Int !Int !Int !BackEnd -> (!BESymbolP,!BackEnd);
 BEOverloadedConsSymbol a0 a1 a2 a3 a4 = code {

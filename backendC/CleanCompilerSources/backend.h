@@ -248,8 +248,8 @@ Clean (BEAdjustUnboxedFromJustInstance :: Int Int BackEnd -> BackEnd)
 void BEAdjustOverloadedNilFunction (int functionIndex,int moduleIndex);
 Clean (BEAdjustOverloadedNilFunction :: Int Int BackEnd -> BackEnd)
 
-void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex);
-Clean (BEAdjustOverloadedNothingFunction :: Int Int BackEnd -> BackEnd)
+void BEAdjustOverloadedNoneFunction (int functionIndex,int moduleIndex);
+Clean (BEAdjustOverloadedNoneFunction :: Int Int BackEnd -> BackEnd)
 
 BESymbolP BEOverloadedConsSymbol (int constructorIndex,int moduleIndex,int deconsIndex,int deconsModuleIndex);
 Clean (BEOverloadedConsSymbol :: Int Int Int Int BackEnd -> (BESymbolP,BackEnd))

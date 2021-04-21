@@ -28,7 +28,7 @@
 /EXPORT:BEAdjustUnboxedListDeconsInstance
 /EXPORT:BEAdjustUnboxedFromJustInstance
 /EXPORT:BEAdjustOverloadedNilFunction
-/EXPORT:BEAdjustOverloadedNothingFunction
+/EXPORT:BEAdjustOverloadedNoneFunction
 /EXPORT:BEOverloadedConsSymbol
 /EXPORT:BEOverloadedPushNode
 /EXPORT:BEPredefineConstructorSymbol

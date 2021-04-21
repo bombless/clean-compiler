@@ -29,7 +29,7 @@ BEAdjustStrictJustInstance
 BEAdjustUnboxedListDeconsInstance
 BEAdjustUnboxedFromJustInstance
 BEAdjustOverloadedNilFunction
-BEAdjustOverloadedNothingFunction
+BEAdjustOverloadedNoneFunction
 BEOverloadedConsSymbol
 BEOverloadedPushNode
 BEPredefineConstructorSymbol

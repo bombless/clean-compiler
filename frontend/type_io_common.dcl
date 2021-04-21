@@ -60,7 +60,7 @@ TypeSymbIdentWithoutDefinition	:== (toChar 29)		// valid only for predefined in 
 TypeSymbIdentWithDefinition		:== (toChar 30)		// for all types which have definitions in some .icl-module
 
 // Maybe
-MaybeNothingCode				:== (toChar 31)
+MaybeNoneCode					:== (toChar 31)
 MaybeJustCode					:== (toChar 32)
 
 // StrictnessList

@@ -1373,7 +1373,7 @@ where
 
 	adjust_overloaded_none_functions function_index first_instance_index std_strict_maybes_none_functions backEnd
 		| function_index<first_instance_index
-			# backEnd = appBackEnd (BEAdjustOverloadedNothingFunction function_index std_strict_maybes_module_index) backEnd
+			# backEnd = appBackEnd (BEAdjustOverloadedNoneFunction function_index std_strict_maybes_module_index) backEnd
 			= adjust_overloaded_none_functions (function_index+1) first_instance_index std_strict_maybes_none_functions backEnd
 			= backEnd
 
