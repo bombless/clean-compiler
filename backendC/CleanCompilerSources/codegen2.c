@@ -3679,9 +3679,9 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 			}
 			if (update_node_id==NULL){
 				*asp_p+=1;
-				GenBuildh (&nothing_lab,0);
+				GenBuildh (&none_lab,0);
 			} else
-				GenFillh (&nothing_lab,0,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
+				GenFillh (&none_lab,0,*asp_p-update_node_id->nid_a_index,node->node_state.state_kind == SemiStrict ? ReleaseAndFill : NormalFill);
 			return;
 		case string_denot:
 			GenBuildString (symb->symb_val);
@@ -4710,7 +4710,7 @@ void FillMatchNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_id,CodeGe
 				break;
 			case just_symb:
 				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
-					GenEqDesc (&nothing_lab,0,0);
+					GenEqDesc (&none_lab,0,0);
 					GenNotB();
 				} else
 					GenEqDesc (&just_lab,1,0);

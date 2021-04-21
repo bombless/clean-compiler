@@ -1044,9 +1044,9 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				if (resultstate.state_kind==StrictRedirection){
 					GenPopA	(asp);
 					GenPopB	(bsp);
-					GenBuildh (&nothing_lab,0);
+					GenBuildh (&none_lab,0);
 				} else {
-					GenFillh (&nothing_lab,0,asp,ReleaseAndFill);
+					GenFillh (&none_lab,0,asp,ReleaseAndFill);
 
 					GenPopA	(asp);
 					GenPopB	(bsp);
@@ -1055,7 +1055,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 				return;
 			}
 
-			FillRhsRoot (&nothing_lab,root,asp,bsp,code_gen_node_ids_p);
+			FillRhsRoot (&none_lab,root,asp,bsp,code_gen_node_ids_p);
 			return;
 		case apply_symb:
 #ifdef NEW_APPLY

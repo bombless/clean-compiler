@@ -113,7 +113,7 @@ LabDef unboxed_just_labels[5] = {
 					/*RealObj*/	  {NULL, "", False, "_Justr", 0},
 					/*FileObj*/	  {NULL, "", False, "_Justf", 0}
 	};
-LabDef nothing_lab				= {NULL, "", False, "_Nothing", 0};
+LabDef none_lab					= {NULL, "", False, "_None", 0};
 
 int unboxed_just_mark[5];
 int unboxed_just_array_mark;
@@ -3651,7 +3651,7 @@ void generate_is_constructor (ImpRuleP rule)
 				break;
 			}
 			case none_symb:
-				GenEqDesc (&nothing_lab,case_node->node_arity,0);
+				GenEqDesc (&none_lab,case_node->node_arity,0);
 				break;
 			case just_symb:
 			{
@@ -3659,7 +3659,7 @@ void generate_is_constructor (ImpRuleP rule)
 				
 				symbol=case_node->node_symbol;
 				if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
-					GenEqDesc (&nothing_lab,0,0);
+					GenEqDesc (&none_lab,0,0);
 					GenNotB();
 				} else
 					GenEqDesc (&just_lab,case_node->node_arity,0);
@@ -4561,7 +4561,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								matches_always=1;
 							} else {
 								if (symbol->symb_head_strictness==OVERLOADED_CONS || symbol->symb_head_strictness>=UNBOXED_OVERLOADED_CONS){
-									GenEqDesc (&nothing_lab,0,asp-a_index);
+									GenEqDesc (&none_lab,0,asp-a_index);
 									GenJmpFalse (&case_label);
 								} else {
 									GenEqDesc (&just_lab,case_node->node_arity,asp-a_index);
@@ -4574,7 +4574,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								GenJmp (&case_label);
 								matches_always=1;
 							} else {
-								GenEqDesc (&nothing_lab,case_node->node_arity,asp-a_index);
+								GenEqDesc (&none_lab,case_node->node_arity,asp-a_index);
 								GenJmpTrue (&case_label);
 							}
 							break;

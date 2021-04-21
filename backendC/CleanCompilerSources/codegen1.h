@@ -21,7 +21,7 @@ extern LabDef
 #if STRICT_LISTS
 	conss_lab,consts_lab,conssts_lab,unboxed_cons_labels[5][2],unboxed_cons_array_label,
 #endif
-	just_lab, justs_lab, unboxed_just_array_label, unboxed_just_labels[5], nothing_lab,
+	just_lab, justs_lab, unboxed_just_array_label, unboxed_just_labels[5], none_lab,
 	select_with_dictionary_lab, update_with_dictionary_lab,
 	CurrentAltLabel;
 
