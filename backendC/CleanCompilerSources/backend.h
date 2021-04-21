@@ -114,7 +114,7 @@ enum {
 	BEIntegerDenot,
 	BEStringDenot,
 	BETupleSymb,
-	BEConsSymb, BEJustSymb, BENilSymb, BENothingSymb,
+	BEConsSymb, BEJustSymb, BENilSymb, BENoneSymb,
 	BEApplySymb, BEIfSymb, BEFailSymb
 };
 
