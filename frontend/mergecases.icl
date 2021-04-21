@@ -285,10 +285,10 @@ where
 				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
 				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 			(OverloadedMaybe _ _ _,UnboxedMaybe _ _ _)
-				# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_UnboxedJustSymbol PD_UnboxedNothingSymbol
+				# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
 				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
 			(UnboxedMaybe _ _ _,OverloadedMaybe _ _ _)
-				# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_UnboxedJustSymbol PD_UnboxedNothingSymbol
+				# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
 				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
 			_
 				-> (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
@@ -318,10 +318,10 @@ where
 					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 			| type2=:OverloadedMaybe _ _ _
 				| gi_index==PD_MaybeTypeIndex
-					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_JustSymbol PD_NothingSymbol
+					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_JustSymbol PD_NoneSymbol
 					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 				| gi_index==PD_StrictMaybeTypeIndex
-					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_StrictJustSymbol PD_StrictNothingSymbol
+					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_StrictJustSymbol PD_StrictNoneSymbol
 					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
 					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
@@ -343,10 +343,10 @@ where
 					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 			| type1=:OverloadedMaybe _ _ _
 				| gi_index==PD_MaybeTypeIndex
-					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_JustSymbol PD_NothingSymbol
+					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_JustSymbol PD_NoneSymbol
 					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
 				| gi_index==PD_StrictMaybeTypeIndex
-					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_StrictJustSymbol PD_StrictNothingSymbol
+					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_StrictJustSymbol PD_StrictNoneSymbol
 					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
 					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
 				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
@@ -445,7 +445,7 @@ where
 					# glob_object & ds_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex,
 									ds_ident=predefined_idents.[pd_cons_symbol]
 					= {pattern & ap_symbol.glob_object=glob_object}
-				| index==PD_OverloadedNothingSymbol
+				| index==PD_OverloadedNoneSymbol
 					# glob_object & ds_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex,
 									ds_ident=predefined_idents.[pd_nil_symbol]
 					= {pattern & ap_symbol.glob_object=glob_object}

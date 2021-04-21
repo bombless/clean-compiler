@@ -1007,7 +1007,7 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 									TAS _ args=:[arg1,arg2] _ -> args
 			= (argument_types,result_type,tst_context,tst_attr_env,ts)
 
-fresh_overloaded_maybe_type [{ap_symbol}:patterns] pd_just_symbol pd_nothing_symbol from_just_index nothing_index stdStrictMaybes_index pos functions common_defs ts
+fresh_overloaded_maybe_type [{ap_symbol}:patterns] pd_just_symbol pd_none_symbol from_just_index none_index stdStrictMaybes_index pos functions common_defs ts
 	| ap_symbol.glob_module==cPredefinedModuleIndex
 		| ap_symbol.glob_object.ds_index==pd_just_symbol-FirstConstructorPredefinedSymbolIndex
 			# (argument_types,result_type,tst_context,tst_attr_env,ts) = make_just_type_from_from_just_type stdStrictMaybes_index from_just_index common_defs ts
@@ -1015,12 +1015,12 @@ fresh_overloaded_maybe_type [{ap_symbol}:patterns] pd_just_symbol pd_nothing_sym
 				[]
 					-> ([argument_types],result_type,tst_context,tst_attr_env,ts)
 				[pattern=:{ap_symbol}]
-					| ap_symbol.glob_module==cPredefinedModuleIndex && ap_symbol.glob_object.ds_index==pd_nothing_symbol-FirstConstructorPredefinedSymbolIndex
+					| ap_symbol.glob_module==cPredefinedModuleIndex && ap_symbol.glob_object.ds_index==pd_none_symbol-FirstConstructorPredefinedSymbolIndex
 						-> ([argument_types,[]],result_type,tst_context,tst_attr_env,ts)
-		| ap_symbol.glob_object.ds_index==pd_nothing_symbol-FirstConstructorPredefinedSymbolIndex
+		| ap_symbol.glob_object.ds_index==pd_none_symbol-FirstConstructorPredefinedSymbolIndex
 			= case patterns of
 				[]
-					# {ft_type,ft_ident,ft_type_ptr,ft_specials} = functions.[stdStrictMaybes_index].[nothing_index]
+					# {ft_type,ft_ident,ft_type_ptr,ft_specials} = functions.[stdStrictMaybes_index].[none_index]
 					# (fun_type_copy, ts) = determineSymbolTypeOfFunction pos ft_ident 0 ft_type ft_type_ptr common_defs ts
 					  {tst_args,tst_result,tst_context,tst_attr_env}=fun_type_copy
 					-> ([tst_args],tst_result,tst_context,tst_attr_env,ts)
@@ -1045,10 +1045,10 @@ freshOverloadedPatternType (UnboxedTailStrictList stdStrictLists_index decons_u_
 	= fresh_overloaded_list_type patterns PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
 freshOverloadedPatternType (OverloadedList stdStrictLists_index decons_u_index nil_u_index) pos patterns common_defs functions ts
 	= fresh_overloaded_list_type patterns PD_OverloadedConsSymbol PD_OverloadedNilSymbol decons_u_index nil_u_index stdStrictLists_index pos functions common_defs ts
-freshOverloadedPatternType (UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index) pos patterns common_defs functions ts
-	= fresh_overloaded_maybe_type patterns PD_UnboxedJustSymbol PD_UnboxedNothingSymbol from_just_u_index nothing_u_index stdStrictMaybes_index pos functions common_defs ts
-freshOverloadedPatternType (OverloadedMaybe stdStrictMaybes_index from_just_index nothing_index) pos patterns common_defs functions ts
-	= fresh_overloaded_maybe_type patterns PD_OverloadedJustSymbol PD_OverloadedNothingSymbol from_just_index nothing_index stdStrictMaybes_index pos functions common_defs ts
+freshOverloadedPatternType (UnboxedMaybe stdStrictMaybes_index from_just_u_index none_u_index) pos patterns common_defs functions ts
+	= fresh_overloaded_maybe_type patterns PD_UnboxedJustSymbol PD_UnboxedNoneSymbol from_just_u_index none_u_index stdStrictMaybes_index pos functions common_defs ts
+freshOverloadedPatternType (OverloadedMaybe stdStrictMaybes_index from_just_index none_index) pos patterns common_defs functions ts
+	= fresh_overloaded_maybe_type patterns PD_OverloadedJustSymbol PD_OverloadedNoneSymbol from_just_index none_index stdStrictMaybes_index pos functions common_defs ts
 
 cWithFreshContextVars 		:== True
 cWithoutFreshContextVars 	:== False

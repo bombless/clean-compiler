@@ -672,8 +672,8 @@ where
 								# cons_index=cons_ds_index+FirstConstructorPredefinedSymbolIndex
 								| index==PD_OverloadedJustSymbol
 									= cons_index==PD_JustSymbol || cons_index==PD_StrictJustSymbol
-								| index==PD_OverloadedNothingSymbol
-									= cons_index==PD_NothingSymbol || cons_index==PD_StrictNothingSymbol
+								| index==PD_OverloadedNoneSymbol
+									= cons_index==PD_NoneSymbol || cons_index==PD_StrictNoneSymbol
 									= abort "equal_maybe_contructor"
 			match_and_instantiate_overloaded_maybe _ cons_index app_args [] cons_types case_default ro ti
 				= transform case_default { ro & ro_root_case_mode = NotRootCase } ti

@@ -37,10 +37,10 @@ predefined_idents
 					[PD_StrictJustSymbol] = i "_!Just",
 					[PD_UnboxedJustSymbol] = i "_#Just",
 					[PD_OverloadedJustSymbol] = i "_|Just",
-					[PD_NothingSymbol] = i "_Nothing",
-					[PD_StrictNothingSymbol] = i "_!Nothing",
-					[PD_UnboxedNothingSymbol] = i "_#Nothing",
-					[PD_OverloadedNothingSymbol] = i "_|Nothing",
+					[PD_NoneSymbol] = i "_Nothing",
+					[PD_StrictNoneSymbol] = i "_!Nothing",
+					[PD_UnboxedNoneSymbol] = i "_#Nothing",
+					[PD_OverloadedNoneSymbol] = i "_|Nothing",
 					[PD_UnitConsSymbol] = i "_Unit",
 
 					[PD_PredefinedModule] = i "_predefined",
@@ -107,8 +107,8 @@ predefined_idents
 					[PD_just_u] = i "_cJust_u",
 					[PD_from_just_u] = i "_eJust_u",
 
-					[PD_nothing] = i "_nothing",
-					[PD_nothing_u] = i "_nothing_u",
+					[PD_none] = i "_nothing",
+					[PD_none_u] = i "_nothing_u",
 
 					[PD_MaybeClass] = i "Maybe",
 					[PD_UMaybeClass] = i "UMaybe",
@@ -343,10 +343,10 @@ where
 			<<= (local_predefined_idents, PD_StrictArrayType)
 			<<= (local_predefined_idents, PD_UnboxedArrayType)
 			<<= (local_predefined_idents, PD_PackedArrayType)
-			<<= (local_predefined_idents, PD_MaybeType) <<= (local_predefined_idents, PD_JustSymbol) <<= (local_predefined_idents, PD_NothingSymbol)
-			<<= (local_predefined_idents, PD_StrictMaybeType) <<= (local_predefined_idents, PD_StrictJustSymbol) <<= (local_predefined_idents, PD_StrictNothingSymbol)
-			<<= (local_predefined_idents, PD_UnboxedMaybeType) <<= (local_predefined_idents, PD_UnboxedJustSymbol) <<= (local_predefined_idents, PD_UnboxedNothingSymbol)
-			<<= (local_predefined_idents, PD_OverloadedMaybeType) <<= (local_predefined_idents, PD_OverloadedJustSymbol) <<= (local_predefined_idents, PD_OverloadedNothingSymbol)
+			<<= (local_predefined_idents, PD_MaybeType) <<= (local_predefined_idents, PD_JustSymbol) <<= (local_predefined_idents, PD_NoneSymbol)
+			<<= (local_predefined_idents, PD_StrictMaybeType) <<= (local_predefined_idents, PD_StrictJustSymbol) <<= (local_predefined_idents, PD_StrictNoneSymbol)
+			<<= (local_predefined_idents, PD_UnboxedMaybeType) <<= (local_predefined_idents, PD_UnboxedJustSymbol) <<= (local_predefined_idents, PD_UnboxedNoneSymbol)
+			<<= (local_predefined_idents, PD_OverloadedMaybeType) <<= (local_predefined_idents, PD_OverloadedJustSymbol) <<= (local_predefined_idents, PD_OverloadedNoneSymbol)
 			<<= (local_predefined_idents, PD_UnitType) <<= (local_predefined_idents, PD_UnitConsSymbol)
 			<<= (local_predefined_idents, PD_TypeCodeMember)
 			<<= (local_predefined_idents, PD_DummyForStrictAliasFun) // MW++
@@ -461,19 +461,19 @@ make_list_definition list_type_pre_def_symbol_index cons_pre_def_symbol_index ni
 	= (list_def,ParsedConstructorToConsDef cons_def,ParsedConstructorToConsDef nil_def,pre_def_symbols)
 
 make_maybe_definition :: Int Int Int Ident TypeVar AType StrictnessList *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!ConsDef,!.{#PredefinedSymbol})
-make_maybe_definition maybe_type_pre_def_symbol_index just_pre_def_symbol_index nothing_pre_def_symbol_index pre_mod_id type_var type_var_with_attr just_strictness pre_def_symbols
+make_maybe_definition maybe_type_pre_def_symbol_index just_pre_def_symbol_index none_pre_def_symbol_index pre_mod_id type_var type_var_with_attr just_strictness pre_def_symbols
 	# just_ident = predefined_idents.[just_pre_def_symbol_index]
-	  nothing_ident = predefined_idents.[nothing_pre_def_symbol_index]
+	  none_ident = predefined_idents.[none_pre_def_symbol_index]
 	  maybe_ident = predefined_idents.[maybe_type_pre_def_symbol_index]
 	  
 	  just_ds = { ds_ident = just_ident, ds_arity = 1, ds_index = just_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
-	  nothing_ds = { ds_ident = nothing_ident, ds_arity = 0, ds_index = nothing_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
-	  (maybe_def, pre_def_symbols) = make_type_def maybe_type_pre_def_symbol_index [type_var] (AlgType [just_ds,nothing_ds]) pre_def_symbols
+	  none_ds = { ds_ident = none_ident, ds_arity = 0, ds_index = none_pre_def_symbol_index-FirstConstructorPredefinedSymbolIndex }
+	  (maybe_def, pre_def_symbols) = make_type_def maybe_type_pre_def_symbol_index [type_var] (AlgType [just_ds,none_ds]) pre_def_symbols
 	  just_def = {	pc_cons_ident = just_ident, pc_cons_arity = 1, pc_arg_types = [type_var_with_attr], pc_context = [],
 					pc_args_strictness=just_strictness,	pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
-	  nothing_def = {	pc_cons_ident = nothing_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
-						pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
-	= (maybe_def,ParsedConstructorToConsDef just_def,ParsedConstructorToConsDef nothing_def,pre_def_symbols)
+	  none_def = {	pc_cons_ident = none_ident, pc_cons_arity = 0, pc_arg_types = [], pc_args_strictness=NotStrict, pc_context = [],
+					pc_cons_prio =  NoPrio, pc_exi_vars = [], pc_cons_pos = PreDefPos pre_mod_id}
+	= (maybe_def,ParsedConstructorToConsDef just_def,ParsedConstructorToConsDef none_def,pre_def_symbols)
 
 make_unit_definition :: Ident *{#PredefinedSymbol} -> (!TypeDef TypeRhs,!ConsDef,!.{#PredefinedSymbol})
 make_unit_definition pre_mod_id pre_def_symbols
@@ -518,21 +518,21 @@ buildPredefinedModule support_dynamics pre_def_symbols
 	  (unboxed_def, pre_def_symbols)	= make_type_def PD_UnboxedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 	  (packed_def, pre_def_symbols)	= make_type_def PD_PackedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
 
-	  (maybe_def,just_def,nothing_def,pre_def_symbols)
-		= make_maybe_definition PD_MaybeType PD_JustSymbol PD_NothingSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
-	  (strict_maybe_def,strict_just_def,strict_nothing_def,pre_def_symbols)
-		= make_maybe_definition PD_StrictMaybeType PD_StrictJustSymbol PD_StrictNothingSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
-	  (unboxed_maybe_def,unboxed_just_def,unboxed_nothing_def,pre_def_symbols)
-		= make_maybe_definition PD_UnboxedMaybeType PD_UnboxedJustSymbol PD_UnboxedNothingSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
-	  (overloaded_maybe_def,overloaded_just_def,overloaded_nothing_def,pre_def_symbols)
-		= make_maybe_definition PD_OverloadedMaybeType PD_OverloadedJustSymbol PD_OverloadedNothingSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
+	  (maybe_def,just_def,none_def,pre_def_symbols)
+		= make_maybe_definition PD_MaybeType PD_JustSymbol PD_NoneSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
+	  (strict_maybe_def,strict_just_def,strict_none_def,pre_def_symbols)
+		= make_maybe_definition PD_StrictMaybeType PD_StrictJustSymbol PD_StrictNoneSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
+	  (unboxed_maybe_def,unboxed_just_def,unboxed_none_def,pre_def_symbols)
+		= make_maybe_definition PD_UnboxedMaybeType PD_UnboxedJustSymbol PD_UnboxedNoneSymbol pre_mod_ident type_var type_var_with_attr (Strict 1) pre_def_symbols
+	  (overloaded_maybe_def,overloaded_just_def,overloaded_none_def,pre_def_symbols)
+		= make_maybe_definition PD_OverloadedMaybeType PD_OverloadedJustSymbol PD_OverloadedNoneSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
 
 	  (unit_type_def,unit_cons_def,pre_def_symbols) = make_unit_definition pre_mod_ident pre_def_symbols
 
 	  array_and_unit_type_defs
 		= [array_def,strict_def,unboxed_def,packed_def,maybe_def,strict_maybe_def,unboxed_maybe_def,overloaded_maybe_def,unit_type_def]
-	  cons_defs = [just_def,nothing_def,strict_just_def,strict_nothing_def,
-	  			   unboxed_just_def,unboxed_nothing_def,overloaded_just_def,overloaded_nothing_def,unit_cons_def]
+	  cons_defs = [just_def,none_def,strict_just_def,strict_none_def,
+				   unboxed_just_def,unboxed_none_def,overloaded_just_def,overloaded_none_def,unit_cons_def]
 	  (type_defs, cons_defs, pre_def_symbols)
 		= add_tuple_defs pre_mod_ident MaxTupleArity array_and_unit_type_defs cons_defs pre_def_symbols
 

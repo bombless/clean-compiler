@@ -1195,10 +1195,10 @@ predefineSymbols {dcl_common} predefs
 
 		maybe_constructors :: [(Int,BESymbKind,Int)]
 		maybe_constructors
-			=	[	(PD_NothingSymbol, BENothingSymb,0),
-					(PD_StrictNothingSymbol, BENothingSymb,2),
-					(PD_UnboxedNothingSymbol, BENothingSymb,4/*3*/),
-					(PD_OverloadedNothingSymbol, BENothingSymb,0),
+			=	[	(PD_NoneSymbol, BENoneSymb,0),
+					(PD_StrictNoneSymbol, BENoneSymb,2),
+					(PD_UnboxedNoneSymbol, BENoneSymb,4/*3*/),
+					(PD_OverloadedNoneSymbol, BENoneSymb,0),
 					(PD_JustSymbol, BEJustSymb,0),
 					(PD_StrictJustSymbol, BEJustSymb,2),
 					(PD_UnboxedJustSymbol, BEJustSymb,3),
@@ -1333,9 +1333,9 @@ adjustStrictMaybeFunctions maybe_unboxed_first_instance_indices predefs dcls use
 		= backEnd
 		# std_strict_maybes_instances=std_strict_maybes.dcl_common.com_instance_defs
 		# backEnd = adjust_strict_maybe_instances 0 std_strict_maybes_instances backEnd
-		# std_strict_maybes_nothing_functions=std_strict_maybes.dcl_functions
+		# std_strict_maybes_none_functions=std_strict_maybes.dcl_functions
 		# first_instance_index=std_strict_maybes.dcl_instances.ir_from;
-		# backEnd=adjust_overloaded_nothing_functions 0 first_instance_index std_strict_maybes_nothing_functions backEnd
+		# backEnd=adjust_overloaded_none_functions 0 first_instance_index std_strict_maybes_none_functions backEnd
 
 		# std_maybe_common_defs = std_strict_maybes.dcl_common
 		  indexUMaybeClass = predefs.[PD_UMaybeClass].pds_def
@@ -1371,10 +1371,10 @@ where
 					= adjust_strict_maybe_members (i+1) members backEnd
 				= backEnd
 
-	adjust_overloaded_nothing_functions function_index first_instance_index std_strict_maybes_nothing_functions backEnd
+	adjust_overloaded_none_functions function_index first_instance_index std_strict_maybes_none_functions backEnd
 		| function_index<first_instance_index
 			# backEnd = appBackEnd (BEAdjustOverloadedNothingFunction function_index std_strict_maybes_module_index) backEnd
-			= adjust_overloaded_nothing_functions (function_index+1) first_instance_index std_strict_maybes_nothing_functions backEnd
+			= adjust_overloaded_none_functions (function_index+1) first_instance_index std_strict_maybes_none_functions backEnd
 			= backEnd
 
 	adjustRecordMaybeInstances [] rt_fields backend

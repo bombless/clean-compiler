@@ -3865,8 +3865,8 @@ where
 				<=< adjustPredefSymbol PD_just mod_index STE_Member
 				<=< adjustPredefSymbol PD_from_just_u mod_index STE_Member
 				<=< adjustPredefSymbol PD_from_just mod_index STE_Member
-				<=< adjustPredefSymbol PD_nothing_u mod_index STE_DclFunction
-				<=< adjustPredefSymbol PD_nothing mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_none_u mod_index STE_DclFunction
+				<=< adjustPredefSymbol PD_none mod_index STE_DclFunction
 				<=< adjust_predef_symbols PD_MaybeClass PD_UMaybeClass mod_index STE_Class
 		| mod_index==cs_predef_symbols.[PD_StdDynamic].pds_def
 			= cs

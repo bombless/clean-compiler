@@ -104,13 +104,13 @@ PD_Arity32TupleSymbol		:== 93
 
 // same order as in MaybeIdentToken
 PD_JustSymbol :== 94
-PD_NothingSymbol :== 95
+PD_NoneSymbol :== 95
 PD_StrictJustSymbol :== 96
-PD_StrictNothingSymbol :== 97
+PD_StrictNoneSymbol :== 97
 PD_UnboxedJustSymbol :== 98
-PD_UnboxedNothingSymbol :== 99
+PD_UnboxedNoneSymbol :== 99
 PD_OverloadedJustSymbol :== 100
-PD_OverloadedNothingSymbol :== 101
+PD_OverloadedNoneSymbol :== 101
 
 PD_UnitConsSymbol :== 102
 
@@ -186,9 +186,9 @@ PD_StdStrictMaybes:==175
 
 // same order as in MaybeIdentToken
 PD_just_u:==176
-PD_nothing_u:==177
+PD_none_u:==177
 PD_just:==178
-PD_nothing:==179
+PD_none:==179
 
 PD_from_just_u:==180
 PD_from_just:==181

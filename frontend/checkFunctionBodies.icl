@@ -133,35 +133,35 @@ make_overloaded_list expr_heap cs
 get_unboxed_maybe_indices_and_from_just_u_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
 get_unboxed_maybe_indices_and_from_just_u_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictMaybes_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictMaybes].pds_def
-	  (nothing_u_index,cs_predef_symbols)=cs_predef_symbols![PD_nothing_u].pds_def
+	  (none_u_index,cs_predef_symbols)=cs_predef_symbols![PD_none_u].pds_def
 	  (from_just_u_index,cs_predef_symbols)=cs_predef_symbols![PD_from_just_u].pds_def
 	  from_just_u_ident = predefined_idents.[PD_from_just_u]
 	  app_symb = {symb_ident=from_just_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
 	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictMaybes}
-	= (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs)
+	= (stdStrictMaybes_index,from_just_u_index,none_u_index,app_symb,cs)
 
 make_unboxed_maybe expr_heap cs
-	# (stdStrictMaybes_index,from_just_u_index,nothing_u_index,app_symb,cs) = get_unboxed_maybe_indices_and_from_just_u_symb_ident cs
+	# (stdStrictMaybes_index,from_just_u_index,none_u_index,app_symb,cs) = get_unboxed_maybe_indices_and_from_just_u_symb_ident cs
 	# (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 	# decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
-	# unboxed_maybe=UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index
+	# unboxed_maybe=UnboxedMaybe stdStrictMaybes_index from_just_u_index none_u_index
 	= (unboxed_maybe,decons_expr,expr_heap,cs)
 
 get_overloaded_maybe_indices_and_from_just_symb_ident :: *CheckState -> (!Index,!Index,!Index,!SymbIdent,!*CheckState)
 get_overloaded_maybe_indices_and_from_just_symb_ident cs=:{cs_predef_symbols,cs_x=cs_x=:{x_needed_modules}}
 	# (stdStrictMaybes_index,cs_predef_symbols)=cs_predef_symbols![PD_StdStrictMaybes].pds_def
-	  (nothing_index,cs_predef_symbols)=cs_predef_symbols![PD_nothing].pds_def
+	  (none_index,cs_predef_symbols)=cs_predef_symbols![PD_none].pds_def
 	  (from_just_index,cs_predef_symbols)=cs_predef_symbols![PD_from_just].pds_def
 	  from_just_ident = predefined_idents.[PD_from_just]
 	  app_symb = {symb_ident=from_just_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_index,glob_module=stdStrictMaybes_index}}
 	  cs & cs_predef_symbols=cs_predef_symbols,cs_x={cs_x & x_needed_modules=x_needed_modules bitor cNeedStdStrictMaybes}
-	= (stdStrictMaybes_index,from_just_index,nothing_index,app_symb,cs)
+	= (stdStrictMaybes_index,from_just_index,none_index,app_symb,cs)
 
 make_overloaded_maybe expr_heap cs
-	# (stdStrictMaybes_index,from_just_index,nothing_index,app_symb,cs) = get_overloaded_maybe_indices_and_from_just_symb_ident cs
+	# (stdStrictMaybes_index,from_just_index,none_index,app_symb,cs) = get_overloaded_maybe_indices_and_from_just_symb_ident cs
 	  (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 	  decons_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
-	  overloaded_list=OverloadedMaybe stdStrictMaybes_index from_just_index nothing_index
+	  overloaded_list=OverloadedMaybe stdStrictMaybes_index from_just_index none_index
 	= (overloaded_list,decons_expr,expr_heap,cs)
 
 make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
@@ -176,10 +176,10 @@ make_case_guards cons_symbol global_type_index alg_patterns expr_heap cs
 		| pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol
 			# (overloaded_list,decons_expr,expr_heap,cs) = make_overloaded_list expr_heap cs
 			= (OverloadedPatterns overloaded_list decons_expr alg_patterns,expr_heap,cs)
-		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol
+		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNoneSymbol
 			# (unboxed_maybe,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
 			= (OverloadedPatterns unboxed_maybe from_just_expr alg_patterns,expr_heap,cs)
-		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
+		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNoneSymbol
 			# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
 			= (OverloadedPatterns overloaded_maybe from_just_expr alg_patterns,expr_heap,cs)
 			= (AlgebraicPatterns global_type_index alg_patterns,expr_heap,cs)
@@ -1004,8 +1004,8 @@ where
 			| pd_cons_index==PD_UnboxedConsSymbol || pd_cons_index==PD_UnboxedNilSymbol ||
 			  pd_cons_index==PD_UnboxedTailStrictConsSymbol || pd_cons_index==PD_UnboxedTailStrictNilSymbol ||
 			  pd_cons_index==PD_OverloadedConsSymbol || pd_cons_index==PD_OverloadedNilSymbol ||
-			  pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol ||
-			  pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
+			  pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNoneSymbol ||
+			  pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNoneSymbol
 				= False
 				= all_wild_card_args args
 			= all_wild_card_args args
@@ -1101,7 +1101,7 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					-> (OverloadedPatterns overloaded_list decons_expr [pattern], OverloadedPatterns overloaded_list decons_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
-		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNothingSymbol
+		| pd_cons_index==PD_UnboxedJustSymbol || pd_cons_index==PD_UnboxedNoneSymbol
 			# (unboxed_maybe,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
 			= case pattern_scheme of
 				OverloadedPatterns (UnboxedMaybe _ _ _) _ _
@@ -1109,13 +1109,13 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				OverloadedPatterns (OverloadedMaybe _ _ _) _ _
 					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
-					# (alg_patterns,cs) = replace_overloaded_maybe_symbols_in_patterns alg_patterns PD_UnboxedJustSymbol PD_UnboxedNothingSymbol cs
+					# (alg_patterns,cs) = replace_overloaded_maybe_symbols_in_patterns alg_patterns PD_UnboxedJustSymbol PD_UnboxedNoneSymbol cs
 					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern : alg_patterns], OverloadedPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				NoPattern
 					-> (OverloadedPatterns unboxed_maybe from_just_expr [pattern], OverloadedPatterns unboxed_maybe from_just_expr [], pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				_
 					-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
-		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNothingSymbol
+		| pd_cons_index==PD_OverloadedJustSymbol || pd_cons_index==PD_OverloadedNoneSymbol
 			= case pattern_scheme of
 				OverloadedPatterns (OverloadedMaybe _ _ _) _ _
 					# (overloaded_maybe,from_just_expr,expr_heap,cs) = make_overloaded_maybe expr_heap cs
@@ -1124,17 +1124,17 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 				OverloadedPatterns (UnboxedMaybe _ _ _) _ _
 					# (unboxed_list,from_just_expr,expr_heap,cs) = make_unboxed_maybe expr_heap cs
 					# alg_patterns = alg_patterns_of_OverloadedPatterns_or_NoPattern patterns
-					# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_UnboxedJustSymbol PD_UnboxedNothingSymbol cs
+					# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_UnboxedJustSymbol PD_UnboxedNoneSymbol cs
 					-> (OverloadedPatterns unboxed_list from_just_expr [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 				AlgebraicPatterns alg_type=:{gi_module,gi_index} _
 					| gi_module==cPredefinedModuleIndex
 						| gi_index==PD_MaybeTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
-							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_JustSymbol PD_NothingSymbol cs
+							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_JustSymbol PD_NoneSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 						| gi_index==PD_StrictMaybeTypeIndex
 							# alg_patterns = alg_patterns_of_AlgebraicPatterns_or_NoPattern patterns
-							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_StrictJustSymbol PD_StrictNothingSymbol cs
+							# (pattern,cs) = replace_overloaded_maybe_symbol_in_pattern pattern PD_StrictJustSymbol PD_StrictNoneSymbol cs
 							-> (AlgebraicPatterns alg_type [pattern : alg_patterns], pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 							-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
 						-> (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics,illegal_combination_of_patterns_error cons_symbol cs)
@@ -1231,7 +1231,7 @@ transform_pattern (AP_Algebraic cons_symbol global_type_index args opt_var) patt
 					# pds_ident = predefined_idents.[pd_cons_symbol]
 					# glob_object = {glob_object & ds_index=pds_def,ds_ident=pds_ident}
 					= ({pattern & ap_symbol.glob_object=glob_object},cs)
-				| index==PD_OverloadedNothingSymbol
+				| index==PD_OverloadedNoneSymbol
 					# ({pds_def},cs) = cs!cs_predef_symbols.[pd_nil_symbol]
 					# pds_ident = predefined_idents.[pd_nil_symbol]
 					# glob_object = {glob_object & ds_index=pds_def,ds_ident=pds_ident}
@@ -1455,7 +1455,7 @@ where
 				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_just] || id==local_predefined_idents.[PD_from_just]
 		  || id==local_predefined_idents.[PD_just_u] || id==local_predefined_idents.[PD_from_just_u]
-		  || id==local_predefined_idents.[PD_nothing] || id==local_predefined_idents.[PD_nothing_u]
+		  || id==local_predefined_idents.[PD_none] || id==local_predefined_idents.[PD_none_u]
 			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdStrictMaybes}})
 				// instead report that cNeedStdStrictMaybes should be imported in function check_needed_modules_are_imported
 		= (EE, free_vars, e_state, e_info, { cs & cs_error = checkError id "undefined" cs_error })

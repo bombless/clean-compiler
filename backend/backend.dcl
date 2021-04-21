@@ -293,7 +293,7 @@ BETupleSymb:==7;
 BEConsSymb:==8;
 BEJustSymb:==9;
 BENilSymb:==10;
-BENothingSymb:==11;
+BENoneSymb:==11;
 BEApplySymb:==12;
 BEIfSymb:==13;
 BEFailSymb:==14;

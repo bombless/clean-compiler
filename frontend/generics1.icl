@@ -1284,13 +1284,13 @@ make_unboxed_tail_strict_list expr_heap predef_symbols
 make_unboxed_maybe :: !*ExpressionHeap !PredefinedSymbols -> (!OverloadedPatternType,!Expression,!*ExpressionHeap)
 make_unboxed_maybe expr_heap predef_symbols
 	# stdStrictMaybes_index = predef_symbols.[PD_StdStrictMaybes].pds_def
-	  nothing_u_index = predef_symbols.[PD_nothing_u].pds_def
+	  none_u_index = predef_symbols.[PD_none_u].pds_def
 	  from_just_u_index = predef_symbols.[PD_from_just_u].pds_def
 	  from_just_u_ident = predefined_idents.[PD_from_just_u]
 	  app_symb = {symb_ident=from_just_u_ident,symb_kind=SK_OverloadedFunction {glob_object=from_just_u_index,glob_module=stdStrictMaybes_index}}
 	  (new_info_ptr,expr_heap) = newPtr EI_Empty expr_heap
 	  from_just_expr = App {app_symb=app_symb,app_args=[],app_info_ptr=new_info_ptr}
-	  unboxed_maybe = UnboxedMaybe stdStrictMaybes_index from_just_u_index nothing_u_index
+	  unboxed_maybe = UnboxedMaybe stdStrictMaybes_index from_just_u_index none_u_index
 	= (unboxed_maybe,from_just_expr,expr_heap)
 
 //	conversions functions
@@ -1527,8 +1527,8 @@ where
 				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_u predefs.psd_predefs_a) ds_arity heaps error
 			| cons_index==PD_UnboxedTailStrictNilSymbol
 				= build_sum_cons (buildUnboxedNilSymbIdent PD_nil_uts predefs.psd_predefs_a) ds_arity heaps error
-			| cons_index==PD_UnboxedNothingSymbol
-				= build_sum_cons (buildUnboxedNilSymbIdent PD_nothing_u predefs.psd_predefs_a) ds_arity heaps error
+			| cons_index==PD_UnboxedNoneSymbol
+				= build_sum_cons (buildUnboxedNilSymbIdent PD_none_u predefs.psd_predefs_a) ds_arity heaps error
 				# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
 				= build_sum_cons symb_ident ds_arity heaps error
 			# symb_ident = {symb_ident=ds_ident, symb_kind=SK_Constructor {glob_module=type_def_mod,glob_object=ds_index}}
@@ -4951,8 +4951,8 @@ build_unboxed_alg_pattern cons_ds vars args type_module_n predefs heaps
 		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
 		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
 		= (alg_pattern,heaps)
-	| cons_index==PD_UnboxedNothingSymbol
-		# cons_symb_ident = buildUnboxedNilSymbIdent PD_nothing_u predefs.psd_predefs_a
+	| cons_index==PD_UnboxedNoneSymbol
+		# cons_symb_ident = buildUnboxedNilSymbIdent PD_none_u predefs.psd_predefs_a
 		# expr = App {app_symb = cons_symb_ident, app_args = args, app_info_ptr = expr_info_ptr}
 		#! alg_pattern = { ap_symbol = cons_symbol, ap_vars = vars, ap_expr = expr, ap_position = NoPos }
 		= (alg_pattern,heaps)
