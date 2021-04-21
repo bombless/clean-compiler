@@ -114,7 +114,7 @@ static Fun
 	* tuplesym[MaxNodeArity],	/* the tuple ids						*/
 	* lazy_just_sym0,
 	* strict_just_sym0,
-	* nothing_sym,
+	* none_sym,
 	* strict_sym[MaxNrAnnots],	/* the strict ids						*/
 	* fail_sym,					/* the fail id							*/
 	* inffunct_sym,				/* the E2 id							*/
@@ -2252,9 +2252,9 @@ static Exp ConvertNode (Node node, NodeId nid)
 						e->e_fun = lazy_just_sym0+arity;
 					}
 					break;
-				case nothing_symb:
+				case none_symb:
 					e->e_hnf = True;
-					e->e_fun = nothing_sym;
+					e->e_fun = none_sym;
 					break;
 				case apply_symb:
 					e->e_fun = apsym;
@@ -2671,9 +2671,9 @@ static Exp convert_pattern (SymbolP symbol_p,int arity,NodeIdListElementP node_i
 				e->e_fun = lazy_just_sym0+arity;
 			}
 			break;
-		case nothing_symb:
+		case none_symb:
 			e->e_hnf = True;
-			e->e_fun = nothing_sym;
+			e->e_fun = none_sym;
 			break;
 		case definition:
 		{
@@ -3509,7 +3509,7 @@ static void init_predefined_symbols (void)
 	conssym = lazy_cons_sym0+2;
 #endif
 
-	nothing_sym = f;
+	none_sym = f;
 	f->fun_symbol     = NULL;
 	f->fun_arity      = 0;
 	f->fun_kind       = Constructor;

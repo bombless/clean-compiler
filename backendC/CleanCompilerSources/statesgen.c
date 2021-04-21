@@ -2113,7 +2113,7 @@ static Bool NodeInAStrictContext (Node node,StateS demanded_state,int local_scop
 
 				SetUnaryState (&node->node_state, StrictOnA, MaybeObj);
 				break;
-			case nothing_symb:
+			case none_symb:
 				if (rootsymb->symb_head_strictness & 1)
 					parallel = DetermineStrictArgContext (node->node_arguments,StrictState,local_scope);
 

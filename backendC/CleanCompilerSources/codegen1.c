@@ -3650,7 +3650,7 @@ void generate_is_constructor (ImpRuleP rule)
 					GenEqDesc (&cons_lab,case_node->node_arity,0);
 				break;
 			}
-			case nothing_symb:
+			case none_symb:
 				GenEqDesc (&nothing_lab,case_node->node_arity,0);
 				break;
 			case just_symb:
@@ -4569,7 +4569,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 								}
 							}
 							break;
-						case nothing_symb:
+						case none_symb:
 							if (case_number==1){
 								GenJmp (&case_label);
 								matches_always=1;

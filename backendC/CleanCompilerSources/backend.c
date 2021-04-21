@@ -242,7 +242,7 @@ InitPredefinedSymbols (void)
 
 	gBasicSymbols [nil_symb]	= PredefinedSymbol (nil_symb, 0);
 	gBasicSymbols [cons_symb]	= PredefinedSymbol (cons_symb, 2);
-	gBasicSymbols [nothing_symb]= PredefinedSymbol (nothing_symb, 0);
+	gBasicSymbols [none_symb]	= PredefinedSymbol (none_symb, 0);
 	gBasicSymbols [just_symb]	= PredefinedSymbol (just_symb, 1);
 
 	for (i = 0; i < MaxNodeArity; i++)
@@ -1323,7 +1323,7 @@ void BEAdjustOverloadedNothingFunction (int functionIndex,int moduleIndex)
 
 	symbol_p=&gBEState.be_modules[moduleIndex].bem_functions[functionIndex];
 
-	symbol_p->symb_kind = nothing_symb;
+	symbol_p->symb_kind = none_symb;
 	symbol_p->symb_head_strictness=OVERLOADED_CONS;
 }
 

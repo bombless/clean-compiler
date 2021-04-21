@@ -340,7 +340,7 @@ char *symbol_to_string (Symbol symbol)
 		return "[]";
 	case just_symb:
 		return "+?";
-	case nothing_symb:
+	case none_symb:
 		return "-?";
 	case select_symb:
 		return "_Select";

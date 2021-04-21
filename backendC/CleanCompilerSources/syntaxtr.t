@@ -48,7 +48,7 @@ typedef enum {
 	integer_denot,
 	string_denot,
 	tuple_symb,
-	cons_symb, just_symb, nil_symb, nothing_symb,
+	cons_symb, just_symb, nil_symb, none_symb,
 	apply_symb, if_symb, fail_symb, seq_symb,
 	select_symb,
 	Nr_Of_Predef_FunsOrConses,

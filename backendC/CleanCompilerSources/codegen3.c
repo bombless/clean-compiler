@@ -1033,7 +1033,7 @@ static void CodeNormalRootNode (Node root,NodeId rootid,int asp,int bsp,CodeGenN
 
 			FillRhsRoot (&nil_lab, root, asp, bsp,code_gen_node_ids_p);
 			return;
-		case nothing_symb:
+		case none_symb:
 			if (rootsymb->symb_head_strictness & 1){
 				if (!simple_expression_without_node_ids (root->node_arguments->arg_node)){
 					BuildArg (root->node_arguments,&asp,&bsp,code_gen_node_ids_p);

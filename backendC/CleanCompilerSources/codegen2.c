@@ -3671,7 +3671,7 @@ static void FillNormalNode (Node node,int *asp_p,int *bsp_p,NodeId update_node_i
 				*asp_p-=node->node_arity;
 			}
 			return;
-		case nothing_symb:
+		case none_symb:
 			if ((symb->symb_head_strictness & 1) && !simple_expression_without_node_ids (node->node_arguments->arg_node)){
 				BuildArg (node->node_arguments,asp_p,bsp_p,code_gen_node_ids_p);
 				GenPopA (1);

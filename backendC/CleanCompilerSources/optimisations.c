@@ -1349,7 +1349,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 #endif
 #ifdef THUNK_LIFT_0_CONSTRUCTORS
 				case nil_symb:
-				case nothing_symb:
+				case none_symb:
 					if (arg_node->node_arity==0){
 						NodeP function_node;
 						ArgP new_arg;
@@ -1591,7 +1591,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					call_state_p=&node_id->nid_node->node_state;
 			} else if (arg_node->node_kind==NormalNode){
 #ifdef STRICT_STATE_FOR_LAZY_TUPLE_CONSTRUCTORS
-				if (BETWEEN (tuple_symb,nothing_symb,arg_node->node_symbol->symb_kind)
+				if (BETWEEN (tuple_symb,none_symb,arg_node->node_symbol->symb_kind)
 					&& !(arg_node->node_symbol->symb_kind==cons_symb && (arg_node->node_symbol->symb_head_strictness>LAZY_CONS || arg_node->node_symbol->symb_tail_strictness))
 					&& !(arg_node->node_symbol->symb_kind==just_symb && arg_node->node_symbol->symb_head_strictness>LAZY_CONS)
 					&& arg_node->node_state.state_type==SimpleState && arg_node->node_state.state_kind==OnA)
@@ -2239,7 +2239,7 @@ static void optimise_normal_node (Node node)
 #else
 		if ((BETWEEN (int_denot,real_denot,symbol->symb_kind)
 			 || symbol->symb_kind==string_denot
-			 || (BETWEEN (tuple_symb,nothing_symb,symbol->symb_kind)
+			 || (BETWEEN (tuple_symb,none_symb,symbol->symb_kind)
 				 && !(symbol->symb_kind==cons_symb && (symbol->symb_head_strictness>1 || symbol->symb_tail_strictness))
 				 && !(symbol->symb_kind==just_symb && (symbol->symb_head_strictness>1))
 				 )
@@ -3166,7 +3166,7 @@ static void optimise_strict_constructor_in_lazy_context (NodeP node,FreeUniqueNo
 #endif
 			}
 		}
-	} else if (symbol->symb_kind==nothing_symb){
+	} else if (symbol->symb_kind==none_symb){
 		if (node->node_state.state_type==SimpleState && node->node_state.state_kind==OnA && node->node_arity==0)
 			if ((symbol->symb_head_strictness & 1)==0)
 				node->node_state.state_kind=StrictOnA;
