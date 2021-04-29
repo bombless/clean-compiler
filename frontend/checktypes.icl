@@ -1504,7 +1504,7 @@ where
 				-> case opt_type of
 					Yes dyn_type
 						# (dyn_type, loc_type_vars, type_defs, class_defs, modules, type_heaps, cs)
-							= check_dynamic_type_in_pattern mod_index scope dyn_type type_defs class_defs modules type_heaps cs
+							= check_dynamic_type mod_index scope dyn_type type_defs class_defs modules type_heaps cs
 						| isEmpty loc_type_vars
 							# expr_heap =  expr_heap <:= (dyn_info_ptr, EI_UnmarkedDynamic (Yes dyn_type) loc_dynamics)
 				  		  	-> check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
@@ -1516,7 +1516,7 @@ where
 				  		 -> check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
 			EI_DynamicType dyn_type loc_dynamics
 				# (dyn_type, loc_type_vars, type_defs, class_defs, modules, type_heaps, cs)
-					= check_dynamic_type_in_pattern mod_index scope dyn_type type_defs class_defs modules type_heaps cs
+					= check_dynamic_type mod_index scope dyn_type type_defs class_defs modules type_heaps cs
 				  (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
 				  	= check_local_dynamics mod_index scope loc_dynamics type_defs class_defs modules type_heaps expr_heap cs
 				  cs_symbol_table = removeVariablesFromSymbolTable scope loc_type_vars cs.cs_symbol_table
@@ -1526,21 +1526,7 @@ where
 	check_local_dynamics mod_index scope local_dynamics type_defs class_defs modules type_heaps expr_heap cs
 		= foldSt (check_dynamic mod_index (inc scope)) local_dynamics (type_defs, class_defs, modules, type_heaps, expr_heap, cs)
 
-	check_dynamic_type_in_expression mod_index scope dt=:{dt_uni_vars,dt_type,dt_contexts} type_defs class_defs modules type_heaps=:{th_vars} cs
-		# (dt_uni_vars, (th_vars, cs)) = add_type_variables_to_symbol_table scope dt_uni_vars th_vars cs
-		  ots = { ots_type_defs = type_defs, ots_modules = modules }
-		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }
-
-		  (contexts, type_defs, class_defs, modules, heaps, cs)
-		  	= checkTypeContexts dt_contexts mod_index class_defs ots {oti & oti_all_vars=[],oti_all_attrs=[],oti_global_vars=[]} cs
-		  oti = {oti & oti_heaps=heaps}
-		  ots = {ots_modules = modules, ots_type_defs = type_defs}
-
-		  (dt_type, ({ots_type_defs, ots_modules}, oti, cs))
-		  		= checkOpenAType mod_index scope DAK_None dt_type (ots, oti, { cs & cs_x = {cs.cs_x & x_check_dynamic_types = True} })
-		= check_dynamic_type_uniqueness dt_type dt_uni_vars contexts oti ots_type_defs ots_modules class_defs cs
-
-	check_dynamic_type_in_pattern mod_index scope dt=:{dt_uni_vars,dt_type,dt_contexts} type_defs class_defs modules type_heaps=:{th_vars} cs
+	check_dynamic_type mod_index scope dt=:{dt_uni_vars,dt_type,dt_contexts} type_defs class_defs modules type_heaps=:{th_vars} cs
 		# (dt_uni_vars, (th_vars, cs)) = add_type_variables_to_symbol_table scope dt_uni_vars th_vars cs
 		  ots = { ots_type_defs = type_defs, ots_modules = modules }
 		  oti = { oti_heaps = { type_heaps & th_vars = th_vars }, oti_all_vars = [], oti_all_attrs = [], oti_global_vars = [] }

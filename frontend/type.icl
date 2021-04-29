@@ -35,11 +35,6 @@ import check_instances, genericsupport
 	,	tc_coercible	:: !Bool
 	}
 
-::	SharedAttribute = 
-	{	sa_attr_nr	:: !Int
-	,	sa_position	:: !Expression
-	}
-
 ::	Requirements =
 	{	req_overloaded_calls	:: ![ExprInfoPtr]
 	,	req_type_coercions		:: ![TypeCoercion]
@@ -1000,7 +995,7 @@ fresh_overloaded_list_type [{ap_symbol}:patterns] pd_cons_symbol pd_nil_symbol d
 		make_cons_type_from_decons_type stdStrictLists_index decons_u_index common_defs ts
 			# {me_ident,me_type,me_type_ptr} = common_defs.[stdStrictLists_index].com_member_defs.[decons_u_index]
 			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_ident 1 me_type me_type_ptr common_defs ts
-			  {tst_args,tst_lifted,tst_result,tst_context,tst_attr_env}=fun_type_copy
+			  {tst_args,tst_result,tst_context,tst_attr_env}=fun_type_copy
 			# result_type = case tst_args of [t] -> t
 			# argument_types = case tst_result.at_type of
 									TA _ args=:[arg1,arg2] -> args
@@ -1033,7 +1028,7 @@ fresh_overloaded_maybe_type [{ap_symbol}:patterns] pd_just_symbol pd_none_symbol
 		make_just_type_from_from_just_type stdStrictMaybes_index from_just_index common_defs ts
 			# {me_ident,me_type,me_type_ptr} = common_defs.[stdStrictMaybes_index].com_member_defs.[from_just_index]
 			  (fun_type_copy,ts) = determineSymbolTypeOfFunction pos me_ident 1 me_type me_type_ptr common_defs ts
-			  {tst_args,tst_lifted,tst_result,tst_context,tst_attr_env}=fun_type_copy
+			  {tst_args,tst_result,tst_context,tst_attr_env}=fun_type_copy
 			# result_type = case tst_args of [t] -> t
 			# argument_types = [tst_result]
 			= (argument_types,result_type,tst_context,tst_attr_env,ts)
@@ -1636,7 +1631,7 @@ getSymbolType pos ti {symb_kind = SK_Constructor {glob_module,glob_object}} n_ap
 getSymbolType pos ti {symb_kind = SK_NewTypeConstructor {gi_module,gi_index}} n_app_args ts
 	# (fresh_cons_type, ts) = standardRhsConstructorType pos gi_index gi_module n_app_args ti ts
 	= (fresh_cons_type, [], ts) 
-getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_ident} n_app_args ts
+getSymbolType pos ti=:{ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_LocalMacroFunction glob_object, symb_ident} n_app_args ts
 	| glob_object>=size ts.ts_fun_env
 		= abort symb_ident.id_name;
 	# (fun_type, ts) = ts!ts_fun_env.[glob_object]
@@ -2442,7 +2437,6 @@ where
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (prop_type_heaps.th_vars, ts.ts_expr_heap)
 		  (fresh_fun_type, ts) = freshSymbolType No cWithoutFreshContextVars ft_with_prop common_defs
 									{ts & ts_type_heaps={prop_type_heaps & th_vars=th_vars}, ts_expr_heap=ts_expr_heap, ts_td_infos=prop_td_infos, ts_error=ts_error}
-//		  (lifted_args, ts) = fresh_non_unique_type_variables fun_lifted [] ts
 		  (lifted_args, ts) = fresh_attributed_type_variables fun_lifted [] ts
 
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
@@ -2477,14 +2471,7 @@ where
 			= (vars, ts)
 			# (var, ts) = freshAttributedVariable ts
 			= fresh_attributed_type_variables (dec n) [var : vars] ts
-	/*
-	fresh_non_unique_type_variables :: !Int ![AType] !*TypeState -> (![AType], !*TypeState)
-	fresh_non_unique_type_variables n vars ts
-		| n == 0
-			= (vars, ts)
-			# (var, ts) = freshNonUniqueVariable ts
-			= fresh_non_unique_type_variables (dec n) [var : vars] ts
-	*/
+
 	fresh_dynamics dyn_ptrs state
 		= foldSt fresh_dynamic dyn_ptrs state
 	where
@@ -2601,11 +2588,9 @@ where
 
 specification_error type type1 err
 	# err = errorHeading "Type error" err
-	  format = { form_properties = cAttributed, form_attr_position = No}
 	# err = { err & ea_file = err.ea_file <<< "derived type conflicts with specified type:" <<< '\n' }
 	# format = { form_properties = cAttributed, form_attr_position = No}
 	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type, Yes initialTypeVarBeautifulizer) <<< '\n' }
-	# format = { form_properties = cAttributed, form_attr_position = No}
 	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type1, Yes initialTypeVarBeautifulizer) <<< '\n' }
 	= err
 
@@ -2687,11 +2672,6 @@ where
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
 			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
 			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
-	where
-		add_lifted_arg_types arity_diff args1 args2
-			| arity_diff > 0
-				= take arity_diff args2 ++ args1
-				= args1
 
 	check_caf_context fun_ident fun_pos FK_Caf {st_context=[_:_]} error
 		=	checkErrorWithPosition fun_ident fun_pos "CAF cannot be overloaded" error

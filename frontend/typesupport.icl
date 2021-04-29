@@ -303,10 +303,6 @@ errorHeadingWithPositionNameAndLine error_kind pos ident_name line_n err=:{ea_fi
 		= {err & ea_file = ea_file <<< ident_name <<< "]:", ea_ok = False}
 		= {err & ea_file = ea_file <<< line_n <<< ',' <<< ident_name <<< "]:", ea_ok = False}
 
-contextError class_symb err
-	# err = errorHeading "Overloading error" err
-	= {err & ea_file = err.ea_file <<< " unresolved class \"" <<< class_symb <<< "\" not occurring in specified type\n"}
-
 liftedContextError class_symb err
 	# err = errorHeading "Overloading error" err
 	= {err & ea_file = err.ea_file <<< " type variable of type of lifted argument appears in class \"" <<< class_symb <<< "\"\n"}

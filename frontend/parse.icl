@@ -2507,7 +2507,7 @@ where
 			_
 				# (condefs, extensible_algebraic_type, pState) = want_constructor_list exi_vars token pState
 				# td & td_rhs = if extensible_algebraic_type (ExtensibleConses condefs) (ConsList condefs)
-				| annot == AN_None
+				| annot =: AN_None
 	 		  		->	(PD_Type td, pState)
 					->	(PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
 	where
@@ -2522,7 +2522,7 @@ where
 		  pState			= verify_annot_attr annot td_attribute name pState
 		  (atype, pState)	= want pState // Atype
 		  td				= {td & td_rhs = TypeSpec atype}
-		| annot == AN_None
+		| annot =: AN_None
 			= (PD_Type td, pState)
 			= (PD_Type td, parseError "Type synonym" No ("No lhs strictness annotation for the type synonym "+name) pState)
 
@@ -2533,7 +2533,7 @@ where
 		  (token, pState)		= nextToken GeneralContext pState
 		  (condef, pState)		= want_newtype_constructor exi_vars token pState
 		  td					= { td & td_rhs = NewTypeCons condef }
-		| annot == AN_None
+		| annot =: AN_None
 	 		= (PD_Type td, pState)
 	 		= (PD_Type td, parseError "New type" No ("No lhs strictness annotation for the new type "+name) pState)
 
@@ -2570,14 +2570,14 @@ where
 		  module_name = file_name % (0,size file_name-4)
 		  (type_ext_ident, pState) = stringToIdent name (IC_TypeExtension module_name) pState
 		  td & td_rhs			= MoreConses type_ext_ident condefs
-		| annot == AN_None
+		| annot =: AN_None
 	 		= (PD_Type td, pState)
 	 		= (PD_Type td, parseError "Algebraic type" No ("No lhs strictness annotation for the algebraic type "+name) pState)
 
 	want_type_rhs token parseContext td=:{td_attribute} annot pState
 		| isIclContext parseContext
 			= (PD_Erroneous, parseError "type RHS" (Yes token) "type definition" pState)
-			| td_attribute == TA_Anonymous || td_attribute == TA_Unique || td_attribute == TA_None
+			| td_attribute =: TA_Anonymous || td_attribute =: TA_Unique || td_attribute =: TA_None
 				# (td_attribute, properties) = determine_properties annot td_attribute
 				# td = { td & td_attribute = td_attribute, td_rhs = EmptyRhs properties}
 				= (PD_Type td, tokenBack pState)
@@ -2586,19 +2586,19 @@ where
 
 	verify_annot_attr :: !Annotation !TypeAttribute !String !ParseState -> ParseState
 	verify_annot_attr annot attr name pState
-		| annot <> AN_None
+		| not annot =: AN_None
 			= parseError "type definition" No ("No annotation, "+toString annot+", in the lhs of type "+name) pState
-		| attr == TA_None || attr == TA_Unique
+		| attr =: TA_None || attr =: TA_Unique
 			= pState
 			= parseError "type definition" No ("No attribute, "+toString attr+", in the lhs of type "+name) pState
 
 	determine_properties :: !Annotation !TypeAttribute -> (!TypeAttribute, !BITVECT)
 	determine_properties annot attr
-		| annot == AN_Strict
-			| attr == TA_Anonymous
+		| annot =: AN_Strict
+			| attr =: TA_Anonymous
 				= (TA_None, cIsHyperStrict)
 				= (attr, cIsHyperStrict bitor cIsNonCoercible)
-		| attr == TA_Anonymous
+		| attr =: TA_Anonymous
 			= (TA_None, cAllBitsClear)
 			= (attr, cIsNonCoercible)
 
@@ -3661,7 +3661,7 @@ tryATypeToType atype pState
 		  , atype.at_type
 		  , parseError "simple type" No ("type instead of type annotation "+toString atype.at_annotation) pState
 		  )
-*/	| atype.at_attribute <> TA_None
+*/	| not atype.at_attribute =: TA_None
 		= ( False
 		  , atype.at_type
 		  , parseError "simple type" No ("type instead of type attribute "+toString atype.at_attribute) pState
