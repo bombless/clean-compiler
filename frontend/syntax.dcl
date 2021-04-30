@@ -789,7 +789,6 @@ pIsSafe			:== True
 ::	ImportedTypes			:== {#{# CheckedTypeDef}}
 
 ::	VI_TypeInfo	= VITI_Empty
-				| VITI_Coercion		CoercionPosition
 				| ..
 
 ::	VarInfo  =	VI_Empty | VI_Type !AType !VI_TypeInfo |
@@ -1473,12 +1472,6 @@ instance == OverloadedPatternType
 					| PreDefPos Ident
 					| NoPos
 
-::	CoercionPosition
-	=	CP_Expression !Expression
-	|	CP_FunArg !Ident !Int // Function or constructor ident, argument position (>=1)
-	|	CP_SymbArgAndExpression !SymbIdent !Int !Expression // Function or constructor symbol, argument position (>=1)
-	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
-
 ::	IdentPos =
 	{	ip_ident	:: !Ident
 	,	ip_line		:: !Int
@@ -1507,7 +1500,7 @@ instance <<< (Module a) | <<< a, ParsedDefinition, InstanceType, AttributeVar, T
 			 FieldNameOrQualifiedFieldName, ParsedConstructor, (TypeDef a) | <<< a, TypeVarInfo, AttrVarInfo,
 			 BasicValue, ATypeVar, TypeRhs, Import, ImportDeclaration, CasePatterns,
 			 (Optional a) | <<< a, ConsVariable, BasicType, Annotation, SelectorKind, Selection, SelectorDef, ConsDef, LocalDefs, FreeVar, ClassInstance, SignClassification,
-			 TypeCodeExpression, CoercionPosition, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
+			 TypeCodeExpression, AttrInequality, LetBind, Declaration, STE_Kind, BoundVar,
 			 TypeSymbIdent,
 			 TypeCons,
 			 IndexRange,

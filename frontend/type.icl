@@ -35,6 +35,12 @@ import check_instances, genericsupport
 	,	tc_coercible	:: !Bool
 	}
 
+::	CoercionPosition
+	=	CP_Expression !Expression
+	|	CP_FunArg !Ident !Int // Function or constructor ident, argument position (>=1)
+	|	CP_SymbArgAndExpression !SymbIdent !Int !Expression // Function or constructor symbol, argument position (>=1)
+	|	CP_LiftedFunArg !Ident !Ident // Function symbol, lifted argument ident
+
 ::	Requirements =
 	{	req_overloaded_calls	:: ![ExprInfoPtr]
 	,	req_type_coercions		:: ![TypeCoercion]
@@ -881,6 +887,7 @@ where
 	| VITI_PatternType [AType] /*module*/!Index /*constructor*/!Index !VI_TypeInfo
 	| VITI_ExiPatternType [AType] /*module*/!Index /*constructor*/!Index !ExiVarNumbers !VI_TypeInfo
 	| VITI_ExiVars !ExiVarNumbers !VI_TypeInfo
+	| VITI_Coercion CoercionPosition
 
 freshRecordType :: ![ATypeVar] ![AttributeVar] ![AlgebraicPattern] !{#CommonDefs} !Expression !*TypeState
 					-> (![[AType]],!AType,![AttrCoercion],![(DefinedSymbol,[TypeContext])],!ExiVarNumbers,!*TypeState)
@@ -3374,6 +3381,65 @@ getTypeInfoOfVariable {var_info_ptr} var_heap
 			-> (type_info, var_heap)
 
 empty_id =: { id_name = "", id_info = nilPtr }
+
+instance <<< CoercionPosition
+where
+	(<<<) file (CP_FunArg fun_name arg_nr)
+		= file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name
+	(<<<) file (CP_SymbArgAndExpression fun_name arg_nr expression)
+		= show_expression (file <<< "argument " <<< arg_nr <<< " of " <<< readable fun_name.symb_ident <<< " : ") expression
+	(<<<) file (CP_LiftedFunArg fun_name arg_name)
+		= file <<< "lifted argument " <<< arg_name <<< " of " <<< readable fun_name
+	(<<<) file (CP_Expression expression) = show_expression file expression
+
+show_expression file (Var {var_ident})
+	= file <<< var_ident
+show_expression file (FreeVar {fv_ident})
+	= file <<< fv_ident
+show_expression file (App {app_symb={symb_ident}, app_args})
+	| symb_ident.id_name=="_dummyForStrictAlias"
+		= show_expression file (hd app_args)
+	= file <<< readable symb_ident
+show_expression file (fun @ fun_args)
+	= show_expression file fun
+show_expression file (Case {case_ident=No})
+	= file <<< "(case ... )"
+show_expression file (Selection _ expr selectors)
+	= file <<< "selection"
+show_expression file (Update expr1 selectors expr2)
+	= file <<< "update"
+show_expression file (TupleSelect {ds_arity} elem_nr expr)
+	= file <<< "argument " <<< (elem_nr + 1) <<< " of " <<< ds_arity <<< "-tuple"
+show_expression file (BasicExpr bv)
+	= file <<< bv
+show_expression file (RecordUpdate _ _ _)
+	= file <<< "update of record"
+show_expression file (MatchExpr _ expr)
+	= file <<< "match expression"
+show_expression file (IsConstructor _ _ _ _ _ _)
+	= file <<< "is constructor expression"
+show_expression file (Let _)
+	= file <<< "(let ... ) or #"
+show_expression file _
+	= file
+
+readable :: !Ident -> String // somewhat hacky
+readable {id_name}
+	| size id_name>0 && id_name.[0]=='_'
+		| id_name=="_Cons" || id_name=="_Nil"
+			= "list constructor"
+		| id_name=="_!Cons" || id_name=="_!Nil"
+			= "! list constructor"
+		| id_name=="_#Cons" || id_name=="_#Nil"
+			= "# list constructor"
+		| id_name=="_Cons!" || id_name=="_Nil!"
+			= "list constructor !"
+		| id_name=="_!Cons!" || id_name=="_!Nil!"
+			= "! list constructor !"
+		| id_name=="_#Cons!" || id_name=="_#Nil!"
+			= "# list constructor !"
+			= id_name%(1, size id_name-1)
+	= id_name
 
 instance <<< (Ptr a)
 where
