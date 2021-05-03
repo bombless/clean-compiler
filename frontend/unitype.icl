@@ -1013,14 +1013,14 @@ uniquenessErrorVar {fv_info_ptr,fv_ident} (TransformedBody {tb_args,tb_rhs}) mes
 	# position = find_var_position_in_expression fv_info_ptr tb_rhs
 	= case position of
 		LinePos file_name line_n
-			# ea_file = err.ea_file <<< "Uniqueness error " <<< {sp_file=file_name,sp_line=line_n,sp_name=fv_ident.id_name} <<< '\"' <<< mess <<< '\n'
+			# ea_file = err.ea_file <<< "Uniqueness error " <<< {ep_ident=fv_ident,ep_position=position} <<< '\"' <<< mess <<< '\n'
 			-> {err & ea_file = ea_file, ea_ok = False}
 		_
 			-> uniquenessErrorFreeVar fv_ident mess err
 
 uniquenessErrorFreeVar :: !Ident !String !*ErrorAdmin -> *ErrorAdmin
-uniquenessErrorFreeVar ident mess err=:{ea_file,ea_loc=[{ep_ident,ep_position}:_]}
-	# ea_file = ea_file <<< "Uniqueness error " <<< stringPosition ep_ident.id_name ep_position <<< ": \"" <<< ident <<< '\"' <<< mess <<< '\n'
+uniquenessErrorFreeVar ident mess err=:{ea_file,ea_loc=[ep:_]}
+	# ea_file = ea_file <<< "Uniqueness error " <<< ep <<< ": \"" <<< ident <<< '\"' <<< mess <<< '\n'
 	= {err & ea_file = ea_file, ea_ok = False}
 
 var_in_free_vars var_ptr []

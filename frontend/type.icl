@@ -255,10 +255,8 @@ type_error_format =: { form_properties = cNoProperties, form_attr_position = No 
 cannotUnify t1 t2 position=:(CP_Expression expr) common_defs err=:{ea_loc=[{ep_position}:_]}
 	= case tryToOptimizePosition expr of
 		Yes (id_name, line)
-			# err = errorHeadingWithPositionNameAndLine type_error ep_position id_name line err
-			  err = { err & ea_file = err.ea_file <<< " cannot unify demanded type with offered type:\n" }
-			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t1, No) <<< '\n' }
-			  err = { err & ea_file = err.ea_file <<< " " <:: (type_error_format, t2, No) <<< '\n' }
+			# (err=:{ea_file}) = errorHeadingWithPositionNameAndLine type_error ep_position id_name line err
+			  err & ea_file = write_cannot_unify_error_message t1 t2 type_error_format ea_file
 			-> err
 		_
 			-> cannot_unify t1 t2 position common_defs err
@@ -289,10 +287,14 @@ cannot_unify t1 t2 position common_defs err
 	  				-> ea_file <<< " near " <<< position <<< " :"
 	  			_
 	  				-> ea_file
-	  ea_file = ea_file <<< " cannot unify demanded type with offered type:\n"
-	  ea_file = ea_file <<< " " <:: (type_error_format, t1, No) <<< "\n"
-	  ea_file = ea_file <<< " " <:: (type_error_format, t2, No) <<< "\n"
+	  ea_file = write_cannot_unify_error_message t1 t2 type_error_format ea_file
 	= { err & ea_file = ea_file}
+
+write_cannot_unify_error_message t1 t2 type_error_format error_file
+	# error_file = error_file <<< " cannot unify demanded type with offered type:\n"
+	  error_file = error_file <<< " " <:: (type_error_format, t1, No) <<< '\n'
+	  error_file = error_file <<< " " <:: (type_error_format, t2, No) <<< '\n'
+	= error_file
 
 existentialError position=:(CP_Expression expr) err=:{ea_loc=[{ep_position}:_]}
 	= case tryToOptimizePosition expr of

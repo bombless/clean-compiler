@@ -293,8 +293,8 @@ where
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 errorHeading error_kind err=:{ea_file,ea_loc = []}
 	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }
-errorHeading error_kind err=:{ea_file,ea_loc = [{ep_ident,ep_position} : _ ]}
-	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< stringPosition ep_ident.id_name ep_position <<< ':', ea_ok = False }
+errorHeading error_kind err=:{ea_file,ea_loc = [ep : _]}
+	= { err & ea_file = ea_file <<< error_kind <<< ' ' <<< ep <<< ':', ea_ok = False }
 
 errorHeadingWithPositionNameAndLine :: !String !Position !String !Int !*ErrorAdmin -> *ErrorAdmin
 errorHeadingWithPositionNameAndLine error_kind pos ident_name line_n err=:{ea_file}

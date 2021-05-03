@@ -1478,12 +1478,6 @@ instance == OverloadedPatternType
 	,	ip_file		:: !FileName
 	}
 
-::	StringPos =
-	{	sp_name		:: !String
-	,	sp_line		:: !Int
-	,	sp_file		:: !FileName
-	}
-
 :: FileName			:== String
 
 :: FunctName		:== String

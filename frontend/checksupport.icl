@@ -46,13 +46,27 @@ where
 	popErrorAdmin cs=:{cs_error}
 		= {cs & cs_error = popErrorAdmin cs_error}
 
-stringPosition :: !String !Position -> StringPos
-stringPosition id (LinePos file_name line_nr)
-	= { sp_name = id, sp_line = line_nr, sp_file = file_name }
-stringPosition id (PreDefPos file_name)
-	= { sp_name = id, sp_line = cNotALineNumber, sp_file = file_name.id_name }
-stringPosition id NoPos
-	= { sp_name = id, sp_line = cNotALineNumber, sp_file = "???" }
+instance <<< ErrorPosition
+where
+	(<<<) file {ep_ident,ep_position}
+		= writeErrorPosition ep_position ep_ident.id_name (file <<< '[') <<< ']'
+
+::	StringPosition = { sp_name :: !String, sp_position :: !Position }
+
+instance <<< StringPosition
+where
+	(<<<) file {sp_name,sp_position}
+		= writeErrorPosition sp_position sp_name (file <<< '[') <<< ']'
+
+writeErrorPosition :: !Position !{#Char} !*File -> *File
+writeErrorPosition (LinePos module_name line_n) name file
+	| line_n == cNotALineNumber
+		= file <<< module_name <<< ',' <<< name
+		= file <<< module_name <<< ',' <<< line_n <<< ',' <<< name
+writeErrorPosition (PreDefPos {id_name}) name file
+	= file <<< id_name <<< ',' <<< name
+writeErrorPosition _ name file
+	= file <<< "???" <<< ',' <<< name
 
 writePositionModuleName :: !Position !*File -> *File
 writePositionModuleName (LinePos file_name _) file
@@ -65,14 +79,14 @@ writePositionModuleName NoPos file
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkError id mess error=:{ea_file,ea_loc=[]}
 	= { error & ea_file = ea_file <<< "Error " <<< " " <<< id <<< " " <<< mess <<< '\n', ea_ok = False }
-checkError id mess error=:{ea_file,ea_loc=[{ep_ident,ep_position}:_]}
-	= { error & ea_file = ea_file <<< "Error " <<< stringPosition ep_ident.id_name ep_position <<< ": " <<< id  <<< " " <<< mess <<< '\n', ea_ok = False }
+checkError id mess error=:{ea_file,ea_loc=[ep:_]}
+	= { error & ea_file = ea_file <<< "Error " <<< ep <<< ": " <<< id  <<< " " <<< mess <<< '\n', ea_ok = False }
 
 checkWarning :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 checkWarning id mess error=:{ea_file,ea_loc=[]}
 	= { error & ea_file = ea_file <<< "Warning " <<< " " <<< id <<< " " <<< mess <<< '\n' }
-checkWarning id mess error=:{ea_file,ea_loc=[{ep_ident,ep_position}:_]}
-	= { error & ea_file = ea_file <<< "Warning " <<< stringPosition ep_ident.id_name ep_position <<< ": " <<< id  <<< " " <<< mess <<< '\n' }
+checkWarning id mess error=:{ea_file,ea_loc=[ep:_]}
+	= { error & ea_file = ea_file <<< "Warning " <<< ep <<< ": " <<< id  <<< " " <<< mess <<< '\n' }
 
 checkErrorIdentWithIdentPos :: !IdentPos !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorIdentWithIdentPos ident_pos id mess error=:{ea_file}
@@ -80,7 +94,7 @@ checkErrorIdentWithIdentPos ident_pos id mess error=:{ea_file}
 
 checkErrorIdentWithPosition :: !Ident !Position !Ident !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorIdentWithPosition ident pos id mess error=:{ea_file}
-	= { error & ea_file = ea_file <<< "Error " <<< stringPosition ident.id_name pos <<< ": " <<< id  <<< ' ' <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< {ep_ident=ident,ep_position=pos} <<< ": " <<< id <<< ' ' <<< mess <<< '\n', ea_ok = False }
 
 checkErrorWithIdentPos :: !IdentPos !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorWithIdentPos ident_pos mess error=:{ea_file}
@@ -88,16 +102,15 @@ checkErrorWithIdentPos ident_pos mess error=:{ea_file}
 
 checkErrorWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkErrorWithPosition ident pos mess error=:{ea_file}
-	= { error & ea_file = ea_file <<< "Error " <<< stringPosition ident.id_name pos <<< ": " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< {ep_ident=ident,ep_position=pos} <<< ": " <<< mess <<< '\n', ea_ok = False }
 
 checkErrorWithStringPosition :: !{#Char} !Position !a !*ErrorAdmin -> *ErrorAdmin | <<< a;
 checkErrorWithStringPosition string pos mess error=:{ea_file}
-	# string_pos = stringPosition string pos
-	= { error & ea_file = ea_file <<< "Error " <<< string_pos <<< ": " <<< mess <<< '\n', ea_ok = False }
+	= { error & ea_file = ea_file <<< "Error " <<< {sp_name=string,sp_position=pos} <<< ": " <<< mess <<< '\n', ea_ok = False }
 
 checkWarningWithPosition :: !Ident !Position !a !*ErrorAdmin -> .ErrorAdmin | <<< a;
 checkWarningWithPosition ident pos mess error=:{ea_file}
-	= { error & ea_file = ea_file <<< "Warning " <<< stringPosition ident.id_name pos <<< ": " <<< mess <<< '\n' }
+	= { error & ea_file = ea_file <<< "Warning " <<< {ep_ident=ident,ep_position=pos} <<< ": " <<< mess <<< '\n' }
 
 class envLookUp a :: !a !(Env Ident .b) -> (!Bool,.b)
 
@@ -585,12 +598,6 @@ where
 	| ip_line == cNotALineNumber
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_ident <<< ']'
 		= file <<< '[' <<< ip_file <<< ',' <<< ip_line <<< ',' <<< ip_ident <<< ']'
-
-instance <<< StringPos where
-	(<<<) file {sp_file,sp_line,sp_name}
-	| sp_line == cNotALineNumber
-		= file <<< '[' <<< sp_file <<< ',' <<< sp_name <<< ']'
-		= file <<< '[' <<< sp_file <<< ',' <<< sp_line <<< ',' <<< sp_name <<< ']'
 
 import_ident :: Ident
 import_ident =: { id_name = "import", id_info = nilPtr }

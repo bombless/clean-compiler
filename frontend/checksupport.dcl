@@ -65,7 +65,7 @@ where
 
 instance Erroradmin ErrorAdmin, CheckState
 
-stringPosition :: !String !Position -> StringPos
+instance <<< ErrorPosition
 
 checkError :: !a !b !*ErrorAdmin -> *ErrorAdmin | <<< a & <<< b
 	special a={#Char},b={#Char}; a=Ident,b={#Char}
@@ -92,7 +92,7 @@ instance toIdent ConsDef, (TypeDef a), ClassDef, MemberDef, FunDef, SelectorDef 
 instance toIdent SymbIdent, TypeSymbIdent, BoundVar, TypeVar, ATypeVar, Ident
 
 instance toInt STE_Kind
-instance <<< IdentPos, StringPos
+instance <<< IdentPos
 writePositionModuleName :: !Position !*File -> *File
 
 ::	ExpressionInfo =
