@@ -4519,10 +4519,9 @@ where
 									->	case acc of
 											[e]
 												# pd_from_to_index =
-													if (head_strictness==HeadStrict) PD_FromToS
-													(if (head_strictness==HeadUnboxed) PD_FromToU
-													(if (head_strictness==HeadOverloaded) PD_FromToO
-														PD_FromTo))
+													if (head_strictness==HeadStrict) PD_FromToSTS
+													(if (head_strictness==HeadUnboxed) PD_FromToUTS
+														PD_FromToTS)
 												-> (PE_Sequ (SQ_FromTo pd_from_to_index e exp), pState)
 											[e2,e1]
 												# pd_from_then_to_index =
