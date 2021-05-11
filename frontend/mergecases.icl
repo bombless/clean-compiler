@@ -22,6 +22,33 @@ instance GetSetPatternRhs DynamicPattern
 		get_pattern_rhs p = p.dp_rhs
 		set_pattern_rhs p expr = {p & dp_rhs=expr}
 
+mergeExplicitCasePatterns :: !CasePatterns !*VarHeap !*ExpressionHeap !*ErrorAdmin
+						-> *(!CasePatterns,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+mergeExplicitCasePatterns case_patterns var_heap symbol_heap error
+	# (first_case_pattern,next_case_patterns) = split_patterns case_patterns
+	= mergeCasePatterns first_case_pattern next_case_patterns var_heap symbol_heap error
+where
+	split_patterns (AlgebraicPatterns index [pattern:patterns=:[_:_]])
+		= (AlgebraicPatterns index [pattern], [AlgebraicPatterns index [pattern] \\ pattern <- patterns])
+	split_patterns (BasicPatterns basicType [pattern:patterns=:[_:_]])
+		= (BasicPatterns basicType [pattern], [BasicPatterns basicType [pattern] \\ pattern <- patterns])
+	split_patterns (OverloadedPatterns overloaded_list_type decons_expr [pattern:patterns=:[_:_]])
+		= (OverloadedPatterns overloaded_list_type decons_expr [pattern], [OverloadedPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns])
+	split_patterns (NewTypePatterns index [pattern:patterns=:[_:_]])
+		= (NewTypePatterns index [pattern], [NewTypePatterns index [pattern] \\ pattern <- patterns])
+	split_patterns (DynamicPatterns [pattern:patterns=:[_:_]])
+		= (DynamicPatterns [pattern], [DynamicPatterns [pattern] \\ pattern <- patterns])
+	split_patterns case_patterns
+		= (case_patterns, [])
+
+	mergeCasePatterns :: !CasePatterns ![CasePatterns] !*VarHeap !*ExpressionHeap !*ErrorAdmin
+									-> *(!CasePatterns,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+	mergeCasePatterns case_patterns [] var_heap symbol_heap error
+		= (case_patterns, var_heap, symbol_heap, error)
+	mergeCasePatterns case_patterns [next_case_patterns : remaining_case_patterns] var_heap symbol_heap error
+		# (case_patterns, var_heap, symbol_heap, error) = merge_guards case_patterns next_case_patterns var_heap symbol_heap error
+		= mergeCasePatterns case_patterns remaining_case_patterns var_heap symbol_heap error
+
 mergeCases :: !(!Expression, !Position) ![(Expression, Position)] !*VarHeap !*ExpressionHeap !*ErrorAdmin
 								  -> *(!(!Expression, !Position), !*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 mergeCases expr_and_pos [] var_heap symbol_heap error
@@ -259,127 +286,31 @@ where
 		  (patterns, var_heap, expr_heap) = push_let_expression_into_algebraic_pattern lad patterns var_heap expr_heap
 		= ([{pattern & ap_expr = ap_expr} : patterns], var_heap, expr_heap)
 
-	merge_guards guards=:(AlgebraicPatterns type1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
-		| type1 == type2
-			= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(BasicPatterns basic_type1 patterns1) (BasicPatterns basic_type2 patterns2) var_heap symbol_heap error
-		| basic_type1 == basic_type2
-			# (merged_patterns, var_heap, symbol_heap, error) = merge_basic_patterns patterns1 patterns2 var_heap symbol_heap error
-			= (BasicPatterns basic_type1 merged_patterns, var_heap, symbol_heap, error) 
-			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
-		| type1 == type2
-			= merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
-		= case (type1,type2) of
-			(OverloadedList _ _ _,UnboxedList _ _ _)
-				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
-				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
-			(OverloadedList _ _ _,UnboxedTailStrictList _ _ _)
-				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
-				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
-			(UnboxedList _ _ _,OverloadedList _ _ _)
-				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
-				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
-			(UnboxedTailStrictList _ _ _,OverloadedList _ _ _)
-				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
-				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
-			(OverloadedMaybe _ _ _,UnboxedMaybe _ _ _)
-				# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
-				-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
-			(UnboxedMaybe _ _ _,OverloadedMaybe _ _ _)
-				# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
-				-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
-			_
-				-> (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(NewTypePatterns type1 patterns1) (NewTypePatterns type2 patterns2) var_heap symbol_heap error
-		| type1 == type2
-			# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
-			= (NewTypePatterns type1 merged_patterns, var_heap, symbol_heap, error) 
-			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(DynamicPatterns  patterns1) (DynamicPatterns  patterns2) var_heap symbol_heap error
-		# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
-		= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error) 
-	merge_guards guards=:(AlgebraicPatterns type1=:{gi_module,gi_index} patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
-		| gi_module==cPredefinedModuleIndex
-			| type2=:OverloadedList _ _ _
-				| gi_index==PD_ListTypeIndex
-					# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_ConsSymbol PD_NilSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictListTypeIndex
-					# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_StrictConsSymbol PD_StrictNilSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_TailStrictListTypeIndex
-					# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_TailStrictConsSymbol PD_TailStrictNilSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictTailStrictListTypeIndex
-					# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-			| type2=:OverloadedMaybe _ _ _
-				| gi_index==PD_MaybeTypeIndex
-					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_JustSymbol PD_NoneSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictMaybeTypeIndex
-					# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_StrictJustSymbol PD_StrictNoneSymbol
-					= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
-					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2=:{gi_module,gi_index} patterns2) var_heap symbol_heap error
-		| gi_module==cPredefinedModuleIndex
-			| type1=:OverloadedList _ _ _
-				| gi_index==PD_ListTypeIndex
-					# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_ConsSymbol PD_NilSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictListTypeIndex
-					# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_StrictConsSymbol PD_StrictNilSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_TailStrictListTypeIndex
-					# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_TailStrictConsSymbol PD_TailStrictNilSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictTailStrictListTypeIndex
-					# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-			| type1=:OverloadedMaybe _ _ _
-				| gi_index==PD_MaybeTypeIndex
-					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_JustSymbol PD_NoneSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-				| gi_index==PD_StrictMaybeTypeIndex
-					# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_StrictJustSymbol PD_StrictNoneSymbol
-					= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
-					= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-	merge_guards patterns1 patterns2 var_heap symbol_heap error
-		= (patterns1, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
-		
-	merge_algebraic_patterns type patterns1 patterns2 var_heap symbol_heap error
-		# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
-		= (AlgebraicPatterns type merged_patterns, var_heap, symbol_heap, error) 
+mergeCases (Case first_case=:{case_default, case_default_pos, case_explicit}, case_pos) [expr : exprs] var_heap symbol_heap error
+	| not case_explicit
+		= case case_default of
+			Yes default_expr
+				# ((default_expr, case_default_pos), var_heap, symbol_heap, error) = mergeCases (default_expr, case_default_pos) [expr : exprs] var_heap symbol_heap error
+				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = case_default_pos }, case_pos),
+					var_heap, symbol_heap, error)
+			No
+				# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
+				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = pos }, case_pos),
+					var_heap, symbol_heap, error)
+mergeCases expr_and_pos=:(_,pos) _ var_heap symbol_heap error
+	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
 
-	merge_overloaded_list_patterns type decons_expr patterns1 patterns2 var_heap symbol_heap error
-		# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
-		= (OverloadedPatterns type decons_expr merged_patterns, var_heap, symbol_heap, error)
-
-	merge_algebraic_or_overloaded_list_patterns patterns [] var_heap symbol_heap error
-		= (patterns, var_heap, symbol_heap, error)
-	merge_algebraic_or_overloaded_list_patterns patterns [alg_pattern : alg_patterns] var_heap symbol_heap error
-		# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns alg_pattern patterns var_heap symbol_heap error
-		= merge_algebraic_or_overloaded_list_patterns patterns alg_patterns var_heap symbol_heap error
-	where
-		merge_algebraic_pattern_with_patterns new_pattern [pattern=:{ap_symbol,ap_vars,ap_expr} : patterns] var_heap symbol_heap error
-			| new_pattern.ap_symbol == ap_symbol
-				| isEmpty new_pattern.ap_vars
-					# ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_pattern.ap_expr, NoPos)] var_heap symbol_heap error
-					= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
-					# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
-					  ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_expr, NoPos)] var_heap symbol_heap error
-					= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
-				# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error		
-				= ([ pattern : patterns ], var_heap, symbol_heap, error)
-		merge_algebraic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
-			= ([new_pattern], var_heap, symbol_heap, error)
-	
+merge_guards :: CasePatterns CasePatterns *VarHeap *ExpressionHeap *ErrorAdmin -> (CasePatterns,*VarHeap,*ExpressionHeap,*ErrorAdmin)
+merge_guards guards=:(AlgebraicPatterns type1 patterns1) (AlgebraicPatterns type2 patterns2) var_heap symbol_heap error
+	| type1 == type2
+		= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+		= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+merge_guards guards=:(BasicPatterns basic_type1 patterns1) (BasicPatterns basic_type2 patterns2) var_heap symbol_heap error
+	| basic_type1 == basic_type2
+		# (merged_patterns, var_heap, symbol_heap, error) = merge_basic_patterns patterns1 patterns2 var_heap symbol_heap error
+		= (BasicPatterns basic_type1 merged_patterns, var_heap, symbol_heap, error) 
+		= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+where
 	merge_basic_patterns patterns [] var_heap symbol_heap error
 		= (patterns, var_heap, symbol_heap, error)
 	merge_basic_patterns patterns [alg_pattern : alg_patterns] var_heap symbol_heap error
@@ -394,6 +325,120 @@ where
 				= ([ pattern : patterns ], var_heap, symbol_heap, error)
 		merge_basic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
 			= ([new_pattern], var_heap, symbol_heap, error)
+merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
+	| type1 == type2
+		= merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
+	= case (type1,type2) of
+		(OverloadedList _ _ _,UnboxedList _ _ _)
+			# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
+			-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
+		(OverloadedList _ _ _,UnboxedTailStrictList _ _ _)
+			# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
+			-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
+		(UnboxedList _ _ _,OverloadedList _ _ _)
+			# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedConsSymbol PD_UnboxedNilSymbol
+			-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
+		(UnboxedTailStrictList _ _ _,OverloadedList _ _ _)
+			# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_UnboxedTailStrictConsSymbol PD_UnboxedTailStrictNilSymbol
+			-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
+		(OverloadedMaybe _ _ _,UnboxedMaybe _ _ _)
+			# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
+			-> merge_overloaded_list_patterns type2 decons_expr2 patterns1 patterns2 var_heap symbol_heap error
+		(UnboxedMaybe _ _ _,OverloadedMaybe _ _ _)
+			# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_UnboxedJustSymbol PD_UnboxedNoneSymbol
+			-> merge_overloaded_list_patterns type1 decons_expr1 patterns1 patterns2 var_heap symbol_heap error
+		_
+			-> (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+where
+	merge_overloaded_list_patterns type decons_expr patterns1 patterns2 var_heap symbol_heap error
+		# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
+		= (OverloadedPatterns type decons_expr merged_patterns, var_heap, symbol_heap, error)
+merge_guards guards=:(NewTypePatterns type1 patterns1) (NewTypePatterns type2 patterns2) var_heap symbol_heap error
+	| type1 == type2
+		# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
+		= (NewTypePatterns type1 merged_patterns, var_heap, symbol_heap, error) 
+		= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+merge_guards guards=:(DynamicPatterns  patterns1) (DynamicPatterns  patterns2) var_heap symbol_heap error
+	# (merged_patterns, var_heap, symbol_heap, error) = merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
+	= (DynamicPatterns merged_patterns, var_heap, symbol_heap, error)
+where
+	merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
+		= (patterns1 ++ patterns2, var_heap, symbol_heap, error)
+merge_guards guards=:(AlgebraicPatterns type1=:{gi_module,gi_index} patterns1) (OverloadedPatterns type2 decons_expr2 patterns2) var_heap symbol_heap error
+	| gi_module==cPredefinedModuleIndex
+		| type2=:OverloadedList _ _ _
+			| gi_index==PD_ListTypeIndex
+				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_ConsSymbol PD_NilSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictListTypeIndex
+				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_StrictConsSymbol PD_StrictNilSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_TailStrictListTypeIndex
+				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_TailStrictConsSymbol PD_TailStrictNilSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictTailStrictListTypeIndex
+				# patterns2=replace_overloaded_symbols_in_patterns patterns2 PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+		| type2=:OverloadedMaybe _ _ _
+			| gi_index==PD_MaybeTypeIndex
+				# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_JustSymbol PD_NoneSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictMaybeTypeIndex
+				# patterns2=replace_overloaded_maybe_symbols_in_patterns patterns2 PD_StrictJustSymbol PD_StrictNoneSymbol
+				= merge_algebraic_patterns type1 patterns1 patterns2 var_heap symbol_heap error
+				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+merge_guards guards=:(OverloadedPatterns type1 decons_expr1 patterns1) (AlgebraicPatterns type2=:{gi_module,gi_index} patterns2) var_heap symbol_heap error
+	| gi_module==cPredefinedModuleIndex
+		| type1=:OverloadedList _ _ _
+			| gi_index==PD_ListTypeIndex
+				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_ConsSymbol PD_NilSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictListTypeIndex
+				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_StrictConsSymbol PD_StrictNilSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_TailStrictListTypeIndex
+				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_TailStrictConsSymbol PD_TailStrictNilSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictTailStrictListTypeIndex
+				# patterns1=replace_overloaded_symbols_in_patterns patterns1 PD_StrictTailStrictConsSymbol PD_StrictTailStrictNilSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+		| type1=:OverloadedMaybe _ _ _
+			| gi_index==PD_MaybeTypeIndex
+				# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_JustSymbol PD_NoneSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+			| gi_index==PD_StrictMaybeTypeIndex
+				# patterns1=replace_overloaded_maybe_symbols_in_patterns patterns1 PD_StrictJustSymbol PD_StrictNoneSymbol
+				= merge_algebraic_patterns type2 patterns1 patterns2 var_heap symbol_heap error
+				= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+			= (guards, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+merge_guards patterns1 patterns2 var_heap symbol_heap error
+	= (patterns1, var_heap, symbol_heap, incompatible_patterns_in_case_error error)
+
+merge_algebraic_patterns type patterns1 patterns2 var_heap symbol_heap error
+	# (merged_patterns, var_heap, symbol_heap, error) = merge_algebraic_or_overloaded_list_patterns patterns1 patterns2 var_heap symbol_heap error
+	= (AlgebraicPatterns type merged_patterns, var_heap, symbol_heap, error)
+
+merge_algebraic_or_overloaded_list_patterns patterns [] var_heap symbol_heap error
+	= (patterns, var_heap, symbol_heap, error)
+merge_algebraic_or_overloaded_list_patterns patterns [alg_pattern : alg_patterns] var_heap symbol_heap error
+	# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns alg_pattern patterns var_heap symbol_heap error
+	= merge_algebraic_or_overloaded_list_patterns patterns alg_patterns var_heap symbol_heap error
+where
+	merge_algebraic_pattern_with_patterns new_pattern [pattern=:{ap_symbol,ap_vars,ap_expr} : patterns] var_heap symbol_heap error
+		| new_pattern.ap_symbol == ap_symbol
+			| isEmpty new_pattern.ap_vars
+				# ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_pattern.ap_expr, NoPos)] var_heap symbol_heap error
+				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
+				# (new_expr, var_heap, symbol_heap) = replace_variables new_pattern.ap_vars new_pattern.ap_expr ap_vars var_heap symbol_heap
+				  ((ap_expr, _), var_heap, symbol_heap, error) = mergeCases (ap_expr, NoPos) [(new_expr, NoPos)] var_heap symbol_heap error
+				= ([{ pattern & ap_expr = ap_expr} : patterns], var_heap, symbol_heap, error)
+			# (patterns, var_heap, symbol_heap, error) = merge_algebraic_pattern_with_patterns new_pattern patterns var_heap symbol_heap error
+			= ([ pattern : patterns ], var_heap, symbol_heap, error)
+	merge_algebraic_pattern_with_patterns new_pattern [] var_heap symbol_heap error
+		= ([new_pattern], var_heap, symbol_heap, error)
 
 	replace_variables vars expr ap_vars var_heap symbol_heap
 		# var_heap = build_aliases vars ap_vars var_heap
@@ -406,64 +451,47 @@ where
 		build_aliases [] [] var_heap
 			= var_heap
 
-	merge_dynamic_patterns patterns1 patterns2 var_heap symbol_heap error
-		= (patterns1 ++ patterns2, var_heap, symbol_heap, error)
-	
-	replace_overloaded_symbols_in_patterns [] pd_cons_symbol pd_nil_symbol
-		= []
-	replace_overloaded_symbols_in_patterns [pattern=:{ap_symbol={glob_module,glob_object}}:patterns] pd_cons_symbol pd_nil_symbol
-		# pattern = replace_overloaded_symbol_in_pattern pattern pd_cons_symbol pd_nil_symbol
-		# patterns = replace_overloaded_symbols_in_patterns patterns pd_cons_symbol pd_nil_symbol
-		= [pattern:patterns]
-	where
-		replace_overloaded_symbol_in_pattern pattern=:{ap_symbol={glob_module,glob_object}} pd_cons_symbol pd_nil_symbol
-			| glob_module==cPredefinedModuleIndex
-				# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
-				| index==PD_OverloadedConsSymbol
-					# new_cons_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex
-					# new_cons_ident=predefined_idents.[pd_cons_symbol]
-					# glob_object = {glob_object & ds_index=new_cons_index,ds_ident=new_cons_ident}
-					= {pattern & ap_symbol.glob_object=glob_object}
-				| index==PD_OverloadedNilSymbol
-					# new_nil_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex
-					# new_nil_ident=predefined_idents.[pd_nil_symbol]
-					# glob_object = {glob_object & ds_index=new_nil_index,ds_ident=new_nil_ident}
-					= {pattern & ap_symbol.glob_object=glob_object}
-					= abort "replace_overloaded_symbol_in_pattern"
+replace_overloaded_symbols_in_patterns [] pd_cons_symbol pd_nil_symbol
+	= []
+replace_overloaded_symbols_in_patterns [pattern=:{ap_symbol={glob_module,glob_object}}:patterns] pd_cons_symbol pd_nil_symbol
+	# pattern = replace_overloaded_symbol_in_pattern pattern pd_cons_symbol pd_nil_symbol
+	# patterns = replace_overloaded_symbols_in_patterns patterns pd_cons_symbol pd_nil_symbol
+	= [pattern:patterns]
+where
+	replace_overloaded_symbol_in_pattern pattern=:{ap_symbol={glob_module,glob_object}} pd_cons_symbol pd_nil_symbol
+		| glob_module==cPredefinedModuleIndex
+			# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
+			| index==PD_OverloadedConsSymbol
+				# new_cons_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex
+				# new_cons_ident=predefined_idents.[pd_cons_symbol]
+				# glob_object = {glob_object & ds_index=new_cons_index,ds_ident=new_cons_ident}
+				= {pattern & ap_symbol.glob_object=glob_object}
+			| index==PD_OverloadedNilSymbol
+				# new_nil_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex
+				# new_nil_ident=predefined_idents.[pd_nil_symbol]
+				# glob_object = {glob_object & ds_index=new_nil_index,ds_ident=new_nil_ident}
+				= {pattern & ap_symbol.glob_object=glob_object}
+				= abort "replace_overloaded_symbol_in_pattern"
 
-	replace_overloaded_maybe_symbols_in_patterns [] pd_cons_symbol pd_nil_symbol
-		= []
-	replace_overloaded_maybe_symbols_in_patterns [pattern=:{ap_symbol={glob_module,glob_object}}:patterns] pd_cons_symbol pd_nil_symbol
-		# pattern = replace_overloaded_maybe_symbol_in_pattern pattern pd_cons_symbol pd_nil_symbol
-		# patterns = replace_overloaded_maybe_symbols_in_patterns patterns pd_cons_symbol pd_nil_symbol
-		= [pattern:patterns]
-	where
-		replace_overloaded_maybe_symbol_in_pattern pattern=:{ap_symbol={glob_module,glob_object}} pd_cons_symbol pd_nil_symbol
-			| glob_module==cPredefinedModuleIndex
-				# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
-				| index==PD_OverloadedJustSymbol
-					# glob_object & ds_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex,
-									ds_ident=predefined_idents.[pd_cons_symbol]
-					= {pattern & ap_symbol.glob_object=glob_object}
-				| index==PD_OverloadedNoneSymbol
-					# glob_object & ds_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex,
-									ds_ident=predefined_idents.[pd_nil_symbol]
-					= {pattern & ap_symbol.glob_object=glob_object}
-					= abort "replace_overloaded_maybe_symbol_in_pattern"
+replace_overloaded_maybe_symbols_in_patterns [] pd_cons_symbol pd_nil_symbol
+	= []
+replace_overloaded_maybe_symbols_in_patterns [pattern=:{ap_symbol={glob_module,glob_object}}:patterns] pd_cons_symbol pd_nil_symbol
+	# pattern = replace_overloaded_maybe_symbol_in_pattern pattern pd_cons_symbol pd_nil_symbol
+	# patterns = replace_overloaded_maybe_symbols_in_patterns patterns pd_cons_symbol pd_nil_symbol
+	= [pattern:patterns]
+where
+	replace_overloaded_maybe_symbol_in_pattern pattern=:{ap_symbol={glob_module,glob_object}} pd_cons_symbol pd_nil_symbol
+		| glob_module==cPredefinedModuleIndex
+			# index=glob_object.ds_index+FirstConstructorPredefinedSymbolIndex
+			| index==PD_OverloadedJustSymbol
+				# glob_object & ds_index=pd_cons_symbol-FirstConstructorPredefinedSymbolIndex,
+								ds_ident=predefined_idents.[pd_cons_symbol]
+				= {pattern & ap_symbol.glob_object=glob_object}
+			| index==PD_OverloadedNoneSymbol
+				# glob_object & ds_index=pd_nil_symbol-FirstConstructorPredefinedSymbolIndex,
+								ds_ident=predefined_idents.[pd_nil_symbol]
+				= {pattern & ap_symbol.glob_object=glob_object}
+				= abort "replace_overloaded_maybe_symbol_in_pattern"
 
-	incompatible_patterns_in_case_error error
-		= checkError "" "incompatible patterns in case" error
-
-mergeCases (Case first_case=:{case_default, case_default_pos, case_explicit}, case_pos) [expr : exprs] var_heap symbol_heap error
-	| not case_explicit
-		= case case_default of
-			Yes default_expr
-				# ((default_expr, case_default_pos), var_heap, symbol_heap, error) = mergeCases (default_expr, case_default_pos) [expr : exprs] var_heap symbol_heap error
-				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = case_default_pos }, case_pos),
-					var_heap, symbol_heap, error)
-			No
-				# ((default_expr, pos), var_heap, symbol_heap, error) = mergeCases expr exprs var_heap symbol_heap error
-				-> ((Case { first_case & case_default = Yes default_expr, case_default_pos = pos }, case_pos),
-					var_heap, symbol_heap, error)
-mergeCases expr_and_pos=:(_,pos) _ var_heap symbol_heap error
-	= (expr_and_pos, var_heap, symbol_heap, checkWarning "" " alternative will never match" error)
+incompatible_patterns_in_case_error error
+	= checkError "" "incompatible patterns in case" error

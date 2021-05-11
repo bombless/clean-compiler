@@ -1788,43 +1788,12 @@ where
 		# ((case_expr,(case_guards,case_default)), ei) = expand (case_expr,(case_guards,case_default)) ei
 		= ({ kees & case_expr = case_expr,case_guards = case_guards, case_default = case_default }, ei)
 		where
-			merge_if_explicit_case kees=:{ case_explicit } var_heap expr_heap error_admin
+			merge_if_explicit_case kees=:{case_explicit,case_guards} var_heap expr_heap error_admin
 				| case_explicit
-					# cases	= map (make_case kees.case_expr) (split_patterns kees.case_guards)
-					  cases = init cases ++ [{last cases & case_default = kees.case_default}]
-					  [firstCase : otherCases] = [(Case kees, NoPos) \\ kees <- cases]
-					  ((Case {case_guards},_), var_heap, expr_heap, error_admin)
-					  		=  mergeCases firstCase otherCases var_heap expr_heap error_admin
-					  kees = {kees & case_guards = case_guards}
-					=	(kees, var_heap, expr_heap, error_admin)
-					with
-						split_patterns :: CasePatterns -> [CasePatterns]
-						split_patterns (AlgebraicPatterns index patterns)
-							=	[AlgebraicPatterns index [pattern] \\ pattern <- patterns]
-						split_patterns (BasicPatterns basicType patterns)
-							=	[BasicPatterns basicType [pattern] \\ pattern <- patterns]
-						split_patterns (OverloadedPatterns overloaded_list_type decons_expr patterns)
-							=	[OverloadedPatterns overloaded_list_type decons_expr [pattern] \\ pattern <- patterns]
-						split_patterns (NewTypePatterns index patterns)
-							=	[NewTypePatterns index [pattern] \\ pattern <- patterns]
-						split_patterns (DynamicPatterns patterns)
-							=	[DynamicPatterns [pattern] \\ pattern <- patterns]
-						split_patterns NoPattern
-							=	[NoPattern]
-
-						make_case :: Expression CasePatterns -> Case
-						make_case expr guard
-							=
-							{	case_expr		= expr
-							,	case_guards		= guard
-							,	case_default	= No
-							,	case_ident		= No
-							,	case_info_ptr	= nilPtr
-							,	case_default_pos= NoPos
-							,	case_explicit	= False
-							}
-				// otherwise // not case_explicit
-					=	(kees, var_heap, expr_heap, error_admin)
+					# (case_guards, var_heap, expr_heap, error_admin)
+						= mergeExplicitCasePatterns case_guards var_heap expr_heap error_admin
+					= ({kees & case_guards = case_guards}, var_heap, expr_heap, error_admin)
+					= (kees, var_heap, expr_heap, error_admin)
 
 instance expand CasePatterns
 where
