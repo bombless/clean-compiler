@@ -1974,15 +1974,14 @@ where
 		# ((expr, exprs), free_vars, dynamics, cos) = collectVariables (expr, exprs) free_vars dynamics cos
 		= (expr @ exprs, free_vars, dynamics, cos)
 	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) free_vars dynamics cos=:{cos_var_heap}
-		# (let_info,cos_expression_heap)	= readPtr let_info_ptr cos.cos_expression_heap
+		# cos_var_heap = determine_aliases let_strict_binds cos.cos_var_heap
+		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+
+		  (let_info,cos_expression_heap)	= readPtr let_info_ptr cos.cos_expression_heap
 		  let_types = case let_info of
 		  				EI_LetType let_types	-> let_types
 		  				_						-> repeat undef
-		  cos = {cos & cos_expression_heap = cos_expression_heap}
-		  cos_var_heap = cos.cos_var_heap
-
-		# cos_var_heap = determine_aliases let_strict_binds cos_var_heap
-		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+		  cos & cos_var_heap=cos_var_heap, cos_expression_heap = cos_expression_heap
 
 		  (let_strict_binds, let_types)	= combine let_strict_binds let_types
 			  	with
@@ -1994,75 +1993,61 @@ where
 		  let_lazy_binds = zip2 let_types let_lazy_binds
 
 		  (is_cyclic_s, let_strict_binds, cos) 
-		  		= detect_cycles_and_handle_alias_binds True let_strict_binds
-		  											{ cos & cos_var_heap = cos_var_heap }
+				= detect_cycles_and_handle_alias_binds True let_strict_binds cos
 		  (is_cyclic_l, let_lazy_binds, cos) 
-		  		= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
+				= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
 		| is_cyclic_s || is_cyclic_l
-			# let_info = case let_info of
-				EI_LetType _	-> EI_LetType (map fst (let_strict_binds ++ let_lazy_binds))
+			# (let_strict_bind_types,let_strict_binds) = unzip let_strict_binds
+			  (let_lazy_bind_types,let_lazy_binds) = unzip let_lazy_binds
+			  let_info = case let_info of
+				EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 				_				-> let_info
-			  let_strict_binds = map snd let_strict_binds
-			  let_lazy_binds = map snd let_lazy_binds
-			  cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
-			  cos = {cos & cos_expression_heap = cos_expression_heap}
+			  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds }, free_vars, dynamics,
 					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
 //		| otherwise
 			# (let_expr, free_vars, dynamics, cos) = collectVariables let_expr free_vars dynamics cos
-			  all_binds = combine let_strict_binds let_lazy_binds
-						  	with
-						  		combine [] let_lazy_binds
-						  			= [(False, tp, lb) \\ (tp,lb)<-let_lazy_binds]
-						  		combine [(tp,lb):let_strict_binds] let_lazy_binds
-						  			= [(True, tp, lb) : combine let_strict_binds let_lazy_binds]
-			  (collected_binds, free_vars, dynamics, cos) = collect_variables_in_binds all_binds [] free_vars dynamics cos
-			| isEmpty collected_binds
+			  (collected_strict_binds, collected_lazy_binds, free_vars, dynamics, cos)
+				= collect_variables_in_binds let_strict_binds let_lazy_binds [] [] free_vars dynamics cos
+			| collected_strict_binds=:[] && collected_lazy_binds=:[]
 				= (let_expr, free_vars, dynamics, cos)
-			 	# (let_strict_bind_types,let_lazy_bind_types,let_strict_binds,let_lazy_binds,cos_var_heap) = split_binds collected_binds cos.cos_var_heap
-				  	with
-		  				split_binds :: ![(Bool, AType, LetBind)] !*VarHeap -> (!*[AType],!*[AType],!*[LetBind],!*[LetBind],!*VarHeap)
-						split_binds [] var_heap
-							= ([],[],[],[],var_heap)
-						split_binds [(strict, t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSelector expr selections}) : xs] var_heap
-							| unique_result_selection selections fv_info_ptr var_heap
-								# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
-								# b = {b & lb_src = Selection UniqueSelectorUniqueElementResult expr selections}
-								| strict
-									= ([t:st],lt,[b:sb],lb,var_heap)
-									= (st,[t:lt],sb,[b:lb],var_heap)
-						split_binds [(strict, t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSingleArraySelector expr selections}) : xs] var_heap
-							| unique_result_selection selections fv_info_ptr var_heap
-								# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
-								# b = {b & lb_src = Selection UniqueSingleArraySelectorUniqueElementResult expr selections}
-								| strict
-									= ([t:st],lt,[b:sb],lb,var_heap)
-									= (st,[t:lt],sb,[b:lb],var_heap)
-						split_binds [(strict, t, b):xs] var_heap
-							# (st,lt,sb,lb,var_heap) = split_binds xs var_heap
-							| strict
-								= ([t:st],lt,[b:sb],lb,var_heap)
-								= (st,[t:lt],sb,[b:lb],var_heap)
-
-						unique_result_selection selections fv_info_ptr var_heap
-							= case sreadPtr fv_info_ptr var_heap of
-								VI_RefFromArrayUpdateOfTupleElem2 _ update_selections
-									-> same_selections selections update_selections
-								_
-									-> False
-				# cos = {cos & cos_var_heap=cos_var_heap}
-				# let_info = case let_info of
+				# (let_strict_bind_types,let_strict_binds,cos_var_heap) = unzip_binds collected_strict_binds cos.cos_var_heap
+				  (let_lazy_bind_types,let_lazy_binds,cos_var_heap) = unzip_binds collected_lazy_binds cos_var_heap
+				  cos & cos_var_heap=cos_var_heap
+				  let_info = case let_info of
 					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 					_				-> let_info
-				  cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
-				  cos = {cos & cos_expression_heap = cos_expression_heap}
+				  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
 				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, free_vars, dynamics, cos)
+				with
+					unzip_binds :: ![(AType, LetBind)] !*VarHeap -> (!*[AType],!*[LetBind],!*VarHeap)
+					unzip_binds [] var_heap
+						= ([],[],var_heap)
+					unzip_binds [(t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSelector expr selections}) : xs] var_heap
+						| unique_result_selection selections fv_info_ptr var_heap
+							# (lt,lb,var_heap) = unzip_binds xs var_heap
+							  b & lb_src = Selection UniqueSelectorUniqueElementResult expr selections
+							= ([t:lt],[b:lb],var_heap)
+					unzip_binds [(t, b=:{lb_dst={fv_info_ptr},lb_src=Selection UniqueSingleArraySelector expr selections}) : xs] var_heap
+						| unique_result_selection selections fv_info_ptr var_heap
+							# (lt,lb,var_heap) = unzip_binds xs var_heap
+							  b & lb_src = Selection UniqueSingleArraySelectorUniqueElementResult expr selections
+							= ([t:lt],[b:lb],var_heap)
+					unzip_binds [(t, b):xs] var_heap
+						# (lt,lb,var_heap) = unzip_binds xs var_heap
+						= ([t:lt],[b:lb],var_heap)
+
+					unique_result_selection selections fv_info_ptr var_heap
+						= case sreadPtr fv_info_ptr var_heap of
+							VI_RefFromArrayUpdateOfTupleElem2 _ update_selections
+								-> same_selections selections update_selections
+							_
+								-> False
 		where
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
 			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
 		   	the reference count info.
 		*/
-
 			determine_aliases [{lb_dst={fv_info_ptr}, lb_src = Var var} : binds] var_heap
 				= determine_aliases binds (writePtr fv_info_ptr (VI_Alias var) var_heap)
 			determine_aliases [bind : binds] var_heap
@@ -2121,17 +2106,20 @@ where
 		    the corresponding bound variable (the 'bind_dst' field) has been used. This can be determined
 		    by examining the reference count.
 		*/
+			collect_variables_in_binds :: ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] ![FreeVar] ![DynamicPtr] !*CollectState
+																	-> (![(t,LetBind)],![(t,LetBind)],![FreeVar],![DynamicPtr],!*CollectState)
+			collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds free_vars dynamics cos
+				# (bind_fond, lazy_binds, collected_lazy_binds, free_vars, dynamics, cos)
+					= examine_reachable_binds False lazy_binds collected_lazy_binds free_vars dynamics cos
+				# (bind_fond, strict_binds, collected_strict_binds, free_vars, dynamics, cos)
+					= examine_reachable_binds bind_fond strict_binds collected_strict_binds free_vars dynamics cos
+				| bind_fond
+					= collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds free_vars dynamics cos
+					# cos & cos_error=report_unused_strict_binds strict_binds cos.cos_error
+					= (collected_strict_binds, collected_lazy_binds, free_vars, dynamics, cos)
 
-			collect_variables_in_binds :: ![(Bool,.b,.LetBind)] !u:[v:(Bool,.b,w:LetBind)] ![FreeVar] ![(Ptr ExprInfo)] !*CollectState -> (!x:[y:(Bool,.b,z:LetBind)],![FreeVar],![(Ptr ExprInfo)],!.CollectState), [u <= x,v <= y,w <= z]
-			collect_variables_in_binds binds collected_binds free_vars dynamics cos
-				# (continue, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds False binds collected_binds free_vars dynamics cos
-				| continue
-					= collect_variables_in_binds binds collected_binds free_vars dynamics cos
-					# cos = {cos & cos_error=report_unused_strict_binds binds cos.cos_error}
-					= (collected_binds, free_vars, dynamics, cos)
-
-			examine_reachable_binds :: !Bool ![v:(.a,.b,w:LetBind)] !x:[y:(.a,.b,z:LetBind)] ![.FreeVar] ![.(Ptr ExprInfo)] !*CollectState -> *(!Bool,![v0:(.a,.b,w0:LetBind)],!x0:[y0:(.a,.b,z0:LetBind)],![FreeVar],![(Ptr ExprInfo)],!*CollectState), [v <= v0,w <= w0,x <= x0,y <= y0,z <= z0]
-			examine_reachable_binds bind_found [bind=:(is_strict, type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
+			examine_reachable_binds :: !Bool ![(t,LetBind)] ![(t,LetBind)] ![FreeVar] ![DynamicPtr] !*CollectState -> *(!Bool,![(t,LetBind)],![(t,LetBind)],![FreeVar],![DynamicPtr],!*CollectState)
+			examine_reachable_binds bind_found [bind=:(type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds free_vars dynamics cos
 				# (bind_found, binds, collected_binds, free_vars, dynamics, cos) = examine_reachable_binds bind_found binds collected_binds free_vars dynamics cos
 				# (info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
 				# cos = { cos & cos_var_heap = cos_var_heap }
@@ -2139,33 +2127,30 @@ where
 					VI_Count count _
 						| count > 0
 							#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-							-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+							-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 							-> (bind_found, [bind : binds], collected_binds, free_vars, dynamics, cos)
 					VI_RefFromTupleSel0 count
 						#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-						-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+						-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 					VI_RefFromArrayUpdate count selectors
 						-> case lb_src of
 							TupleSelect tuple_symbol 1 (Var var)
 								# (var, free_vars, dynamics, cos) = collectUpdateVarTupleSelect2Var var fv_info_ptr count selectors free_vars dynamics cos
 								#  lb_src = TupleSelect tuple_symbol 1 (Var var)
-								-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+								-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 							_
 								#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-								-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+								-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 					VI_RefFromArrayUpdateOfTupleElem2 count _
 						#  (lb_src, free_vars, dynamics, cos) = collectVariables lb_src free_vars dynamics cos
-						-> (True, binds, [ (is_strict, type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
+						-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], free_vars, dynamics, cos)
 					VI_RefFromArrayUpdateToTupleSelector2 count selectors array_var_info_ptr
 						-> abort "examine_reachable_binds VI_RefFromArrayUpdateToTupleSelector2"
-
 			examine_reachable_binds bind_found [] collected_binds free_vars dynamics cos
 				= (bind_found, [], collected_binds, free_vars, dynamics, cos)
 
-			report_unused_strict_binds [(is_strict,type,{lb_dst={fv_ident},lb_position}):binds] errors
-				| not is_strict
-					= report_unused_strict_binds binds errors
-					= report_unused_strict_binds binds (checkWarningWithPosition fv_ident lb_position "not used, ! ignored" errors)
+			report_unused_strict_binds [(type,{lb_dst={fv_ident},lb_position}):binds] errors
+				= report_unused_strict_binds binds (checkWarningWithPosition fv_ident lb_position "not used, ! ignored" errors)
 			report_unused_strict_binds [] errors
 				= errors
 
