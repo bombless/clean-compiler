@@ -23,15 +23,6 @@ restore_unexpanded_dcl_macros :: !UnexpandedDclMacros !*{#*{#FunDef}} -> *{#*{#F
 
 ::	CopiedLocalFunctions
 
-::	CollectState =
-	{	cos_var_heap		:: !.VarHeap
-	,	cos_expression_heap :: !.ExpressionHeap
-	,	cos_error			:: !.ErrorAdmin
-	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
-	}
-
-determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], ![FreeVar], ![DynamicPtr], !*CollectState)
-
 ::	UnfoldState =
 	{	us_var_heap				:: !.VarHeap
 	,	us_symbol_heap			:: !.ExpressionHeap

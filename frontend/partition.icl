@@ -1,6 +1,7 @@
 implementation module partition
 
-import syntax, transform, utilities
+import syntax, checksupport, utilities
+from transform import ::PredefSymbolsForTransform{..}
 
 //	PARTITIONING
 
@@ -500,8 +501,6 @@ where
 		= find_calls fc_info pats fc_state
 	find_calls fc_info (BasicPatterns _ pats) fc_state
 		= find_calls fc_info pats fc_state
-	find_calls fc_info (DynamicPatterns pats) fc_state
-		= find_calls fc_info pats fc_state
 	find_calls fc_info (OverloadedPatterns _ expr pats) fc_state
 		= find_calls fc_info pats (find_calls fc_info expr fc_state)
 	find_calls fc_info (NoPattern) fc_state
@@ -518,41 +517,356 @@ where
 	find_calls fc_info {bp_expr} fc_state
 		= find_calls fc_info bp_expr fc_state
 
-instance find_calls DynamicPattern
-where
-	find_calls fc_info {dp_rhs} fc_state
-		= find_calls fc_info dp_rhs fc_state
-
 determine_ref_counts fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
-	# (new_rhs, new_args, _, _, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
+	# (new_rhs, new_args, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
 	# fd = {fd & fun_body=TransformedBody {tb_args=new_args,tb_rhs=new_rhs}}
 	= (fd,pi_collect)
 determine_ref_counts fd pi_collect
 	= (fd, pi_collect)
 
-// from check.icl
-
 get_predef_symbols_for_transform :: *PredefinedSymbols -> (!PredefSymbolsForTransform,!.PredefinedSymbols)
-// clean 2.0 does not allow this, clean 1.3 does:
-// get_predef_symbols_for_transform cs_predef_symbols=:{[PD_DummyForStrictAliasFun]=predef_alias_dummy,[PD_AndOp]=predef_and,[PD_OrOp]=predef_or}
 get_predef_symbols_for_transform cs_predef_symbols
 	# (predef_alias_dummy,cs_predef_symbols) = cs_predef_symbols![PD_DummyForStrictAliasFun]
 	# (predef_and,cs_predef_symbols) = cs_predef_symbols![PD_AndOp]
 	# (predef_or,cs_predef_symbols) = cs_predef_symbols![PD_OrOp]
 	= ({predef_alias_dummy=predef_alias_dummy,predef_and=predef_and,predef_or=predef_or},cs_predef_symbols)
 
-dummy_predef_symbol =
-	{ pds_module	= 0
-	, pds_def		= 0
-	}
-
-dummy_predef_symbols =
-	{ predef_alias_dummy	= dummy_predef_symbol
-	, predef_and			= dummy_predef_symbol
-	, predef_or				= dummy_predef_symbol
-	}
-
 set_rec_prop non_recursive fi_properties
 	| non_recursive
 		= fi_properties bitor FI_IsNonRecursive
 		= fi_properties bitand (bitnot FI_IsNonRecursive)
+
+::	CollectState =
+	{	cos_var_heap		:: !.VarHeap
+	,	cos_expression_heap :: !.ExpressionHeap
+	,	cos_error			:: !.ErrorAdmin
+	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
+	}
+
+determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], !*CollectState)
+determineVariablesAndRefCounts free_vars expr cos=:{cos_var_heap}
+	# cos = {cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap}
+	  (expr, cos) = collectVariables expr cos
+	  (free_vars, cos_var_heap) = retrieveRefCounts free_vars cos.cos_var_heap
+	= (expr, free_vars, { cos & cos_var_heap = cos_var_heap })
+
+retrieveRefCounts free_vars var_heap
+	= mapSt retrieveRefCount free_vars var_heap
+
+retrieveRefCount :: FreeVar *VarHeap -> (!FreeVar,!.VarHeap)
+retrieveRefCount fv=:{fv_info_ptr} var_heap
+	# (VI_Count count _, var_heap) = readPtr fv_info_ptr var_heap
+	= ({ fv & fv_count = count }, var_heap)
+
+class clearCount a :: !a !Bool !*VarHeap -> *VarHeap
+
+instance clearCount [a] | clearCount a
+where
+	clearCount [x:xs] locality var_heap
+		= clearCount x locality (clearCount xs locality var_heap)
+	clearCount [] locality var_heap
+		= var_heap
+
+instance clearCount LetBind
+where
+	clearCount bind=:{lb_dst} locality var_heap
+		= clearCount lb_dst locality var_heap
+
+instance clearCount FreeVar
+where
+	clearCount {fv_info_ptr} locality var_heap
+		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
+
+instance clearCount (FreeVar,a)
+where
+	clearCount ({fv_info_ptr},_) locality var_heap
+		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
+
+//	In 'collectVariables' the reference counts of the local as well as of the global variables are determined.
+//	Aliases and unreachable bindings introduced in a 'let' are removed.
+
+class collectVariables a :: !a !*CollectState -> (!a, !*CollectState)
+
+cContainsACycle		:== True
+cContainsNoCycle	:== False
+
+instance collectVariables Expression
+where
+	collectVariables (Var var) cos
+		# (var, cos) = collectVariables var cos
+		= (Var var, cos)
+	collectVariables (App app=:{app_args}) cos
+		# (app_args, cos) = collectVariables app_args cos
+		= (App { app & app_args = app_args}, cos)
+	collectVariables (expr @ exprs) cos
+		# ((expr, exprs), cos) = collectVariables (expr, exprs) cos
+		= (expr @ exprs, cos)
+	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) cos=:{cos_var_heap}
+		# cos_var_heap = determine_aliases let_strict_binds cos.cos_var_heap
+		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+
+		  (let_info,cos_expression_heap)	= readPtr let_info_ptr cos.cos_expression_heap
+		  let_types = case let_info of
+						EI_LetType let_types	-> let_types
+						_						-> repeat undef
+		  cos & cos_var_heap=cos_var_heap, cos_expression_heap = cos_expression_heap
+
+		  (let_strict_binds, let_types)	= combine let_strict_binds let_types
+				with
+					combine [] let_types
+						= ([],let_types)
+					combine [lb:let_binds] [tp:let_types]
+						# (let_binds,let_types)	= combine let_binds let_types
+						= ([(tp, lb) : let_binds], let_types)
+		  let_lazy_binds = zip2 let_types let_lazy_binds
+
+		  (is_cyclic_s, let_strict_binds, cos)
+				= detect_cycles_and_handle_alias_binds True let_strict_binds cos
+		  (is_cyclic_l, let_lazy_binds, cos)
+				= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
+		| is_cyclic_s || is_cyclic_l
+			# (let_strict_bind_types,let_strict_binds) = unzip let_strict_binds
+			  (let_lazy_bind_types,let_lazy_binds) = unzip let_lazy_binds
+			  let_info = case let_info of
+				EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
+				_				-> let_info
+			  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
+			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds },
+					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
+//		| otherwise
+			# (let_expr, cos) = collectVariables let_expr cos
+			  (collected_strict_binds, collected_lazy_binds, cos)
+				= collect_variables_in_binds let_strict_binds let_lazy_binds [] [] cos
+			| collected_strict_binds=:[] && collected_lazy_binds=:[]
+				= (let_expr, cos)
+				# (let_strict_bind_types,let_strict_binds) = unzip collected_strict_binds
+				  (let_lazy_bind_types,let_lazy_binds) = unzip collected_lazy_binds
+				  let_info = case let_info of
+					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
+					_				-> let_info
+				  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
+				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, cos)
+		where
+		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
+			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
+			the reference count info.
+		*/
+			determine_aliases [{lb_dst={fv_info_ptr}, lb_src = Var var} : binds] var_heap
+				= determine_aliases binds (writePtr fv_info_ptr (VI_Alias var) var_heap)
+			determine_aliases [bind : binds] var_heap
+				= determine_aliases binds (clearCount bind cIsALocalVar var_heap)
+			determine_aliases [] var_heap
+				= var_heap
+
+		/*	Remove all aliases from the list of lazy 'let'-binds. Add a _dummyForStrictAlias
+			function call for the strict aliases. Be careful with cycles! */
+
+			detect_cycles_and_handle_alias_binds :: !.Bool !u:[v:(.a,w:LetBind)] !*CollectState -> (!.Bool,!x:[y:(.a,z:LetBind)],!.CollectState), [u <= x,v <= y,w <= z]
+			detect_cycles_and_handle_alias_binds is_strict [] cos
+				= (cContainsNoCycle, [], cos)
+//			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
+			detect_cycles_and_handle_alias_binds is_strict [(type,bind=:{lb_dst={fv_info_ptr}}) : binds] cos
+				# (var_info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
+				  cos = { cos & cos_var_heap = cos_var_heap }
+				= case var_info of
+					VI_Alias {var_info_ptr}
+						| is_cyclic fv_info_ptr var_info_ptr cos.cos_var_heap
+							-> (cContainsACycle, binds, cos)
+						| is_strict
+							# cos_var_heap = writePtr fv_info_ptr (VI_Count 0 cIsALocalVar) cos.cos_var_heap
+							  (new_bind_src, cos) = add_dummy_id_for_strict_alias bind.lb_src
+															{ cos & cos_var_heap = cos_var_heap }
+							  (is_cyclic, binds, cos)
+									= detect_cycles_and_handle_alias_binds is_strict binds cos
+							-> (is_cyclic, [(type,{ bind & lb_src = new_bind_src }) : binds], cos)
+						-> detect_cycles_and_handle_alias_binds is_strict binds cos
+					_
+						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
+						-> (is_cyclic, [(type,bind) : binds], cos)
+			where
+				is_cyclic :: !.(Ptr VarInfo) !(Ptr VarInfo) !VarHeap -> .Bool
+				is_cyclic orig_info_ptr info_ptr var_heap
+					| orig_info_ptr == info_ptr
+						= True
+						#! var_info = sreadPtr info_ptr var_heap
+						= case var_info of
+							VI_Alias {var_info_ptr}
+								-> is_cyclic orig_info_ptr var_info_ptr var_heap
+							_
+								-> False
+
+				add_dummy_id_for_strict_alias :: !.Expression !*CollectState -> (!.Expression,!.CollectState)
+				add_dummy_id_for_strict_alias bind_src cos=:{cos_expression_heap, cos_predef_symbols_for_transform}
+					# (new_app_info_ptr, cos_expression_heap) = newPtr EI_Empty cos_expression_heap
+					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
+					  pds_ident = predefined_idents.[PD_DummyForStrictAliasFun]
+					  app_symb = { symb_ident = pds_ident, symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def} }
+					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },
+						{ cos & cos_expression_heap = cos_expression_heap } )
+
+		/*	Apply 'collectVariables' to the bound expressions (the 'bind_src' field of 'let'-bind) if
+		    the corresponding bound variable (the 'bind_dst' field) has been used. This can be determined
+		    by examining the reference count.
+		*/
+			collect_variables_in_binds :: ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] !*CollectState
+																	-> (![(t,LetBind)],![(t,LetBind)],!*CollectState)
+			collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cos
+				# (bind_fond, lazy_binds, collected_lazy_binds, cos)
+					= examine_reachable_binds False lazy_binds collected_lazy_binds cos
+				# (bind_fond, strict_binds, collected_strict_binds, cos)
+					= examine_reachable_binds bind_fond strict_binds collected_strict_binds cos
+				| bind_fond
+					= collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cos
+					# cos & cos_error=report_unused_strict_binds strict_binds cos.cos_error
+					= (collected_strict_binds, collected_lazy_binds, cos)
+
+			examine_reachable_binds :: !Bool ![(t,LetBind)] ![(t,LetBind)] !*CollectState -> *(!Bool,![(t,LetBind)],![(t,LetBind)],!*CollectState)
+			examine_reachable_binds bind_found [bind=:(type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds cos
+				# (bind_found, binds, collected_binds, cos) = examine_reachable_binds bind_found binds collected_binds cos
+				# (info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
+				# cos = { cos & cos_var_heap = cos_var_heap }
+				= case info of
+					VI_Count count _
+						| count > 0
+							#  (lb_src, cos) = collectVariables lb_src cos
+							-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], cos)
+							-> (bind_found, [bind : binds], collected_binds, cos)
+			examine_reachable_binds bind_found [] collected_binds cos
+				= (bind_found, [], collected_binds, cos)
+
+			report_unused_strict_binds [(type,{lb_dst={fv_ident},lb_position}):binds] errors
+				= report_unused_strict_binds binds (checkWarningWithPosition fv_ident lb_position "not used, ! ignored" errors)
+			report_unused_strict_binds [] errors
+				= errors
+
+	collectVariables (Case case_expr) cos
+		# (case_expr, cos) = collectVariables case_expr cos
+		= (Case case_expr, cos)
+	collectVariables (Selection is_unique expr selectors) cos
+		# ((expr, selectors), cos) = collectVariables (expr, selectors) cos
+		= (Selection is_unique expr selectors, cos)
+	collectVariables (Update expr1 selectors expr2) cos
+		# (((expr1, expr2), selectors), cos) = collectVariables ((expr1, expr2), selectors) cos
+		= (Update expr1 selectors expr2, cos)
+	collectVariables (RecordUpdate cons_symbol expression expressions) cos
+		# ((expression, expressions), cos) = collectVariables (expression, expressions) cos
+		= (RecordUpdate cons_symbol expression expressions, cos)
+	collectVariables (TupleSelect symbol argn_nr expr) cos
+		# (expr, cos) = collectVariables expr cos
+		= (TupleSelect symbol argn_nr expr, cos)
+	collectVariables (MatchExpr cons_ident expr) cos
+		# (expr, cos) = collectVariables expr cos
+		= (MatchExpr cons_ident expr, cos)
+	collectVariables (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) cos
+		# (expr, cos) = collectVariables expr cos
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, cos)
+	collectVariables (DynamicExpr dynamic_expr) cos
+		= abort "collectVariables DynamicExpr"
+	collectVariables (TypeSignature type_function expr) cos
+		# (expr, cos) = collectVariables expr cos
+		= (TypeSignature type_function expr, cos);
+	collectVariables (DictionariesFunction dictionaries expr expr_type) cos
+		# cos = {cos & cos_var_heap = clearCount dictionaries cIsALocalVar cos.cos_var_heap}
+		  (expr, cos) = collectVariables expr cos
+		  (dictionaries, var_heap) = mapSt retrieve_ref_count dictionaries cos.cos_var_heap
+		  cos = {cos & cos_var_heap = var_heap}
+		= (DictionariesFunction dictionaries expr expr_type, cos)
+	where
+		retrieve_ref_count (fv,a_type) var_heap
+			# (fv,var_heap) = retrieveRefCount fv var_heap
+			= ((fv,a_type),var_heap)
+	collectVariables expr cos
+		= (expr, cos)
+
+instance collectVariables Selection
+where
+	collectVariables (ArraySelection array_select expr_ptr index_expr) cos
+		# (index_expr, cos) = collectVariables index_expr cos
+		= (ArraySelection array_select expr_ptr index_expr, cos)
+	collectVariables (DictionarySelection dictionary_select selectors expr_ptr index_expr) cos
+		# ((index_expr,selectors), cos) = collectVariables (index_expr,selectors) cos
+		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, cos)
+	collectVariables record_selection cos
+		= (record_selection, cos)
+
+instance collectVariables [a] | collectVariables a
+where
+	collectVariables [x:xs] cos
+		# (x, cos) = collectVariables x cos
+		# (xs, cos) = collectVariables xs cos
+		= ([x:xs], cos)
+	collectVariables [] cos
+		= ([], cos)
+
+instance collectVariables (!a,!b) | collectVariables a & collectVariables b
+where
+	collectVariables (x,y) cos
+		# (x, cos) = collectVariables x cos
+		# (y, cos) = collectVariables y cos
+		= ((x,y), cos)
+
+instance collectVariables (Optional a) | collectVariables a
+where
+	collectVariables (Yes x) cos
+		# (x, cos) = collectVariables x cos
+		= (Yes x, cos)
+	collectVariables no cos
+		= (no, cos)
+
+instance collectVariables (Bind a b) | collectVariables a where
+	collectVariables bind=:{bind_src} cos
+		# (bind_src, cos) = collectVariables bind_src cos
+		= ({bind & bind_src = bind_src}, cos)
+
+instance collectVariables Case
+where
+	collectVariables kees=:{ case_expr, case_guards, case_default } cos
+		# (case_expr, cos) = collectVariables case_expr cos
+		# (case_guards, cos) = collectVariables case_guards cos
+		# (case_default, cos) = collectVariables case_default cos
+		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, cos)
+
+instance collectVariables CasePatterns
+where
+	collectVariables (AlgebraicPatterns type patterns) cos
+		# (patterns, cos) = collectVariables patterns cos
+		= (AlgebraicPatterns type patterns, cos)
+	collectVariables (BasicPatterns type patterns) cos
+		# (patterns, cos) = collectVariables patterns cos
+		= (BasicPatterns type patterns, cos)
+	collectVariables (OverloadedPatterns type decons_expr patterns) cos
+		# (patterns, cos) = collectVariables patterns cos
+		= (OverloadedPatterns type decons_expr patterns, cos)
+	collectVariables (NewTypePatterns type patterns) cos
+		# (patterns, cos) = collectVariables patterns cos
+		= (NewTypePatterns type patterns, cos)
+	collectVariables NoPattern cos
+		= (NoPattern, cos)
+
+instance collectVariables AlgebraicPattern
+where
+	collectVariables pattern=:{ap_vars,ap_expr} cos
+		# cos = {cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
+		  (ap_expr, cos) = collectVariables ap_expr cos
+		  (ap_vars, cos_var_heap) = retrieveRefCounts ap_vars cos.cos_var_heap
+		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, { cos & cos_var_heap = cos_var_heap })
+
+instance collectVariables BasicPattern
+where
+	collectVariables pattern=:{bp_expr} cos
+		# (bp_expr, cos) = collectVariables bp_expr cos
+		= ({ pattern & bp_expr = bp_expr }, cos)
+
+instance collectVariables BoundVar
+where
+	collectVariables var=:{var_ident,var_info_ptr,var_expr_ptr} cos=:{cos_var_heap}
+		# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
+		  cos = { cos & cos_var_heap = cos_var_heap }
+		= case var_info of
+			VI_Count count is_global
+				| count > 0 || is_global
+					-> (var, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
+					-> (var, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
+			VI_Alias alias
+				#  (original, cos) = collectVariables alias cos
+				-> ({ original & var_expr_ptr = var_expr_ptr }, cos)
