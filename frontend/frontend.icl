@@ -223,7 +223,7 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 				-> case options.feo_fusion.compile_with_fusion of
 					True
 						# (fun_defs,predef_symbols,var_heap,expression_heap,error_admin)
-								= stripStrictLets fun_defs predef_symbols var_heap expression_heap error_admin
+								= stripStrictLets fun_defs main_dcl_module_n def_min def_max predef_symbols var_heap expression_heap error_admin
 						-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
 					_	-> (components, fun_defs, predef_symbols, var_heap, expression_heap, error_admin)
 

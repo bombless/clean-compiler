@@ -1,7 +1,6 @@
 implementation module partition
 
 import syntax, checksupport, utilities
-from transform import ::PredefSymbolsForTransform{..}
 
 //	PARTITIONING
 
@@ -86,35 +85,35 @@ where
 	,	pi_next_group` ::	!Int
 	,	pi_groups` ::		![ComponentMembers]
 	,	pi_deps` ::			![Int]
-	,	pi_collect` ::		!.CollectState
+	,	pi_collect` ::		!.CountVarsFindCallsState
 	}
 
-stripStrictLets :: !*{# FunDef} !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin -> (!*{# FunDef}, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
-stripStrictLets fun_defs predef_symbols var_heap sym_heap error_admin
-	# (cs_predef,predef_symbols) = get_predef_symbols_for_transform predef_symbols
-	# collect_state =
-		{ cos_predef_symbols_for_transform	= cs_predef
-		, cos_var_heap						= var_heap
-		, cos_expression_heap				= sym_heap
-		, cos_error							= error_admin
-		}
-	# (fun_defs,collect_state) = aMapSt determine_ref_counts fun_defs collect_state
-	= (fun_defs,predef_symbols,collect_state.cos_var_heap, collect_state.cos_expression_heap, collect_state.cos_error)
+stripStrictLets :: !*{#FunDef} !Int !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
+							  -> (!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+stripStrictLets fun_defs main_dcl_module_n def_min def_max predef_symbols var_heap sym_heap error_admin
+	# (predef_alias_dummy,predef_symbols) = predef_symbols![PD_DummyForStrictAliasFun]
+	# collect_state = {cvfcs_var_heap = var_heap, cvfcs_expr_heap = sym_heap, cvfcs_error = error_admin, cvfcs_fun_calls = []}
+	# collect_info
+		= {cvfci_predef_alias_dummy=predef_alias_dummy, cvfci_main_dcl_module_n=main_dcl_module_n, cvfci_def_min=def_min, cvfci_def_max=def_max}
+	# (fun_defs,collect_state) = aMapSt (determine_ref_counts collect_info) fun_defs collect_state
+	= (fun_defs,predef_symbols,collect_state.cvfcs_var_heap, collect_state.cvfcs_expr_heap, collect_state.cvfcs_error)
 where
 	aMapSt f a s
 		# (l,s)	= mapSt f [e \\ e <-: a] s
 		= ({e \\ e <- l},s)
 
-partitionateFunctions` :: !*{# FunDef} ![IndexRange] !Index !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin -> (!*{!Component}, !*{# FunDef}, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+partitionateFunctions` :: !*{#FunDef} ![IndexRange] !Index !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
+									  -> (!*{!Component},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_symbols var_heap sym_heap error_admin
+	# (predef_alias_dummy,predef_symbols) = predef_symbols![PD_DummyForStrictAliasFun]
+	# collect_info
+		= {cvfci_predef_alias_dummy=predef_alias_dummy, cvfci_main_dcl_module_n=main_dcl_module_n, cvfci_def_min=def_min, cvfci_def_max=def_max}
+	= partitionateFunctions` fun_defs ranges collect_info predef_symbols var_heap sym_heap error_admin
+where
+  partitionateFunctions` :: !*{# FunDef} ![IndexRange] !CountVarsFindCallsInfo !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin -> (!*{!Component}, !*{# FunDef}, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+  partitionateFunctions` fun_defs ranges collect_info predef_symbols var_heap sym_heap error_admin
 	#! max_fun_nr = size fun_defs
-	# (cs_predef,predef_symbols) = get_predef_symbols_for_transform predef_symbols
-	# collect_state =
-		{ cos_predef_symbols_for_transform	= cs_predef
-		, cos_var_heap						= var_heap
-		, cos_expression_heap				= sym_heap
-		, cos_error							= error_admin
-		}
+	# collect_state = {cvfcs_var_heap = var_heap, cvfcs_expr_heap = sym_heap, cvfcs_error = error_admin, cvfcs_fun_calls = []}
 	# partitioning_info =
 		{ pi_collect` = collect_state
 		, pi_marks` = createArray max_fun_nr NotChecked
@@ -126,31 +125,25 @@ partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_
 	  (fun_defs, {pi_groups`,pi_next_group`,pi_collect`}) = 
 	  		foldSt (partitionate_functions max_fun_nr) ranges (fun_defs, partitioning_info)
 	  groups = { {component_members = group} \\ group <- reverse pi_groups` }
-	= (groups, fun_defs, predef_symbols, pi_collect`.cos_var_heap, pi_collect`.cos_expression_heap, pi_collect`.cos_error)
-where
-	partitionate_functions :: !Index !IndexRange !(!*{# FunDef}, !*PartitioningInfo`) -> (!*{# FunDef}, !*PartitioningInfo`)
+	= (groups, fun_defs, predef_symbols, pi_collect`.cvfcs_var_heap, pi_collect`.cvfcs_expr_heap, pi_collect`.cvfcs_error)
+	where
+	partitionate_functions :: !Index !IndexRange !(!*{#FunDef}, !*PartitioningInfo`) -> (!*{#FunDef}, !*PartitioningInfo`)
 	partitionate_functions max_fun_nr ir=:{ir_from,ir_to} (fun_defs, pi=:{pi_marks`})
 		| ir_from == ir_to
 			= (fun_defs, pi)
 		| pi_marks`.[ir_from] == NotChecked
 			# (_, fun_defs, pi) = partitionate_function ir_from max_fun_nr fun_defs pi
-			= partitionate_functions max_fun_nr { ir & ir_from = inc ir_from } (fun_defs, pi)
-			= partitionate_functions max_fun_nr { ir & ir_from = inc ir_from } (fun_defs, pi)
+			= partitionate_functions max_fun_nr {ir & ir_from = inc ir_from} (fun_defs, pi)
+			= partitionate_functions max_fun_nr {ir & ir_from = inc ir_from} (fun_defs, pi)
 
-	partitionate_function :: !Int !Int !*{# FunDef} !*PartitioningInfo` -> *(!Int, !*{# FunDef}, !*PartitioningInfo`)
+	partitionate_function :: !Int !Int !*{#FunDef} !*PartitioningInfo` -> *(!Int, !*{# FunDef}, !*PartitioningInfo`)
 	partitionate_function fun_index max_fun_nr fun_defs pi=:{pi_next_num`,pi_collect`}
 		# (fd, fun_defs) = fun_defs![fun_index]
-		# (fd,pi_collect`) = determine_ref_counts fd pi_collect`
-		# pi = {pi & pi_collect` = pi_collect`}
-		# fc_state = find_calls
-						{ main_dcl_module_n=main_dcl_module_n
-						, def_min=def_min
-						, def_max=def_max
-						, fun_index=fun_index
-						} fd.fun_body {fun_calls = []}
-		  fi_calls = fc_state.fun_calls
-		  fd = {fd & fun_info.fi_calls = fi_calls}
-		# fun_defs = {fun_defs & [fun_index] = fd}
+		  (fd,pi_collect`) = determine_ref_counts collect_info fd pi_collect`
+		  (fi_calls,pi_collect`) = pi_collect`!cvfcs_fun_calls
+		  pi & pi_collect` = pi_collect`
+		  fd & fun_info.fi_calls = fi_calls
+		  fun_defs & [fun_index] = fd
 
 		  pi = push_on_dep_stack fun_index pi
 		  (min_dep, fun_defs, pi) = visit_functions fi_calls max_fun_nr max_fun_nr fun_defs pi
@@ -208,7 +201,7 @@ where
 	, pi_next_group``		:: !Int
 	, pi_groups``			:: ![ComponentMembers]
 	, pi_deps``				:: !ComponentMembers
-	, pi_collect``			:: !.CollectState
+	, pi_collect``			:: !.CountVarsFindCallsState
 	}
 
 :: Marks	:== {# Mark}
@@ -246,16 +239,19 @@ where
 			= {marks & [i].m_mark=val}
 
 partitionateFunctions`` :: !Int !Int !*{#FunDef} !ComponentMembers !Index !Int !Int !*FunctionHeap !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
-	-> (!Int, ![Component], !*{#FunDef}, !*FunctionHeap, !*PredefinedSymbols, !*VarHeap, !*ExpressionHeap, !*ErrorAdmin)
+												  -> (!Int,![Component],!*{#FunDef},!*FunctionHeap,!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 partitionateFunctions`` max_fun_nr next_group fun_defs functions main_dcl_module_n def_min def_max fun_heap predef_symbols var_heap sym_heap error_admin
+	# (predef_alias_dummy,predef_symbols) = predef_symbols![PD_DummyForStrictAliasFun]
+	# collect_info
+		= {cvfci_predef_alias_dummy=predef_alias_dummy, cvfci_main_dcl_module_n=main_dcl_module_n, cvfci_def_min=def_min, cvfci_def_max=def_max}
+	= partitionateFunctions`` max_fun_nr next_group fun_defs functions collect_info fun_heap predef_symbols var_heap sym_heap error_admin
+where
+  partitionateFunctions`` :: !Int !Int !*{#FunDef} !ComponentMembers !CountVarsFindCallsInfo
+  									  !*FunctionHeap !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
+	-> (!Int,![Component],!*{#FunDef},!*FunctionHeap,!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+  partitionateFunctions`` max_fun_nr next_group fun_defs functions collect_info fun_heap predef_symbols var_heap sym_heap error_admin
 	# marks					= create_marks max_fun_nr functions
-	# (cs_predef,predef_symbols) = get_predef_symbols_for_transform predef_symbols
-	# collect_state =
-		{ cos_predef_symbols_for_transform	= cs_predef
-		, cos_var_heap						= var_heap
-		, cos_expression_heap				= sym_heap
-		, cos_error							= error_admin
-		}
+	# collect_state = {cvfcs_var_heap = var_heap, cvfcs_expr_heap = sym_heap, cvfcs_error = error_admin, cvfcs_fun_calls = []}
 	# partitioning_info =
 		{ pi_marks``		= marks
 		, pi_deps``			= NoComponentMembers
@@ -267,9 +263,9 @@ partitionateFunctions`` max_fun_nr next_group fun_defs functions main_dcl_module
 	  (fun_defs, fun_heap, {pi_groups``,pi_next_group``,pi_collect``})
 	  	= partitionate_component functions max_fun_nr (fun_defs, fun_heap, partitioning_info)
 	  groups = [ {component_members = group} \\ group <- reverse pi_groups`` ]
-	= (pi_next_group``,groups, fun_defs, fun_heap, predef_symbols, pi_collect``.cos_var_heap, pi_collect``.cos_expression_heap, pi_collect``.cos_error)
-where
-	partitionate_component :: !ComponentMembers !Index !(!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``) -> (!*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
+	= (pi_next_group``,groups, fun_defs, fun_heap, predef_symbols, pi_collect``.cvfcs_var_heap, pi_collect``.cvfcs_expr_heap, pi_collect``.cvfcs_error)
+	where
+	partitionate_component :: !ComponentMembers !Index !(!*{#FunDef}, !*FunctionHeap, !*PartitioningInfo``) -> (!*{#FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	partitionate_component (ComponentMember member members) max_fun_nr (fun_defs, fun_heap, pi=:{pi_marks``})
 		| get_mark max_fun_nr pi_marks`` member == NotChecked
 			# (_, fun_defs, fun_heap, pi) = partitionate_function member max_fun_nr fun_defs fun_heap pi
@@ -286,23 +282,21 @@ where
 	partitionate_function :: !Int !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	partitionate_function fun_index max_fun_nr fun_defs fun_heap pi=:{pi_next_num``,pi_collect``}
 		# (fd,fun_defs) = fun_defs![fun_index]
-		  (fd,pi_collect``) = determine_ref_counts fd pi_collect``
-		  pi = {pi & pi_collect`` = pi_collect``}
-		  fc_state = find_calls {main_dcl_module_n=main_dcl_module_n, def_min=def_min, def_max=def_max, fun_index=fun_index} fd.fun_body {fun_calls = []}
-		  fi_calls = fc_state.fun_calls
-		  fd = {fd & fun_info.fi_calls = fi_calls}	
-		  fun_defs = {fun_defs & [fun_index] = fd}
+		  (fd,pi_collect``) = determine_ref_counts collect_info fd pi_collect``
+		  (fi_calls,pi_collect``) = pi_collect``!cvfcs_fun_calls
+		  pi & pi_collect`` = pi_collect``
+		  fd & fun_info.fi_calls = fi_calls
+		  fun_defs & [fun_index] = fd
 		  pi = push_on_dep_stack fun_index pi
 		= visit_functions_and_try_to_close_group fi_calls fun_index pi_next_num`` max_fun_nr fun_defs fun_heap pi
 
 	partitionate_generated_function :: !Int !FunctionInfoPtr !Int !*{# FunDef} !*FunctionHeap !*PartitioningInfo`` -> *(!Int, !*{# FunDef}, !*FunctionHeap, !*PartitioningInfo``)
 	partitionate_generated_function fun_index fun_ptr max_fun_nr fun_defs fun_heap pi=:{pi_next_num``,pi_collect``}
 		# (FI_Function gf=:{gf_fun_def=fd}, fun_heap) = readPtr fun_ptr fun_heap
-		  (fd,pi_collect``) = determine_ref_counts fd pi_collect``
-		  pi = {pi & pi_collect`` = pi_collect``}
-		  fc_state = find_calls {main_dcl_module_n=main_dcl_module_n, def_min=def_min, def_max=def_max, fun_index=fun_index} fd.fun_body {fun_calls = []}
-		  fi_calls = fc_state.fun_calls
-		  fd = {fd & fun_info.fi_calls = fi_calls}
+		  (fd,pi_collect``) = determine_ref_counts collect_info fd pi_collect``
+		  (fi_calls,pi_collect``) = pi_collect``!cvfcs_fun_calls
+		  pi & pi_collect`` = pi_collect``
+		  fd & fun_info.fi_calls = fi_calls
 		  fun_heap = writePtr fun_ptr (FI_Function {gf & gf_fun_def = fd}) fun_heap
 		  pi = push_generated_function_on_dep_stack fun_index fun_ptr pi
 		= visit_functions_and_try_to_close_group fi_calls fun_index pi_next_num`` max_fun_nr fun_defs fun_heap pi
@@ -380,175 +374,38 @@ where
 									| case fc of FunCall idx _ -> idx == d; GeneratedFunCall idx _ -> idx == d; _ -> False]
 					= False
 
-:: FindCallsInfo =
-	{ main_dcl_module_n	:: !Index
-	, def_min			:: !Int
-	, def_max			:: !Int
-	, fun_index			:: !Int
-	}
+:: CountVarsFindCallsInfo = !{
+	cvfci_main_dcl_module_n		:: !Index,
+	cvfci_def_min				:: !Int,
+	cvfci_def_max				:: !Int,
+	cvfci_predef_alias_dummy	:: !PredefinedSymbol
+   }
 
-:: FindCallsState =
-	{ fun_calls			:: ![FunCall]
-	}
+:: CountVarsFindCallsState = {
+	cvfcs_var_heap	:: !.VarHeap,
+	cvfcs_expr_heap	:: !.ExpressionHeap,
+	cvfcs_error		:: !.ErrorAdmin,
+	cvfcs_fun_calls	:: ![FunCall]
+   }
 
-class find_calls a :: !FindCallsInfo !a !FindCallsState -> FindCallsState
-
-instance find_calls [a] | find_calls a
-where
-	find_calls fc_info els fc_state = foldSt (find_calls fc_info) els fc_state
-
-instance find_calls (Optional a) | find_calls a
-where
-	find_calls fc_info (Yes e) fc_state = find_calls fc_info e fc_state
-	find_calls fc_info No fc_state = fc_state
-
-instance find_calls FunctionBody
-where
-	find_calls fc_info (TransformedBody tb) fc_state
-		= find_calls fc_info tb fc_state
-//	find_calls fc_info NoBody fc_state = fc_state
-	find_calls fc_info _ fc_state = abort ("Undefined pattern in FunctionBody: "+++toString fc_info.fun_index+++ "?" +++ toString fc_info.def_min+++ "?" +++ toString fc_info.def_max +++ "\n")
-
-instance find_calls TransformedBody
-where
-	find_calls fc_info {tb_rhs} fc_state = find_calls fc_info tb_rhs fc_state
-
-instance find_calls Expression
-where
-	find_calls fc_info (Var _)					fc_state = fc_state
-	find_calls fc_info (App app)				fc_state = find_calls fc_info app fc_state
-	find_calls fc_info (exp @ exps)				fc_state = find_calls fc_info exps (find_calls fc_info exp fc_state)
-	find_calls fc_info (Let lete)				fc_state = find_calls fc_info lete fc_state
-	find_calls fc_info (Case kees)				fc_state = find_calls fc_info kees fc_state
-	find_calls fc_info (Selection _ exp sells)	fc_state = find_calls fc_info sells (find_calls fc_info exp fc_state)
-	find_calls fc_info (Update e1 sl e2)		fc_state
-		#! fc_state	= find_calls fc_info e1 fc_state
-		   fc_state	= find_calls fc_info sl fc_state
-		= find_calls fc_info e2 fc_state
-	find_calls fc_info (RecordUpdate _ expr bexps) fc_state
-		#! fc_state	= find_calls fc_info expr fc_state
-		= find_calls fc_info (map (\{bind_src} -> bind_src) bexps) fc_state
-	find_calls fc_info (TupleSelect _ _ expr) fc_state
-		= find_calls fc_info expr fc_state
-	find_calls fc_info (BasicExpr _) fc_state
-		= fc_state
-	find_calls fc_info (AnyCodeExpr _ _ _) fc_state
-		= fc_state
-	find_calls fc_info (ABCCodeExpr _ _) fc_state
-		= fc_state
-	find_calls fc_info (MatchExpr _ expr) fc_state
-		= find_calls fc_info expr fc_state
-	find_calls fc_info (IsConstructor expr _ _ _ _ _) fc_state
-		= find_calls fc_info expr fc_state
-	find_calls fc_info EE fc_state
-		= fc_state
-	find_calls fc_info (NoBind _) fc_state
-		= fc_state
-	find_calls fc_info (FailExpr _) fc_state
-		= fc_state
-	find_calls fc_info (DictionariesFunction dictionaries expr expr_type) fc_state
-		= find_calls fc_info expr fc_state
-	find_calls fc_info ExprToBeRemoved fc_state
-		= fc_state
-
-instance find_calls App
-where
-	find_calls fc_info {app_symb,app_args} fc_state
-		#! fc_state = get_index app_symb.symb_kind fc_state
-		= find_calls fc_info app_args fc_state
-	where
-		get_index (SK_Function {glob_object,glob_module}) fc_state
-			| fc_info.main_dcl_module_n == glob_module && (glob_object < fc_info.def_max || glob_object >= fc_info.def_min)
-				= {fc_state & fun_calls = [FunCall glob_object 0: fc_state.fun_calls]}
-				= {fc_state & fun_calls = [DclFunCall glob_module glob_object: fc_state.fun_calls]}
-		get_index (SK_Constructor idx) fc_state
-			= fc_state
-		get_index (SK_LocalMacroFunction idx) fc_state
-			= {fc_state & fun_calls = [FunCall idx 0: fc_state.fun_calls]}
-		get_index (SK_GeneratedFunction fun_ptr idx) fc_state
-			= {fc_state & fun_calls = [GeneratedFunCall idx fun_ptr : fc_state.fun_calls]}
-
-instance find_calls Let
-where
-	find_calls fc_info {let_strict_binds,let_lazy_binds,let_expr} fc_state
-		= find_calls fc_info (let_strict_binds++let_lazy_binds) (find_calls fc_info let_expr fc_state)
-
-instance find_calls Case
-where
-	find_calls fc_info {case_expr,case_guards,case_default} fc_state
-		#! fc_state	= find_calls fc_info case_expr fc_state
-		   fc_state	= find_calls fc_info case_default fc_state
-		= find_calls fc_info case_guards fc_state
-
-instance find_calls Selection
-where
-	find_calls fc_info (RecordSelection _ _) fc_state
-		= fc_state
-	find_calls fc_info (ArraySelection _ _ expr) fc_state
-		= find_calls fc_info expr fc_state
-	find_calls fc_info (DictionarySelection _ sells _ expr) fc_state
-		= find_calls fc_info expr (find_calls fc_info sells fc_state)
-	find_calls _ u _ = abort "Undefined pattern in Selection\n"
-
-instance find_calls LetBind
-where
-	find_calls fc_info {lb_src} fc_state
-		= find_calls fc_info lb_src fc_state
-
-instance find_calls CasePatterns
-where
-	find_calls fc_info (AlgebraicPatterns _ pats) fc_state
-		= find_calls fc_info pats fc_state
-	find_calls fc_info (BasicPatterns _ pats) fc_state
-		= find_calls fc_info pats fc_state
-	find_calls fc_info (OverloadedPatterns _ expr pats) fc_state
-		= find_calls fc_info pats (find_calls fc_info expr fc_state)
-	find_calls fc_info (NoPattern) fc_state
-		= fc_state
-	find_calls _ u _ = abort "Undefined pattern in CasePatterns\n"
-
-instance find_calls AlgebraicPattern
-where
-	find_calls fc_info {ap_expr} fc_state
-		= find_calls fc_info ap_expr fc_state
-
-instance find_calls BasicPattern
-where
-	find_calls fc_info {bp_expr} fc_state
-		= find_calls fc_info bp_expr fc_state
-
-determine_ref_counts fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
-	# (new_rhs, new_args, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs pi_collect
+determine_ref_counts cvfci fd=:{fun_body=TransformedBody {tb_args,tb_rhs}} pi_collect
+	# (new_rhs, new_args, pi_collect) = determineVariablesAndRefCounts tb_args tb_rhs cvfci {pi_collect & cvfcs_fun_calls = []}
 	# fd = {fd & fun_body=TransformedBody {tb_args=new_args,tb_rhs=new_rhs}}
 	= (fd,pi_collect)
-determine_ref_counts fd pi_collect
+determine_ref_counts cvfci fd pi_collect
 	= (fd, pi_collect)
-
-get_predef_symbols_for_transform :: *PredefinedSymbols -> (!PredefSymbolsForTransform,!.PredefinedSymbols)
-get_predef_symbols_for_transform cs_predef_symbols
-	# (predef_alias_dummy,cs_predef_symbols) = cs_predef_symbols![PD_DummyForStrictAliasFun]
-	# (predef_and,cs_predef_symbols) = cs_predef_symbols![PD_AndOp]
-	# (predef_or,cs_predef_symbols) = cs_predef_symbols![PD_OrOp]
-	= ({predef_alias_dummy=predef_alias_dummy,predef_and=predef_and,predef_or=predef_or},cs_predef_symbols)
 
 set_rec_prop non_recursive fi_properties
 	| non_recursive
 		= fi_properties bitor FI_IsNonRecursive
 		= fi_properties bitand (bitnot FI_IsNonRecursive)
 
-::	CollectState =
-	{	cos_var_heap		:: !.VarHeap
-	,	cos_expression_heap :: !.ExpressionHeap
-	,	cos_error			:: !.ErrorAdmin
-	,	cos_predef_symbols_for_transform :: !PredefSymbolsForTransform
-	}
-
-determineVariablesAndRefCounts :: ![FreeVar] !Expression !*CollectState -> (!Expression , ![FreeVar], !*CollectState)
-determineVariablesAndRefCounts free_vars expr cos=:{cos_var_heap}
-	# cos = {cos & cos_var_heap = clearCount free_vars cIsAGlobalVar cos_var_heap}
-	  (expr, cos) = collectVariables expr cos
-	  (free_vars, cos_var_heap) = retrieveRefCounts free_vars cos.cos_var_heap
-	= (expr, free_vars, { cos & cos_var_heap = cos_var_heap })
+determineVariablesAndRefCounts :: ![FreeVar] !Expression !CountVarsFindCallsInfo !*CountVarsFindCallsState -> (!Expression , ![FreeVar], !*CountVarsFindCallsState)
+determineVariablesAndRefCounts free_vars expr cvfci cvfcs=:{cvfcs_var_heap}
+	# cvfcs & cvfcs_var_heap = clearCount free_vars cIsAGlobalVar cvfcs_var_heap
+	  (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+	  (free_vars, cvfcs_var_heap) = retrieveRefCounts free_vars cvfcs.cvfcs_var_heap
+	= (expr, free_vars, {cvfcs & cvfcs_var_heap = cvfcs_var_heap})
 
 retrieveRefCounts free_vars var_heap
 	= mapSt retrieveRefCount free_vars var_heap
@@ -582,34 +439,46 @@ where
 	clearCount ({fv_info_ptr},_) locality var_heap
 		= var_heap <:= (fv_info_ptr, VI_Count 0 locality)
 
-//	In 'collectVariables' the reference counts of the local as well as of the global variables are determined.
+//	In 'countVarsFindCalls' the reference counts of the local as well as of the global variables are determined.
 //	Aliases and unreachable bindings introduced in a 'let' are removed.
 
-class collectVariables a :: !a !*CollectState -> (!a, !*CollectState)
+class countVarsFindCalls a :: !a !CountVarsFindCallsInfo !*CountVarsFindCallsState -> (!a, !*CountVarsFindCallsState)
 
 cContainsACycle		:== True
 cContainsNoCycle	:== False
 
-instance collectVariables Expression
+instance countVarsFindCalls Expression
 where
-	collectVariables (Var var) cos
-		# (var, cos) = collectVariables var cos
-		= (Var var, cos)
-	collectVariables (App app=:{app_args}) cos
-		# (app_args, cos) = collectVariables app_args cos
-		= (App { app & app_args = app_args}, cos)
-	collectVariables (expr @ exprs) cos
-		# ((expr, exprs), cos) = collectVariables (expr, exprs) cos
-		= (expr @ exprs, cos)
-	collectVariables (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) cos=:{cos_var_heap}
-		# cos_var_heap = determine_aliases let_strict_binds cos.cos_var_heap
-		  cos_var_heap = determine_aliases let_lazy_binds cos_var_heap
+	countVarsFindCalls (Var var) cvfci cvfcs
+		# (var, cvfcs) = countVarsFindCalls var cvfci cvfcs
+		= (Var var, cvfcs)
+	countVarsFindCalls (App app=:{app_symb={symb_kind},app_args}) cvfci cvfcs
+		# (app_args, cvfcs) = countVarsFindCalls app_args cvfci cvfcs
+		# cvfcs = get_index symb_kind cvfcs
+		= (App {app & app_args = app_args}, cvfcs)
+	where
+		get_index (SK_Function {glob_object,glob_module}) cvfcs
+			| cvfci.cvfci_main_dcl_module_n == glob_module && (glob_object < cvfci.cvfci_def_max || glob_object >= cvfci.cvfci_def_min)
+				= {cvfcs & cvfcs_fun_calls = [FunCall glob_object 0: cvfcs.cvfcs_fun_calls]}
+				= {cvfcs & cvfcs_fun_calls = [DclFunCall glob_module glob_object: cvfcs.cvfcs_fun_calls]}
+		get_index (SK_Constructor idx) cvfcs
+			= cvfcs
+		get_index (SK_LocalMacroFunction idx) cvfcs
+			= {cvfcs & cvfcs_fun_calls = [FunCall idx 0: cvfcs.cvfcs_fun_calls]}
+		get_index (SK_GeneratedFunction fun_ptr idx) cvfcs
+			= {cvfcs & cvfcs_fun_calls = [GeneratedFunCall idx fun_ptr : cvfcs.cvfcs_fun_calls]}
+	countVarsFindCalls (expr @ exprs) cvfci cvfcs
+		# ((expr, exprs), cvfcs) = countVarsFindCalls (expr, exprs) cvfci cvfcs
+		= (expr @ exprs, cvfcs)
+	countVarsFindCalls (Let lad=:{let_strict_binds, let_lazy_binds, let_expr, let_info_ptr}) cvfci cvfcs=:{cvfcs_var_heap}
+		# cvfcs_var_heap = determine_aliases let_strict_binds cvfcs.cvfcs_var_heap
+		  cvfcs_var_heap = determine_aliases let_lazy_binds cvfcs_var_heap
 
-		  (let_info,cos_expression_heap)	= readPtr let_info_ptr cos.cos_expression_heap
+		  (let_info,cvfcs_expr_heap)	= readPtr let_info_ptr cvfcs.cvfcs_expr_heap
 		  let_types = case let_info of
 						EI_LetType let_types	-> let_types
 						_						-> repeat undef
-		  cos & cos_var_heap=cos_var_heap, cos_expression_heap = cos_expression_heap
+		  cvfcs & cvfcs_var_heap=cvfcs_var_heap, cvfcs_expr_heap = cvfcs_expr_heap
 
 		  (let_strict_binds, let_types)	= combine let_strict_binds let_types
 				with
@@ -620,32 +489,32 @@ where
 						= ([(tp, lb) : let_binds], let_types)
 		  let_lazy_binds = zip2 let_types let_lazy_binds
 
-		  (is_cyclic_s, let_strict_binds, cos)
-				= detect_cycles_and_handle_alias_binds True let_strict_binds cos
-		  (is_cyclic_l, let_lazy_binds, cos)
-				= detect_cycles_and_handle_alias_binds False let_lazy_binds cos
+		  (is_cyclic_s, let_strict_binds, cvfcs)
+				= detect_cycles_and_handle_alias_binds True let_strict_binds cvfcs
+		  (is_cyclic_l, let_lazy_binds, cvfcs)
+				= detect_cycles_and_handle_alias_binds False let_lazy_binds cvfcs
 		| is_cyclic_s || is_cyclic_l
 			# (let_strict_bind_types,let_strict_binds) = unzip let_strict_binds
 			  (let_lazy_bind_types,let_lazy_binds) = unzip let_lazy_binds
 			  let_info = case let_info of
 				EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 				_				-> let_info
-			  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
+			  cvfcs & cvfcs_expr_heap = writePtr let_info_ptr let_info cvfcs.cvfcs_expr_heap
 			= (Let {lad & let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds },
-					{ cos & cos_error = checkError "" "cyclic let definition" cos.cos_error})
+					{cvfcs & cvfcs_error = checkError "" "cyclic let definition" cvfcs.cvfcs_error})
 //		| otherwise
-			# (let_expr, cos) = collectVariables let_expr cos
-			  (collected_strict_binds, collected_lazy_binds, cos)
-				= collect_variables_in_binds let_strict_binds let_lazy_binds [] [] cos
+			# (let_expr, cvfcs) = countVarsFindCalls let_expr cvfci cvfcs
+			  (collected_strict_binds, collected_lazy_binds, cvfcs)
+				= collect_variables_in_binds let_strict_binds let_lazy_binds [] [] cvfcs
 			| collected_strict_binds=:[] && collected_lazy_binds=:[]
-				= (let_expr, cos)
+				= (let_expr, cvfcs)
 				# (let_strict_bind_types,let_strict_binds) = unzip collected_strict_binds
 				  (let_lazy_bind_types,let_lazy_binds) = unzip collected_lazy_binds
 				  let_info = case let_info of
 					EI_LetType _	-> EI_LetType (let_strict_bind_types ++ let_lazy_bind_types)
 					_				-> let_info
-				  cos & cos_expression_heap = writePtr let_info_ptr let_info cos.cos_expression_heap
-				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, cos)
+				  cvfcs & cvfcs_expr_heap = writePtr let_info_ptr let_info cvfcs.cvfcs_expr_heap
+				= (Let {lad & let_expr = let_expr, let_strict_binds = let_strict_binds, let_lazy_binds = let_lazy_binds}, cvfcs)
 		where
 		/*	Set the 'var_info_field' of each  bound variable to either 'VI_Alias var' (if
 			this variable is an alias for 'var') or to 'VI_Count 0 cIsALocalVar' to initialise
@@ -661,30 +530,30 @@ where
 		/*	Remove all aliases from the list of lazy 'let'-binds. Add a _dummyForStrictAlias
 			function call for the strict aliases. Be careful with cycles! */
 
-			detect_cycles_and_handle_alias_binds :: !.Bool !u:[v:(.a,w:LetBind)] !*CollectState -> (!.Bool,!x:[y:(.a,z:LetBind)],!.CollectState), [u <= x,v <= y,w <= z]
-			detect_cycles_and_handle_alias_binds is_strict [] cos
-				= (cContainsNoCycle, [], cos)
-//			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cos
-			detect_cycles_and_handle_alias_binds is_strict [(type,bind=:{lb_dst={fv_info_ptr}}) : binds] cos
-				# (var_info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
-				  cos = { cos & cos_var_heap = cos_var_heap }
+			detect_cycles_and_handle_alias_binds :: !Bool ![(t,LetBind)] !*CountVarsFindCallsState -> (!Bool,![(t,LetBind)],!*CountVarsFindCallsState)
+			detect_cycles_and_handle_alias_binds is_strict [] cvfcs
+				= (cContainsNoCycle, [], cvfcs)
+//			detect_cycles_and_handle_alias_binds is_strict [bind=:{bind_dst={fv_info_ptr}} : binds] cvfcs
+			detect_cycles_and_handle_alias_binds is_strict [(type,bind=:{lb_dst={fv_info_ptr}}) : binds] cvfcs
+				# (var_info, cvfcs_var_heap) = readPtr fv_info_ptr cvfcs.cvfcs_var_heap
+				  cvfcs & cvfcs_var_heap = cvfcs_var_heap
 				= case var_info of
 					VI_Alias {var_info_ptr}
-						| is_cyclic fv_info_ptr var_info_ptr cos.cos_var_heap
-							-> (cContainsACycle, binds, cos)
+						| is_cyclic fv_info_ptr var_info_ptr cvfcs.cvfcs_var_heap
+							-> (cContainsACycle, binds, cvfcs)
 						| is_strict
-							# cos_var_heap = writePtr fv_info_ptr (VI_Count 0 cIsALocalVar) cos.cos_var_heap
-							  (new_bind_src, cos) = add_dummy_id_for_strict_alias bind.lb_src
-															{ cos & cos_var_heap = cos_var_heap }
-							  (is_cyclic, binds, cos)
-									= detect_cycles_and_handle_alias_binds is_strict binds cos
-							-> (is_cyclic, [(type,{ bind & lb_src = new_bind_src }) : binds], cos)
-						-> detect_cycles_and_handle_alias_binds is_strict binds cos
+							# cvfcs_var_heap = writePtr fv_info_ptr (VI_Count 0 cIsALocalVar) cvfcs.cvfcs_var_heap
+							  (new_bind_src, cvfcs) = add_dummy_id_for_strict_alias bind.lb_src cvfci
+															{cvfcs & cvfcs_var_heap = cvfcs_var_heap}
+							  (is_cyclic, binds, cvfcs)
+									= detect_cycles_and_handle_alias_binds is_strict binds cvfcs
+							-> (is_cyclic, [(type,{ bind & lb_src = new_bind_src }) : binds], cvfcs)
+						-> detect_cycles_and_handle_alias_binds is_strict binds cvfcs
 					_
-						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
-						-> (is_cyclic, [(type,bind) : binds], cos)
+						# (is_cyclic, binds, cvfcs) = detect_cycles_and_handle_alias_binds is_strict binds cvfcs
+						-> (is_cyclic, [(type,bind) : binds], cvfcs)
 			where
-				is_cyclic :: !.(Ptr VarInfo) !(Ptr VarInfo) !VarHeap -> .Bool
+				is_cyclic :: !VarInfoPtr !VarInfoPtr !VarHeap -> .Bool
 				is_cyclic orig_info_ptr info_ptr var_heap
 					| orig_info_ptr == info_ptr
 						= True
@@ -695,178 +564,176 @@ where
 							_
 								-> False
 
-				add_dummy_id_for_strict_alias :: !.Expression !*CollectState -> (!.Expression,!.CollectState)
-				add_dummy_id_for_strict_alias bind_src cos=:{cos_expression_heap, cos_predef_symbols_for_transform}
-					# (new_app_info_ptr, cos_expression_heap) = newPtr EI_Empty cos_expression_heap
-					  {pds_module, pds_def} = cos_predef_symbols_for_transform.predef_alias_dummy
+				add_dummy_id_for_strict_alias :: !.Expression !CountVarsFindCallsInfo !*CountVarsFindCallsState -> (!.Expression,!.CountVarsFindCallsState)
+				add_dummy_id_for_strict_alias bind_src {cvfci_predef_alias_dummy} cvfcs=:{cvfcs_expr_heap}
+					# (new_app_info_ptr, cvfcs_expr_heap) = newPtr EI_Empty cvfcs_expr_heap
+					  {pds_module, pds_def} = cvfci_predef_alias_dummy
 					  pds_ident = predefined_idents.[PD_DummyForStrictAliasFun]
 					  app_symb = { symb_ident = pds_ident, symb_kind = SK_Function {glob_module = pds_module, glob_object = pds_def} }
 					= (App { app_symb = app_symb, app_args = [bind_src], app_info_ptr = new_app_info_ptr },
-						{ cos & cos_expression_heap = cos_expression_heap } )
+						{cvfcs & cvfcs_expr_heap = cvfcs_expr_heap} )
 
-		/*	Apply 'collectVariables' to the bound expressions (the 'bind_src' field of 'let'-bind) if
+		/*	Apply 'countVarsFindCalls' to the bound expressions (the 'bind_src' field of 'let'-bind) if
 		    the corresponding bound variable (the 'bind_dst' field) has been used. This can be determined
 		    by examining the reference count.
 		*/
-			collect_variables_in_binds :: ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] !*CollectState
-																	-> (![(t,LetBind)],![(t,LetBind)],!*CollectState)
-			collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cos
-				# (bind_fond, lazy_binds, collected_lazy_binds, cos)
-					= examine_reachable_binds False lazy_binds collected_lazy_binds cos
-				# (bind_fond, strict_binds, collected_strict_binds, cos)
-					= examine_reachable_binds bind_fond strict_binds collected_strict_binds cos
+			collect_variables_in_binds :: ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] ![(t,LetBind)] !*CountVarsFindCallsState
+																	-> (![(t,LetBind)],![(t,LetBind)],!*CountVarsFindCallsState)
+			collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cvfcs
+				# (bind_fond, lazy_binds, collected_lazy_binds, cvfcs)
+					= examine_reachable_binds False lazy_binds collected_lazy_binds cvfcs
+				# (bind_fond, strict_binds, collected_strict_binds, cvfcs)
+					= examine_reachable_binds bind_fond strict_binds collected_strict_binds cvfcs
 				| bind_fond
-					= collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cos
-					# cos & cos_error=report_unused_strict_binds strict_binds cos.cos_error
-					= (collected_strict_binds, collected_lazy_binds, cos)
+					= collect_variables_in_binds strict_binds lazy_binds collected_strict_binds collected_lazy_binds cvfcs
+					# cvfcs & cvfcs_error=report_unused_strict_binds strict_binds cvfcs.cvfcs_error
+					= (collected_strict_binds, collected_lazy_binds, cvfcs)
 
-			examine_reachable_binds :: !Bool ![(t,LetBind)] ![(t,LetBind)] !*CollectState -> *(!Bool,![(t,LetBind)],![(t,LetBind)],!*CollectState)
-			examine_reachable_binds bind_found [bind=:(type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds cos
-				# (bind_found, binds, collected_binds, cos) = examine_reachable_binds bind_found binds collected_binds cos
-				# (info, cos_var_heap) = readPtr fv_info_ptr cos.cos_var_heap
-				# cos = { cos & cos_var_heap = cos_var_heap }
+			examine_reachable_binds :: !Bool ![(t,LetBind)] ![(t,LetBind)] !*CountVarsFindCallsState -> *(!Bool,![(t,LetBind)],![(t,LetBind)],!*CountVarsFindCallsState)
+			examine_reachable_binds bind_found [bind=:(type, letb=:{lb_dst=fv=:{fv_info_ptr},lb_src}) : binds] collected_binds cvfcs
+				# (bind_found, binds, collected_binds, cvfcs) = examine_reachable_binds bind_found binds collected_binds cvfcs
+				# (info, cvfcs_var_heap) = readPtr fv_info_ptr cvfcs.cvfcs_var_heap
+				# cvfcs & cvfcs_var_heap = cvfcs_var_heap
 				= case info of
 					VI_Count count _
 						| count > 0
-							#  (lb_src, cos) = collectVariables lb_src cos
-							-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], cos)
-							-> (bind_found, [bind : binds], collected_binds, cos)
-			examine_reachable_binds bind_found [] collected_binds cos
-				= (bind_found, [], collected_binds, cos)
+							#  (lb_src, cvfcs) = countVarsFindCalls lb_src cvfci cvfcs
+							-> (True, binds, [ (type, { letb & lb_dst = { fv & fv_count = count }, lb_src = lb_src }) : collected_binds ], cvfcs)
+							-> (bind_found, [bind : binds], collected_binds, cvfcs)
+			examine_reachable_binds bind_found [] collected_binds cvfcs
+				= (bind_found, [], collected_binds, cvfcs)
 
 			report_unused_strict_binds [(type,{lb_dst={fv_ident},lb_position}):binds] errors
 				= report_unused_strict_binds binds (checkWarningWithPosition fv_ident lb_position "not used, ! ignored" errors)
 			report_unused_strict_binds [] errors
 				= errors
 
-	collectVariables (Case case_expr) cos
-		# (case_expr, cos) = collectVariables case_expr cos
-		= (Case case_expr, cos)
-	collectVariables (Selection is_unique expr selectors) cos
-		# ((expr, selectors), cos) = collectVariables (expr, selectors) cos
-		= (Selection is_unique expr selectors, cos)
-	collectVariables (Update expr1 selectors expr2) cos
-		# (((expr1, expr2), selectors), cos) = collectVariables ((expr1, expr2), selectors) cos
-		= (Update expr1 selectors expr2, cos)
-	collectVariables (RecordUpdate cons_symbol expression expressions) cos
-		# ((expression, expressions), cos) = collectVariables (expression, expressions) cos
-		= (RecordUpdate cons_symbol expression expressions, cos)
-	collectVariables (TupleSelect symbol argn_nr expr) cos
-		# (expr, cos) = collectVariables expr cos
-		= (TupleSelect symbol argn_nr expr, cos)
-	collectVariables (MatchExpr cons_ident expr) cos
-		# (expr, cos) = collectVariables expr cos
-		= (MatchExpr cons_ident expr, cos)
-	collectVariables (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) cos
-		# (expr, cos) = collectVariables expr cos
-		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, cos)
-	collectVariables (DynamicExpr dynamic_expr) cos
-		= abort "collectVariables DynamicExpr"
-	collectVariables (TypeSignature type_function expr) cos
-		# (expr, cos) = collectVariables expr cos
-		= (TypeSignature type_function expr, cos);
-	collectVariables (DictionariesFunction dictionaries expr expr_type) cos
-		# cos = {cos & cos_var_heap = clearCount dictionaries cIsALocalVar cos.cos_var_heap}
-		  (expr, cos) = collectVariables expr cos
-		  (dictionaries, var_heap) = mapSt retrieve_ref_count dictionaries cos.cos_var_heap
-		  cos = {cos & cos_var_heap = var_heap}
-		= (DictionariesFunction dictionaries expr expr_type, cos)
+	countVarsFindCalls (Case case_expr) cvfci cvfcs
+		# (case_expr, cvfcs) = countVarsFindCalls case_expr cvfci cvfcs
+		= (Case case_expr, cvfcs)
+	countVarsFindCalls (Selection is_unique expr selectors) cvfci cvfcs
+		# ((expr, selectors), cvfcs) = countVarsFindCalls (expr, selectors) cvfci cvfcs
+		= (Selection is_unique expr selectors, cvfcs)
+	countVarsFindCalls (Update expr1 selectors expr2) cvfci cvfcs
+		# (((expr1, expr2), selectors), cvfcs) = countVarsFindCalls ((expr1, expr2), selectors) cvfci cvfcs
+		= (Update expr1 selectors expr2, cvfcs)
+	countVarsFindCalls (RecordUpdate cons_symbol expression expressions) cvfci cvfcs
+		# ((expression, expressions), cvfcs) = countVarsFindCalls (expression, expressions) cvfci cvfcs
+		= (RecordUpdate cons_symbol expression expressions, cvfcs)
+	countVarsFindCalls (TupleSelect symbol argn_nr expr) cvfci cvfcs
+		# (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+		= (TupleSelect symbol argn_nr expr, cvfcs)
+	countVarsFindCalls (MatchExpr cons_ident expr) cvfci cvfcs
+		# (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+		= (MatchExpr cons_ident expr, cvfcs)
+	countVarsFindCalls (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position) cvfci cvfcs
+		# (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+		= (IsConstructor expr cons_symbol cons_arity global_type_index case_ident position, cvfcs)
+	countVarsFindCalls (TypeSignature type_function expr) cvfci cvfcs
+		# (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+		= (TypeSignature type_function expr, cvfcs);
+	countVarsFindCalls (DictionariesFunction dictionaries expr expr_type) cvfci cvfcs
+		# cvfcs & cvfcs_var_heap = clearCount dictionaries cIsALocalVar cvfcs.cvfcs_var_heap
+		  (expr, cvfcs) = countVarsFindCalls expr cvfci cvfcs
+		  (dictionaries, var_heap) = mapSt retrieve_ref_count dictionaries cvfcs.cvfcs_var_heap
+		  cvfcs & cvfcs_var_heap = var_heap
+		= (DictionariesFunction dictionaries expr expr_type, cvfcs)
 	where
 		retrieve_ref_count (fv,a_type) var_heap
 			# (fv,var_heap) = retrieveRefCount fv var_heap
 			= ((fv,a_type),var_heap)
-	collectVariables expr cos
-		= (expr, cos)
+	countVarsFindCalls expr cvfci cvfcs
+		= (expr, cvfcs)
 
-instance collectVariables Selection
+instance countVarsFindCalls Selection
 where
-	collectVariables (ArraySelection array_select expr_ptr index_expr) cos
-		# (index_expr, cos) = collectVariables index_expr cos
-		= (ArraySelection array_select expr_ptr index_expr, cos)
-	collectVariables (DictionarySelection dictionary_select selectors expr_ptr index_expr) cos
-		# ((index_expr,selectors), cos) = collectVariables (index_expr,selectors) cos
-		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, cos)
-	collectVariables record_selection cos
-		= (record_selection, cos)
+	countVarsFindCalls (ArraySelection array_select expr_ptr index_expr) cvfci cvfcs
+		# (index_expr, cvfcs) = countVarsFindCalls index_expr cvfci cvfcs
+		= (ArraySelection array_select expr_ptr index_expr, cvfcs)
+	countVarsFindCalls (DictionarySelection dictionary_select selectors expr_ptr index_expr) cvfci cvfcs
+		# ((index_expr,selectors), cvfcs) = countVarsFindCalls (index_expr,selectors) cvfci cvfcs
+		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, cvfcs)
+	countVarsFindCalls record_selection cvfci cvfcs
+		= (record_selection, cvfcs)
 
-instance collectVariables [a] | collectVariables a
+instance countVarsFindCalls [a] | countVarsFindCalls a
 where
-	collectVariables [x:xs] cos
-		# (x, cos) = collectVariables x cos
-		# (xs, cos) = collectVariables xs cos
-		= ([x:xs], cos)
-	collectVariables [] cos
-		= ([], cos)
+	countVarsFindCalls [x:xs] cvfci cvfcs
+		# (x, cvfcs) = countVarsFindCalls x cvfci cvfcs
+		# (xs, cvfcs) = countVarsFindCalls xs cvfci cvfcs
+		= ([x:xs], cvfcs)
+	countVarsFindCalls [] cvfci cvfcs
+		= ([], cvfcs)
 
-instance collectVariables (!a,!b) | collectVariables a & collectVariables b
+instance countVarsFindCalls (!a,!b) | countVarsFindCalls a & countVarsFindCalls b
 where
-	collectVariables (x,y) cos
-		# (x, cos) = collectVariables x cos
-		# (y, cos) = collectVariables y cos
-		= ((x,y), cos)
+	countVarsFindCalls (x,y) cvfci cvfcs
+		# (x, cvfcs) = countVarsFindCalls x cvfci cvfcs
+		# (y, cvfcs) = countVarsFindCalls y cvfci cvfcs
+		= ((x,y), cvfcs)
 
-instance collectVariables (Optional a) | collectVariables a
+instance countVarsFindCalls (Optional a) | countVarsFindCalls a
 where
-	collectVariables (Yes x) cos
-		# (x, cos) = collectVariables x cos
-		= (Yes x, cos)
-	collectVariables no cos
-		= (no, cos)
+	countVarsFindCalls (Yes x) cvfci cvfcs
+		# (x, cvfcs) = countVarsFindCalls x cvfci cvfcs
+		= (Yes x, cvfcs)
+	countVarsFindCalls no cvfci cvfcs
+		= (no, cvfcs)
 
-instance collectVariables (Bind a b) | collectVariables a where
-	collectVariables bind=:{bind_src} cos
-		# (bind_src, cos) = collectVariables bind_src cos
-		= ({bind & bind_src = bind_src}, cos)
+instance countVarsFindCalls (Bind a b) | countVarsFindCalls a where
+	countVarsFindCalls bind=:{bind_src} cvfci cvfcs
+		# (bind_src, cvfcs) = countVarsFindCalls bind_src cvfci cvfcs
+		= ({bind & bind_src = bind_src}, cvfcs)
 
-instance collectVariables Case
+instance countVarsFindCalls Case
 where
-	collectVariables kees=:{ case_expr, case_guards, case_default } cos
-		# (case_expr, cos) = collectVariables case_expr cos
-		# (case_guards, cos) = collectVariables case_guards cos
-		# (case_default, cos) = collectVariables case_default cos
-		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, cos)
+	countVarsFindCalls kees=:{ case_expr, case_guards, case_default } cvfci cvfcs
+		# (case_expr, cvfcs) = countVarsFindCalls case_expr cvfci cvfcs
+		# (case_guards, cvfcs) = countVarsFindCalls case_guards cvfci cvfcs
+		# (case_default, cvfcs) = countVarsFindCalls case_default cvfci cvfcs
+		=  ({ kees & case_expr = case_expr, case_guards = case_guards, case_default = case_default }, cvfcs)
 
-instance collectVariables CasePatterns
+instance countVarsFindCalls CasePatterns
 where
-	collectVariables (AlgebraicPatterns type patterns) cos
-		# (patterns, cos) = collectVariables patterns cos
-		= (AlgebraicPatterns type patterns, cos)
-	collectVariables (BasicPatterns type patterns) cos
-		# (patterns, cos) = collectVariables patterns cos
-		= (BasicPatterns type patterns, cos)
-	collectVariables (OverloadedPatterns type decons_expr patterns) cos
-		# (patterns, cos) = collectVariables patterns cos
-		= (OverloadedPatterns type decons_expr patterns, cos)
-	collectVariables (NewTypePatterns type patterns) cos
-		# (patterns, cos) = collectVariables patterns cos
-		= (NewTypePatterns type patterns, cos)
-	collectVariables NoPattern cos
-		= (NoPattern, cos)
+	countVarsFindCalls (AlgebraicPatterns type patterns) cvfci cvfcs
+		# (patterns, cvfcs) = countVarsFindCalls patterns cvfci cvfcs
+		= (AlgebraicPatterns type patterns, cvfcs)
+	countVarsFindCalls (BasicPatterns type patterns) cvfci cvfcs
+		# (patterns, cvfcs) = countVarsFindCalls patterns cvfci cvfcs
+		= (BasicPatterns type patterns, cvfcs)
+	countVarsFindCalls (OverloadedPatterns type decons_expr patterns) cvfci cvfcs
+		# (patterns, cvfcs) = countVarsFindCalls patterns cvfci cvfcs
+		= (OverloadedPatterns type decons_expr patterns, cvfcs)
+	countVarsFindCalls (NewTypePatterns type patterns) cvfci cvfcs
+		# (patterns, cvfcs) = countVarsFindCalls patterns cvfci cvfcs
+		= (NewTypePatterns type patterns, cvfcs)
+	countVarsFindCalls NoPattern cvfci cvfcs
+		= (NoPattern, cvfcs)
 
-instance collectVariables AlgebraicPattern
+instance countVarsFindCalls AlgebraicPattern
 where
-	collectVariables pattern=:{ap_vars,ap_expr} cos
-		# cos = {cos & cos_var_heap = clearCount ap_vars cIsALocalVar cos.cos_var_heap}
-		  (ap_expr, cos) = collectVariables ap_expr cos
-		  (ap_vars, cos_var_heap) = retrieveRefCounts ap_vars cos.cos_var_heap
-		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, { cos & cos_var_heap = cos_var_heap })
+	countVarsFindCalls pattern=:{ap_vars,ap_expr} cvfci cvfcs
+		# cvfcs & cvfcs_var_heap = clearCount ap_vars cIsALocalVar cvfcs.cvfcs_var_heap
+		  (ap_expr, cvfcs) = countVarsFindCalls ap_expr cvfci cvfcs
+		  (ap_vars, cvfcs_var_heap) = retrieveRefCounts ap_vars cvfcs.cvfcs_var_heap
+		= ({ pattern & ap_expr = ap_expr, ap_vars = ap_vars }, {cvfcs & cvfcs_var_heap = cvfcs_var_heap})
 
-instance collectVariables BasicPattern
+instance countVarsFindCalls BasicPattern
 where
-	collectVariables pattern=:{bp_expr} cos
-		# (bp_expr, cos) = collectVariables bp_expr cos
-		= ({ pattern & bp_expr = bp_expr }, cos)
+	countVarsFindCalls pattern=:{bp_expr} cvfci cvfcs
+		# (bp_expr, cvfcs) = countVarsFindCalls bp_expr cvfci cvfcs
+		= ({ pattern & bp_expr = bp_expr }, cvfcs)
 
-instance collectVariables BoundVar
+instance countVarsFindCalls BoundVar
 where
-	collectVariables var=:{var_ident,var_info_ptr,var_expr_ptr} cos=:{cos_var_heap}
-		# (var_info, cos_var_heap) = readPtr var_info_ptr cos_var_heap
-		  cos = { cos & cos_var_heap = cos_var_heap }
+	countVarsFindCalls var=:{var_ident,var_info_ptr,var_expr_ptr} cvfci cvfcs=:{cvfcs_var_heap}
+		# (var_info, cvfcs_var_heap) = readPtr var_info_ptr cvfcs_var_heap
+		  cvfcs & cvfcs_var_heap = cvfcs_var_heap
 		= case var_info of
 			VI_Count count is_global
 				| count > 0 || is_global
-					-> (var, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cos.cos_var_heap })
-					-> (var, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cos.cos_var_heap })
+					-> (var, {cvfcs & cvfcs_var_heap = writePtr var_info_ptr (VI_Count (inc count) is_global) cvfcs.cvfcs_var_heap})
+					-> (var, {cvfcs & cvfcs_var_heap = writePtr var_info_ptr (VI_Count 1 is_global) cvfcs.cvfcs_var_heap})
 			VI_Alias alias
-				#  (original, cos) = collectVariables alias cos
-				-> ({ original & var_expr_ptr = var_expr_ptr }, cos)
+				#  (original, cvfcs) = countVarsFindCalls alias cvfci cvfcs
+				-> ({ original & var_expr_ptr = var_expr_ptr }, cvfcs)
