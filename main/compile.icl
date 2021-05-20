@@ -197,7 +197,8 @@ parseCommandLine [arg1=:"-generic_fusion":args] options
 	# (args,modules,options) = parseCommandLine args {options & fusion_options.generic_fusion = True}
 	= ([arg1:args],modules,options)
 parseCommandLine [arg1=:"-strip":args] options
-	= parseCommandLine args {options & fusion_options.strip_unused = True}
+	// ignored
+	= parseCommandLine args options
 parseCommandLine ["-generics":args] options
 	// enable generics
 	= parseCommandLine args options

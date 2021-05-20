@@ -88,20 +88,6 @@ where
 	,	pi_collect` ::		!.CountVarsFindCallsState
 	}
 
-stripStrictLets :: !*{#FunDef} !Int !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
-							  -> (!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
-stripStrictLets fun_defs main_dcl_module_n def_min def_max predef_symbols var_heap sym_heap error_admin
-	# (predef_alias_dummy,predef_symbols) = predef_symbols![PD_DummyForStrictAliasFun]
-	# collect_state = {cvfcs_var_heap = var_heap, cvfcs_expr_heap = sym_heap, cvfcs_error = error_admin, cvfcs_fun_calls = []}
-	# collect_info
-		= {cvfci_predef_alias_dummy=predef_alias_dummy, cvfci_main_dcl_module_n=main_dcl_module_n, cvfci_def_min=def_min, cvfci_def_max=def_max}
-	# (fun_defs,collect_state) = aMapSt (determine_ref_counts collect_info) fun_defs collect_state
-	= (fun_defs,predef_symbols,collect_state.cvfcs_var_heap, collect_state.cvfcs_expr_heap, collect_state.cvfcs_error)
-where
-	aMapSt f a s
-		# (l,s)	= mapSt f [e \\ e <-: a] s
-		= ({e \\ e <- l},s)
-
 partitionateFunctions` :: !*{#FunDef} ![IndexRange] !Index !Int !Int !*PredefinedSymbols !*VarHeap !*ExpressionHeap !*ErrorAdmin
 									  -> (!*{!Component},!*{#FunDef},!*PredefinedSymbols,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 partitionateFunctions` fun_defs ranges main_dcl_module_n def_min def_max predef_symbols var_heap sym_heap error_admin
