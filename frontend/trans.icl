@@ -355,27 +355,28 @@ where
 	is_variable (Var _) = True
 	is_variable _ 		= False
 
-skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns basic_type basicPatterns,case_default} ro ti
+skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns basic_type basicPatterns,case_default,case_explicit} ro ti
 	// currently only active cases are matched at runtime (multimatch problem)
 	# matching_patterns = [pattern \\ pattern=:{bp_value}<-basicPatterns | bp_value==basic_value]
 	= case matching_patterns of
 		[]
 			-> case case_default of
 				Yes default_expr
+					// maybe not if default_expr is strict let and not on root ?
 					-> transform default_expr {ro & ro_root_case_mode = NotRootCase} ti
 				No
 					# ro_lost_root = {ro & ro_root_case_mode = NotRootCase}
 					# (new_case_expr, ti) = transform case_expr ro_lost_root ti
 					-> (Case {this_case & case_expr=new_case_expr, case_guards=BasicPatterns basic_type []}, ti)
-/*
-					// The following does not work, because a FailExpr may only occur as else of an if in the backend */
+					// The following does not work, because a FailExpr may only occur as else of an if in the backend
+					/*
 					# never_ident = case ro.ro_root_case_mode of
 										NotRootCase -> this_case.case_ident
 										_ -> Yes ro.ro_tfi.tfi_case.symb_ident
 					-> (neverMatchingCase never_ident, ti)
-*/
+					*/
 		[{bp_expr}]
-			| case_alt_matches_always bp_expr ro
+			| case_alt_matches_always_and_strict_let_allowed bp_expr case_explicit ro
 				-> transform bp_expr {ro & ro_root_case_mode = NotRootCase} ti
 		_
 			# ro_lost_root = {ro & ro_root_case_mode = NotRootCase}
@@ -390,34 +391,40 @@ skip_over this_case=:{case_expr,case_guards,case_default} ro ti
 	  (new_case_default, ti) = transform case_default ro_lost_root ti
 	= (Case { this_case & case_expr=new_case_expr, case_guards=new_case_guards, case_default=new_case_default }, ti)
 
-case_alt_matches_always (Case {case_default,case_explicit,case_guards}) ro
-	| case_explicit
-		= True
-		= case case_default of
-			Yes _
-				-> True
-			_
-				-> case case_guards of
-					AlgebraicPatterns {gi_module,gi_index} algebraic_patterns
-						-> case ro.ro_common_defs.[gi_module].com_type_defs.[gi_index].td_rhs of
-							AlgType constructors
-								| same_length constructors algebraic_patterns
+case_alt_matches_always_and_strict_let_allowed (Let {let_strict_binds=[_:_],let_expr}) case_explicit=:True ro=:{ro_root_case_mode}
+	= ro_root_case_mode=:RootCase && case_alt_matches_always_and_strict_let_allowed let_expr case_explicit ro
+case_alt_matches_always_and_strict_let_allowed bp_expr case_explicit ro
+	= case_alt_matches_always bp_expr ro
+where
+	case_alt_matches_always (Case {case_default,case_explicit,case_guards}) ro
+		| case_explicit
+			= True
+			= case case_default of
+				Yes _
+					// test if default may fail ?
+					-> True
+				_
+					-> case case_guards of
+						AlgebraicPatterns {gi_module,gi_index} algebraic_patterns
+							-> case ro.ro_common_defs.[gi_module].com_type_defs.[gi_index].td_rhs of
+								AlgType constructors
+									| same_length constructors algebraic_patterns
+										-> algebraic_patterns_match_always algebraic_patterns ro
+								RecordType _
 									-> algebraic_patterns_match_always algebraic_patterns ro
-							RecordType _
-								-> algebraic_patterns_match_always algebraic_patterns ro
-							_
-								-> False
-					_
-						-> False
-case_alt_matches_always (Let {let_expr}) ro
-	= case_alt_matches_always let_expr ro
-case_alt_matches_always _ ro
-	= True
+								_
+									-> False
+						_
+							-> False
+	case_alt_matches_always (Let {let_expr}) ro
+		= case_alt_matches_always let_expr ro
+	case_alt_matches_always _ ro
+		= True
 
-algebraic_patterns_match_always [{ap_expr}:algebraic_patterns] ro
-	= case_alt_matches_always ap_expr ro && algebraic_patterns_match_always algebraic_patterns ro
-algebraic_patterns_match_always [] ro
-	= True
+	algebraic_patterns_match_always [{ap_expr}:algebraic_patterns] ro
+		= case_alt_matches_always ap_expr ro && algebraic_patterns_match_always algebraic_patterns ro
+	algebraic_patterns_match_always [] ro
+		= True
 
 free_vars_to_bound_vars free_vars
 	= [Var {var_ident = fv_ident, var_info_ptr = fv_info_ptr, var_expr_ptr = nilPtr} \\ {fv_ident,fv_info_ptr} <- free_vars]
