@@ -736,9 +736,9 @@ checkExpression free_vars (PE_Case case_ident expr alts) e_input e_state e_info 
 	  (guards, _, pattern_variables, defaul, free_vars, e_state, e_info, cs)
 	  		= check_case_alts free_vars alts [] case_ident.id_name e_input e_state e_info cs
 	  (pattern_expr, binds, es_expr_heap) = bind_pattern_variables pattern_variables pattern_expr e_state.es_expr_heap
-	  (case_expr, es_var_heap, es_expr_heap) = build_and_share_case guards defaul pattern_expr case_ident cCaseExplicit e_state.es_var_heap es_expr_heap
+	  (case_expr, es_expr_heap) = build_explicit_case guards defaul pattern_expr case_ident es_expr_heap
 	  (result_expr, es_expr_heap) = buildLetExpression [] binds case_expr NoPos es_expr_heap
-	= (result_expr, free_vars, { e_state & es_var_heap = es_var_heap,  es_expr_heap = es_expr_heap }, e_info, cs)
+	= (result_expr, free_vars, {e_state & es_expr_heap = es_expr_heap}, e_info, cs)
 where
 	check_case_alts free_vars [g] pattern_variables case_name e_input=:{ei_expr_level} e_state e_info cs
 		# e_input = { e_input & ei_expr_level = inc ei_expr_level }
@@ -993,8 +993,8 @@ checkExpression free_vars (PE_Matches case_ident expr pattern position) e_input=
 		  true_expr = BasicExpr (BVB True)
 		  (guarded_expr, pattern_scheme, _/*pattern_variables*/, defaul, es_var_heap, es_expr_heap, _/*dynamics_in_patterns*/, cs)
 			= transform_pattern pattern NoPattern NoPattern [] fail_expr true_expr case_ident.id_name position ps_var_heap es_expr_heap [] cs
-		  (case_expr, es_var_heap, es_expr_heap)
-		 	= build_and_share_case guarded_expr defaul expr case_ident cCaseExplicit es_var_heap es_expr_heap
+		  (case_expr, es_expr_heap)
+			= build_explicit_case guarded_expr defaul expr case_ident es_expr_heap
 		  e_state & es_fun_defs=ps_fun_defs, es_var_heap = es_var_heap, es_expr_heap = es_expr_heap
 		= (case_expr, free_vars, e_state, e_info, cs)
 where
@@ -1285,7 +1285,7 @@ transform_pattern (AP_Variable name var_info opt_var) patterns pattern_scheme pa
 	# free_var = { fv_ident = name, fv_info_ptr = var_info, fv_def_level = NotALevel, fv_count = 0 }
 	  (new_bound_var, expr_heap) = allocate_bound_var free_var expr_heap
 	  case_ident = { id_name = case_name, id_info = nilPtr }
-	  (new_case, var_store, expr_heap) = build_and_share_case patterns defaul (Var new_bound_var) case_ident cCaseExplicit var_store expr_heap
+	  (new_case, expr_heap) = build_explicit_case patterns defaul (Var new_bound_var) case_ident expr_heap
 	  new_defaul = insert_as_default result_expr new_case
 	= (NoPattern, pattern_scheme, (cons_optional opt_var pattern_variables), Yes (Yes free_var, new_defaul),
 		var_store, expr_heap, opt_dynamics, cs)
@@ -1331,72 +1331,51 @@ transform_pattern (AP_WildCard _) patterns pattern_scheme pattern_variables defa
 transform_pattern AP_Empty patterns pattern_scheme pattern_variables defaul result_expr _ pos var_store expr_heap opt_dynamics cs
 	= (patterns, pattern_scheme, pattern_variables, defaul, var_store, expr_heap, opt_dynamics, cs)
 
-build_and_share_case patterns defaul expr case_ident explicit var_heap expr_heap
-	# (expr, expr_heap) = build_case patterns defaul expr case_ident explicit expr_heap
-	= share_case_expr expr var_heap expr_heap
-where
-	build_case NoPattern defaul expr case_ident explicit expr_heap
-		= case defaul of
-			Yes (opt_var, result)
-				-> case opt_var of
-					Yes var
-						-> bind_default_variable expr var result expr_heap
-					No
-						-> (result, expr_heap)
-			No
-				-> (EE, expr_heap)
-	build_case (DynamicPatterns patterns) defaul expr case_ident explicit expr_heap
-		= case defaul of
-			Yes (opt_var, result)
-				-> case opt_var of
-					Yes var
-						# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						  (bound_var, expr_heap) = allocate_bound_var var expr_heap
-						  result = buildTypeCase (Var bound_var) patterns (Yes result) type_case_info_ptr cCaseExplicit
-						-> bind_default_variable expr var result expr_heap
-					No
-						# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-						-> (buildTypeCase expr patterns (Yes result) type_case_info_ptr cCaseExplicit, expr_heap)
-			No
-				# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				-> (buildTypeCase expr patterns No type_case_info_ptr cCaseExplicit, expr_heap)
-	build_case patterns (Yes (opt_var,result)) expr case_ident explicit expr_heap
-		= case opt_var of
-			Yes var
-				# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				  (bound_var, expr_heap) = allocate_bound_var var expr_heap
-				  result = Case {case_expr = Var bound_var, case_guards = patterns, case_default = Yes result,
-								 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr,
-								 case_explicit = explicit,
-								 case_default_pos = NoPos }
-				-> bind_default_variable expr var result expr_heap
-			No
-				#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-				-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
-							case_explicit = explicit,
-							case_ident = Yes case_ident, case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
-	build_case patterns No expr case_ident explicit expr_heap
-		# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
-		= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident,
-					case_explicit = explicit,
-					case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
-
-// make sure that the case_expr is a variable, because that's needed for merging
-// the alternatives in cases (in transform.icl)
-// FIXME: this should be represented in the syntax tree: change case_expr to
-// case_var :: BoundVar in Case
-share_case_expr (Let lad=:{let_expr}) var_heap expr_heap
-	# (let_expr, var_heap, expr_heap) = share_case_expr let_expr var_heap expr_heap
-	= (Let {lad & let_expr = let_expr}, var_heap, expr_heap)
-share_case_expr expr=:(Case {case_expr=Var var_ptr}) var_heap expr_heap
-	= (expr, var_heap, expr_heap)
-share_case_expr (Case kees=:{case_expr}) var_heap expr_heap
-	# (free_var, var_heap) = allocate_free_var { id_name = "_case_var", id_info = nilPtr } var_heap
-	  (bound_var, expr_heap) = allocate_bound_var free_var expr_heap
-	  (case_expression, expr_heap) = bind_default_variable case_expr free_var (Case {kees & case_expr = Var bound_var}) expr_heap
- 	= (case_expression, var_heap, expr_heap)
-share_case_expr expr var_heap expr_heap
-	=  (expr, var_heap, expr_heap)			
+build_explicit_case NoPattern defaul expr case_ident expr_heap
+	= case defaul of
+		Yes (opt_var, result)
+			-> case opt_var of
+				Yes var
+					-> bind_default_variable expr var result expr_heap
+				No
+					-> (result, expr_heap)
+		No
+			-> (EE, expr_heap)
+build_explicit_case (DynamicPatterns patterns) defaul expr case_ident expr_heap
+	= case defaul of
+		Yes (opt_var, result)
+			-> case opt_var of
+				Yes var
+					# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
+					  (bound_var, expr_heap) = allocate_bound_var var expr_heap
+					  result = buildTypeCase (Var bound_var) patterns (Yes result) type_case_info_ptr cCaseExplicit
+					-> bind_default_variable expr var result expr_heap
+				No
+					# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
+					-> (buildTypeCase expr patterns (Yes result) type_case_info_ptr cCaseExplicit, expr_heap)
+		No
+			# (type_case_info_ptr, expr_heap) = newPtr EI_Empty expr_heap
+			-> (buildTypeCase expr patterns No type_case_info_ptr cCaseExplicit, expr_heap)
+build_explicit_case patterns (Yes (opt_var,result)) expr case_ident expr_heap
+	= case opt_var of
+		Yes var
+			# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+			  (bound_var, expr_heap) = allocate_bound_var var expr_heap
+			  result = Case {case_expr = Var bound_var, case_guards = patterns, case_default = Yes result,
+							 case_ident = Yes case_ident, case_info_ptr = case_expr_ptr,
+							 case_explicit = True,
+							 case_default_pos = NoPos }
+			-> bind_default_variable expr var result expr_heap
+		No
+			#  (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+			-> (Case {case_expr = expr, case_guards = patterns, case_default = Yes result,
+						case_explicit = True,
+						case_ident = Yes case_ident, case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
+build_explicit_case patterns No expr case_ident expr_heap
+	# (case_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
+	= (Case {case_expr = expr, case_guards = patterns, case_default = No, case_ident = Yes case_ident,
+				case_explicit = True,
+				case_info_ptr = case_expr_ptr, case_default_pos = NoPos }, expr_heap)
 
 bind_default_variable lb_src lb_dst result_expr expr_heap
 	# (let_expr_ptr, expr_heap) = newPtr EI_Empty expr_heap
