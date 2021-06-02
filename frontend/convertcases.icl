@@ -48,11 +48,11 @@ convertCasesOfFunctions :: !*{!Component} !Int !{#{#FunType}} !{#CommonDefs}
 				!*{#FunDef},!*{#{#CheckedTypeDef}},!ImportedConstructors,!*VarHeap,!*TypeHeaps,!*ExpressionHeap)
 convertCasesOfFunctions groups main_dcl_module_n dcl_functions common_defs fun_defs imported_types imported_conses var_heap type_heaps expr_heap
 	#! nr_of_funs = size fun_defs
-	# (groups, (fun_defs, collected_imports, {cs_new_functions, cs_var_heap, cs_expr_heap, cs_fun_heap}))
+	# (groups, (fun_defs, collected_imports, {cs_new_functions, cs_var_heap, cs_expr_heap}))
 			= convert_groups 0 groups dcl_functions common_defs main_dcl_module_n
-				(fun_defs, [], { cs_new_functions = [], cs_fun_heap = newHeap, cs_var_heap = var_heap, cs_expr_heap = expr_heap, cs_next_fun_nr = nr_of_funs })
+				(fun_defs, [], { cs_new_functions = [], cs_var_heap = var_heap, cs_expr_heap = expr_heap, cs_next_fun_nr = nr_of_funs })
 	  (groups, new_fun_defs, imported_types, imported_conses, type_heaps, cs_var_heap)
-			= addNewFunctionsToGroups common_defs cs_fun_heap cs_new_functions main_dcl_module_n groups imported_types imported_conses type_heaps cs_var_heap
+			= addNewFunctionsToGroups common_defs cs_new_functions main_dcl_module_n groups imported_types imported_conses type_heaps cs_var_heap
 	  (imported_functions, imported_conses) = foldSt split collected_imports ([], imported_conses)
 	= (imported_functions, groups, { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs },
 			imported_types, imported_conses, cs_var_heap, type_heaps, cs_expr_heap)
@@ -1289,11 +1289,10 @@ nextAlts si=:{si_next_alt=Yes next_alt, si_force_next_alt} kees=:{case_info_ptr,
 nextAlts si kees=:{case_default} ss
 	=	findSplitCases si case_default ss // ->> ("nextAlts no outerdefault" +++ toString kees.case_explicit)
 
-newFunctionWithType :: !(Optional Ident) !FunctionBody ![FreeVar] !SymbolType !Int !(!Int, ![FunctionInfoPtr],!*FunctionHeap)
-	-> (! SymbIdent, !(!Int, ![FunctionInfoPtr],!*FunctionHeap))
-newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_fun_nr, cs_new_functions, cs_fun_heap)
-	# (fun_def_ptr, cs_fun_heap) = newPtr FI_Empty cs_fun_heap
-	  fun_id = getIdent opt_id cs_next_fun_nr
+newFunctionWithType :: !(Optional Ident) !FunctionBody ![FreeVar] !SymbolType !Int !(!Int, ![(FunDef,Index)])
+	-> (! SymbIdent, !(!Int, ![(FunDef,Index)]))
+newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_fun_nr, cs_new_functions)
+	# fun_id = getIdent opt_id cs_next_fun_nr
 	  arity = fun_type.st_arity
 	  fun_def = 
 			{	fun_ident		= fun_id
@@ -1306,32 +1305,28 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 			,	fun_lifted		= 0
 			,	fun_info		= { EmptyFunInfo & fi_group_index = group_index, fi_local_vars = local_vars }
 			}
-	= ({ symb_ident = fun_id, symb_kind = SK_GeneratedFunction fun_def_ptr cs_next_fun_nr },
-			(inc cs_next_fun_nr, [fun_def_ptr : cs_new_functions],
-				cs_fun_heap <:= (fun_def_ptr,  FI_Function { gf_fun_def = fun_def, gf_instance_info = II_Empty,
-	  				  gf_fun_index = cs_next_fun_nr, gf_cons_args = {cc_size=0, cc_args = [], cc_linear_bits = [#!], cc_producer = False} })))
+	  fun_ident = {symb_ident = fun_id, symb_kind = SK_LocalMacroFunction cs_next_fun_nr}
+	= (fun_ident, (inc cs_next_fun_nr, [(fun_def,cs_next_fun_nr) : cs_new_functions]))
 
-addNewFunctionsToGroups :: !{#.CommonDefs} FunctionHeap ![FunctionInfoPtr] !Int !*{!Component} !*{#{# CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
-	-> (!*{!Component}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-addNewFunctionsToGroups common_defs fun_heap new_functions main_dcl_module_n groups imported_types imported_conses type_heaps var_heap
-	= foldSt (add_new_function_to_group fun_heap common_defs) new_functions (groups, [], imported_types, imported_conses, type_heaps, var_heap)
+addNewFunctionsToGroups :: !{#.CommonDefs} ![(FunDef,Index)] !Int !*{!Component} !*{#{#CheckedTypeDef}} !ImportedFunctions !*TypeHeaps !*VarHeap
+	-> (!*{!Component}, ![FunDef], !*{#{#CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+addNewFunctionsToGroups common_defs new_functions main_dcl_module_n groups imported_types imported_conses type_heaps var_heap
+	= foldSt (add_new_function_to_group common_defs) new_functions (groups, [], imported_types, imported_conses, type_heaps, var_heap)
 where
-	add_new_function_to_group :: !FunctionHeap  !{# CommonDefs} !FunctionInfoPtr
-				!(!*{!Component}, ![FunDef], !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-					-> (!*{!Component}, ![FunDef],  !*{#{# CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-	add_new_function_to_group fun_heap common_defs fun_ptr (groups, fun_defs, imported_types, imported_conses, type_heaps, var_heap)
-		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
-		  {fun_type = Yes ft, fun_info = {fi_group_index, fi_properties}} = gf_fun_def
+	add_new_function_to_group :: !{# CommonDefs} !(FunDef,Index)
+				!(!*{!Component}, ![FunDef], !*{#{#CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+			  -> (!*{!Component}, ![FunDef], !*{#{#CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
+	add_new_function_to_group common_defs (fun_def,fun_index) (groups, fun_defs, imported_types, imported_conses, type_heaps, var_heap)
+		# {fun_type = Yes ft, fun_info = {fi_group_index, fi_properties}} = fun_def
 		  (ft, imported_types, imported_conses, type_heaps, var_heap)
 		  		= convertSymbolType (fi_properties bitand FI_HasTypeSpec == 0) common_defs ft main_dcl_module_n
 		  		 			imported_types imported_conses type_heaps var_heap
-		# (group, groups) = groups![fi_group_index]
-		= ({ groups & [fi_group_index] = { group & component_members = ComponentMember gf_fun_index group.component_members} },
-				[ { gf_fun_def & fun_type = Yes ft }: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
+		  (group, groups) = groups![fi_group_index]
+		  groups & [fi_group_index] = {group & component_members = ComponentMember fun_index group.component_members}
+		= (groups,[{fun_def & fun_type = Yes ft}: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
 ::	ConvertState =
-	{	cs_new_functions 	:: ![FunctionInfoPtr]
-	,	cs_fun_heap			:: !.FunctionHeap
+	{	cs_new_functions 	:: ![(FunDef,Index)]
 	,	cs_var_heap			:: !.VarHeap
 	,	cs_expr_heap		:: !.ExpressionHeap
 	,	cs_next_fun_nr		:: !Index
@@ -2086,10 +2081,10 @@ new_case_function opt_id result_type rhs free_vars local_vars group_index cs
 	  body = TransformedBody {tb_args=args, tb_rhs=rhs}
 	  type = {st_args = args_types, st_args_strictness = st_args_strictness, st_arity = length free_vars,
 	 		  st_result = result_type, st_vars = [], st_context = [], st_attr_vars = [], st_attr_env = []}
-	  (fun_ident, (cs_next_fun_nr, cs_new_functions, cs_fun_heap))
+	  (fun_ident, (cs_next_fun_nr, cs_new_functions))
 			= newFunctionWithType opt_id body local_vars type group_index
-					(cs.cs_next_fun_nr, cs.cs_new_functions, cs.cs_fun_heap)
-	= (fun_ident, { cs & cs_fun_heap = cs_fun_heap, cs_next_fun_nr = cs_next_fun_nr, cs_new_functions = cs_new_functions })
+					(cs.cs_next_fun_nr, cs.cs_new_functions)
+	= (fun_ident, { cs & cs_next_fun_nr = cs_next_fun_nr, cs_new_functions = cs_new_functions })
 where
 	make_dictionaries_strict :: ![FreeVar] !Int !StrictnessList -> StrictnessList
 	make_dictionaries_strict [{fv_def_level = DictionaryLevel}:args] arg_n strictness
