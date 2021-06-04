@@ -519,99 +519,117 @@ where
 							(write_to_var_heap cons_type_ptr VI_Empty be0)
 							be0
 
-:: DeclVarsInput :== Ident
+(|>) infixl
+(|>) s f :== f s
 
-class declareVars a :: a !DeclVarsInput -> BackEnder
+:: DeclVarsInput :== Ident
+:: *DeclVarsState = { dvs_backEnd :: !BackEnd, dvs_varHeap :: !*VarHeap, dvs_sequenceNumber :: !Int }
+
+declareVariable :: Int (Ptr VarInfo) {#Char} !*DeclVarsState -> *DeclVarsState
+declareVariable lhsOrRhs varInfoPtr name dvs
+	# (variable_sequence_number,dvs) = assignOrGetVariableSequenceNumber varInfoPtr dvs
+	= {dvs & dvs_backEnd = BEDeclareNodeId variable_sequence_number lhsOrRhs name dvs.dvs_backEnd}
+where
+	assignOrGetVariableSequenceNumber :: !VarInfoPtr !*DeclVarsState -> (!Int,!*DeclVarsState)
+	assignOrGetVariableSequenceNumber varInfoPtr dvs=:{dvs_varHeap}
+		# (vi,dvs_varHeap) = readPtr varInfoPtr dvs_varHeap
+		#! dvs & dvs_varHeap=dvs_varHeap
+		= case vi of
+			VI_SequenceNumber sequenceNumber
+				-> (sequenceNumber,dvs)
+			VI_AliasSequenceNumber {var_info_ptr}
+				-> assignOrGetVariableSequenceNumber var_info_ptr dvs
+			_
+				# {dvs_sequenceNumber,dvs_varHeap} = dvs
+				  dvs_varHeap = writePtr varInfoPtr (VI_SequenceNumber dvs_sequenceNumber) dvs_varHeap
+				  dvs & dvs_sequenceNumber=dvs_sequenceNumber+1, dvs_varHeap=dvs_varHeap
+				-> (dvs_sequenceNumber,dvs)
+
+class declareVars a :: a !DeclVarsInput !*DeclVarsState -> *DeclVarsState
 
 instance declareVars [a] | declareVars a where
-	declareVars :: [a] !DeclVarsInput -> BackEnder | declareVars a
-	declareVars list dvInput
-		=	foldState (flip declareVars dvInput) list
+	declareVars list dvInput dvs
+		= foldState (flip declareVars dvInput) list dvs
 
 instance declareVars (Ptr VarInfo) where
-	declareVars varInfoPtr _
-		=	declareVariable BELhsNodeId varInfoPtr "_var???"	// +++ name
+	declareVars varInfoPtr _ dvs
+		= declareVariable BELhsNodeId varInfoPtr "_var???" dvs	// +++ name
 
 instance declareVars FreeVar where
-	declareVars :: FreeVar !DeclVarsInput -> BackEnder
-	declareVars freeVar _
-		=	declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
+	declareVars freeVar _ dvs
+		= declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name dvs
 
 instance declareVars LetBind where
-	declareVars :: LetBind !DeclVarsInput -> BackEnder
-	declareVars {lb_src=App {app_symb, app_args=[Var _:_]}, lb_dst=freeVar} aliasDummyId
+	declareVars {lb_src=App {app_symb, app_args=[Var bound_var:_]}, lb_dst=freeVar} aliasDummyId dvs
 		| not (isNilPtr app_symb.symb_ident.id_info) && app_symb.symb_ident==aliasDummyId
-			= identity		// we have an alias. Don't declare the same variable twice
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
-	declareVars {lb_dst=freeVar} _
-		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
-
-declareVariable :: Int (Ptr VarInfo) {#Char} -> BackEnder
-declareVariable lhsOrRhs varInfoPtr name
-	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfoPtr be0 in
-		beDeclareNodeId variable_sequence_number lhsOrRhs name be
+			# (vi, dvs_varHeap) = readPtr bound_var.var_info_ptr dvs.dvs_varHeap
+			  non_alias_bound_var = case vi of
+										VI_AliasSequenceNumber alias_bound_var -> alias_bound_var
+										_ -> bound_var
+			  dvs & dvs_varHeap
+				= writePtr freeVar.fv_info_ptr (VI_AliasSequenceNumber non_alias_bound_var) dvs_varHeap
+			= dvs	// we have an alias. Don't declare the same variable twice
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name dvs
+	declareVars {lb_dst=freeVar} _ dvs
+		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name dvs
 
 instance declareVars (Optional a) | declareVars a where
-	declareVars :: (Optional a) !DeclVarsInput -> BackEnder | declareVars a
-	declareVars (Yes x) dvInput
-		=	declareVars x dvInput
-	declareVars No _
-		=	identity
+	declareVars (Yes x) dvInput dvs
+		=	declareVars x dvInput dvs
+	declareVars No _ dvs
+		=	dvs
 
 instance declareVars FunctionPattern where
-	declareVars :: FunctionPattern !DeclVarsInput -> BackEnder
-	declareVars (FP_Algebraic _ freeVars) dvInput
-		=	declareVars freeVars dvInput
-	declareVars (FP_Variable freeVar) dvInput
-		=	declareVars freeVar dvInput
+	declareVars (FP_Algebraic _ freeVars) dvInput dvs
+		=	declareVars freeVars dvInput dvs
+	declareVars (FP_Variable freeVar) dvInput dvs
+		=	declareVars freeVar dvInput dvs
 
 instance declareVars Expression where
-	declareVars :: Expression !DeclVarsInput -> BackEnder
-	declareVars (Let {let_strict_binds, let_lazy_binds, let_expr}) dvInput
-		=	declareVars let_strict_binds dvInput
-		o`	declareVars let_lazy_binds dvInput
-		o`	declareVars let_expr dvInput
-	declareVars (Conditional {if_cond, if_then, if_else}) dvInput
-		=	declareVars if_cond dvInput
-		o`	declareVars if_then dvInput
-		o`	declareVars if_else dvInput
-	declareVars (Case caseExpr) dvInput
-		=	declareVars caseExpr dvInput
-	declareVars (AnyCodeExpr _ outParams _) _
-		=	foldState declVar outParams 
+	declareVars (Let {let_strict_binds, let_lazy_binds, let_expr}) dvInput dvs
+		= dvs	|> declareVars let_strict_binds dvInput
+				|> declareVars let_lazy_binds dvInput
+				|> declareVars let_expr dvInput
+	declareVars (Conditional {if_cond, if_then, if_else}) dvInput dvs
+		= dvs	|> declareVars if_cond dvInput
+				|> declareVars if_then dvInput
+				|> declareVars if_else dvInput
+	declareVars (Case caseExpr) dvInput dvs
+		= declareVars caseExpr dvInput dvs
+	declareVars (AnyCodeExpr _ outParams _) _ dvs
+		= foldState declVar outParams dvs
 	  where
 		declVar {bind_dst=freeVar} 
 			= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name
-	declareVars _ _
-		=	identity
+	declareVars _ _ dvs
+		=	dvs
 
 instance declareVars TransformedBody where
-	declareVars :: TransformedBody !DeclVarsInput -> BackEnder
-	declareVars {tb_args, tb_rhs} dvInput
-		=	declareVars tb_args dvInput
-		o`	declareVars tb_rhs dvInput
+	declareVars {tb_args, tb_rhs} dvInput dvs
+		= dvs	|> declareVars tb_args dvInput
+				|> declareVars tb_rhs dvInput
 
 instance declareVars Case where
-	declareVars {case_expr, case_guards, case_default} dvInput
-		=	declareVars case_guards dvInput
-		o`	declareVars case_default dvInput
+	declareVars {case_expr, case_guards, case_default} dvInput dvs
+		= dvs	|> declareVars case_guards dvInput
+				|> declareVars case_default dvInput
 
 instance declareVars CasePatterns where
-	declareVars (AlgebraicPatterns _ patterns) dvInput
-		=	declareVars patterns dvInput
-	declareVars (BasicPatterns _ patterns) dvInput
-		=	declareVars patterns dvInput
-	declareVars (OverloadedPatterns _ decons_expr patterns) dvInput
-		=	declareVars patterns dvInput
+	declareVars (AlgebraicPatterns _ patterns) dvInput dvs
+		=	declareVars patterns dvInput dvs
+	declareVars (BasicPatterns _ patterns) dvInput dvs
+		=	declareVars patterns dvInput dvs
+	declareVars (OverloadedPatterns _ decons_expr patterns) dvInput dvs
+		=	declareVars patterns dvInput dvs
 
 instance declareVars AlgebraicPattern where
-	declareVars {ap_vars, ap_expr} dvInput
-		=	declareVars ap_vars dvInput
-		o`	declareVars ap_expr dvInput
+	declareVars {ap_vars, ap_expr} dvInput dvs
+		= dvs	|> declareVars ap_vars dvInput
+				|> declareVars ap_expr dvInput
 
 instance declareVars BasicPattern where
-	declareVars {bp_expr} dvInput
-		=	declareVars bp_expr dvInput
+	declareVars {bp_expr} dvInput dvs
+		= declareVars bp_expr dvInput dvs
 
 class declare a :: ModuleIndex a  -> BackEnder
 
@@ -1883,14 +1901,14 @@ where
 		# (type_arg_p,bes) = beNoTypeArgs bes
 		= (type_arg_p,type_var_heap,bes)
 
-convertTransformedBody :: Int Int Ident TransformedBody Int -> BEMonad BERuleAltP
-convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
+convertTransformedBody :: Int Int Ident TransformedBody Int *BackEndState -> *(BERuleAltP,*BackEndState)
+convertTransformedBody functionIndex lineNumber aliasDummyId body main_dcl_module_n bes
+	# {dvs_backEnd,dvs_varHeap}
+		= declareVars body aliasDummyId {dvs_backEnd=bes.bes_backEnd, dvs_varHeap=bes.bes_varHeap, dvs_sequenceNumber=0}
+	  bes & bes_backEnd=dvs_backEnd, bes_varHeap=dvs_varHeap
 	| isCodeBlock body.tb_rhs
-		=	declareVars body aliasDummyId
-		o`	convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n
-	// otherwise
-		=	declareVars body aliasDummyId
-		o`	convertBody True functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n
+		= convertCodeBody functionIndex lineNumber aliasDummyId body main_dcl_module_n bes
+		= convertBody True functionIndex lineNumber aliasDummyId (map FP_Variable body.tb_args) body.tb_rhs main_dcl_module_n bes
 
 isCodeBlock :: Expression -> Bool
 isCodeBlock (Case {case_expr=Var _, case_guards=AlgebraicPatterns _ [{ap_expr}]})
