@@ -805,7 +805,6 @@ pIsSafe			:== True
 				VI_ForwardClassVar !VarInfoPtr | /* to hold the dictionary variable generated during overloading */
 				VI_ForwardClassVars !VarInfoPtr !VarInfo |
 				VI_ForwardTypeContextVar !VarInfoPtr |
-				VI_SequenceNumber !Int | VI_AliasSequenceNumber !BoundVar |
 				VI_Used | /* for indicating that an imported function has been used */
 				VI_PropagationType !SymbolType | /* for storing the type with propagation environment of an imported function */
 				VI_ExpandedType !SymbolType | /* for storing the (expanded) type of an imported function */

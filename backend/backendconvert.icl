@@ -4,7 +4,9 @@ import StdEnv, compare_types
 from StdFunc import return
 import frontend
 import backend
-import backendsupport, backendpreprocess
+import backendsupport
+
+:: VarInfo | VI_SequenceNumber !Int | VI_AliasSequenceNumber !VarInfoPtr;
 
 // trace macro
 (-*->) infixl
@@ -537,7 +539,7 @@ where
 		= case vi of
 			VI_SequenceNumber sequenceNumber
 				-> (sequenceNumber,dvs)
-			VI_AliasSequenceNumber {var_info_ptr}
+			VI_AliasSequenceNumber var_info_ptr
 				-> assignOrGetVariableSequenceNumber var_info_ptr dvs
 			_
 				# {dvs_sequenceNumber,dvs_varHeap} = dvs
@@ -560,14 +562,14 @@ instance declareVars FreeVar where
 		= declareVariable BELhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name dvs
 
 instance declareVars LetBind where
-	declareVars {lb_src=App {app_symb, app_args=[Var bound_var:_]}, lb_dst=freeVar} aliasDummyId dvs
+	declareVars {lb_src=App {app_symb, app_args=[Var {var_info_ptr}:_]}, lb_dst=freeVar} aliasDummyId dvs
 		| not (isNilPtr app_symb.symb_ident.id_info) && app_symb.symb_ident==aliasDummyId
-			# (vi, dvs_varHeap) = readPtr bound_var.var_info_ptr dvs.dvs_varHeap
-			  non_alias_bound_var = case vi of
-										VI_AliasSequenceNumber alias_bound_var -> alias_bound_var
-										_ -> bound_var
+			# (vi, dvs_varHeap) = readPtr var_info_ptr dvs.dvs_varHeap
+			  non_alias_bound_var_info_ptr = case vi of
+												VI_AliasSequenceNumber alias_var_info_ptr -> alias_var_info_ptr
+												_ -> var_info_ptr
 			  dvs & dvs_varHeap
-				= writePtr freeVar.fv_info_ptr (VI_AliasSequenceNumber non_alias_bound_var) dvs_varHeap
+				= writePtr freeVar.fv_info_ptr (VI_AliasSequenceNumber non_alias_bound_var_info_ptr) dvs_varHeap
 			= dvs	// we have an alias. Don't declare the same variable twice
 		= declareVariable BERhsNodeId freeVar.fv_info_ptr freeVar.fv_ident.id_name dvs
 	declareVars {lb_dst=freeVar} _ dvs
@@ -2521,7 +2523,7 @@ getVariableSequenceNumber varInfoPtr be
 	= case vi of
 		VI_SequenceNumber sequenceNumber
 			-> (sequenceNumber,be)
-		VI_AliasSequenceNumber {var_info_ptr}
+		VI_AliasSequenceNumber var_info_ptr
 			-> getVariableSequenceNumber var_info_ptr be
 
 set_dictionary_field_for_instance_member_functions :: !Int !{#ClassInstance} !{#ClassDef} !{#CheckedTypeDef} !{#SelectorDef} !{#FunDef} !Int !{#DclModule} !*BackEndState -> *BackEndState

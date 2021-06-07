@@ -4,7 +4,7 @@ import StdEnv
 
 import frontend
 import backend
-import backendpreprocess, backendsupport, backendconvert
+import backendsupport, backendconvert
 import partition
 from filesystem import fremove
 
@@ -13,22 +13,6 @@ backEndInterface :: !{#Char} [{#Char}] !ListTypesOption !{#Char} !PredefinedSymb
 					-> (!Bool,!*VarHeap,!*TypeVarHeap,!*AttrVarHeap,!*File,!*File,!*Files)
 backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbols syntaxTree=:{fe_icl,fe_components,fe_dcls} main_dcl_module_n
 		var_heap type_var_heap attrHeap errorFile outFile files
-	# varHeap
-		=	backEndPreprocess predefined_idents.[PD_DummyForStrictAliasFun] functionIndices fe_icl var_heap
-		with
-			functionIndices = function_indices 0 fe_components
-
-			function_indices i components
-				| i<size components
-					= function_indices2 components.[i].component_members i components
-					= []
-
-			function_indices2 (ComponentMember member members) i components
-				= [member : function_indices2 members i components]
-			function_indices2 (GeneratedComponentMember member _ members) i components
-				= [member : function_indices2 members i components]
-			function_indices2 NoComponentMembers i components
-				= function_indices (i+1) components
 	# backEndFiles = 0
 	# (backEnd, backEndFiles)
 		=	BEInit (length commandLineArgs) backEndFiles
@@ -47,7 +31,7 @@ backEndInterface outputFileName commandLineArgs listTypes typesPath predef_symbo
 		=	(backEndFiles == 0 && False, var_heap, type_var_heap, attrHeap, errorFile, outFile, files)
 
 	# (type_var_heap,var_heap,attrHeap,backEnd)
-		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n type_var_heap varHeap attrHeap backEnd
+		=	backEndConvertModules predef_symbols syntaxTree main_dcl_module_n type_var_heap var_heap attrHeap backEnd
 	# (fail_success_or_use_clean_file_io, backEnd)
 		=	BEGenerateStatesAndOptimise backEnd
 	| fail_success_or_use_clean_file_io==2
