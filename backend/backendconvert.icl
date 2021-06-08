@@ -74,16 +74,6 @@ where
 
 write_to_attr_heap ptr v beState
 	= {beState & bes_attrHeap = writePtr ptr v beState.bes_attrHeap}
-/*
-read_from_var_heap ptr heap be
-	= (sreadPtr ptr heap,be)
-
-::	*BackEndState :== BackEnd
-
-appBackEnd f beState :== f beState
-accBackEnd f beState :== f beState
-accVarHeap f beState :== f beState
-*/
 
 beApFunction0 f
 	:== appBackEnd f
@@ -281,10 +271,6 @@ backEndConvertModulesH predefs {fe_icl =
 				iaci_start_index_generic_classes, iaci_not_exported_generic_classes }
 	}
 	main_dcl_module_n type_var_heap backEnd
-	// sanity check ...
-//	| cIclModIndex <> kIclModuleIndex || cPredefinedModuleIndex <> kPredefinedModuleIndex
-//		=	undef <<- "backendconvert, backEndConvertModules: module index mismatch"
-	// ... sanity check
 	#! backEnd = appBackEnd (BESetMainDclModuleN main_dcl_module_n) backEnd
 	#! backEnd
 		=	appBackEnd (BEDeclareModules (size fe_dcls)) backEnd
@@ -521,9 +507,6 @@ where
 							(write_to_var_heap cons_type_ptr VI_Empty be0)
 							be0
 
-(|>) infixl
-(|>) s f :== f s
-
 :: DeclVarsInput :== Ident
 :: *DeclVarsState = { dvs_backEnd :: !BackEnd, dvs_varHeap :: !*VarHeap, dvs_sequenceNumber :: !Int }
 
@@ -677,25 +660,24 @@ folds op l r :== folds l r
 		folds [] r = r
 		folds [a:x]	r = folds x (op a r)
 
+(|>) infixl
+(|>) s f :== f s
+
 declareGeneratedUnboxedRecordInstances
 		ali_array_first_instance_indices ali_list_first_instance_indices ali_tail_strict_list_first_instance_indices
 		ali_unboxed_maybe_first_instance_indices predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		= declareGeneratedUnboxedRecordInstancesOfClass ali_array_first_instance_indices PD_StdArray PD_ArrayClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		= declareGeneratedUnboxedRecordInstancesOfClass ali_list_first_instance_indices PD_StdStrictLists PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		= declareGeneratedUnboxedRecordInstancesOfClass ali_tail_strict_list_first_instance_indices PD_StdStrictLists PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
-	#! backEnd
-		= declareGeneratedUnboxedRecordInstancesOfClass ali_unboxed_maybe_first_instance_indices PD_StdStrictMaybes PD_UMaybeClass predefs main_dcl_module_n icl_functions fe_dcls backEnd
 	= backEnd
+		|> declareGeneratedUnboxedRecordInstancesOfClass ali_array_first_instance_indices PD_StdArray PD_ArrayClass predefs main_dcl_module_n icl_functions fe_dcls
+		|> declareGeneratedUnboxedRecordInstancesOfClass ali_list_first_instance_indices PD_StdStrictLists PD_UListClass predefs main_dcl_module_n icl_functions fe_dcls
+		|> declareGeneratedUnboxedRecordInstancesOfClass ali_tail_strict_list_first_instance_indices PD_StdStrictLists PD_UTSListClass predefs main_dcl_module_n icl_functions fe_dcls
+		|> declareGeneratedUnboxedRecordInstancesOfClass ali_unboxed_maybe_first_instance_indices PD_StdStrictMaybes PD_UMaybeClass predefs main_dcl_module_n icl_functions fe_dcls
 
-declareGeneratedUnboxedRecordInstancesOfClass :: [Int] Int Int PredefinedSymbols Int {#FunDef} {#DclModule} -> BackEnder
-declareGeneratedUnboxedRecordInstancesOfClass [] predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls
-	= identity
-declareGeneratedUnboxedRecordInstancesOfClass ali_first_instance_indices predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls
+declareGeneratedUnboxedRecordInstancesOfClass :: [Int] Int Int PredefinedSymbols Int {#FunDef} {#DclModule} !*BackEndState -> *BackEndState
+declareGeneratedUnboxedRecordInstancesOfClass [] predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls bes
+	= bes
+declareGeneratedUnboxedRecordInstancesOfClass ali_first_instance_indices predef_class_module_index predef_class_index predefs main_dcl_module_n functions dcls bes
 	#! n_class_members=size dcls.[class_module_index].dcl_common.com_class_defs.[class_index].class_members
-	= folds (declareInstances 0 n_class_members) ali_first_instance_indices
+	= folds (declareInstances 0 n_class_members) ali_first_instance_indices bes
 	where
 		class_module_index = predefs.[predef_class_module_index].pds_def
 		class_index = predefs.[predef_class_index].pds_def
@@ -761,33 +743,32 @@ declareFunTypes :: ModuleIndex {#FunType} [IndexRange] -> BackEnder
 declareFunTypes moduleIndex funTypes ranges
 		=	foldStateWithIndexA (declareFunType moduleIndex ranges) funTypes
 
-declareFunType :: ModuleIndex [IndexRange] Int FunType -> BackEnder
-declareFunType moduleIndex ranges functionIndex {ft_ident,ft_type_ptr,ft_specials}
-	= \be0 -> let (vi,be) = read_from_var_heap ft_type_ptr be0 in
-					(case vi of
-						VI_ExpandedType expandedType
-							| not ft_specials=:FSP_ABCCode _
-								->	beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges)
-								o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)
-								->	be_f ft_specials with
-									be_f (FSP_ABCCode abc_code) be
-										# be = beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges) be
-										= beDefineRuleTypeWithCode functionIndex moduleIndex
-											(convertTypeAlt functionIndex moduleIndex expandedType)
-											(beAbcCodeBlock False (convertStrings abc_code)) be
-						_
-							->	identity) be
-		where
-			functionName :: {#Char} Int [IndexRange] -> {#Char}
-			functionName name functionIndex ranges 
-				| index_in_ranges functionIndex ranges
-					=	name
-					=	name +++ ";" +++ toString functionIndex
-				where
-					index_in_ranges index [{ir_from, ir_to}:ranges]
-						= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
-					index_in_ranges index []
-						= False
+declareFunType :: ModuleIndex [IndexRange] Int FunType !*BackEndState -> *BackEndState
+declareFunType moduleIndex ranges functionIndex {ft_ident,ft_type_ptr,ft_specials} bes
+	# (vi,bes) = read_from_var_heap ft_type_ptr bes
+	= case vi of
+		VI_ExpandedType expandedType
+			| not ft_specials=:FSP_ABCCode _
+				->	(beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges)
+				o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType)) bes
+				# (FSP_ABCCode abc_code) = ft_specials
+				# bes = beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges) bes
+				-> beDefineRuleTypeWithCode functionIndex moduleIndex
+					(convertTypeAlt functionIndex moduleIndex expandedType)
+					(beAbcCodeBlock False (convertStrings abc_code)) bes
+		_
+			->	bes
+	where
+		functionName :: {#Char} Int [IndexRange] -> {#Char}
+		functionName name functionIndex ranges
+			| index_in_ranges functionIndex ranges
+				=	name
+				=	name +++ ";" +++ toString functionIndex
+			where
+				index_in_ranges index [{ir_from, ir_to}:ranges]
+					= (index>=ir_from && index < ir_to) || index_in_ranges index ranges;
+				index_in_ranges index []
+					= False
 
 defineTypes :: !Int !Int ModuleIndex {#ConsDef} {#SelectorDef} {#CheckedTypeDef} !*TypeVarHeap !*BackEndState -> (!*TypeVarHeap,!*BackEndState)
 defineTypes type_i type_i_stop moduleIndex constructors selectors types type_var_heap bes
@@ -1040,9 +1021,6 @@ where
 				= convert_exported_generic_member_selector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 				= convertSelector moduleIndex selectors (arg_is_strict index strictness) symbols.[index] field_list_p type_var_heap bes
 
-remove_first_arg_type expanded_member_type=:{st_args=[_:args],st_arity,st_args_strictness}
-	= {expanded_member_type & st_args = args, st_arity = st_arity-1, st_args_strictness = remove_first_n 1 st_args_strictness}
-
 convertMemberSelector :: ModuleIndex {#SelectorDef} Bool FieldSymbol !BEFieldListP !*TypeVarHeap !*BackEndState -> (!BEFieldListP,!*TypeVarHeap,!*BackEndState)
 convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p type_var_heap bes
 	# selectorDef = selectorDefs.[fs_index]
@@ -1063,13 +1041,11 @@ convertMemberSelector moduleIndex selectorDefs is_strict {fs_index} field_list_p
 					->	(st_result,No,bes)
 				VI_ExpandedMemberType expanded_member_type (VI_ExpandedType {st_result})
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
-					  expanded_member_type = remove_first_arg_type expanded_member_type
-					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					  (type_alt_p,bes) = convertTypeAltForSymbolPWithoutFirstArg dont_care_symbol_p expanded_member_type bes
 					->	(st_result,Yes type_alt_p,bes)
 				VI_ExpandedMemberType expanded_member_type VI_Empty
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
-					  expanded_member_type = remove_first_arg_type expanded_member_type
-					  (type_alt_p,bes) = convertTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					  (type_alt_p,bes) = convertTypeAltForSymbolPWithoutFirstArg dont_care_symbol_p expanded_member_type bes
 					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
 					->	(sd_type.st_result,No,bes)
@@ -1094,13 +1070,11 @@ convert_exported_generic_member_selector moduleIndex selectorDefs is_strict {fs_
 					->	(st_result,No,bes)
 				VI_ExpandedMemberType expanded_member_type (VI_ExpandedType {st_result})
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
-					  expanded_member_type = remove_first_arg_type expanded_member_type
-					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					  (type_alt_p,bes) = convertExportedTypeAltForSymbolPWithoutFirstArg dont_care_symbol_p expanded_member_type bes
 					->	(st_result,Yes type_alt_p,bes)
 				VI_ExpandedMemberType expanded_member_type VI_Empty
 					# (dont_care_symbol_p,bes) = accBackEnd BEDontCareDefinitionSymbol bes
-					  expanded_member_type = remove_first_arg_type expanded_member_type
-					  (type_alt_p,bes) = convertExportedTypeAltForSymbolP dont_care_symbol_p expanded_member_type bes
+					  (type_alt_p,bes) = convertExportedTypeAltForSymbolPWithoutFirstArg dont_care_symbol_p expanded_member_type bes
 					->	(sd_type.st_result,Yes type_alt_p,bes)
 				_
 					->	(sd_type.st_result,No,bes)
@@ -1529,21 +1503,17 @@ convertRules rules main_dcl_module_n aliasDummyId be
 				=	accBackEnd (BERules ruleP rulesP) be
 			=	convert t rulesP be
 
-convertRule :: Ident (Int,FunDef) Int -> BEMonad BEImpRuleP
-convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_info}) main_dcl_module_n
+convertRule :: Ident (Int,FunDef) Int !*BackEndState -> *(!BEImpRuleP,!*BackEndState)
+convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun_kind, fun_info}) main_dcl_module_n bes
 	| fun_info.fi_properties bitand FI_FusedMember<>0
 		#! instance_function_index = fun_info.fi_def_level;
-		= convert_fused_instance_member_function instance_function_index
-		with
-		  convert_fused_instance_member_function instance_function_index bes
-			# bes & bes_backEnd = BESetInstanceFunctionOfFunction index instance_function_index bes.bes_backEnd
-			= beRule index (cafness fun_kind)
-					(convertTypeAlt index main_dcl_module_n type)
-					(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
-					bes
+		# bes & bes_backEnd = BESetInstanceFunctionOfFunction index instance_function_index bes.bes_backEnd
 		= beRule index (cafness fun_kind)
 			(convertTypeAlt index main_dcl_module_n type)
-			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n)
+			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n) bes
+		= beRule index (cafness fun_kind)
+			(convertTypeAlt index main_dcl_module_n type)
+			(convertFunctionBody index (positionToLineNumber fun_pos) aliasDummyId body main_dcl_module_n) bes
 	where
 		cafness :: FunKind -> Int
 		cafness (FK_Function _)
@@ -1561,31 +1531,38 @@ convertRule aliasDummyId (index, {fun_type=Yes type, fun_body=body, fun_pos, fun
 		positionToLineNumber _
 			=	0
 
-beautifyAttributes :: SymbolType -> BEMonad SymbolType
-beautifyAttributes st
-	=	return st
-//	=	accAttrHeap (beautifulizeAttributes st)
-
 convertTypeAlt :: Int ModuleIndex SymbolType -> BEMonad BETypeAltP
 convertTypeAlt functionIndex moduleIndex symbolType
 	= beFunctionSymbol functionIndex moduleIndex ==> \symbol_p ->
 	  convertTypeAltForSymbolP symbol_p symbolType
 
-convertTypeAltForSymbolP :: BESymbolP SymbolType -> BEMonad BETypeAltP
-convertTypeAltForSymbolP symbol_p symbolType
-	=	beautifyAttributes (symbolType) ==> \symbolType=:{st_result, st_attr_env, st_attr_vars} 
-	->	resetAttrNumbers st_attr_vars
-	o`	(beTypeAlt symbol_p
-			(convertSymbolTypeArgs symbolType)
-			(convertAnnotTypeNode st_result))
+convertTypeAltForSymbolP :: BESymbolP SymbolType !*BackEndState -> (!BETypeAltP,!*BackEndState)
+convertTypeAltForSymbolP symbol_p {st_args,st_result,st_attr_vars,st_args_strictness} bes
+	= resetAttrNumbers st_attr_vars bes
+	|> beTypeAlt symbol_p
+		(convertAnnotatedTypeArgs st_args st_args_strictness)
+		(convertAnnotTypeNode st_result)
 
-convertExportedTypeAltForSymbolP :: BESymbolP SymbolType -> BEMonad BETypeAltP
-convertExportedTypeAltForSymbolP symbol_p symbolType
-	=	beautifyAttributes symbolType ==> \ {st_args,st_args_strictness,st_result, st_attr_env, st_attr_vars} 
-	->	resetAttrNumbers st_attr_vars
-	o`	(beTypeAlt symbol_p
-			(convertAnnotatedExternalTypeArgs st_args st_args_strictness)
-			(convertAnnotExternalTypeNode st_result))
+convertTypeAltForSymbolPWithoutFirstArg :: BESymbolP SymbolType !*BackEndState -> (!BETypeAltP,!*BackEndState)
+convertTypeAltForSymbolPWithoutFirstArg symbol_p {st_args=st_args=:[_:args],st_result,st_attr_vars,st_args_strictness} bes
+	= resetAttrNumbers st_attr_vars bes
+	|> beTypeAlt symbol_p
+		(convertAnnotatedTypeArgs args (remove_first_n 1 st_args_strictness))
+		(convertAnnotTypeNode st_result)
+
+convertExportedTypeAltForSymbolP :: BESymbolP SymbolType !*BackEndState -> (!BETypeAltP,!*BackEndState)
+convertExportedTypeAltForSymbolP symbol_p {st_args,st_result,st_attr_vars,st_args_strictness} bes
+	= resetAttrNumbers st_attr_vars bes
+	|> beTypeAlt symbol_p
+		(convertAnnotatedExternalTypeArgs st_args st_args_strictness)
+		(convertAnnotExternalTypeNode st_result)
+
+convertExportedTypeAltForSymbolPWithoutFirstArg :: BESymbolP SymbolType !*BackEndState -> (!BETypeAltP,!*BackEndState)
+convertExportedTypeAltForSymbolPWithoutFirstArg symbol_p {st_args=st_args=:[_:args],st_result,st_attr_vars,st_args_strictness} bes
+	= resetAttrNumbers st_attr_vars bes
+	|> beTypeAlt symbol_p
+		(convertAnnotatedExternalTypeArgs args (remove_first_n 1 st_args_strictness))
+		(convertAnnotExternalTypeNode st_result)
 
 resetAttrNumbers :: [AttributeVar] *BackEndState -> *BackEndState
 resetAttrNumbers attrVars state=:{bes_attrHeap}
@@ -1597,10 +1574,6 @@ resetAttrNumbers attrVars state=:{bes_attrHeap}
 		resetAttrVar :: AttributeVar *AttrVarHeap -> *AttrVarHeap
 		resetAttrVar {av_info_ptr} attrHeap
 			=	writePtr av_info_ptr AVI_Empty attrHeap
-
-convertSymbolTypeArgs :: SymbolType -> BEMonad BETypeArgP
-convertSymbolTypeArgs {st_args,st_args_strictness}
-	= convertAnnotatedTypeArgs st_args st_args_strictness
 
 convertBasicTypeKind :: BasicType -> BETypeSymbKind
 convertBasicTypeKind BT_Int
