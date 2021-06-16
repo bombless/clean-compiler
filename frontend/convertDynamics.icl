@@ -3,8 +3,6 @@ implementation module convertDynamics
 import syntax
 
 from type_io_common import PredefinedModuleName
-// Optional
-extended_unify_and_coerce no yes :== no;	// change also _unify and _coerce in StdDynamic
 
 import type_io;
 
@@ -46,10 +44,6 @@ import type_io;
 	{	cinp_dynamic_representation	:: !DynamicRepresentation
 	,	cinp_subst_var :: BoundVar // lazy, may be on a cycle
 	}
-
-fatal :: {#Char} {#Char} -> .a
-fatal function_name message
-	=	abort ("convertDynamics, " +++ function_name +++ ": " +++ message)
 
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} directly_imported_dcl_modules common_defs icl_common
 	n_types_with_type_functions n_constructors_with_type_functions
@@ -138,7 +132,7 @@ where
 			= {cds & cds_fun_defs=cds_fun_defs}
 			# ci = {ci_predef_symb = cds.cds_predef_symb, ci_var_heap=cds.cds_var_heap, ci_expr_heap=cds.cds_expr_heap,
 					ci_new_variables = [], ci_type_pattern_var_count = 0, ci_type_var_count = 0, ci_subst_var_used = False}
-			# (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
+			# (unify_subst_var, ci) = newVariable "unify_subst" ci
 			# (fun_body, ci) = convertDynamics {cinp_dynamic_representation = dynamic_representation,
 												cinp_subst_var = unify_subst_var} fun_body ci
 			# cds_fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}
@@ -388,7 +382,7 @@ convertDynamicsAlgebraicPatternsWithContexts cinp [ap=:{ap_vars,ap_expr}:aps] ci
 				= (ap_expr,subst_var,ci)
 				# ci & ci_subst_var_used = True
 				  unification_environment_expr = Var subst_var
-				  (new_subst_var, ci) = newVariable "gtpv_subst" VI_Empty ci
+				  (new_subst_var, ci) = newVariable "gtpv_subst" ci
 				  (unification_environment_expr, ci)
 					= bind_global_type_pattern_vars ap_vars unification_environment_expr ci
 				  (ap_expr,ci) = share_init_subst new_subst_var ap_expr unification_environment_expr ci
@@ -398,8 +392,8 @@ convertDynamicsAlgebraicPatternsWithContexts cinp [] ci
 
 convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dynamic_type}}
 			kees=:{case_guards=DynamicPatterns alts, case_info_ptr, case_default} ci
-	# (value_var, ci) = newVariable "value" VI_Empty ci
-	# (type_var, ci) = newVariable "type" VI_Empty ci
+	# (value_var, ci) = newVariable "value" ci
+	# (type_var, ci) = newVariable "type" ci
 	# ci = {ci & ci_new_variables = [varToFreeVar value_var 1, varToFreeVar type_var 1 : ci.ci_new_variables ]}
 
 	# (result_type, ci) = getResultType case_info_ptr ci
@@ -421,55 +415,61 @@ convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dyn
 convertDynamicAlts _ _ _ _ _ defoult [] ci
 	=	(defoult, ci)
 convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type defoult [{dp_rhs, dp_position, dp_type_code, dp_var}:alts] ci
-	# (type_code, binds, ci)
-		=	convertPatternTypeCode cinp dp_type_code ci
+	# (type_code, binds, ci) = convertPatternTypeCode cinp dp_type_code ci
 
-	#  (unify_symb, ci) 
-		=	getSymbol PD_Dyn_unify SK_Function (extended_unify_and_coerce 3 4) /*3 was 2 */ ci
-	# ci & ci_subst_var_used = True
-	# unify_call = App {app_symb = unify_symb, app_args = [Var cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
+	  (unify_subst_var, ci) = newVariable "unify_subst" ci
 
-	// FIXME, more precise types (not all TEs)
-	# (let_info_ptr, ci) = let_ptr (3+length binds) ci
+	  ci & ci_var_heap = writePtr dp_var.fv_info_ptr (VI_DynamicValueAlias value_var) ci.ci_var_heap
 
-	  (unify_result_var, ci) = newVariable "result" VI_Empty ci
-	  unify_result_fv = varToFreeVar unify_result_var 1
-	  (unify_bool_var, ci) = newVariable "unify_bool" VI_Empty ci
-	  unify_bool_fv = varToFreeVar unify_bool_var 1
-	  (unify_subst_var, ci) = newVariable "unify_subst" VI_Empty ci
-	  unify_subst_fv = varToFreeVar unify_subst_var 1
+	  (dp_rhs, ci) = convertDynamics {cinp & cinp_subst_var=unify_subst_var} dp_rhs ci
+	  ci & ci_subst_var_used = True
 
-	# ci_var_heap = writePtr dp_var.fv_info_ptr (VI_DynamicValueAlias value_var) ci.ci_var_heap
-	# ci = {ci & ci_var_heap = ci_var_heap}
+	  case_guards =	BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
 
-	# (dp_rhs, ci) = convertDynamics {cinp & cinp_subst_var=unify_subst_var} dp_rhs ci
-
-	# (case_info_ptr, ci) = bool_case_ptr result_type ci
-	# case_guards =	BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
-	# (case_default, ci)
+	  (case_default, ci)
 		=	convertDynamicAlts cinp kees type_var value_var result_type defoult alts ci
 
-	# kees = {kees & case_info_ptr=case_info_ptr, case_guards=case_guards,
-					 case_default=case_default, case_explicit=False, case_expr=Var unify_bool_var}
+	  (case_unify_expr,ci)
+		= case_unify type_code binds type_var case_default case_guards result_type unify_subst_var kees cinp_subst_var ci
+	= (Yes case_unify_expr, ci)
 
-	# ci = {ci & ci_new_variables = [unify_result_fv, unify_bool_fv, unify_subst_fv : ci.ci_new_variables ]}
+case_unify :: Expression [LetBind] BoundVar (Optional Expression) CasePatterns AType BoundVar Case BoundVar *ConversionState -> *(!Expression,!*ConversionState)
+case_unify type_code binds type_var case_default case_guards result_type unify_subst_var kees cinp_subst_var ci
+	# (unify_symb, ci) = getSymbol PD_Dyn_unify SK_Function 3 ci
+	  unify_call = App {app_symb = unify_symb, app_args = [Var cinp_subst_var,Var type_var,type_code], app_info_ptr = nilPtr}
+
+	  (case_info_ptr, ci) = bool_case_ptr result_type ci
+
+	  (unify_bool_var, ci) = newVariable "unify_bool" ci
+
+	  kees & case_info_ptr=case_info_ptr, case_guards=case_guards,
+			 case_default=case_default, case_explicit=False, case_expr=Var unify_bool_var
+
+	  (unify_result_var, ci) = newVariable "result" ci
+	  unify_result_fv = varToFreeVar unify_result_var 1
+	  unify_bool_fv = varToFreeVar unify_bool_var 1
+	  unify_subst_fv = varToFreeVar unify_subst_var 1
+
+	  ci & ci_new_variables = [unify_result_fv, unify_bool_fv, unify_subst_fv : ci.ci_new_variables]
+
+	// FIXME, more precise types (not all TEs)
+	  (let_info_ptr, ci) = let_ptr (3+length binds) ci
 
 	  (twotuple, ci) = getTupleSymbol 2 ci
 
 	  letje
 		=	{	let_strict_binds = [{ lb_src =  unify_call,
-		  							   lb_dst = unify_result_fv, lb_position = NoPos },
-		  							{ lb_src =  TupleSelect twotuple 0 (Var unify_result_var),
-		  							   lb_dst = unify_bool_fv, lb_position = NoPos }]
-		  	,	let_lazy_binds = [ // { lb_src = Var value_var, lb_dst = dp_var, lb_position = NoPos },
-								  	{ lb_src = TupleSelect twotuple 1 (Var unify_result_var),
-		  							   lb_dst = unify_subst_fv, lb_position = NoPos }] ++ binds
+									   lb_dst = unify_result_fv, lb_position = NoPos },
+									{ lb_src =  TupleSelect twotuple 0 (Var unify_result_var),
+									   lb_dst = unify_bool_fv, lb_position = NoPos }]
+			,	let_lazy_binds = [{ lb_src = TupleSelect twotuple 1 (Var unify_result_var),
+									   lb_dst = unify_subst_fv, lb_position = NoPos }] ++ binds
 			,	let_info_ptr = let_info_ptr
 			,	let_expr = Case kees
 			,	let_expr_position = NoPos // FIXME, add correct position
 			} 
 
-	= (Yes (Let letje), ci)
+	= (Let letje, ci)
 
 class position a :: a -> Position
 
@@ -704,7 +704,6 @@ convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
 createTypePatternVariable :: !*ConversionState -> (!Expression, !*ConversionState)
 createTypePatternVariable ci
 	# (tpv_symb, ci)
-//		=	getSymbol PD_Dyn_TypePatternVar SK_Constructor 1 ci
 		=	getSymbol PD_Dyn_TypeVar SK_Constructor 1 ci
 	=	(App {	app_symb = tpv_symb,
 						app_args = [BasicExpr (BVInt ci.ci_type_pattern_var_count)],
@@ -713,9 +712,9 @@ createTypePatternVariable ci
 
 /**************************************************************************************************/
 
-newVariable :: String !VarInfo !*ConversionState -> *(!BoundVar,!*ConversionState)
-newVariable var_ident var_info ci=:{ci_var_heap}
-	# (var_info_ptr, ci_var_heap) = newPtr var_info ci_var_heap
+newVariable :: String !*ConversionState -> *(!BoundVar,!*ConversionState)
+newVariable var_ident ci=:{ci_var_heap}
+	# (var_info_ptr, ci_var_heap) = newPtr VI_Empty ci_var_heap
 	= ( { var_ident = {id_name = var_ident, id_info = nilPtr},  var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr},
 	    { ci & ci_var_heap = ci_var_heap })	
 
