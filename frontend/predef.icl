@@ -139,6 +139,7 @@ predefined_idents
 					[PD_Dyn_bind_global_type_pattern_var_n] = i "_bind_global_type_pattern_var_n",
 					[PD_Dyn_unify] = i "_unify",
 					[PD_Dyn_unify_] = i "_unify_",
+					[PD_Dyn_unify_tcs] = i "_unify_tcs",
 					[PD_Dyn_normalise] = i "_normalise",
 
 					[PD_Dyn__to_TypeCodeConstructor] = i "_to_TypeCodeConstructor",

@@ -43,6 +43,7 @@ import type_io;
 ::	ConversionInput =
 	{	cinp_dynamic_representation	:: !DynamicRepresentation
 	,	cinp_subst_var :: BoundVar // lazy, may be on a cycle
+	,	cinp_subst_var_used :: !Bool
 	}
 
 write_tcl_file main_dcl_module_n dcl_mods=:{[main_dcl_module_n] = main_dcl_module} directly_imported_dcl_modules common_defs icl_common
@@ -134,7 +135,7 @@ where
 					ci_new_variables = [], ci_type_pattern_var_count = 0, ci_type_var_count = 0, ci_subst_var_used = False}
 			# (unify_subst_var, ci) = newVariable "unify_subst" ci
 			# (fun_body, ci) = convertDynamics {cinp_dynamic_representation = dynamic_representation,
-												cinp_subst_var = unify_subst_var} fun_body ci
+												cinp_subst_var = unify_subst_var, cinp_subst_var_used = False} fun_body ci
 			# cds_fun_defs & [fun] = {fun_def & fun_body = fun_body, fun_info = {fun_info & fi_local_vars = ci.ci_new_variables ++ fun_info.fi_local_vars }}
 			= {cds_fun_defs=cds_fun_defs,cds_predef_symb=ci.ci_predef_symb,cds_var_heap=ci.ci_var_heap,cds_expr_heap=ci.ci_expr_heap}
 
@@ -414,6 +415,44 @@ convertDynamicCase cinp=:{cinp_dynamic_representation={dr_dynamic_symbol, dr_dyn
 
 convertDynamicAlts _ _ _ _ _ defoult [] ci
 	=	(defoult, ci)
+convertDynamicAlts cinp=:{cinp_subst_var,cinp_subst_var_used=False} kees type_var value_var result_type defoult
+		[{dp_type_code=dp_type_code=:TCE_TypeTerm var_info_ptr,dp_var,dp_rhs, dp_position}:alts] ci=:{ci_var_heap}
+	# (unify_subst_var, ci) = newVariable "unify_subst" ci
+
+	  ci & ci_var_heap = writePtr dp_var.fv_info_ptr (VI_DynamicValueAlias value_var) ci.ci_var_heap
+
+	  (old_subst_var_used,ci) = ci!ci_subst_var_used
+	  ci & ci_subst_var_used = False
+	  (dp_rhs, ci=:{ci_subst_var_used}) = convertDynamics {cinp & cinp_subst_var=unify_subst_var, cinp_subst_var_used=True} dp_rhs ci
+
+	  case_guards = BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
+
+	| not ci_subst_var_used
+		# ci & ci_subst_var_used = old_subst_var_used
+
+		  type_code = Var {var_ident = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}
+
+		  (unify_tcs_symb, ci) = getSymbol PD_Dyn_unify_tcs SK_Function 2 ci
+		  unify_call = App {app_symb = unify_tcs_symb, app_args = [Var type_var,type_code], app_info_ptr = nilPtr}
+
+		  (case_info_ptr, ci) = bool_case_ptr result_type ci
+		  (case_default, ci)
+			= convertDynamicAlts cinp kees type_var value_var result_type defoult alts ci
+
+		  kees & case_info_ptr=case_info_ptr, case_guards=case_guards,
+				 case_default=case_default, case_explicit=False, case_expr=unify_call
+
+		= (Yes (Case kees), ci)
+
+		# ci & ci_subst_var_used = True
+		  (type_code, binds, ci) = convertPatternTypeCode cinp dp_type_code ci
+
+		  (case_default, ci)
+			= convertDynamicAlts cinp kees type_var value_var result_type defoult alts ci
+
+		  (case_unify_expr,ci)
+			= case_unify type_code binds type_var case_default case_guards result_type unify_subst_var kees cinp_subst_var ci
+		= (Yes case_unify_expr, ci)
 convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type defoult [{dp_type_code,dp_var,dp_rhs,dp_position}:alts] ci
 	# (type_code, binds, ci) = convertPatternTypeCode cinp dp_type_code ci
 
@@ -422,7 +461,7 @@ convertDynamicAlts cinp=:{cinp_subst_var} kees type_var value_var result_type de
 	  ci & ci_var_heap = writePtr dp_var.fv_info_ptr (VI_DynamicValueAlias value_var) ci.ci_var_heap
 
 	  ci & ci_subst_var_used = False
-	  (dp_rhs, ci=:{ci_subst_var_used}) = convertDynamics {cinp & cinp_subst_var=unify_subst_var} dp_rhs ci
+	  (dp_rhs, ci=:{ci_subst_var_used}) = convertDynamics {cinp & cinp_subst_var=unify_subst_var, cinp_subst_var_used=True} dp_rhs ci
 	  ci & ci_subst_var_used = True
 
 	  case_guards =	BasicPatterns BT_Bool [{bp_value = BVB True, bp_expr = dp_rhs, bp_position = dp_position}]
@@ -700,15 +739,15 @@ convertTypeCode pattern cinp (TCE_Selector selections var_info_ptr) st
 	(var_info, ci_var_heap) = readPtr var_info_ptr ci.ci_var_heap
 	ci = {ci & ci_var_heap = ci_var_heap}
   =	case var_info of
-		VI_TypeCodeVariable (TCI_TypeVar tv)
-			-> abort "convertTypeCode TCE_Selector"
-		VI_TypeCodeVariable (TCI_TypePatternVar _ _)
-			-> abort "convertTypeCode TCE_Selector"
 		VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)
 			# (var_n, var, ci) = createTypePatternVariable ci
 			  tc_selections = [(var_n,selections):tc_selections]
 			  ci = {ci & ci_var_heap = writePtr var_info_ptr (VI_TypeCodeVariable (TCI_SelectionsTypePatternVar tc_selections)) ci.ci_var_heap}
 		  	-> (var, (True, binds, ci))
+		VI_TypeCodeVariable (TCI_TypeVar tv)
+			-> abort "convertTypeCode TCE_Selector"
+		VI_TypeCodeVariable (TCI_TypePatternVar _ _)
+			-> abort "convertTypeCode TCE_Selector"
 		_
 			# (var_n, var, ci) = createTypePatternVariable ci
 			  tc_selections = [(var_n,selections)]
