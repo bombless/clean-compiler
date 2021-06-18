@@ -8,10 +8,6 @@ import backendsupport
 
 :: VarInfo | VI_SequenceNumber !Int | VI_AliasSequenceNumber !VarInfoPtr;
 
-// trace macro
-(-*->) infixl
-(-*->) value trace
-	:==	value //---> trace
 /*
 sfoldr op r l
 	:== foldr l
@@ -31,7 +27,6 @@ sfoldr op r l s
 :: BEMonad a :== *BackEndState -> *(a,*BackEndState)
 :: BackEnder :== *BackEndState -> *BackEndState
 
-//
 :: *BackEndState = {bes_backEnd :: !BackEnd, bes_varHeap :: !*VarHeap, bes_attrHeap :: !*AttrVarHeap, bes_attr_number :: !Int}
 
 appBackEnd f beState
@@ -99,12 +94,6 @@ beFunction3 f m1 m2 m3
 	->	m2 ==> \a2
 	->	m3 ==> \a3
 	->	accBackEnd (f a1 a2 a3)
-beFunction4 f m1 m2 m3 m4
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	accBackEnd (f a1 a2 a3 a4)
 beFunction5 f m1 m2 m3 m4 m5
 	:== m1 ==> \a1
 	->	m2 ==> \a2
@@ -112,14 +101,6 @@ beFunction5 f m1 m2 m3 m4 m5
 	->	m4 ==> \a4
 	->	m5 ==> \a5
 	->	accBackEnd (f a1 a2 a3 a4 a5)
-beFunction6 f m1 m2 m3 m4 m5 m6
-	:== m1 ==> \a1
-	->	m2 ==> \a2
-	->	m3 ==> \a3
-	->	m4 ==> \a4
-	->	m5 ==> \a5
-	->	m6 ==> \a6
-	->	accBackEnd (f a1 a2 a3 a4 a5 a6)
 beFunction7 f m1 m2 m3 m4 m5 m6 m7
 	:== m1 ==> \a1
 	->	m2 ==> \a2
@@ -130,21 +111,12 @@ beFunction7 f m1 m2 m3 m4 m5 m6 m7
 	->	m7 ==> \a7
 	->	accBackEnd (f a1 a2 a3 a4 a5 a6 a7)
 
-changeArrayFunctionIndex selectIndex
-	:== selectIndex
-
-beBoolSymbol value
-	:==	beFunction0 (BEBoolSymbol value)
 beLiteralSymbol type value
 	:==	beFunction0 (BELiteralSymbol type value)
 beFunctionSymbol functionIndex moduleIndex
 	:==	beFunction0 (BEFunctionSymbol functionIndex moduleIndex)
 beSpecialArrayFunctionSymbol arrayFunKind functionIndex moduleIndex
-	:==	beFunction0 (BESpecialArrayFunctionSymbol arrayFunKind (changeArrayFunctionIndex functionIndex) moduleIndex)
-beDictionarySelectFunSymbol
-	:==	beFunction0 BEDictionarySelectFunSymbol
-beDictionaryUpdateFunSymbol
-	:==	beFunction0 BEDictionaryUpdateFunSymbol
+	:==	beFunction0 (BESpecialArrayFunctionSymbol arrayFunKind functionIndex moduleIndex)
 beConstructorSymbol moduleIndex constructorIndex
 	:==	beFunction0 (BEConstructorSymbol constructorIndex moduleIndex)
 
@@ -157,14 +129,10 @@ beTypeSymbol typeIndex moduleIndex
 	:==	beFunction0 (BETypeSymbol typeIndex moduleIndex)
 beTypeSymbolNoMark typeIndex moduleIndex
 	:==	beFunction0 (BETypeSymbolNoMark typeIndex moduleIndex)
-beExternalTypeSymbol typeIndex moduleIndex
-	:==	beFunction0 (BEExternalTypeSymbol typeIndex moduleIndex)
 beBasicSymbol symbolIndex
 	:==	beFunction0 (BEBasicSymbol symbolIndex)
 beBasicTypeSymbol symbolIndex
 	:==	beFunction0 (BEBasicTypeSymbol symbolIndex)
-beDontCareDefinitionSymbol
-	:==	beFunction0 BEDontCareDefinitionSymbol
 beDontCareTypeDefinitionSymbol
 	:==	beFunction0 BEDontCareTypeDefinitionSymbol
 beNoArgs
@@ -177,16 +145,12 @@ beTypeArgs
 	:==	beFunction2 BETypeArgs
 beNormalNode
 	:==	beFunction2 BENormalNode
-beIfNode
-	:==	beFunction3 BEIfNode
 beGuardNode
 	:==	beFunction7 BEGuardNode
 beSelectorNode selectorKind
 	:==	beFunction2 (BESelectorNode selectorKind)
 beUpdateNode
 	:==	beFunction1 BEUpdateNode
-beRuleAlt lineNumber
-	:==	beFunction5 (BERuleAlt lineNumber)
 beTypeAlt symbol_p
 	:==	beFunction2 (BETypeAlt symbol_p)
 beRule index isCaf
@@ -197,56 +161,24 @@ beNoStrictNodeIds
 	:==	beFunction0 BENoStrictNodeIds
 beNodeIdNode
 	:==	beFunction2 BENodeIdNode
-beNodeId sequenceNumber
-	:==	beFunction0 (BENodeId sequenceNumber)
-beNoConstructors
-	:==	beFunction0 BENoConstructors
 beDeclareRuleType functionIndex moduleIndex name
 	:==	beApFunction0 (BEDeclareRuleType functionIndex moduleIndex name)
 beDefineRuleType functionIndex moduleIndex
 	:==	beApFunction1 (BEDefineRuleType functionIndex moduleIndex)
-beDefineRuleTypeWithCode functionIndex moduleIndex
-	:==	beApFunction2 (BEDefineRuleTypeWithCode functionIndex moduleIndex)
 beCodeAlt lineNumber
 	:==	beFunction3 (BECodeAlt lineNumber)
-beStringList string strings
-	:==	beFunction0 (BEStringList string strings)
-beNoStrings
-	:==	beFunction0 BENoStrings
-beNoCodeParameters
-	:==	beFunction0 BENoCodeParameters
 beAbcCodeBlock inline
 	:==	beFunction1 (BEAbcCodeBlock inline)
-beAnyCodeBlock
-	:==	beFunction3 BEAnyCodeBlock
-beDeclareNodeId number lhsOrRhs name
-	:==	beApFunction0 (BEDeclareNodeId number lhsOrRhs name)
 beAdjustArrayFunction backendId functionIndex moduleIndex
 	:==	beApFunction0 (BEAdjustArrayFunction backendId functionIndex moduleIndex)
 beExportType isDictionary typeIndex
 	:==	beApFunction0 (BEExportType isDictionary typeIndex)
-beExportConstructor constructorIndex
-	:==	beApFunction0 (BEExportConstructor constructorIndex)
 beExportField isDictionaryField fieldIndex
 	:==	beApFunction0 (BEExportField isDictionaryField fieldIndex)
 beExportFunction functionIndex
 	:==	beApFunction0 (BEExportFunction functionIndex)
-beTupleSelectNode arity index
-	:==	beFunction1 (BETupleSelectNode arity index)
 beMatchNode arity
 	:==	beFunction2 (BEMatchNode arity)
-beDefineImportedObjsAndLibs
-	:== beApFunction2 BEDefineImportedObjsAndLibs
-beSwitchNode
-	:==	beFunction2 BESwitchNode
-beDefaultNode
-	:==	beFunction3 BEDefaultNode
-beNoNodeIds
-	:==	beFunction0 BENoNodeIds
-beBindSpecialModule specialIdentIndex moduleIndex
-	:== beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
-beBindSpecialFunction specialIdentIndex functionIndex moduleIndex
-	:== beApFunction0 (BEBindSpecialFunction specialIdentIndex functionIndex moduleIndex)
 
 // temporary hack
 beDynamicTempTypeSymbol
@@ -309,7 +241,7 @@ backEndConvertModulesH predefs {fe_icl =
 		=	appBackEnd (BEDeclareIclModule icl_name.id_name icl_modification_time (size icl_functions) (size icl_common.com_type_defs) (size icl_common.com_cons_defs) (size icl_common.com_selector_defs)) backEnd
 	#! backEnd
 		=	declareFunctionSymbols icl_functions functionIndices
-				(ifi_type_function_indices ++ ifi_global_function_indices) (backEnd -*-> "declareFunctionSymbols")
+				(ifi_type_function_indices ++ ifi_global_function_indices) backEnd
 	#! (type_var_heap,backEnd)
 		=	declare_icl_common_defs main_dcl_module_n iaci_start_index_generic_classes iaci_not_exported_generic_classes icl_common currentDcl.dcl_common currentDcl.dcl_module_kind array_dictionary_index type_var_heap backEnd
 	#! backEnd
@@ -329,15 +261,15 @@ backEndConvertModulesH predefs {fe_icl =
 	# backEnd
 		= set_dictionary_field_for_special_instance_member_functions currentDcl icl_common icl_functions main_dcl_module_n fe_dcls backEnd
 	#! backEnd
-		=	appBackEnd (BEDefineRules rules) (backEnd -*-> "BEDefineRules")
+		=	appBackEnd (BEDefineRules rules) backEnd
 	#! backEnd
-		=	beDefineImportedObjsAndLibs
+		=	beApFunction2 BEDefineImportedObjsAndLibs
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | not imported.io_is_library])
 				(convertStrings [imported.io_name \\ imported <- icl_imported_objects | imported.io_is_library])
-				(backEnd -*-> "beDefineImportedObjsAndLibs")
+				backEnd
 	#! backEnd = appBackEnd (convertForeignExports icl_foreign_exports main_dcl_module_n) backEnd
 	#! backEnd
-		=	markExports fe_dcls.[main_dcl_module_n] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs (backEnd -*-> "markExports")
+		=	markExports fe_dcls.[main_dcl_module_n] dcl_common.com_class_defs dcl_common.com_type_defs icl_common.com_class_defs icl_common.com_type_defs backEnd
 			with
 				dcl_common
 					=	currentDcl.dcl_common
@@ -764,7 +696,7 @@ declareFunType moduleIndex ranges array_dictionary_index functionIndex {ft_ident
 				o`	beDefineRuleType functionIndex moduleIndex (convertTypeAlt functionIndex moduleIndex expandedType array_dictionary_index)) bes
 				# (FSP_ABCCode abc_code) = ft_specials
 				# bes = beDeclareRuleType functionIndex moduleIndex (functionName ft_ident.id_name functionIndex ranges) bes
-				-> beDefineRuleTypeWithCode functionIndex moduleIndex
+				-> beApFunction2 (BEDefineRuleTypeWithCode functionIndex moduleIndex)
 					(convertTypeAlt functionIndex moduleIndex expandedType array_dictionary_index)
 					(beAbcCodeBlock False (convertStrings abc_code)) bes
 		_
@@ -959,7 +891,7 @@ where
 		# (constructors,type_var_heap,beState) = convert_constructors x type_var_heap beState
 		= convertConstructor typeIndex typeName moduleIndex cons_defs a constructors type_var_heap beState
 	convert_constructors [] type_var_heap beState
-		# (constructors,beState) = beNoConstructors beState
+		# (constructors,beState) = beFunction0 BENoConstructors beState
 		= (constructors,type_var_heap,beState)
 
 convertConstructor :: Int {#Char} ModuleIndex {#ConsDef} DefinedSymbol !BEConstructorListP !*TypeVarHeap !*BackEndState
@@ -1243,7 +1175,7 @@ bindSpecialIdents predefs usedModules
 			| moduleIndex == NoIndex || not (inNumberSet moduleIndex usedModules)
 				=	identity
 			// otherwise
-				=	beBindSpecialModule specialIdentIndex moduleIndex
+				=	beApFunction0 (BEBindSpecialModule specialIdentIndex moduleIndex)
 				o`	foldState (bindSpecialFunction predefs) specialFunctions
 				where
 					predef
@@ -1256,7 +1188,7 @@ bindSpecialIdents predefs usedModules
 			| predef.pds_def == NoIndex
 				=	identity
 			// otherwise
-				=	beBindSpecialFunction specialIdentIndex predef.pds_def predef.pds_module
+				=	beApFunction0 (BEBindSpecialFunction specialIdentIndex predef.pds_def predef.pds_module)
 				where
 					predef
 						=	predefs.[predefIndex]
@@ -1989,7 +1921,7 @@ ruleAlt setRefCounts line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
 			=	lhsDefsM be
 		=	beFunction3 (BERuleAlt line lhsDefs lhs) rhsDefsM rhsStrictsM rhsM be
 	// otherwise
-		=	beRuleAlt line lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
+		=	beFunction5 (BERuleAlt line) lhsDefsM lhsM rhsDefsM rhsStrictsM rhsM be
 
 convertBody :: Bool Int Int Ident [FunctionPattern] Expression Int -> BEMonad BERuleAltP
 convertBody _ functionIndex lineNumber aliasDummyId args (ABCCodeExpr instructions inline) main_dcl_module_n
@@ -2005,7 +1937,7 @@ convertBody _ functionIndex lineNumber aliasDummyId args (AnyCodeExpr inParams o
 			lineNumber
 			(return noNodeDefs)
 			(convertBackEndLhs functionIndex args main_dcl_module_n)
-			(beAnyCodeBlock (convertCodeParameters inParams) (convertCodeParameters outParams) (convertStrings instructions))
+			(beFunction3 BEAnyCodeBlock (convertCodeParameters inParams) (convertCodeParameters outParams) (convertStrings instructions))
 convertBody setRefCounts functionIndex lineNumber aliasDummyId args rhs main_dcl_module_n
 	=	beNoNodeDefs ==> \noNodeDefs
 	->	ruleAlt setRefCounts
@@ -2022,12 +1954,12 @@ convertBackEndLhs functionIndex patterns main_dcl_module_n
 
 convertStrings :: [{#Char}] -> BEMonad BEStringListP
 convertStrings strings
-	=	sfoldr (\s -> beFunction1 (BEStringList s)) beNoStrings strings
+	=	sfoldr (\s -> beFunction1 (BEStringList s)) (beFunction0 BENoStrings) strings
 
 convertCodeParameters :: (CodeBinding a) -> BEMonad BECodeParameterP | varInfoPtr a
 convertCodeParameters codeParameters
 	=	sfoldr (\ {bind_src,bind_dst} -> beFunction2 (BECodeParameterList bind_src) (convertVar (varInfoPtr bind_dst)))
-				beNoCodeParameters codeParameters
+				(beFunction0 BENoCodeParameters) codeParameters
 
 class varInfoPtr a :: a -> VarInfoPtr
 
@@ -2087,7 +2019,7 @@ convertRootExpr aliasDummyId (Conditional {if_cond=cond, if_then=then, if_else=N
 				beNoStrictNodeIds
 				(beNormalNode (beBasicSymbol BEFailSymb) beNoArgs)
 convertRootExpr aliasDummyId (Case kees=:{case_expr=Var var, case_guards}) main_dcl_module_n
-	=	beSwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var (defaultCase kees) main_dcl_module_n)
+	=	beFunction2 BESwitchNode (convertVar var.var_info_ptr) (convertCases case_guards aliasDummyId var (defaultCase kees) main_dcl_module_n)
 	where
 		defaultCase {case_default=Yes defaul} 
 			=	DefaultCase defaul
@@ -2169,7 +2101,7 @@ convertLiteralSymbol (BVI intString)
 convertLiteralSymbol (BVInt int)
 	=	beLiteralSymbol BEIntDenot (toString int)
 convertLiteralSymbol (BVB bool)
-	=	beBoolSymbol bool
+	=	beFunction0 (BEBoolSymbol bool)
 convertLiteralSymbol (BVC charString)
 	=	beLiteralSymbol BECharDenot charString
 convertLiteralSymbol (BVR realString)
@@ -2183,7 +2115,7 @@ convertTypeSymbolIdent {type_index={glob_module, glob_object}}
 
 convertExternalTypeSymbolIdent :: TypeSymbIdent -> BEMonad BETypeSymbolP
 convertExternalTypeSymbolIdent {type_index={glob_module, glob_object}}
-	= beExternalTypeSymbol glob_object glob_module
+	= beFunction0 (BEExternalTypeSymbol glob_object glob_module)
 
 convertExpr :: Expression Int -> BEMonad BENodeP
 convertExpr  expr main_dcl_module_n
@@ -2264,7 +2196,7 @@ where
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
 					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
 				DictionarySelection dictionaryVar dictionarySelections _ index
-					->	beNormalNode beDictionaryUpdateFunSymbol
+					->	beNormalNode (beFunction0 BEDictionaryUpdateFunSymbol)
 								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
 						with
 							dictionary
@@ -2282,7 +2214,7 @@ where
 			addKinds []
 				=	[]
 	convertExpr (TupleSelect {ds_arity} n expr)
-		=	beTupleSelectNode ds_arity n (convertExpr expr)
+		=	beFunction1 (BETupleSelectNode ds_arity n) (convertExpr expr)
 	convertExpr (MatchExpr {glob_module, glob_object={ds_index,ds_arity}} expr)
 		| glob_module==cPredefinedModuleIndex
 			&& (let pd_cons_index=ds_index+FirstConstructorPredefinedSymbolIndex in
@@ -2295,7 +2227,7 @@ where
 					->	convertExpr expr
 			=	beMatchNode ds_arity (beConstructorSymbol glob_module ds_index) (convertExpr expr)
 	convertExpr (Conditional {if_cond=cond, if_then, if_else=Yes else})
-		=	beIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
+		=	beFunction3 BEIfNode (convertExpr cond) (convertExpr if_then) (convertExpr else)
 
 	convertArgs :: [Expression] -> BEMonad BEArgP
 	convertArgs exprs
@@ -2340,7 +2272,7 @@ where
 										(beArgs expression beNoArgs)))
 								(convertArgs [index]))
 				_
-					->	beNormalNode beDictionarySelectFunSymbol
+					->	beNormalNode (beFunction0 BEDictionarySelectFunSymbol)
 								(beArgs dictionary (beArgs expression (convertArgs [index])))
 			where
 				dictionary
@@ -2419,7 +2351,7 @@ defaultNode defsM strictsM rhsM be
 	# be
 		=	appBackEnd BEEnterLocalScope be
 	# (defaul, be)
-		=	beDefaultNode defsM strictsM rhsM be
+		=	beFunction3 BEDefaultNode defsM strictsM rhsM be
 	# be
 	 	=	appBackEnd (BELeaveLocalScope defaul) be
 	=	(defaul, be)
@@ -2519,7 +2451,7 @@ where
 
 convertPatternVars :: [FreeVar] -> BEMonad BENodeIdListP
 convertPatternVars vars
-	=	sfoldr (\ {fv_info_ptr} -> beFunction2 BENodeIdList (convertVar fv_info_ptr)) beNoNodeIds vars
+	=	sfoldr (\ {fv_info_ptr} -> beFunction2 BENodeIdList (convertVar fv_info_ptr)) (beFunction0 BENoNodeIds) vars
 
 convertDefaultCase DefaultCaseNone _ _
 	=	beNoArgs
@@ -2541,7 +2473,7 @@ convertDefaultCase (DefaultCase expr) aliasDummyId main_dcl_module_n
 convertVar :: VarInfoPtr -> BEMonad BENodeIdP
 convertVar varInfo
 	= \be0 -> let (variable_sequence_number,be) = getVariableSequenceNumber varInfo be0 in
-		beNodeId variable_sequence_number be
+		beFunction0 (BENodeId variable_sequence_number) be
 
 getVariableSequenceNumber :: VarInfoPtr *BackEndState-> (!Int,!*BackEndState)
 getVariableSequenceNumber varInfoPtr be
@@ -2645,5 +2577,5 @@ markExports {dcl_functions,dcl_common={com_type_defs,com_cons_defs,com_selector_
 
 		export_constructor constructor_index
 			| not (IsNewTypeOrAbstractNewTypeCons com_cons_defs.[constructor_index].cons_number)
-				= beExportConstructor constructor_index
+				= beApFunction0 (BEExportConstructor constructor_index)
 				= \ bs=:{bes_backEnd} -> bs
