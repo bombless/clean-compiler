@@ -356,6 +356,11 @@ instance convertDynamics CasePatterns where
 		# (alts, ci) = convertDynamics cinp alts ci
 		= (OverloadedPatterns type decons alts, ci)
 
+convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident},cinp_subst_var_used=False}
+					{dyn_expr, dyn_type_code=TCE_TypeTerm var_info_ptr} ci
+	# (dyn_expr, ci) = convertDynamics cinp dyn_expr ci
+	# type_code = Var {var_ident = a_ij_var_name, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr}
+	=	(App {app_symb = dr_type_ident, app_args = [dyn_expr, type_code], app_info_ptr = nilPtr}, ci)
 convertDynamic cinp=:{cinp_dynamic_representation={dr_type_ident}}
 					{dyn_expr, dyn_type_code} ci
 	# (dyn_expr, ci) = convertDynamics cinp dyn_expr ci
