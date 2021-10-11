@@ -849,6 +849,10 @@ static Exp *s_exp1, *s_exp2, *q_exp;
 static long lt_exp2_max_n_calls;
 /* */
 
+/* LtExp2 may take exponential time if expressions are shared,
+   if CACHE_LT_EXP is defined extra code prevents this in most cases
+   by storing previous results using e_lt_cached, e_fwd and e_lt_result */
+
 static Bool LtExp2 (Exp e1, Exp e2)
 {
 	unsigned n, i;
@@ -866,7 +870,10 @@ static Bool LtExp2 (Exp e1, Exp e2)
 #endif
 	if (e1 == e2)
 		return True;
-
+#ifdef CACHE_LT_EXP
+	if (e1->e_lt_cached && e1->e_fwd==e2)
+		return e1->e_lt_result;
+#endif
 	if (e1->e_mark || e2->e_mark)
 		return MightBeTrue;
 
@@ -892,6 +899,11 @@ static Bool LtExp2 (Exp e1, Exp e2)
 			e1->e_mark = True;
 			if (LtExp2 (e1->e_args[0], e2)){
 				e1->e_mark = False;
+#ifdef CACHE_LT_EXP
+				e1->e_lt_cached = True;
+				e1->e_fwd = e2;
+				e1->e_lt_result = True;
+#endif
 				return True;
 			}
 			e1->e_mark = False;
@@ -928,6 +940,11 @@ static Bool LtExp2 (Exp e1, Exp e2)
 					case MightBeTrue:
 						e1->e_mark = False;
 						e2->e_mark = False;
+#ifdef CACHE_LT_EXP
+						e1->e_lt_cached = True;
+						e1->e_fwd = e2;
+						e1->e_lt_result = MightBeTrue;
+#endif
 						return MightBeTrue;
 					case False:
 					case AreRelated:
@@ -937,6 +954,11 @@ static Bool LtExp2 (Exp e1, Exp e2)
 						} else {
 							e1->e_mark = False;
 							e2->e_mark = False;
+#ifdef CACHE_LT_EXP
+							e1->e_lt_cached = True;
+							e1->e_fwd = e2;
+							e1->e_lt_result = False;
+#endif
 							return False;
 						}
 				}
@@ -946,9 +968,20 @@ static Bool LtExp2 (Exp e1, Exp e2)
 			if (s_index >= 0){
 				s_exp1 = & e1->e_args[s_index];
 				s_exp2 = & e2->e_args[s_index];
+#ifdef CACHE_LT_EXP
+				e1->e_lt_cached = True;
+				e1->e_fwd = e2;
+				e1->e_lt_result = AreRelated;
+#endif
 				return AreRelated;
-			} else
+			} else {
+#ifdef CACHE_LT_EXP
+				e1->e_lt_cached = True;
+				e1->e_fwd = e2;
+				e1->e_lt_result = True;
+#endif
 				return True;
+			}
 		}
 		case Lub:
 			e1->e_mark = True;
@@ -959,10 +992,20 @@ static Bool LtExp2 (Exp e1, Exp e2)
 				b = LtExp2 (e1->e_args[i], e2);
 				if (b != True){
 					e1->e_mark = False;
+#ifdef CACHE_LT_EXP
+					e1->e_lt_cached = True;
+					e1->e_fwd = e2;
+					e1->e_lt_result = b;
+#endif
 					return b;
 				}
 			}
 			e1->e_mark = False;
+#ifdef CACHE_LT_EXP
+			e1->e_lt_cached = True;
+			e1->e_fwd = e2;
+			e1->e_lt_result = True;
+#endif
 			return True;
 		default:
 			Assume (False, "illegal case", "LtExp");
@@ -983,24 +1026,79 @@ static Bool LtExp2 (Exp e1, Exp e2)
 			b = LtExp2 (e1, e2->e_args[i]);
 			if (b == True){
 				e2->e_mark = False;
+#ifdef CACHE_LT_EXP
+				e1->e_lt_cached = True;
+				e1->e_fwd = e2;
+				e1->e_lt_result = b;
+#endif
 				return b;
 			} else if (b == MightBeTrue)
 				result = MightBeTrue;
 		}
 		e2->e_mark = False;
+#ifdef CACHE_LT_EXP
+		e1->e_lt_cached = True;
+		e1->e_fwd = e2;
+		e1->e_lt_result = result;
+#endif
 		return result;
 	} else if (e2->e_kind == Ind){
 		e2->e_mark = True;
 
 		if (LtExp2 (e1, e2->e_args[0])){
 			e2->e_mark = False;
+#ifdef CACHE_LT_EXP
+			e1->e_lt_cached = True;
+			e1->e_fwd = e2;
+			e1->e_lt_result = True;
+#endif
 			return True;
 		}
 		e2->e_mark = False;
 	}
-
+#ifdef CACHE_LT_EXP
+	e1->e_lt_cached = True;
+	e1->e_fwd = e2;
+	e1->e_lt_result = False;
+#endif
 	return False;
 }
+
+#ifdef CACHE_LT_EXP
+static void remove_lt_cached (Exp e)
+{
+	unsigned n,i;
+
+	if (! e->e_lt_cached)
+		return;
+
+	e->e_lt_cached = False;
+	switch (e->e_kind){
+		case Top:
+		case Bottom:
+		case FunValue:
+			return;
+		case Ind:
+			remove_lt_cached (e->e_args[0]);
+			return;
+		case Argument:
+			return;
+		case Value:
+			n = e->e_fun->fun_arity;
+			break;
+		case Dep:
+		case Lub:
+			n = e->e_sym;
+			break;
+		default:
+			Assume (False, "unknown case", "remove_lt_cached");
+			return;
+	}
+
+	for (i = 0; i < n; i++)
+		remove_lt_cached (e->e_args[i]);
+}
+#endif
 
 #ifdef _DB_
 #undef Bool
@@ -1361,6 +1459,10 @@ static Bool LtExp (Exp e1, Exp e2)
 	lt_exp2_max_n_calls=0;
 	/* */
 	b = LtExp2 (e1, e2);
+
+#ifdef CACHE_LT_EXP
+	remove_lt_cached (e1);
+#endif
 
 #ifdef _DB_EQ_
 	if (DBPrinting){

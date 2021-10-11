@@ -31,19 +31,31 @@ typedef struct _dependency {
 
 typedef Exp *ExpP;
 
+#undef CACHE_LT_EXP
+
 typedef struct _exp {
 	union {
 		unsigned short	u_sym;			
 		struct _fun *	u_fun;			/* if a value, a function id	*/
 	} e_u;
 	ExpKind			e_kind;				/* the kind of expression		*/
-	unsigned char	e_hnf:1,			/* set if reduced to hnf		*/
+#ifdef CACHE_LT_EXP
+	unsigned short
+#else
+	unsigned char
+#endif
+					e_hnf:1,			/* set if reduced to hnf		*/
 	 				e_spechnf:1,		/* set if reduced in spec context */
 	 				e_hasind:1,			/* used for indirections		*/
 					e_red:1,			/* used for reductions			*/
 		 			e_imark:1,			/* for marking use with Inds	*/
 		 			e_mark:1,			/* for general use				*/
-		 			e_mark2:1;			/* not for general use			*/
+					e_mark2:1			/* not for general use			*/
+#ifdef CACHE_LT_EXP
+				   ,e_lt_cached:1,
+					e_lt_result:2
+#endif
+					;
 	 Exp			*e_args;			/* the arguments of the exp		*/
 	 Exp			e_fwd;				/* for forwarding pointers		*/
 	 Dependency		e_deps;				/* the current dependency list	*/
