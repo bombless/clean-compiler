@@ -1115,6 +1115,21 @@ static Bool IsInAPath (Exp e1, Exp e2, APath p)
 	return False;
 }
 
+#ifdef CACHE_EXT_LT_EXP
+/* yields depth<<2|(1 if in APath) */
+static unsigned int IsInAPathAndDepth (Exp e1, Exp e2, APath path)
+{
+	APath p;
+	unsigned int depth;
+
+	for (p=path, depth=0; p!=NULL; p=p->ap_next, depth+=4)
+		if (e1 == p->ap_e1 && e2 == p->ap_e2)
+			return depth|1;
+
+	return depth;
+}
+#endif
+
 #ifdef _DB_
 APath AddToAPath (Exp e1, Exp e2, APath p)
 #else
@@ -1327,6 +1342,272 @@ static Bool EqExp (Exp e1, Exp e2)
 		return False;
 }
 
+/* ExtLtExp2 may take exponential time if expressions are shared,
+   if CACHE_EXT_LT_EXP is defined extra code prevents this in most cases
+   by storing previous results using e_lt_cached, e_fwd and e_lt_result
+   for nodes that are not on a cycle. to detect nodes on a cycle the
+   minimal depth of the reachable nodes is compared to the depth of the
+   current node. if a cached node is encountered, IsInAPathAndDepth would not
+   find node e1 e2 in the path, because that would mean the node is on a cycle */
+
+#ifdef CACHE_EXT_LT_EXP
+#define MaxDepth 0xfffffffcu
+
+/* yields minimal depth<<2|result */
+static unsigned int ExtLtExp2 (Exp e1, Exp e2, APath p)
+{
+	unsigned int depth,current_depth;
+
+	if (e1 == e2)
+		return MaxDepth|True;
+	if (e1->e_kind == Bottom || e2->e_kind == Top)
+		return MaxDepth|True;
+	if (e1->e_kind == Top || e2->e_kind == Bottom)
+		return MaxDepth|False;
+
+	if (e1->e_lt_cached && e1->e_fwd==e2)
+		return MaxDepth|e1->e_lt_result;
+
+	current_depth = IsInAPathAndDepth (e1, e2, p);
+	if (current_depth & 1)
+		return current_depth; /* True */
+
+	switch (e1->e_kind){
+		case FunValue:
+			if (e2->e_kind == FunValue && e1->e_fun == e2->e_fun)
+				return MaxDepth|True;
+			else {
+				depth = MaxDepth;
+				break;
+			}
+		case Ind:
+		{
+			APath newp;
+
+			newp = AddToAPath (e1, e2, p);
+			depth = ExtLtExp2 (e1->e_args[0], e2, newp);
+			if (depth & 3){
+				depth = depth & (~3u);
+				if (depth > current_depth){
+					e1->e_lt_cached=True;
+					e1->e_lt_result=True;
+					e1->e_fwd=e2;
+				} else
+					e1->e_mark=True;
+				return depth|True;
+			} else
+				break;
+		}
+		case Value:
+		case Dep:
+		{
+			unsigned n, i;
+			int s_index;
+			APath newp;
+			unsigned int min_depth;
+
+			if (e1->e_kind != e2->e_kind){
+				depth = MaxDepth;
+				break;
+			}
+
+			if (e1->e_kind==Value){
+				if (e1->e_fun != e2->e_fun){
+					depth = MaxDepth;
+					break;
+				}
+				n=e1->e_fun->fun_arity;
+			} else {
+				if (e1->e_sym != e2->e_sym){
+					depth = MaxDepth;
+					break;
+				}
+				n=e1->e_sym;
+			}
+
+			s_index = -1;
+
+			newp = AddToAPath (e1, e2, p);
+
+			min_depth = MaxDepth;
+			for (i = 0; i < n; i++){
+				Bool b;
+
+				depth = ExtLtExp2 (e1->e_args[i], e2->e_args[i], newp);
+				b = depth & 3u;
+				depth = depth & (~3u);
+				if (depth < min_depth)
+					min_depth = depth;
+
+				switch (b){
+					case True:
+						continue;
+					case False:
+					case AreRelated:
+						if (CheckAreRelated && s_index < 0){
+							s_index = i;
+							continue;
+						}
+						if (min_depth > current_depth){
+							e1->e_lt_cached=True;
+							e1->e_lt_result=False;
+							e1->e_fwd=e2;
+						} else
+							e1->e_mark=True;
+						return min_depth|False;
+				}
+			}
+			if (s_index >= 0){
+				s_exp1 = & e1->e_args[s_index];
+				s_exp2 = & e2->e_args[s_index];
+				e1->e_mark=True;
+				return min_depth|AreRelated;
+			}
+
+			if (min_depth > current_depth){
+				e1->e_lt_cached=True;
+				e1->e_lt_result=True;
+				e1->e_fwd=e2;
+			} else
+				e1->e_mark=True;
+			return min_depth|True;
+		}
+		case Lub:
+		{
+			unsigned n, i;
+			APath newp;
+			unsigned int min_depth;
+
+			n    = e1->e_sym;
+			newp = AddToAPath (e1, e2, p);
+
+			min_depth = MaxDepth;
+			for (i = 0; i < n; i++){
+				Bool b;
+
+				depth = ExtLtExp2 (e1->e_args[i], e2, newp);
+				b = depth & 3u;
+				depth = depth & (~3u);
+				if (depth < min_depth)
+					min_depth = depth;
+
+				if (b != True){
+					if (min_depth > current_depth){
+						e1->e_lt_cached=True;
+						e1->e_lt_result=False;
+						e1->e_fwd=e2;
+					} else
+						e1->e_mark=True;
+					return min_depth|False;
+				}
+			}
+
+			if (min_depth > current_depth){
+				e1->e_lt_cached=True;
+				e1->e_lt_result=True;
+				e1->e_fwd=e2;
+			} else
+				e1->e_mark=True;
+			return min_depth|True;
+		}
+		default:
+			Assume (False, "illegal case", "LtExp");
+			return False;
+	}
+
+	/* check if e2 is a lub */
+	if (e2->e_kind == Lub){
+		unsigned n, i;
+		APath newp;
+		unsigned int min_depth;
+
+		n    = e2->e_sym;
+		newp = AddToAPath (e1, e2, p);
+
+		min_depth = depth;
+		for (i = 0; i < n; i++){
+			Bool b;
+
+			depth = ExtLtExp2 (e1, e2->e_args[i], newp);
+			b = depth & 3u;
+			depth = depth & (~3u);
+			if (depth < min_depth)
+				min_depth = depth;
+
+			if (b == True){
+				if (depth > current_depth){
+					e1->e_lt_cached=True;
+					e1->e_lt_result=True;
+					e1->e_fwd=e2;
+				} else
+					e1->e_mark=True;
+				return min_depth|True;
+			}
+		}
+
+		depth=min_depth;
+	} else if (e2->e_kind == Ind){
+		unsigned int min_depth;
+
+		min_depth = depth;
+		depth = ExtLtExp2 (e1, e2->e_args[0], p);
+
+		if (depth & 3u){
+			depth = depth & (~3u);
+			if (depth < min_depth)
+				min_depth = depth;
+			return min_depth|True;
+		}
+		if (depth < min_depth)
+			min_depth = depth;
+		depth=min_depth;
+	}
+
+	if (depth > current_depth){
+		e1->e_lt_cached=True;
+		e1->e_lt_result=False;
+		e1->e_fwd=e2;
+	} else
+		e1->e_mark=True;
+	return depth|False;
+}
+
+static void remove_mark_or_lt_cached (Exp e)
+{
+	unsigned n,i;
+
+	if (e->e_lt_cached==0 && e->e_mark==0)
+		return;
+
+	e->e_lt_cached = False;
+	e->e_mark = False;
+
+	switch (e->e_kind){
+		case Top:
+		case Bottom:
+		case FunValue:
+			return;
+		case Ind:
+			remove_mark_or_lt_cached (e->e_args[0]);
+			return;
+		case Argument:
+			return;
+		case Value:
+			n = e->e_fun->fun_arity;
+			break;
+		case Dep:
+		case Lub:
+			n = e->e_sym;
+			break;
+		default:
+			Assume (False, "unknown case", "remove_mark_or_lt_cached");
+			return;
+	}
+
+	for (i = 0; i < n; i++)
+		remove_mark_or_lt_cached (e->e_args[i]);
+}
+#else
 static Bool ExtLtExp2 (Exp e1, Exp e2, APath p)
 {
 	if (e1 == e2)
@@ -1440,6 +1721,7 @@ static Bool ExtLtExp2 (Exp e1, Exp e2, APath p)
 	
 	return False;
 }
+#endif
 
 static Bool LtExp (Exp e1, Exp e2)
 {
@@ -1477,6 +1759,11 @@ static Bool LtExp (Exp e1, Exp e2)
 
 	if (b == MightBeTrue && StrictDoExtEq){
 		b = ExtLtExp2 (e1, e2, (APath) NULL);
+
+#ifdef CACHE_EXT_LT_EXP
+		b = b & 3u;
+		remove_mark_or_lt_cached (e1);
+#endif
 
 #ifdef _DB_EQ_
 		if (DBPrinting){
