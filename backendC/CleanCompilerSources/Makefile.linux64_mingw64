@@ -11,6 +11,8 @@ OBJECTS = \
 	$(CC) -shared -s $(OBJECTS) -o $@
 
 backend_dllexport.c: backend.o
-	./add_dllexports.sh
+	cat add_dllexports.sh | tr -d '\r' > add_dllexports_without_cr.sh
+	chmod +x add_dllexports_without_cr.sh
+	./add_dllexports_without_cr.sh
 
 # winedump -j export backend.dll
