@@ -2658,7 +2658,6 @@ where
 				  				-> (out, th_attrs)
 				  			Yes show_attributes
 								# form = { form_properties = if show_attributes cAttributed cNoProperties, form_attr_position = No }
-//								  out = out <<< show_attributes <<< "\n"
 				  				  (printable_type, th_attrs)
 				  				  		= case show_attributes of
 				  				  			True
@@ -2673,7 +2672,7 @@ where
 
 	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
 						defs fun_env attr_var_env type_heaps expr_heap error
-		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type (length fun_type.st_context) defs attr_var_env type_heaps
+		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
 		| equi
 			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap

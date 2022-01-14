@@ -1333,12 +1333,12 @@ set_class_arg_pattern [{atv_variable={tv_info_ptr}}:pattern_vars] [{at_type}:a_t
 set_class_arg_pattern [] [] type_var_heap
 	= type_var_heap
 
-equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs}  !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
-equivalent st=:{st_args,st_result,st_context,st_attr_env} tst=:{tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} nr_of_contexts defs attr_env heaps
-	# nr_of_lifted_contexts = length st_context - nr_of_contexts
+equivalent :: !SymbolType !TempSymbolType !{#CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps)
+equivalent {st_args,st_result,st_context,st_attr_env} {tst_args,tst_result,tst_context,tst_attr_env,tst_lifted} defs attr_env heaps
+	# nr_of_lifted_contexts = length st_context - length tst_context
 	# (ok, heaps) = equiv (drop tst_lifted st_args,st_result) (drop tst_lifted tst_args,tst_result) heaps
 	| ok
-		# (ok, heaps) = equivalent_list_of_contexts (drop nr_of_lifted_contexts st_context) (drop nr_of_lifted_contexts tst_context) defs heaps
+		# (ok, heaps) = equivalent_list_of_contexts (drop nr_of_lifted_contexts st_context) tst_context defs heaps
 		| ok
 			# (ok, attr_env, attr_var_heap) = equivalent_environments st_attr_env (fill_environment tst_attr_env attr_env) heaps.th_attrs
 			= (ok, clear_environment tst_attr_env attr_env, { heaps & th_attrs = attr_var_heap })

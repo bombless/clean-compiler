@@ -45,7 +45,7 @@ cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !
 
 set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> *TypeVarHeap
 
-equivalent :: !SymbolType !TempSymbolType !Int !{# CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps) 
+equivalent :: !SymbolType !TempSymbolType !{#CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps)
 
 NewAttrVar :: !Int !*AttrVarHeap -> (!AttributeVar,!*AttrVarHeap)
 
