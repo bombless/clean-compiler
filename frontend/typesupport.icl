@@ -27,6 +27,129 @@ import syntax, expand_types, unitype, utilities, checktypes
 ::	AttributeEnv	:== {! TypeAttribute }
 ::	VarEnv 			:== {! Type }
 
+::	CleanUpExprTypeState =
+	{	cuets_var_env		:: !.VarEnv
+	,	cuets_heaps			:: !.TypeHeaps
+	,	cuets_var_store		:: !Int
+	}
+
+class clean_up_expr_type a ::  !a !*CleanUpExprTypeState -> (!a, !*CleanUpExprTypeState)
+
+instance clean_up_expr_type AType
+where
+	clean_up_expr_type {at_attribute,at_type} cus
+		# at_attribute = cleanUpExprTypeAttribute at_attribute
+		  (at_type, cus) = clean_up_expr_type at_type cus
+		= ({at_attribute = at_attribute, at_type = at_type}, cus)
+
+cleanUpExprTypeAttribute :: !TypeAttribute -> TypeAttribute
+cleanUpExprTypeAttribute TA_Unique
+	= TA_Unique
+cleanUpExprTypeAttribute TA_Multi
+	= TA_Multi
+cleanUpExprTypeAttribute (TA_TempVar _)
+	= TA_Multi
+cleanUpExprTypeAttribute av=:(TA_Var _)
+	= av
+cleanUpExprTypeAttribute type_attribute
+	= abort ("cleanUpExprTypeAttribute "+++toString type_attribute)
+
+instance clean_up_expr_type Type
+where
+	clean_up_expr_type (TempV tv_number) cuets
+		# (type, cuets) = cuets!cuets_var_env.[tv_number]
+		= cleanUpExprTypeVariable type tv_number cuets
+	clean_up_expr_type (TA tc types) cuets
+		# (types, cuets) = clean_up_expr_type types cuets
+		= (TA tc types, cuets)
+	clean_up_expr_type (TAS tc types strictness) cuets
+		# (types, cuets) = clean_up_expr_type types cuets
+		= (TAS tc types strictness, cuets)
+	clean_up_expr_type (argtype --> restype) cuets
+		# (argtype, cuets) = clean_up_expr_type argtype cuets
+		  (restype, cuets) = clean_up_expr_type restype cuets
+		=  (argtype --> restype, cuets)
+	clean_up_expr_type t=:(TB _) cuets
+		=  (t, cuets)
+	clean_up_expr_type (TArrow1 argtype) cuets
+		# (argtype, cuets) = clean_up_expr_type argtype cuets
+		=  (TArrow1 argtype, cuets)
+	clean_up_expr_type t=:TArrow cuets
+		=  (t, cuets)
+	clean_up_expr_type (TempCV tempvar :@: types) cuets
+		# (type, cuets) = cuets!cuets_var_env.[tempvar]
+		  (type, cuets) = cleanUpExprTypeVariable type tempvar cuets
+		  (types, cuets) = clean_up_expr_type types cuets
+		= (simplifyTypeApplication type types, cuets)
+	clean_up_expr_type (TempQCV qv_number :@: types) cuets
+		# (type, cuets) = cuets!cuets_var_env.[qv_number]
+		  (TV tv, cuets) = cleanUpExprTypeVariable type qv_number cuets
+		  (types, cuets) = clean_up_expr_type types cuets
+		= (CV tv :@: types, cuets)
+	clean_up_expr_type (TempQCDV qv_number :@: types) cuets
+		# (type, cuets) = cuets!cuets_var_env.[qv_number]
+		  (TV tv, cuets) = cleanUpExprTypeVariable type qv_number cuets
+		  (types, cuets) = clean_up_expr_type types cuets
+		= (CV tv :@: types, cuets)
+	clean_up_expr_type (cv :@: types) cuets
+		# (types, cuets) = clean_up_expr_type types cuets
+		= (cv :@: types, cuets)
+	clean_up_expr_type (TempQV qv_number) cuets
+		# (type, cuets) = cuets!cuets_var_env.[qv_number]
+		= cleanUpExprTypeVariable type qv_number cuets
+	clean_up_expr_type (TempQDV qv_number) cuets
+		# (type, cuets) = cuets!cuets_var_env.[qv_number]
+		= cleanUpExprTypeVariable type qv_number cuets
+	clean_up_expr_type tv=:(TV _) cuets
+		= (tv, cuets)
+	clean_up_expr_type TAll cuets
+		= (TAll, cuets)
+	clean_up_expr_type (TFA vars type) cuets
+		# (type, cuets) = clean_up_expr_type type cuets
+		= (TFA vars type, cuets)
+	clean_up_expr_type type cuets
+		= abort "clean_up_expr_type Type (typesupport.icl): unknown type"
+
+cleanUpExprTypeVariable TE tv_number {cuets_heaps,cuets_var_store,cuets_var_env}
+	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cuets_heaps.th_vars
+	  new_var = TV {tv_ident = NewVarId cuets_var_store, tv_info_ptr = tv_info_ptr}
+	  cuets_var_env & [tv_number] = new_var
+	  cuets_heaps & th_vars = th_vars
+	= (new_var, {cuets_var_env = cuets_var_env, cuets_heaps = cuets_heaps, cuets_var_store = inc cuets_var_store})
+cleanUpExprTypeVariable (TLifted var) tv_number cuets
+	= (TV var, cuets)
+cleanUpExprTypeVariable type tv_number cuets
+	= (type, cuets)
+
+instance clean_up_expr_type [a] | clean_up_expr_type a
+where
+	clean_up_expr_type l cuets = mapSt clean_up_expr_type l cuets
+
+instance clean_up_expr_type CaseType
+where
+	clean_up_expr_type ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cuets
+		# (ct_pattern_type, cuets) = clean_up_expr_type ct_pattern_type cuets
+		  (ct_result_type, cuets) = clean_up_expr_type ct_result_type cuets
+		  (ct_cons_types, cuets) = mapSt (mapSt clean_up_arg_type) ct_cons_types cuets
+		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cuets)
+	where
+		clean_up_arg_type {at_type = TFA avars type, at_attribute} cuets
+			# at_attribute = cleanUpExprTypeAttribute at_attribute
+			  (type, cuets) = clean_up_expr_type type cuets
+			= ({at_type = TFA avars type, at_attribute = at_attribute}, cuets)
+		clean_up_arg_type {at_type = TFAC avars type contexts, at_attribute} cuets
+			# at_attribute = cleanUpExprTypeAttribute at_attribute
+			  (type, cuets) = clean_up_expr_type type cuets
+			= ({at_type = TFAC avars type contexts, at_attribute = at_attribute}, cuets)
+		clean_up_arg_type at cuets
+			= clean_up_expr_type at cuets
+
+instance clean_up_expr_type DictionaryAndClassType
+where
+	clean_up_expr_type {dc_var,dc_class_type} cuets
+		# (dc_class_type,cuets) = clean_up_expr_type dc_class_type cuets
+		= ({dc_var=dc_var,dc_class_type=dc_class_type},cuets)
+
 ::	CleanUpState =
 	{	cus_var_env					:: !.VarEnv
 	,	cus_attr_env				:: !.AttributeEnv
@@ -41,7 +164,6 @@ import syntax, expand_types, unitype, utilities, checktypes
 ::	CleanUpInput =
 	{	cui_coercions		:: !{! CoercionTree}
 	,	cui_attr_part		:: !AttributePartition
-	,	cui_top_level		:: !Bool
 	,	cui_is_lifted_part	:: !Bool
 	}
 
@@ -52,11 +174,9 @@ class clean_up a ::  !CleanUpInput !a !*CleanUpState -> (!a, !*CleanUpState)
 instance clean_up AType
 where
 	clean_up cui atype=:{at_attribute, at_type = TempQV qv_number} cus
-		| cui.cui_top_level
-			= clean_up_top_level_q_variable cui at_attribute qv_number cus
+		= clean_up_top_level_q_variable cui at_attribute qv_number cus
 	clean_up cui atype=:{at_attribute, at_type = TempQDV qv_number} cus
-		| cui.cui_top_level
-			= clean_up_top_level_q_variable cui at_attribute qv_number cus
+		= clean_up_top_level_q_variable cui at_attribute qv_number cus
 	clean_up cui atype=:{at_attribute,at_type} cus
 		# (at_attribute, cus) = cleanUpTypeAttribute False cui at_attribute cus 
 		  (at_type, cus) = clean_up cui at_type cus
@@ -65,7 +185,7 @@ where
 clean_up_top_level_q_variable cui at_attribute qv_number cus
 	# (at_attribute, cus)	= cleanUpTypeAttribute True cui at_attribute cus
 	# (type, cus)			= cus!cus_var_env.[qv_number]
-	  (var, cus)			= cleanUpVariable True type qv_number cus
+	  (var, cus)			= cleanUpVariable type qv_number cus
 	  cus = {cus & cus_exis_vars = add_new_exis_attr_var type qv_number at_attribute cus.cus_exis_vars}
 	= ({at_attribute = at_attribute, at_type = var}, cus)
 where
@@ -83,21 +203,19 @@ cleanUpTypeAttribute _ cui TA_Unique cus
 cleanUpTypeAttribute _ cui TA_Multi cus
 	= (TA_Multi, cus)
 cleanUpTypeAttribute may_be_existential cui tv=:(TA_TempVar av_number) cus
-	| cui.cui_top_level
-		# av_group_nr = cui.cui_attr_part.[av_number]
-		  coercion_tree = cui.cui_coercions.[av_group_nr]
-		| isNonUnique coercion_tree
-			= (TA_Multi, cus)
-		| isUnique coercion_tree
-			= (TA_Unique, cus)
-		# cus 			= check_appearance cui.cui_is_lifted_part av_group_nr cus
-		# (attr, cus)	= clean_up_attribute_variable av_group_nr (cus!cus_attr_env.[av_group_nr])
-		| isExistential coercion_tree
-			| may_be_existential
-				= (attr, { cus & cus_error = checkError "attribute variable could not be universally quantified" "" cus.cus_error})
-				= (attr, cus)
-			= (attr, cus)
+	# av_group_nr = cui.cui_attr_part.[av_number]
+	  coercion_tree = cui.cui_coercions.[av_group_nr]
+	| isNonUnique coercion_tree
 		= (TA_Multi, cus)
+	| isUnique coercion_tree
+		= (TA_Unique, cus)
+	# cus 			= check_appearance cui.cui_is_lifted_part av_group_nr cus
+	# (attr, cus)	= clean_up_attribute_variable av_group_nr (cus!cus_attr_env.[av_group_nr])
+	| isExistential coercion_tree
+		| may_be_existential
+			= (attr, { cus & cus_error = checkError "attribute variable could not be universally quantified" "" cus.cus_error})
+			= (attr, cus)
+		= (attr, cus)
 where
 	check_appearance is_lifted_part group_nr cus=:{cus_appears_in_lifted_part, cus_error}
 		| is_lifted_part
@@ -123,7 +241,7 @@ instance clean_up Type
 where
 	clean_up cui (TempV tv_number) cus
 		# (type, cus) = cus!cus_var_env.[tv_number]
-		= cleanUpVariable cui.cui_top_level type tv_number cus
+		= cleanUpVariable type tv_number cus
 	clean_up cui (TA tc types) cus
 		# (types, cus) = clean_up cui types cus
 		= (TA tc types, cus)
@@ -143,45 +261,33 @@ where
 		=  (t, cus)
 	clean_up cui (TempCV tempvar :@: types) cus
 		# (type, cus) = cus!cus_var_env.[tempvar]
-		# (type, cus) = cleanUpVariable cui.cui_top_level type tempvar cus
+		# (type, cus) = cleanUpVariable type tempvar cus
 		  (types, cus) = clean_up cui types cus
 		= (simplifyTypeApplication type types, cus)
 	clean_up cui (TempQCV qv_number :@: types) cus=:{cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
-		| cui.cui_top_level
-			# (TV tv, cus) = cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
-			  (types, cus) = clean_up cui types cus
-			= (CV tv :@: types, cus)
-			# (TV tv, cus) = cleanUpVariable False type qv_number cus
-			  (types, cus) = clean_up cui types cus
-			= (CV tv :@: types, cus)
+		  (TV tv, cus) = cleanUpVariable type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+		  (types, cus) = clean_up cui types cus
+		= (CV tv :@: types, cus)
 	clean_up cui (TempQCDV qv_number :@: types) cus=:{cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
-		| cui.cui_top_level
-			# (TV tv, cus) = cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
-			  (types, cus) = clean_up cui types cus
-			= (CV tv :@: types, cus)
-			# (TV tv, cus) = cleanUpVariable False type qv_number cus
-			  (types, cus) = clean_up cui types cus
-			= (CV tv :@: types, cus)
+		  (TV tv, cus) = cleanUpVariable type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
+		  (types, cus) = clean_up cui types cus
+		= (CV tv :@: types, cus)
 	clean_up cui (cv :@: types) cus
 		# (types, cus) = clean_up cui types cus
 		= (cv :@: types, cus)
 	clean_up cui (TempQV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
-		| cui.cui_top_level
-			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
-			= cleanUpVariable False type qv_number cus
+		= cleanUpVariable type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
 	clean_up cui (TempQDV qv_number) cus=:{cus_error,cus_exis_vars}
 		# (type, cus) = cus!cus_var_env.[qv_number]
-		| cui.cui_top_level
-			= cleanUpVariable True type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
-			= cleanUpVariable False type qv_number cus
+		= cleanUpVariable type qv_number {cus & cus_exis_vars = add_new_variable type qv_number cus_exis_vars}
 	clean_up cui tv=:(TV _) cus
 		= (tv, cus)
 	clean_up cui TAll cus
 		= (TAll, cus)
-	clean_up cui (TFA vars type) cus=:{cus_heaps}
+	clean_up cui (TFA vars type) cus
 		# (type, cus) = clean_up cui type cus
 		= (TFA vars type, cus)
 	clean_up cui type cus
@@ -196,21 +302,14 @@ instance clean_up [a] | clean_up a
 where
 	clean_up cui l cus = mapSt (clean_up cui) l cus
 
-instance clean_up DictionaryAndClassType where
-	clean_up cui {dc_var,dc_class_type} cus
-		# (dc_class_type,cus) = clean_up cui dc_class_type cus
-		= ({dc_var=dc_var,dc_class_type=dc_class_type},cus)
-
-cleanUpVariable _ TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
+cleanUpVariable TE tv_number cus=:{cus_heaps,cus_var_store,cus_var_env}
 	# (tv_info_ptr, th_vars) = newPtr TVI_Empty cus_heaps.th_vars
 	  new_var = TV {tv_ident = NewVarId cus_var_store, tv_info_ptr = tv_info_ptr}
 	= (new_var, {cus & cus_var_env = { cus_var_env & [tv_number] = new_var},
 					   cus_heaps = { cus_heaps & th_vars = th_vars }, cus_var_store = inc cus_var_store})
-cleanUpVariable top_level (TLifted var) tv_number cus=:{cus_error}
-	| top_level
-		= (TV var, { cus & cus_error = liftedError var cus_error})
-		= (TV var, cus)
-cleanUpVariable _ type tv_number cus
+cleanUpVariable (TLifted var) tv_number cus=:{cus_error}
+	= (TV var, { cus & cus_error = liftedError var cus_error})
+cleanUpVariable type tv_number cus
 	= (type, cus)
 
 ::	CleanUpResult :== BITVECT
@@ -446,7 +545,7 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
 				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error, cus_exis_vars = [] }
-	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_top_level = True, cui_is_lifted_part = True }
+	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_is_lifted_part = True }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
 	  cui = { cui & cui_is_lifted_part = False }
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
@@ -457,11 +556,9 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
 	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
-	  (expr_heap, {cus_var_env,cus_attr_env,cus_heaps,cus_error})
-			= clean_up_expression_types {cui & cui_top_level = False} case_and_let_exprs expr_heap
-					 {cus & cus_var_env = cus_var_env, cus_attr_env = cus_attr_env,
-							cus_appears_in_lifted_part = {el\\el<-:cus.cus_appears_in_lifted_part},
-							cus_heaps = type_heaps, cus_error = cus_error}
+	  (expr_heap, {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps})
+			= clean_up_expression_types case_and_let_exprs expr_heap
+					 {cuets_var_env=cus_var_env,cuets_heaps=type_heaps,cuets_var_store=cus.cus_var_store}
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
@@ -494,7 +591,7 @@ where
 			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute}, (all_exi_vars, cus))
 			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute},
 					(all_exi_vars, {cus & cus_error = existentialError cus.cus_error, cus_exis_vars = []}))
-	clean_up_arg_type cui=:{cui_top_level} at (all_exi_vars, cus)
+	clean_up_arg_type cui at (all_exi_vars, cus)
 		# (at, cus) = clean_up cui at cus
 		  (cus_exis_vars, cus) = cus!cus_exis_vars
 		| isEmpty cus_exis_vars
@@ -516,10 +613,8 @@ where
 					TV var
 						-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, {cus & cus_var_env.[var_number] = TE})
 					TLifted var
-						| cui_top_level
-							# cus = {cus & cus_error = liftedError var cus.cus_error, cus_var_env.[var_number] = TE}
-							-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, cus)
-							-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, {cus & cus_var_env.[var_number] = TE})
+						# cus = {cus & cus_error = liftedError var cus.cus_error, cus_var_env.[var_number] = TE}
+						-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, cus)
 
 	clean_up_result_type cui at cus
 		# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
@@ -840,51 +935,51 @@ where
 	is_new_inequality dem_var off_var [{ ai_demanded, ai_offered } : inequalities]
 		= (dem_var <> ai_demanded || off_var <> ai_offered) && is_new_inequality dem_var off_var inequalities
 
-	clean_up_expression_types :: !CleanUpInput ![ExprInfoPtr] !*ExpressionHeap !*CleanUpState -> (!*ExpressionHeap,!*CleanUpState);
-	clean_up_expression_types cui expr_ptrs expr_heap cus
-		= foldSt (clean_up_expression_type cui) expr_ptrs (expr_heap, cus)
+	clean_up_expression_types :: ![ExprInfoPtr] !*ExpressionHeap !*CleanUpExprTypeState -> (!*ExpressionHeap,!*CleanUpExprTypeState)
+	clean_up_expression_types expr_ptrs expr_heap cuets
+		= foldSt clean_up_expression_type expr_ptrs (expr_heap, cuets)
 	where
-		clean_up_expression_type cui expr_ptr (expr_heap, cus)
+		clean_up_expression_type expr_ptr (expr_heap, cuets)
 			# (info, expr_heap) = readPtr expr_ptr expr_heap
 			= case info of
 				EI_CaseType case_type
-					# (case_type, cus) = clean_up cui case_type cus
-					-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cus)
+					# (case_type, cuets) = clean_up_expr_type case_type cuets
+					-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cuets)
 				EI_LetType let_type
-					# (let_type, cus) = clean_up cui let_type cus
-					-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cus)
+					# (let_type, cuets) = clean_up_expr_type let_type cuets
+					-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cuets)
 				EI_DictionaryType dict_type
-					# (dict_type, cus) = clean_up cui dict_type cus
-					-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cus)
+					# (dict_type, cuets) = clean_up_expr_type dict_type cuets
+					-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cuets)
 				EI_ContextWithVarContexts class_expressions var_contexts
-					# (var_contexts,cus) = clean_up_var_contexts var_contexts cus
-					-> (writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap,cus)
+					# (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
+					-> (writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap,cuets)
 				where
-					clean_up_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) cus
-						# (type_contexts,cus) = clean_up cui type_contexts cus
-						  (arg_atype,cus) = clean_up cui arg_atype cus
-						  (var_contexts,cus) = clean_up_var_contexts var_contexts cus
-						= (VarContext arg_n type_contexts arg_atype var_contexts,cus)
-					clean_up_var_contexts NoVarContexts cus
-						= (NoVarContexts,cus)
+					clean_up_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) cuets
+						# (type_contexts,cuets) = clean_up_expr_type type_contexts cuets
+						  (arg_atype,cuets) = clean_up_expr_type arg_atype cuets
+						  (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
+						= (VarContext arg_n type_contexts arg_atype var_contexts,cuets)
+					clean_up_var_contexts NoVarContexts cuets
+						= (NoVarContexts,cuets)
 				EI_CaseTypeWithContexts case_type constructor_contexts
-					# (case_type, cus) = clean_up cui case_type cus
-					  (constructor_contexts, cus) = clean_up_constructor_contexts cui constructor_contexts cus
-					-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cus)
+					# (case_type, cuets) = clean_up_expr_type case_type cuets
+					  (constructor_contexts, cuets) = clean_up_constructor_contexts constructor_contexts cuets
+					-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cuets)
 				where
-					clean_up_constructor_contexts cui [(ds,type_contexts):constructor_contexts] cus
-						# (type_contexts,cus) = clean_up_type_contexts cui type_contexts cus
-						  (constructor_contexts,cus) = clean_up_constructor_contexts cui constructor_contexts cus
-						= ([(ds,type_contexts):constructor_contexts],cus)
-					clean_up_constructor_contexts cui [] cus
-						= ([],cus)
+					clean_up_constructor_contexts [(ds,type_contexts):constructor_contexts] cuets
+						# (type_contexts,cuets) = clean_up_type_contexts type_contexts cuets
+						  (constructor_contexts,cuets) = clean_up_constructor_contexts constructor_contexts cuets
+						= ([(ds,type_contexts):constructor_contexts],cuets)
+					clean_up_constructor_contexts [] cuets
+						= ([],cuets)
 
-					clean_up_type_contexts cui [type_contexts=:{tc_types}:constructor_contexts] cus
-						# (tc_types,cus) = clean_up cui tc_types cus
-						  (constructor_contexts,cus) = clean_up_type_contexts cui constructor_contexts cus
-						= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cus)
-					clean_up_type_contexts cui [] cus
-						= ([],cus)
+					clean_up_type_contexts [type_contexts=:{tc_types}:constructor_contexts] cuets
+						# (tc_types,cuets) = clean_up_expr_type tc_types cuets
+						  (constructor_contexts,cuets) = clean_up_type_contexts constructor_contexts cuets
+						= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cuets)
+					clean_up_type_contexts [] cuets
+						= ([],cuets)
 
  	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
  		| is_start_rule
@@ -900,25 +995,6 @@ where
 					= cus_error						
 	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
 	 		= cus_error
-	 	
-instance clean_up CaseType
-where
-	clean_up cui ctype=:{ct_pattern_type,ct_result_type, ct_cons_types} cus
-		# (ct_pattern_type, cus) = clean_up cui ct_pattern_type cus 
-		  (ct_result_type, cus) = clean_up cui ct_result_type cus
-		  (ct_cons_types, cus) = mapSt (mapSt (clean_up_arg_type cui)) ct_cons_types cus
-		= ({ctype & ct_pattern_type = ct_pattern_type, ct_cons_types = ct_cons_types, ct_result_type = ct_result_type}, cus)
-	where
-		clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} cus
-			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
-			  (type, cus)			= clean_up cui type cus
-			= ({ at & at_type = TFA avars type, at_attribute = at_attribute}, cus)
-		clean_up_arg_type cui at=:{at_type = TFAC avars type contexts, at_attribute} cus
-			# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
-			  (type, cus)			= clean_up cui type cus
-			= ({ at & at_type = TFAC avars type contexts, at_attribute = at_attribute}, cus)
-		clean_up_arg_type cui at cus
-			= clean_up cui at cus
 
 /*
 	In 'bindInstances t1 t2' type variables of t1 are bound to the corresponding subtypes of t2, provided that
