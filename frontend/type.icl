@@ -1619,7 +1619,7 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				  (fun_type_copy,ts) = currySymbolType copy_symb_type n_app_args ts
 				-> (fun_type_copy, [], ts)
 			_
-				# ({fun_type=Yes fun_type}, ts) = ts!ts_fun_defs.[glob_object]
+				# ({fun_type=FunDefType fun_type}, ts) = ts!ts_fun_defs.[glob_object]
 				  (st, ts) = addPropagationAttributesToATypesOfFunctionType fun_type ti_common_defs ts
 				  ts & ts_fun_env.[glob_object] = TypeWithPropagationAttributes st
 				  (copy_symb_type,ts) = freshSymbolType (Yes pos) cWithFreshContextVars st ti_common_defs ts
@@ -2434,7 +2434,7 @@ CreateInitialSymbolTypes start_index common_defs [fun : funs] (pre_def_symbols, 
 	= CreateInitialSymbolTypes start_index common_defs funs (pre_def_symbols, ts)
 where
 	initial_symbol_type is_start_rule common_defs 
-				{fun_type=Yes ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env},fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
+				{fun_type=FunDefType ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env},fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
 				(pre_def_symbols, ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error})
 		# ts_error = setErrorPosition fun_ident fun_pos ts_error
 		  (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
@@ -2698,7 +2698,7 @@ create_special_instances {si_array_instances,si_list_instances,si_tail_strict_li
 			add_extra_elements_to_fun_def_array n_new_elements fun_defs
 				| n_new_elements==0
 					= fun_defs
-					# dummy_fun_def = { fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,
+					# dummy_fun_def = { fun_ident = {id_name="",id_info=nilPtr},fun_arity=0,fun_priority=NoPrio,fun_body=NoBody,fun_type=NoFunDefType,fun_pos=NoPos,
 										fun_kind=FK_Unknown,fun_lifted=0,fun_info = {fi_calls=[],fi_group_index=0,fi_def_level=NotALevel,fi_free_vars=[],fi_local_vars=[],fi_dynamics=[],fi_properties=0}}
 					= {createArray (size fun_defs+n_new_elements) dummy_fun_def & [i]=fun_defs.[i] \\ i<-[0..size fun_defs-1]}
 	  (array_first_instance_indices,fun_defs, predef_symbols, type_heaps, error)
@@ -2758,7 +2758,7 @@ where
 					,	fun_arity		= me_type.st_arity
 					,	fun_priority	= NoPrio
 					,	fun_body		= NoBody
-					,	fun_type		= Yes instance_type
+					,	fun_type		= FunDefType instance_type
 					,	fun_pos			= me_pos
 					,	fun_kind		= FK_Unknown
 					,	fun_lifted		= 0
@@ -2801,7 +2801,7 @@ where
 					,	fun_arity		= me_type.st_arity
 					,	fun_priority	= NoPrio
 					,	fun_body		= NoBody
-					,	fun_type		= Yes instance_type
+					,	fun_type		= FunDefType instance_type
 					,	fun_pos			= me_pos
 					,	fun_kind		= FK_Unknown
 					,	fun_lifted		= 0
@@ -3264,14 +3264,16 @@ where
 			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
 			# (fd, fun_defs) = fun_defs![fun_index]
 			= case fd.fun_type of
-				No
-					-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes checked_fun_type }}
-				Yes fun_type
+				NoFunDefType
+					# fun_defs & [fun_index] = {fd & fun_type = FunDefType checked_fun_type}
+					-> update_function_types_in_component funs fun_env fun_defs
+				FunDefType fun_type
 					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
 					| nr_of_lifted_arguments > 0
 						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-						-> update_function_types_in_component funs fun_env { fun_defs & [fun_index] = { fd & fun_type = Yes fun_type }}
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
+						-> update_function_types_in_component funs fun_env fun_defs
 						-> update_function_types_in_component funs fun_env fun_defs
 		update_function_types_in_component [] fun_env fun_defs
 			= (fun_defs, fun_env)
@@ -3295,14 +3297,11 @@ where
 		  ts_expr_heap = storeAttribute rhs_expr_ptr temp_fun_type.tst_result.at_attribute ts.ts_expr_heap
 		  type_coercion_group_from_accu = { tcg_type_coercions = req_type_coercions, tcg_position = fun_pos }
 		  req_type_coercion_groups = [type_coercion_group_from_accu:rhs_reqs.req_type_coercion_groups]
-		= ( { fe_ident = fun_ident, fe_context = if (has_option fun_type) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
+		= ( { fe_ident = fun_ident, fe_context = if (not fun_type=:NoFunDefType) (Yes temp_fun_type.tst_context) No, fe_index = fun_index,
 			  fe_requirements = { rhs_reqs & req_type_coercions = [], req_type_coercion_groups = req_type_coercion_groups }
 		    },
 		    {ts & ts_expr_heap = ts_expr_heap})
 	where
-		has_option (Yes _)	= True
-		has_option No 		= False
-		 
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
 	

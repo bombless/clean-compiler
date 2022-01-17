@@ -112,8 +112,8 @@ where
 	,	ci_case_level	:: !CaseLevel
 	}
 
-convertCasesInBody :: FunctionBody (Optional SymbolType) Int {#CommonDefs} *ConvertState -> (FunctionBody,  *ConvertState)
-convertCasesInBody (TransformedBody body) (Yes type) group_index common_defs cs
+convertCasesInBody :: FunctionBody FunDefType Int {#CommonDefs} *ConvertState -> (FunctionBody,  *ConvertState)
+convertCasesInBody (TransformedBody body) (FunDefType type) group_index common_defs cs
 	# (body, cs) = convertRootCases
 						{	ci_bound_vars = exactZip body.tb_args type.st_args
 						,	ci_group_index = group_index
@@ -1299,7 +1299,7 @@ newFunctionWithType opt_id fun_bodies local_vars fun_type group_index (cs_next_f
 			,	fun_arity		= arity
 			,	fun_priority	= NoPrio
 			,	fun_body		= fun_bodies
-			,	fun_type		= Yes fun_type
+			,	fun_type		= FunDefType fun_type
 			,	fun_pos			= NoPos
 			,	fun_kind		= FK_Function cNameNotLocationDependent
 			,	fun_lifted		= 0
@@ -1317,13 +1317,13 @@ where
 				!(!*{!Component}, ![FunDef], !*{#{#CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 			  -> (!*{!Component}, ![FunDef], !*{#{#CheckedTypeDef}}, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group common_defs (fun_def,fun_index) (groups, fun_defs, imported_types, imported_conses, type_heaps, var_heap)
-		# {fun_type = Yes ft, fun_info = {fi_group_index, fi_properties}} = fun_def
+		# {fun_type = FunDefType ft, fun_info = {fi_group_index, fi_properties}} = fun_def
 		  (ft, imported_types, imported_conses, type_heaps, var_heap)
 		  		= convertSymbolType (fi_properties bitand FI_HasTypeSpec == 0) common_defs ft main_dcl_module_n
 		  		 			imported_types imported_conses type_heaps var_heap
 		  (group, groups) = groups![fi_group_index]
 		  groups & [fi_group_index] = {group & component_members = ComponentMember fun_index group.component_members}
-		= (groups,[{fun_def & fun_type = Yes ft}: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
+		= (groups,[{fun_def & fun_type = FunDefType ft}: fun_defs], imported_types, imported_conses, type_heaps, var_heap)
 
 ::	ConvertState =
 	{	cs_new_functions 	:: ![(FunDef,Index)]

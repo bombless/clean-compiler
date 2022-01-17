@@ -489,7 +489,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 				# fun_def =
 					{ fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 					, fun_arity = 0, fun_priority = NoPrio
-					, fun_body = GeneratedBody, fun_type = No
+					, fun_body = GeneratedBody, fun_type = NoFunDefType
 					, fun_pos = gc_pos, fun_kind = FK_Unknown
 					, fun_lifted = 0, fun_info = EmptyFunInfo
 					}
@@ -552,7 +552,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 			# fun_def = {
 				fun_ident = genericIdentToFunIdent ds_ident.id_name type_cons,
 				fun_arity = 0, fun_priority = NoPrio,
-				fun_body = GeneratedBody, fun_type = No,
+				fun_body = GeneratedBody, fun_type = NoFunDefType,
 				fun_pos = pos, fun_kind = FK_Unknown,
 				fun_lifted = 0, fun_info = EmptyFunInfo
 				}
@@ -578,7 +578,7 @@ convert_generic_instances gci next_fun_index gencase_defs class_defs symbol_tabl
 			# fun_def = {
 				fun_ident = genericIdentToFunIdent ds_ident.id_name type_cons,
 				fun_arity = 0, fun_priority = NoPrio,
-				fun_body = GeneratedBody, fun_type = No,
+				fun_body = GeneratedBody, fun_type = NoFunDefType,
 				fun_pos = pos, fun_kind = FK_Unknown,
 				fun_lifted = 0, fun_info = EmptyFunInfo
 				}

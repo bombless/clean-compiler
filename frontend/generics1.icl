@@ -1034,7 +1034,7 @@ where
 	build_cons_desc_list_function group_index {ds_ident} cons_info_dss heaps
 		# (cons_info_exprs, heaps) = mapSt (\x st->buildFunApp main_module_index x [] st) cons_info_dss heaps
 		# (gtd_conses_expr, heaps) = makeListExpr cons_info_exprs predefs heaps // gtd_conses
-		# fun = makeFunction ds_ident group_index [] gtd_conses_expr No main_module_index td_pos
+		# fun = makeFunction ds_ident group_index [] gtd_conses_expr NoFunDefType main_module_index td_pos
 		= (fun, heaps)
 
 	build_type_def_dsc group_index /*cons_info_dss*/ {ds_ident} cons_desc_list_ds heaps
@@ -1045,7 +1045,7 @@ where
 		# (body_expr, heaps) = buildPredefConsApp PD_CGenericTypeDefDescriptor
 			[td_name_expr, td_arity_expr, num_conses_expr, gtd_conses_expr] // TODO: module_name_expr
 			predefs heaps
-		# fun = makeFunction ds_ident group_index [] body_expr No main_module_index td_pos
+		# fun = makeFunction ds_ident group_index [] body_expr NoFunDefType main_module_index td_pos
 		= (fun, heaps)
 
 	build_cons_dsc group_index type_def_info_ds {ds_ident} gen_type_ds cons_ds (modules, heaps)
@@ -1061,7 +1061,7 @@ where
 			= buildPredefConsApp PD_CGenericConsDescriptor 
 				[name_expr, arity_expr, prio_expr, type_def_expr, type_expr, cons_index_expr]
 				predefs heaps
-		# fun = makeFunction ds_ident group_index [] body_expr No main_module_index td_pos		
+		# fun = makeFunction ds_ident group_index [] body_expr NoFunDefType main_module_index td_pos
 		= (fun, (modules, heaps))
 
 make_prio_expr NoPrio predefs heaps
@@ -1116,7 +1116,7 @@ where
 	build_field_list_function group_index field_list_ds (modules, heaps)
 		# field_exprs		 	 = [makeStringExpr id_name \\ {fs_ident={id_name}}<-fields]
 		# (fields_expr, heaps)   = makeListExpr field_exprs predefs heaps // grd_fields
-		# fun = makeFunction field_list_ds.ds_ident group_index [] fields_expr No main_module_index td_pos		
+		# fun = makeFunction field_list_ds.ds_ident group_index [] fields_expr NoFunDefType main_module_index td_pos
 		= (fun, (modules, heaps))
 
 	build_record_dsc group_index td_ident cons_info_ds gen_type_ds field_list_ds cons_ds (modules, heaps)
@@ -1131,7 +1131,7 @@ where
 			= buildPredefConsApp PD_CGenericRecordDescriptor
 				[name_expr, arity_expr, td_arity_expr, type_expr, fields_expr]
 				predefs heaps
-		# fun = makeFunction cons_info_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
+		# fun = makeFunction cons_info_ds.ds_ident group_index [] body_expr NoFunDefType main_module_index td_pos
 		= (fun, (modules, heaps))
 
 	build_field_dsc group_index record_dsc_ds field_dsc_ds {fs_ident, fs_index} (modules, heaps)
@@ -1144,7 +1144,7 @@ where
 			= buildPredefConsApp PD_CGenericFieldDescriptor 
 				[name_expr, index_expr, cons_expr]
 				predefs heaps
-		# fun = makeFunction field_dsc_ds.ds_ident group_index [] body_expr No main_module_index td_pos		
+		# fun = makeFunction field_dsc_ds.ds_ident group_index [] body_expr NoFunDefType main_module_index td_pos
 		= (fun, (modules, heaps))
 
 build_gen_type_function :: !Index !Index !Index Position PredefinedSymbolsData !DefinedSymbol !DefinedSymbol !(!*Modules,!*Heaps)
@@ -1152,7 +1152,7 @@ build_gen_type_function :: !Index !Index !Index Position PredefinedSymbolsData !
 build_gen_type_function group_index main_module_index td_module td_pos predefs cons_info_ds cons_ds (modules, heaps)
 	# ({cons_type,cons_exi_vars}, modules) = modules![td_module].com_cons_defs.[cons_ds.ds_index]
 	# (type_expr, modules, heaps) = make_type_expr cons_exi_vars cons_type modules heaps
-	# fun = makeFunction cons_info_ds.ds_ident group_index [] type_expr No main_module_index td_pos		
+	# fun = makeFunction cons_info_ds.ds_ident group_index [] type_expr NoFunDefType main_module_index td_pos
 	= (fun, (modules, heaps))
 where
 	make_type_expr [] {st_vars, st_args, st_result} modules heaps=:{hp_type_heaps=type_heaps=:{th_vars}}
@@ -1314,10 +1314,10 @@ buildConversionTo
 	# fun_name = makeIdent ("toGeneric" +++ td_ident.id_name)
 	| not error.ea_ok
 		# (def_sym, funs_and_groups)
-			= (buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups)
+			= (buildFunAndGroup fun_name [] EE NoFunDefType main_module_index td_pos funs_and_groups)
 		= (def_sym, funs_and_groups, heaps, error)
 		# (def_sym, funs_and_groups) 
-			= (buildFunAndGroup fun_name [arg_var] body_expr No main_module_index td_pos funs_and_groups)
+			= (buildFunAndGroup fun_name [arg_var] body_expr NoFunDefType main_module_index td_pos funs_and_groups)
 		= (def_sym, funs_and_groups, heaps, error)
 where
 	// build conversion for type rhs
@@ -1475,9 +1475,9 @@ buildConversionFrom type_def_mod type_def=:{td_rhs, td_ident, td_pos} main_modul
 	# (body_expr, arg_var, heaps, error) = build_expr_for_type_rhs type_def_mod td_rhs heaps error
 	# fun_name = makeIdent ("fromGeneric" +++ td_ident.id_name)
 	| not error.ea_ok
-		# (def_sym, funs_and_groups) = buildFunAndGroup fun_name [] EE No main_module_index td_pos funs_and_groups
+		# (def_sym, funs_and_groups) = buildFunAndGroup fun_name [] EE NoFunDefType main_module_index td_pos funs_and_groups
 		= (def_sym, funs_and_groups, heaps, error)
-		# (def_sym, funs_and_groups) = buildFunAndGroup fun_name [arg_var] body_expr No main_module_index td_pos funs_and_groups
+		# (def_sym, funs_and_groups) = buildFunAndGroup fun_name [arg_var] body_expr NoFunDefType main_module_index td_pos funs_and_groups
 		= (def_sym, funs_and_groups, heaps, error)
 where
 	// build expression for type def rhs
@@ -2897,7 +2897,7 @@ where
 			#! (st, heaps) = fresh_symbol_type st heaps
 
 			#! (fun_ds, fun_info) 
-				= buildFunAndGroup fun_name arg_vars body_expr (Yes st) gs_main_module gc_pos fun_info
+				= buildFunAndGroup fun_name arg_vars body_expr (FunDefType st) gs_main_module gc_pos fun_info
 
 			= (fun_ds, fun_info, heaps)
 		where
@@ -2981,7 +2981,7 @@ where
 								_
 									-> (tb_args,fun_arity)
 						# fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
+						# fun & fun_ident = fun_ident, fun_type = FunDefType symbol_type, fun_body = fun_body, fun_arity = fun_arity
 						-> {st & ss_funs.[fun_index] = fun}
 					| generic_info<0
 						// keep generic info argument
@@ -2998,7 +2998,7 @@ where
 									-> (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs},fun_arity)
 								_
 									-> (fun_body,fun_arity)
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
+						# fun & fun_ident = fun_ident, fun_type = FunDefType symbol_type, fun_body = fun_body, fun_arity = fun_arity
 						-> {st & ss_funs.[fun_index] = fun}
 						// generic info record already replaced by fields
 						# n_generic_info_field = add_n_bits generic_info 0
@@ -3015,7 +3015,7 @@ where
 									-> (TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs},fun_arity)
 								_
 									-> (fun_body,fun_arity)	
-						# fun = {fun & fun_ident = fun_ident, fun_type = Yes symbol_type, fun_body = fun_body, fun_arity = fun_arity}
+						# fun & fun_ident = fun_ident, fun_type = FunDefType symbol_type, fun_body = fun_body, fun_arity = fun_arity
 						-> {st & ss_funs.[fun_index] = fun}
 					// not a special generic instance, remove generic info argument		
 					# tb_args = tl tb_args
@@ -3025,7 +3025,7 @@ where
 						# error = reportError gc_ident.id_name gc_pos
 									("incorrect arity "+++toString fun_arity+++", expected "+++toString symbol_type.st_arity) st.ss_error
 						-> {st & ss_error=error}
-					# fun = {fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = Yes symbol_type, fun_arity=fun_arity}
+					# fun & fun_ident = fun_ident, fun_body = fun_body, fun_type = FunDefType symbol_type, fun_arity=fun_arity
 					-> {st & ss_funs.[fun_index] = fun}
 			_	// derived case
 			  | fun_body=:GeneratedBody || fun_body=:GenerateGenericBody _
@@ -3036,7 +3036,7 @@ where
 									+++toString (length tb_args)+++",>32)"
 					-> {st & ss_error = reportError gc_ident.id_name gc_pos error_s st.ss_error}
 				# funs_and_groups=:{fg_group_index,fg_groups} = st.ss_funs_and_groups
-				#! fun = makeFunction fun_ident fg_group_index tb_args tb_rhs (Yes symbol_type) gs_main_module gc_pos
+				#! fun = makeFunction fun_ident fg_group_index tb_args tb_rhs (FunDefType symbol_type) gs_main_module gc_pos
 				# group = {group_members=[fun_index]}
 				  funs_and_groups & fg_group_index=fg_group_index+1,fg_groups=[group:fg_groups]
 				-> {st & ss_funs.[fun_index] = fun, ss_funs_and_groups = funs_and_groups}
@@ -3723,10 +3723,10 @@ where
 	where
 		convert_function :: !FunDef !(!*Modules, !*Heaps, !*ErrorAdmin) 
 						-> (!FunDef,!(!*Modules, !*Heaps, !*ErrorAdmin))
-		convert_function fun=:{fun_type=Yes symbol_type, fun_ident, fun_pos} st
+		convert_function fun=:{fun_type=FunDefType symbol_type, fun_ident, fun_pos} st
 			# (has_converted_context, symbol_type, st) = convert_contexts_in_symbol_type fun_ident fun_pos symbol_type st
 			| has_converted_context
-				# fun = {fun & fun_type = Yes symbol_type}
+				# fun & fun_type = FunDefType symbol_type
 				= (fun, st)
 				= (fun, st)		 
 		convert_function fun st
@@ -4191,7 +4191,7 @@ where
 						= if (generic_info<>0)
 							(add_generic_info_to_type fun_type gen_cons_index generic_info predefs)
 							fun_type
-					  fun_def & fun_type = Yes fun_type_with_generic_info
+					  fun_def & fun_type = FunDefType fun_type_with_generic_info
 		  			-> (fun_def,heaps)
 		  		No
 		  			-> (fun_def,heaps)
@@ -4712,7 +4712,7 @@ where
 	add_bimap_to_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs bs=:{bs_heaps}
 		# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs bs_heaps
 		# (def_sym, funs_and_groups)
-			= buildFunAndGroup (makeIdent "bimapToGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
+			= buildFunAndGroup (makeIdent "bimapToGeneric") (bimap_args++[arg_var]) case_expr NoFunDefType bi_main_module_index NoPos bs.bs_funs_and_groups
 		# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
 		= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
 
@@ -4778,7 +4778,7 @@ where
 	add_bimap_from_simple_type_function case_expr arg_var bi_bimap_exprs old_bimap_exprs bs=:{bs_heaps}
 		# (bimap_exprs,bimap_args,heaps) = get_used_bimap_exprs bi_bimap_exprs old_bimap_exprs bs_heaps
 		# (def_sym, funs_and_groups)
-			= buildFunAndGroup (makeIdent "bimapFromGeneric") (bimap_args++[arg_var]) case_expr No bi_main_module_index NoPos bs.bs_funs_and_groups
+			= buildFunAndGroup (makeIdent "bimapFromGeneric") (bimap_args++[arg_var]) case_expr NoFunDefType bi_main_module_index NoPos bs.bs_funs_and_groups
 		# (app_expr, heaps) = buildFunApp bi_main_module_index def_sym (bimap_exprs++args) heaps
 		= (app_expr,{bs & bs_funs_and_groups=funs_and_groups,bs_heaps=heaps})
 
@@ -6106,7 +6106,7 @@ expandSynonymType td ta_attr ta_args th = abort "expanding not a synonym type\n"
 
 //	Function Helpers
 
-makeFunction :: !Ident !Index ![FreeVar] !Expression !(Optional SymbolType) !Index !Position -> FunDef
+makeFunction :: !Ident !Index ![FreeVar] !Expression !FunDefType !Index !Position -> FunDef
 makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n fun_pos	
 	#! (arg_vars, local_vars, free_vars) = collectVars body_expr arg_vars	
 	| not (isEmpty free_vars)
@@ -6130,7 +6130,7 @@ makeFunction ident group_index arg_vars body_expr opt_sym_type main_dcl_module_n
 			}	
 		}
 
-buildFunAndGroup :: !Ident ![FreeVar] !Expression !(Optional SymbolType) !Index !Position !FunsAndGroups -> (!DefinedSymbol, FunsAndGroups)
+buildFunAndGroup :: !Ident ![FreeVar] !Expression !FunDefType !Index !Position !FunsAndGroups -> (!DefinedSymbol, FunsAndGroups)
 buildFunAndGroup 
 		ident arg_vars body_expr opt_sym_type main_dcl_module_n fun_pos 
 		funs_and_groups=:{fg_fun_index,fg_group_index,fg_funs,fg_groups}
@@ -6142,7 +6142,7 @@ buildFunAndGroup
 
 buildFunAndGroup2 :: !Ident ![FreeVar] !Expression !Index !FunsAndGroups -> (!Index, !FunsAndGroups)
 buildFunAndGroup2 ident arg_vars body_expr main_dcl_module_n funs_and_groups=:{fg_fun_index,fg_group_index,fg_funs,fg_groups}
-	# fun = makeFunction ident fg_group_index arg_vars body_expr No main_dcl_module_n NoPos
+	# fun = makeFunction ident fg_group_index arg_vars body_expr NoFunDefType main_dcl_module_n NoPos
 	  group = {group_members = [fg_fun_index]}
 	  funs_and_groups = {funs_and_groups & fg_fun_index=fg_fun_index+1, fg_group_index=fg_group_index+1, fg_funs=[fun:fg_funs], fg_groups=[group:fg_groups]}
 	= (fg_fun_index, funs_and_groups)

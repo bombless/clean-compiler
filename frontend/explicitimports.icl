@@ -796,7 +796,13 @@ instance check_completeness FunctionBody where
 		= check_completeness body cci ccs
 	check_completeness (RhsMacroBody body) cci ccs
 		= check_completeness body cci ccs
-			
+
+instance check_completeness FunDefType where
+	check_completeness (FunDefType x) cci ccs
+		= check_completeness x cci ccs
+	check_completeness NoFunDefType _ ccs
+		= ccs
+
 instance check_completeness FunDef where
 	check_completeness {fun_type, fun_body, fun_info} cci ccs
 		= ( (check_completeness fun_type cci)

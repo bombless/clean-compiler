@@ -1427,10 +1427,10 @@ where
 			= { cs & cs_symbol_table	= removeDefinitionFromSymbolTable cGlobalScope av_ident cs_symbol_table,
 					 cs_error			= checkError av_ident "attribute variable in context undefined" cs_error}
 
-checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType)
+checkDynamicTypes :: !Index ![ExprInfoPtr] !FunDefType
 		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
 	-> (!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
-checkDynamicTypes mod_index dyn_type_ptrs No type_defs class_defs modules type_heaps expr_heap cs
+checkDynamicTypes mod_index dyn_type_ptrs NoFunDefType type_defs class_defs modules type_heaps expr_heap cs
 	# (type_defs, class_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules type_heaps expr_heap cs
 	  (expr_heap, cs_symbol_table) = remove_global_type_variables_in_dynamics dyn_type_ptrs (expr_heap, cs.cs_symbol_table)
 	= (type_defs, class_defs, modules, heaps, expr_heap, { cs & cs_symbol_table = cs_symbol_table })
@@ -1456,7 +1456,7 @@ where
 				| entry.ste_kind =: STE_Empty
 					= symbol_table
 					= symbol_table <:= (id_info, entry.ste_previous)
-checkDynamicTypes mod_index dyn_type_ptrs (Yes {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
+checkDynamicTypes mod_index dyn_type_ptrs (FunDefType {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
 	# (th_vars, cs_symbol_table) = foldSt add_type_variable_to_symbol_table st_vars (type_heaps.th_vars, cs_symbol_table)
 	  (type_defs, class_defs, modules, heaps, expr_heap, cs)
 	  	= checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules

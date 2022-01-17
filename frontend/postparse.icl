@@ -117,7 +117,7 @@ reorganiseLocalDefinitions [PD_Function pos name is_infix args rhs fun_kind : de
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
-	  fun = MakeNewImpOrDefFunction name fun_arity [{pb_args = args, pb_rhs = rhs, pb_position = pos} : bodies] fun_kind prio No pos
+	  fun = MakeNewImpOrDefFunction name fun_arity [{pb_args = args, pb_rhs = rhs, pb_position = pos} : bodies] fun_kind prio NoFunDefType pos
 	= ([fun : fun_defs], node_defs, ca)
 reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	= case defs of
@@ -129,6 +129,7 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 				# fun_arity = determineArity args type
 				# (bodies, fun_kind, defs, ca) = collectFunctionBodies name1 fun_arity prio fun_kind defs ca
 				  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+				  type = case type of Yes type->FunDefType type; No->NoFunDefType
 				  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type pos1
 				-> ([fun : fun_defs], node_defs, ca)
 				-> reorganiseLocalDefinitions defs (postParseFunError name pos "function body expected" ca)
@@ -136,8 +137,9 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 			| not (belongsToTypeSpec name1 prio id False)
 				-> reorganiseLocalDefinitions defs (postParseFunError id pos "function body expected" ca)
 			| arity type<>0
-				-> reorganiseLocalDefinitions defs (postParseFunError id pos "this alternative has not enough arguments" ca)
+				-> reorganiseLocalDefinitions defs (postParseFunError id pos "this alternative does not have enough arguments" ca)
 			# (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
+			  type = case type of Yes type->FunDefType type; No->NoFunDefType
 			  fun = MakeNewImpOrDefFunction id 0
 							[{ pb_args = [], pb_rhs = rhs, pb_position = pos }]
 							(FK_Function cNameNotLocationDependent) prio type pos1
@@ -149,13 +151,13 @@ reorganiseLocalDefinitions [PD_TypeSpec pos1 name1 prio type specials : defs] ca
 	arity No = 2 // it was specified as infix
 reorganiseLocalDefinitions [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
 	# fun_body = GenerateInstanceBody generic_ident optional_member_ident
-	  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+	  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = NoFunDefType, fun_kind = FK_Function False,
 				 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 	= ([fun_def:fun_defs], node_defs, ca)
 reorganiseLocalDefinitions [PD_DeriveFunction pos function_ident type_cons : defs] ca
 	# fun_body = GenerateGenericBody type_cons
-	  fun_def = {fun_ident = function_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+	  fun_def = {fun_ident = function_ident, fun_arity = 0, fun_priority = NoPrio, fun_type = NoFunDefType, fun_kind = FK_Function False,
 				 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 	  (fun_defs, node_defs, ca) = reorganiseLocalDefinitions defs ca
 	= ([fun_def:fun_defs], node_defs, ca)
@@ -446,7 +448,7 @@ instance collectFunctions ParsedBody where
 transformLambda :: Ident [ParsedExpr] Rhs Position -> FunDef
 transformLambda lam_ident args rhs pos
 	# lam_body = [{pb_args = args, pb_rhs = rhs, pb_position = pos }]
-	= MakeNewImpOrDefFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio No pos
+	= MakeNewImpOrDefFunction lam_ident (length args) lam_body (FK_Function cNameLocationDependent) NoPrio NoFunDefType pos
 
 makeConsExpressionForGenerator :: GeneratorKind ParsedExpr ParsedExpr -> ParsedExpr
 makeConsExpressionForGenerator IsListGenerator a1 a2
@@ -1473,7 +1475,7 @@ reorganiseDefinitions icl_module [PD_Function pos name is_infix args rhs fun_kin
 	# prio = if is_infix (Prio NoAssoc 9) NoPrio
 	  fun_arity = length args
 	  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-	  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies] fun_kind prio No pos
+	  fun = MakeNewImpOrDefFunction name fun_arity [{pb_args = args, pb_rhs = rhs, pb_position = pos} : bodies] fun_kind prio NoFunDefType pos
 	| fun_kind == FK_Macro
 		# def_counts & macro_count=macro_count+1
 		  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
@@ -1489,7 +1491,7 @@ reorganiseDefinitions icl_module [PD_TypeSpec fun_pos fun_name prio No specials 
 				-> reorganiseDefinitions icl_module defs def_counts (postParseFunError fun_name fun_pos "infix of type specification and alternative should match" ca)
   				# fun_arity = length args
 				  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
-				  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No fun_pos
+				  fun = MakeNewImpOrDefFunction name fun_arity [{pb_args = args, pb_rhs = rhs, pb_position = pos} : bodies] fun_kind prio NoFunDefType fun_pos
 				| fun_kind == FK_Macro
 					# def_counts & macro_count=macro_count+1
 	  				  (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) = reorganiseDefinitions icl_module defs def_counts ca
@@ -1507,7 +1509,7 @@ reorganiseDefinitions icl_module [PD_TypeSpec pos name prio (Yes fun_type=:{st_a
 		| icl_module
 			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, postParseFunError name pos "function body expected" ca)
 			= (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca)
-		# fun = MakeNewImpOrDefFunction name fun_type.st_arity bodies fun_kind prio (Yes fun_type) pos
+		# fun = MakeNewImpOrDefFunction name fun_type.st_arity bodies fun_kind prio (FunDefType fun_type) pos
 		| icl_module
 			| case fun_kind of FK_Macro -> True; _ -> False
 				= ([fun : fun_defs], c_defs, imports, imported_objects,foreign_exports, postParseFunError name pos "macro with function type not allowed" ca)
@@ -1647,7 +1649,7 @@ where
 					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 		= case fun_kind of
 		   FK_Macro
-			# macro = MakeNewImpOrDefFunction name st_arity bodies FK_Macro prio opt_type pos
+			# macro = MakeNewImpOrDefFunction name st_arity bodies FK_Macro prio (FunDefType type) pos
 			  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 					= check_symbols_of_class_members defs type_context (macro_count+1) ca
 			  macro_member = {mm_ident=name,mm_index=macro_count}
@@ -1658,6 +1660,7 @@ where
 			  ca & ca_hash_table = ca_hash_table
 
 			  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
+			  opt_type = FunDefType type
 			  type & st_context = [type_context : st_context]
 
 			| not (has_PD_DeriveInstanceMember_in_where bodies)
@@ -1709,7 +1712,7 @@ where
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
-					  macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio No fun_pos
+					  macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio NoFunDefType fun_pos
 					-> (mem_defs,[macro : mem_macros],default_members_without_type,macro_members,new_macro_count,ca)
 					-> check_symbols_of_class_members defs type_context macro_count (postParseFunError fun_name fun_pos "macro body expected" ca)
 			_
@@ -1723,14 +1726,14 @@ where
 				= check_symbols_of_class_members defs type_context (macro_count+1) ca
 		= case fun_kind of
 			FK_Macro
-				# macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio No fun_pos
+				# macro = MakeNewImpOrDefFunction name fun_arity bodies FK_Macro prio NoFunDefType fun_pos
 				  macro_member = {mm_ident=name,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],default_members_without_type,[|macro_member : macro_members],new_macro_count,ca)
 			FK_Function _
 				# macro_name = class_ident.id_name+++"_"+++name.id_name
 				  ({boxed_ident=macro_ident}, ca_hash_table) = putIdentInHashTable macro_name IC_Expression ca.ca_hash_table
 				  ca = { ca & ca_hash_table = ca_hash_table }
-				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio No fun_pos
+				  macro = MakeNewImpOrDefFunction macro_ident fun_arity bodies FK_Macro prio NoFunDefType fun_pos
 				  macro_member = {mm_ident=macro_ident,mm_index=macro_count}
 				-> (mem_defs,[macro : mem_macros],[(name,macro_member,fun_pos) : default_members_without_type],macro_members,new_macro_count,ca)
 	check_symbols_of_class_members [PD_DeriveInstanceMember pos member_ident _ _ _ : defs] type_context macro_count ca
@@ -1784,7 +1787,7 @@ where
 		  prio = if is_infix (Prio NoAssoc 9) NoPrio
 		  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  (fun_defs, ca) = collect_member_instances defs ca
-		  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio No pos
+		  fun = MakeNewImpOrDefFunction name fun_arity [{ pb_args = args, pb_rhs = rhs, pb_position = pos } : bodies ] fun_kind prio NoFunDefType pos
 		= ([ fun : fun_defs ], ca)
 	collect_member_instances [PD_TypeSpec fun_pos fun_name prio type specials : defs] ca
 		= case defs of
@@ -1793,13 +1796,14 @@ where
  					# fun_arity = determineArity args type
   					  (bodies, fun_kind, defs, ca) = collectFunctionBodies name fun_arity prio fun_kind defs ca
 		  			  (fun_defs, ca) = collect_member_instances defs ca
+					  type = case type of Yes type->FunDefType type; No->NoFunDefType
 					  fun = MakeNewImpOrDefFunction name fun_arity bodies fun_kind prio type fun_pos
 					-> ([ fun : fun_defs ], ca)
 			_
 				-> collect_member_instances defs (postParseFunError fun_name fun_pos "function body expected" ca)
 	collect_member_instances [PD_DeriveInstanceMember pos member_ident generic_ident arity optional_member_ident : defs] ca
 		# fun_body = GenerateInstanceBody generic_ident optional_member_ident
-		  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = No, fun_kind = FK_Function False,
+		  fun_def = {fun_ident = member_ident, fun_arity = arity, fun_priority = NoPrio, fun_type = NoFunDefType, fun_kind = FK_Function False,
 					 fun_body = fun_body, fun_pos = pos, fun_lifted = 0, fun_info = EmptyFunInfo }
 		  (fun_defs, ca) = collect_member_instances defs ca
 		= ([fun_def : fun_defs], ca)
@@ -1837,7 +1841,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} generic_fun_
 				(determine_generic_instance_deps bodies gcf_arity gc_type_cons ca)
 		#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 			= reorganiseDefinitions icl_module defs def_counts ca
-		#! fun = MakeNewGenericImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio No gc.gc_pos
+		#! fun = MakeNewGenericImpOrDefFunction fun_name gcf_arity bodies (FK_Function cNameNotLocationDependent) NoPrio NoFunDefType gc.gc_pos
 		# gcf & gcf_body=GCB_FunDef fun, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
 		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
 		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases]
@@ -1852,7 +1856,7 @@ reorganiseDefinitions icl_module [PD_GenericCase gc=:{gc_type_cons} generic_fun_
 		# def_counts & macro_count=macro_count+1
 		#! (fun_defs, c_defs, imports, imported_objects,foreign_exports, ca) 
 			= reorganiseDefinitions icl_module defs def_counts ca
-		#! macro = MakeNewImpOrDefFunction generic_fun_ident gcf_arity bodies (FK_Function False) NoPrio No gc.gc_pos
+		#! macro = MakeNewImpOrDefFunction generic_fun_ident gcf_arity bodies (FK_Function False) NoPrio NoFunDefType gc.gc_pos
 		# gcf & gcf_body=GCB_MacroIndex macro_count, gcf_arity=gcf_arity, gcf_generic_info=generic_info, gcf_generic_instance_deps=generic_instance_deps
 		#! inst = {gc & gc_gcf = GCF gc_ident gcf}
 		#! c_defs & def_generic_cases = [inst : c_defs.def_generic_cases], def_macros = [macro : c_defs.def_macros]

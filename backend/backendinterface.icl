@@ -122,7 +122,7 @@ printFunctionTypes all attr info components functions attrHeap file backEnd
 			= function_indices_and_functions (i+1) components
 
 printFunctionType :: Bool Bool DictionaryToClassInfo (Int, FunDef) (*AttrVarHeap, *File, *BackEnd) -> (*AttrVarHeap, *File, *BackEnd)
-printFunctionType all attr info (functionIndex, {fun_ident,fun_type=Yes type}) (attrHeap, file, backEnd)
+printFunctionType all attr info (functionIndex, {fun_ident,fun_type=FunDefType type}) (attrHeap, file, backEnd)
 	| not all && functionIndex >= size info.dtci_dclModules.[info.dtci_iclModuleIndex].dcl_functions
 		=	(attrHeap, file, backEnd)
 

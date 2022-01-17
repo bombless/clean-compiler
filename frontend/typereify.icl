@@ -15,7 +15,7 @@ instance makeTypeFun FunDef where
 				,	fun_arity = 1
 				,	fun_priority = NoPrio
 				,	fun_body = GeneratedBody
-				,	fun_type = Yes symbol_type
+				,	fun_type = FunDefType symbol_type
 				,	fun_pos = position
 				,	fun_kind = FK_Function False
 				,	fun_lifted = 0

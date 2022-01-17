@@ -484,7 +484,7 @@ where
 			= make_default_instance_body arity mm_ident me_priority ins_pos class_member function_n cs
 		  new_instance_member
 			= {	fun_ident = new_instance_member_ds.cim_ident, fun_arity = arity, fun_priority = me_priority,
-				fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
+				fun_body = new_instance_body, fun_type = NoFunDefType, fun_pos = ins_pos,
 				fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
 		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
 	make_default_implementation (DeriveDefault generic_ident generic_index optional_member_ident_global_index) me_priority ins_pos class_member function_n arity instance_member_n ins_member_types_and_functions cs
@@ -500,7 +500,7 @@ where
 		  fun_info = {EmptyFunInfo & fi_properties=FI_DefaultMemberWithDerive}
 		  new_instance_member
 			= {	fun_ident = new_instance_member_ds.cim_ident, fun_arity = arity, fun_priority = me_priority,
-				fun_body = new_instance_body, fun_type = No, fun_pos = ins_pos,
+				fun_body = new_instance_body, fun_type = NoFunDefType, fun_pos = ins_pos,
 				fun_kind = FK_Function False, fun_lifted = 0, fun_info = fun_info }
 		= (new_instance_member_ds,new_instance_member,ins_member_types_and_functions,cs)
 
@@ -575,7 +575,7 @@ where
 		  (argument_pointers,symbol_table) = make_argument_pointers arity [] cs.cs_symbol_table
 		  cs & cs_symbol_table=symbol_table
 		  new_instance_member =	{	fun_ident = new_instance_ident, fun_arity = arity, fun_priority = me_priority,
-									fun_body = fun_body, fun_type = No, fun_pos = ins_pos,
+									fun_body = fun_body, fun_type = NoFunDefType, fun_pos = ins_pos,
 									fun_kind = FK_Function False, fun_lifted = 0, fun_info = EmptyFunInfo }
 		= (new_instance_member_ds,new_instance_member,cs)
 
@@ -1186,23 +1186,23 @@ checkFunction fun_def=:{fun_ident,fun_pos,fun_body,fun_type,fun_kind,fun_info={f
 			{heaps & hp_var_heap = es_var_heap, hp_expression_heap = es_expr_heap, hp_type_heaps = es_type_heaps,hp_generic_heap=es_generic_heap},
 			{cs & cs_symbol_table = cs_symbol_table})
 where
-	has_type (Yes _) 	= FI_HasTypeSpec
-	has_type no 		= 0
+	has_type NoFunDefType = 0
+	has_type _ = FI_HasTypeSpec
 	
-	check_function_type (Yes ft) module_index is_caf type_defs class_defs modules var_heap type_heaps cs
+	check_function_type (FunDefType ft) module_index is_caf type_defs class_defs modules var_heap type_heaps cs
 		# (ft, _, type_defs, class_defs, modules, type_heaps, cs) = checkFunctionType module_index ft FSP_None type_defs class_defs modules type_heaps cs
-		  cs = (if is_caf (check_caf_uniqueness ft.st_result.at_attribute) id) cs
+		  cs = if is_caf (check_caf_uniqueness ft.st_result.at_attribute cs) cs
 		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
-		= (Yes { ft & st_context = st_context } , type_defs,  class_defs, modules, var_heap, type_heaps, cs)
-		where
-			check_caf_uniqueness TA_None cs
-				=	cs
-			check_caf_uniqueness TA_Multi cs
-				=	cs
-			check_caf_uniqueness _ cs
-				= {cs & cs_error = checkError "result type of CAF must be non-unique " "" cs.cs_error}
-	check_function_type No module_index _ type_defs class_defs modules var_heap type_heaps cs
-		= (No, type_defs,  class_defs, modules, var_heap, type_heaps, cs)
+		= (FunDefType {ft & st_context = st_context}, type_defs, class_defs, modules, var_heap, type_heaps, cs)
+	check_function_type NoFunDefType module_index _ type_defs class_defs modules var_heap type_heaps cs
+		= (NoFunDefType, type_defs,  class_defs, modules, var_heap, type_heaps, cs)
+
+	check_caf_uniqueness TA_None cs
+		= cs
+	check_caf_uniqueness TA_Multi cs
+		= cs
+	check_caf_uniqueness _ cs
+		= {cs & cs_error = checkError "result type of CAF must be non-unique " "" cs.cs_error}
 
 	remove_calls_from_symbol_table fun_index fun_level [FunCall fc_index fc_level : fun_calls] fun_defs macro_defs symbol_table
 		| fc_level <= fun_level
@@ -2455,7 +2455,7 @@ renumber_icl_module_functions mod_type icl_global_function_range icl_instance_ra
 		add_dummy_functions n_functions icl_functions
 			| n_functions==0
 				= icl_functions
-				# dummy_function = {fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=No,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
+				# dummy_function = {fun_ident={id_name="",id_info=nilPtr},fun_arity= -1,fun_priority=NoPrio,fun_body=NoBody,fun_type=NoFunDefType,fun_pos=NoPos,fun_kind=FK_Unknown,fun_lifted=0,fun_info=EmptyFunInfo}
 				= arrayPlusList icl_functions [dummy_function \\ i<-[0..n_functions-1]]
 
 		add_dcl_instances_generic_cases_and_type_funs_to_conversion_table :: !{#Int} !Int !Int !Index IndexRange /*IndexRange*/ !DclModule
@@ -3180,7 +3180,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 												symb_kind = SK_Function { glob_module = main_dcl_module_n, glob_object = fun_index }},
 								 app_args = app_args,
 								 app_info_ptr = app_info_ptr }
-				= ({ fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = Yes fun_type,
+				= ({ fun_def & fun_body = TransformedBody {tb_args = tb_args, tb_rhs = tb_rhs}, fun_type = FunDefType fun_type,
 						fun_info = { EmptyFunInfo & fi_calls = [FunCall fun_index cGlobalScope] }},
 					(var_heap, type_var_heap, expr_heap))
 		
@@ -3199,29 +3199,29 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			# (fun_type,icl_functions) = icl_functions![index_of_member_fun].fun_type
 			# (icl_functions, type_heaps, cs_error)
 				= case fun_type of
-	  				No
-						# icl_functions = {icl_functions & [index_of_member_fun].fun_type = Yes derived_symbol_type}
+					NoFunDefType
+						# icl_functions & [index_of_member_fun].fun_type = FunDefType derived_symbol_type
 	  					-> (icl_functions, type_heaps, cs_error)
-		  			Yes specified_symbol_type
+					FunDefType specified_symbol_type
 		  				| not cs_error.ea_ok
-							# icl_functions = {icl_functions & [index_of_member_fun].fun_type = Yes derived_symbol_type}
+							# icl_functions & [index_of_member_fun].fun_type = FunDefType derived_symbol_type
 		  					-> (icl_functions, type_heaps, cs_error)
 						# (err_code, type_heaps)
 							= compare_specified_and_derived_instance_types specified_symbol_type derived_symbol_type type_heaps
 						| err_code==CEC_Ok
-							# icl_functions = {icl_functions & [index_of_member_fun].fun_type = Yes derived_symbol_type}
+							# icl_functions & [index_of_member_fun].fun_type = FunDefType derived_symbol_type
 							-> (icl_functions, type_heaps, cs_error)
 						| err_code==CEC_OkWithFirstMoreStrictness
 							# (function,icl_functions) = icl_functions![index_of_member_fun]
-							# function = {function & fun_type = Yes specified_symbol_type,
-													 fun_info.fi_properties = function.fun_info.fi_properties bitor FI_MemberInstanceRequiresTypeInDefMod}
+							# function & fun_type = FunDefType specified_symbol_type,
+										 fun_info.fi_properties = function.fun_info.fi_properties bitor FI_MemberInstanceRequiresTypeInDefMod
 							# icl_functions = {icl_functions & [index_of_member_fun] = function}
 							-> (icl_functions, type_heaps, cs_error)
 						# ({fun_ident,fun_pos},icl_functions) = icl_functions![index_of_member_fun]
 						  cs_error = pushErrorPosition fun_ident fun_pos cs_error
 						  cs_error = specified_member_type_incorrect_error err_code cs_error
 						  cs_error = popErrorAdmin cs_error
-						  icl_functions = {icl_functions & [index_of_member_fun].fun_type = Yes derived_symbol_type}
+						  icl_functions & [index_of_member_fun].fun_type = FunDefType derived_symbol_type
 						-> (icl_functions, type_heaps, cs_error)
 			= (icl_functions, type_heaps, cs_error)
 
@@ -3263,9 +3263,9 @@ checkForeignExports [{pfe_ident=pfe_ident=:{id_name,id_info},pfe_line,pfe_file,p
 				| ste_index>=ir_from && ste_index<ir_to
 					# ({fun_type,fun_ident,fun_pos},fun_defs) = fun_defs![ste_index]
 					# (foreign_export_fundef_index,cs) = case fun_type of
-							No
+							NoFunDefType
 								-> ([],cs)
-							Yes {st_args,st_args_strictness,st_arity,st_result,st_context}
+							FunDefType {st_args,st_args_strictness,st_arity,st_result,st_context}
 								| not (isEmpty st_context)
 									-> ([],{cs & cs_error = checkErrorWithPosition fun_ident fun_pos "error in type of foreign exported function (context not allowed)" cs.cs_error})
 								| not (first_n_are_strict st_arity st_args_strictness)
@@ -3296,7 +3296,7 @@ checkForeignExportedFunctionTypes [{fe_fd_index}:icl_foreign_exports] error_admi
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 		= checkForeignExportedFunctionTypes icl_foreign_exports error_admin fun_defs2
 	where
-		({fun_type=Yes {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fe_fd_index]
+		({fun_type=FunDefType {st_args,st_result},fun_ident,fun_pos},fun_defs2) = fun_defs![fe_fd_index]
 
 		check_foreign_export_types [{at_type}:argument_types]
 			= check_foreign_export_type at_type && check_foreign_export_types argument_types 

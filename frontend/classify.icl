@@ -1128,8 +1128,8 @@ where
 			   cfvog_accu							= [cases_of_vars_for_function:cfvog_accu]
 			   strictness_accu						= [get_strictness_list fun_def:strictness_accu]
 			   											with
-			   												get_strictness_list {fun_type = Yes {st_args_strictness}}
-			   													= st_args_strictness
+															get_strictness_list {fun_type = FunDefType {st_args_strictness}}
+																= st_args_strictness
 
 			   ai = { ai
 			   		& ai_cases_of_vars_for_function	= [] 
@@ -1299,7 +1299,7 @@ where
 		reanalyse_functions NoComponentMembers common_defs (fun_index, cfvog_accu, strictness_accu, ai)
 			= (cfvog_accu, strictness_accu, ai)
 
-		reanalyse_function (TransformedBody {tb_args,tb_rhs}) (Yes {st_args_strictness}) function_pointer_or_index fun_index ai
+		reanalyse_function (TransformedBody {tb_args,tb_rhs}) (FunDefType {st_args_strictness}) function_pointer_or_index fun_index ai
 			#  nr_of_locals							= count_locals tb_rhs 0
 			   nr_of_args							= length tb_args
 

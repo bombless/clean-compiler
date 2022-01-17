@@ -292,7 +292,7 @@ where
 						= member_type_and_types_equal instance_member_type instance_member_types icl_instance_members (icl_member_n+1) icl_functions comp_st
 
 				  	# ({fun_type},icl_functions) = icl_functions![cim_index]
-				  	# (Yes icl_instance_member_type) = fun_type
+				  	# (FunDefType icl_instance_member_type) = fun_type
 
 					# tc_state = { tc_type_vars = initial_hwn comp_st.comp_type_var_heap
 								 , tc_attr_vars = initial_hwn comp_st.comp_attr_var_heap
@@ -702,8 +702,9 @@ compareTwoFunctionTypes :: !{#FunType} !Int !*(!u:{#FunDef},!*TypesCorrespondSta
 compareTwoFunctionTypes dcl_fun_types dclIndex (icl_functions, tc_state, error_admin)
 	# (fun_def=:{fun_type, fun_priority}, icl_functions) = icl_functions![dclIndex]
 	= case fun_type of
-		No	-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
-		Yes icl_symbol_type
+		NoFunDefType
+			-> generate_error "type of exported function is missing" fun_def icl_functions tc_state error_admin
+		FunDefType icl_symbol_type
 			# {ft_type=dcl_symbol_type, ft_priority,ft_ident} = dcl_fun_types.[dclIndex]			
 			# tc_state = init_symbol_type_vars dcl_symbol_type icl_symbol_type tc_state
 			  (corresponds, tc_state)

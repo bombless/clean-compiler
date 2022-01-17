@@ -756,12 +756,15 @@ FI_HasLocalGenerate :== 2048
 
 :: IdentGlobalIndex = { igi_ident :: !Ident, igi_g_index :: !GlobalIndex }
 
+:: FunDefType	= FunDefType !SymbolType
+				| NoFunDefType
+
 ::	FunDef =
 	{	fun_ident		:: !Ident
 	,	fun_arity		:: !Int
 	,	fun_priority	:: !Priority
 	,	fun_body		:: !FunctionBody
-	,	fun_type		:: !Optional SymbolType
+	,	fun_type		:: !FunDefType
 	,	fun_pos			:: !Position
 	,	fun_kind		:: !FunKind
 	,	fun_lifted		:: !Int

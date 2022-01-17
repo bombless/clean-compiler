@@ -568,7 +568,7 @@ where
 //			<<< '[' <<< fi_free_vars <<< "]  [" <<< fi_local_vars <<< ']'
 			<<< tb_args <<< '[' <<< fi_calls <<< ']' <<< "\n\t= " <<< tb_rhs <<< '\n'
 //			<<< '.' <<< fi_def_level <<< ' ' <<< '[' <<< fi_free_vars <<< ']' <<< tb_args <<< " = " <<< tb_rhs 
-	(<<<) file {fun_ident,fun_body=NoBody,fun_type=Yes type} = file // <<< type <<< '\n'
+	(<<<) file {fun_ident,fun_body=NoBody,fun_type=FunDefType type} = file // <<< type <<< '\n'
 			<<< fun_ident <<< '.' <<< "Array function\n"
 
 	(<<<) file {fun_ident} = file <<< fun_ident <<< "???" <<< '\n'

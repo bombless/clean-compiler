@@ -1172,11 +1172,11 @@ where
 		# ({fun_type,fun_ident,fun_info,fun_pos}, icl_fun_defs) = icl_fun_defs![fun_index]
 		  (expression_heap,class_infos,as) = check_kinds_of_dynamics common_defs fun_info.fi_dynamics expression_heap class_infos as
 		= case fun_type of
-			Yes symbol_type
-				# as_error = pushErrorPosition fun_ident fun_pos as.as_error
-				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos { as & as_error = as_error }
-				-> (icl_fun_defs, class_infos, expression_heap, { as & as_error = popErrorAdmin as.as_error })
-			No
+			FunDefType symbol_type
+				# as & as_error = pushErrorPosition fun_ident fun_pos as.as_error
+				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos as
+				-> (icl_fun_defs, class_infos, expression_heap, {as & as_error = popErrorAdmin as.as_error})
+			NoFunDefType
 				-> (icl_fun_defs, class_infos, expression_heap, as)
 
 	check_kinds_of_dcl_fuctions common_defs module_index dcl_modules class_infos as

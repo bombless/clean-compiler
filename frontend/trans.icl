@@ -510,7 +510,7 @@ where
 					| glob_module==ro.ro_main_dcl_module_n && glob_object>=size ti_cons_args &&
 						(ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsUnboxedListOfRecordsConsOrNil<>0) &&
 							(case ti_fun_defs.[glob_object].fun_type of
-								Yes type ->(type.st_arity==0 || (type.st_arity==2 && not app.app_args=:[])))
+								FunDefType type ->(type.st_arity==0 || (type.st_arity==2 && not app.app_args=:[])))
 							= False						
 						= True
 				isFoldSymbol (SK_LocalMacroFunction _)	= True
@@ -552,8 +552,8 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 			| glob_module==ro.ro_main_dcl_module_n && glob_object>=size ti.ti_cons_args &&
 				(ti.ti_fun_defs.[glob_object].fun_info.fi_properties bitand FI_IsUnboxedListOfRecordsConsOrNil)<>0 &&
 				(case ti.ti_fun_defs.[glob_object].fun_type of
-					Yes type ->(type.st_arity==0 || (type.st_arity==2 && not app_args=:[])))
-				# (Yes type,ti) = ti!ti_fun_defs.[glob_object].fun_type
+					FunDefType type ->(type.st_arity==0 || (type.st_arity==2 && not app_args=:[])))
+				# (FunDefType type,ti) = ti!ti_fun_defs.[glob_object].fun_type
 				-> trans_case_of_overloaded_nil_or_cons type case_info_ptr ti
 		// otherwise it's a function application
 		_
@@ -1028,7 +1028,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 					{ro_tfi={tfi_case=tfi_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _},tfi_args}} ti
 	# fun_arity								= length tfi_args
 	  ti = arity_warning "generate_case_function" tfi_fun.symb_ident fun_index fun_arity ti
-	  (Yes {st_args,st_attr_env})			= outer_fun_def.fun_type
+	  (FunDefType {st_args,st_attr_env})	= outer_fun_def.fun_type
 	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
 	  (lifted_types, ti_var_heap)			= get_types_of_local_vars (take nr_of_lifted_vars tfi_args) ti.ti_var_heap
@@ -1058,7 +1058,7 @@ generate_case_function fun_index case_info_ptr new_expr outer_fun_def outer_cons
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
 				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
-				, fun_type					= Yes fun_type
+				, fun_type					= FunDefType fun_type
 				, fun_pos					= NoPos
 				, fun_kind					= FK_Function cNameNotLocationDependent
 				, fun_lifted				= undeff
@@ -1102,7 +1102,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 					ro_fun=:{symb_kind=SK_GeneratedFunction fun_info_ptr _} ro_fun_args ti
 	# fun_arity								= length ro_fun_args
 	  ti = arity_warning "generate_case_function" ro_fun.symb_ident fun_index fun_arity ti
-	  (Yes {st_args,st_attr_env})			= outer_fun_def.fun_type
+	  (FunDefType {st_args,st_attr_env})	= outer_fun_def.fun_type
 	  types_from_outer_fun					= [ st_arg \\ st_arg <- st_args & used <- used_mask | used ]
 	  nr_of_lifted_vars						= fun_arity-(length types_from_outer_fun)
 	  (lifted_types, ti_var_heap)			= get_types_of_local_vars (take nr_of_lifted_vars ro_fun_args) ti.ti_var_heap
@@ -1138,7 +1138,7 @@ generate_case_function_with_pattern_argument fun_index case_info_ptr
 				, fun_arity					= fun_arity
 				, fun_priority				= NoPrio
 				, fun_body					= TransformedBody { tb_args = form_vars, tb_rhs = copied_expr}
-				, fun_type					= Yes fun_type
+				, fun_type					= FunDefType fun_type
 				, fun_pos					= NoPos
 				, fun_kind					= FK_Function cNameNotLocationDependent
 				, fun_lifted				= undeff
@@ -1548,7 +1548,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	#!(fi_group_index, ti_cons_args, ti_fun_defs, ti_fun_heap)
 			= max_group_index 0 prods ro.ro_main_dcl_module_n fi_group_index ti_fun_defs ti_fun_heap ti_cons_args
 
-	# (Yes consumer_symbol_type) = fd.fun_type
+	# (FunDefType consumer_symbol_type) = fd.fun_type
 	  consumer_symbol_type		= strip_universal_quantor consumer_symbol_type
 	  (sound_consumer_symbol_type, (ti_type_heaps, ti_type_def_infos))
 	  		= add_propagation_attributes` ro.ro_common_defs consumer_symbol_type (ti_type_heaps, ti_type_def_infos)
@@ -1698,7 +1698,7 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  (all_fresh_type_vars, ti_type_heaps)
  	  		= accTypeVarHeap (getTypeVars (fresh_arg_types, fresh_result_type)) ti_type_heaps
 	  new_fun_type
-	  		= Yes
+			= FunDefType
 	  			{ st_vars		= all_fresh_type_vars
 	  			, st_args		= fresh_arg_types
 	  			, st_args_strictness=new_args_strictness
@@ -2087,7 +2087,7 @@ where
 get_producer_type :: !SymbIdent !.ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
 get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
 	| glob_module == ro.ro_main_dcl_module_n
-		# ({fun_type=Yes symbol_type, fun_info={fi_properties}}, fun_defs) = fun_defs![glob_object]
+		# ({fun_type=FunDefType symbol_type, fun_info={fi_properties}}, fun_defs) = fun_defs![glob_object]
 		|  fi_properties bitand FI_HasTypeSpec <> 0
 			# (_, symbol_type) = removeAnnotations symbol_type
 			= (symbol_type, fun_defs, fun_heap)
@@ -2099,10 +2099,10 @@ get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs
 		  new_st_args_strictness = insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
 		= ({ft_type & st_args = new_st_args, st_args_strictness = new_st_args_strictness, st_arity = new_st_arity, st_context = [] }, fun_defs, fun_heap)
 get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
-	# ({fun_type=Yes symbol_type}, fun_defs) = fun_defs![glob_object]
+	# ({fun_type=FunDefType symbol_type}, fun_defs) = fun_defs![glob_object]
 	= (symbol_type, fun_defs, fun_heap)
 get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
-	# (FI_Function {gf_fun_def={fun_type=Yes symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
+	# (FI_Function {gf_fun_def={fun_type=FunDefType symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
 	= (symbol_type, fun_defs, fun_heap)
 get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_defs fun_heap
 	# cons_defs = ro.ro_common_defs.[glob_module].com_cons_defs
@@ -2974,12 +2974,12 @@ determineCurriedProducersInExtraArgs new_args extra_args consumer_properties pro
 	| not (SwitchExtraCurriedFusion (ro.ro_transform_fusion>=FullFusion) consumer_properties)
 		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,0,ti)
 	# n_extra_args													= length extra_args
-	# {fun_type = Yes symbol_type=:{st_args,st_result,st_arity}}	= fun_def
+	# {fun_type = FunDefType symbol_type=:{st_args,st_result,st_arity}}	= fun_def
 	# (ok,new_args_types,new_result_type)							= get_new_args_types_from_result_type st_result n_extra_args
 	| not ok
 		= (False,new_args,extra_args,producers,cc_args,cc_linear_bits,fun_def,0,ti)
 	# symbol_type	= {symbol_type & st_result=new_result_type,st_args=st_args++new_args_types,st_arity=st_arity+n_extra_args}
-	# fun_def							= {fun_def & fun_type=Yes symbol_type}
+	# fun_def & fun_type				= FunDefType symbol_type
 	# (form_args,var_heap)				= create_new_args n_extra_args ti.ti_var_heap
 	# ti								= {ti & ti_var_heap=var_heap}
 	# fun_def							= case fun_def.fun_body of
@@ -3094,7 +3094,7 @@ where
 		# arity = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object].cons_type.st_arity
 		= (arity, fun_defs, fun_heap)
 
-is_trivial_body :: ![FreeVar] !Expression ![Expression] !(Optional SymbolType) !.ReadOnlyTI
+is_trivial_body :: ![FreeVar] !Expression ![Expression] !FunDefType !.ReadOnlyTI
 							 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
 	-> (!Optional Expression,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
 is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps cons_args
@@ -3145,10 +3145,10 @@ where
 			= (i,a)
 
 	// check if strict values in type are also strict in type`
-	match_types :: !(Optional SymbolType) SymbolType ![Int] !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
-	match_types No type` perm common_defs type_heaps
+	match_types :: !FunDefType SymbolType ![Int] !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+	match_types NoFunDefType type` perm common_defs type_heaps
 		= (True,type_heaps)
-	match_types (Yes type) type` perm common_defs type_heaps
+	match_types (FunDefType type) type` perm common_defs type_heaps
 		| is_not_strict type.st_args_strictness 
 			= match_tuple_strictness type.st_result type`.st_result common_defs type_heaps
 		| type.st_arity<>type`.st_arity
@@ -3217,9 +3217,9 @@ is_trivial_body args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_h
 	| both_nil args f_args || (same_length args f_args && no_strict_args type)
 		= (Yes rhs_expr,fun_defs,fun_heap,type_heaps,cons_args)
 where
-	no_strict_args (Yes type)
+	no_strict_args (FunDefType type)
 		= is_not_strict type.st_args_strictness 
-	no_strict_args No
+	no_strict_args NoFunDefType
 		= True
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
 	= (No,fun_defs,fun_heap,type_heaps,cons_args)
@@ -3460,7 +3460,7 @@ transform_remaining_selectors_of_normal_record_selector [record_selector:remaini
 
 // XXX store linear_bits and cc_args together ?
 
-determineProducers :: !BITVECT !Bool !Bool !(Optional SymbolType) ![#Bool!] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo
+determineProducers :: !BITVECT !Bool !Bool !FunDefType ![#Bool!] ![Int] ![Expression] !Int *{!Producer} !ReadOnlyTI !*TransformInfo
 	-> *(!*{!Producer},![Expression],![(LetBind,AType)],!*TransformInfo)
 determineProducers _ _ _ _ _ _ [] _ producers _ ti
 	= (producers, [], [], ti)
@@ -3650,8 +3650,8 @@ where
 	isProducer PR_Empty	= False
 	isProducer _		= True
 	
-	isStrictArg No _ = False
-	isStrictArg (Yes {st_args_strictness}) index = arg_is_strict index st_args_strictness
+	isStrictArg NoFunDefType _ = False
+	isStrictArg (FunDefType {st_args_strictness}) index = arg_is_strict index st_args_strictness
 
 	getArgType (Yes {st_args}) index = st_args!!index
 
@@ -3706,7 +3706,7 @@ where
 	determine_producer _ _ _ _ arg new_args _ producers _ ti
 		= (producers, [arg : new_args], ti)
 
-find_equal_arguments :: !Expression ![Expression] !BITVECT !(Optional SymbolType) !Int !Int !ReadOnlyTI !*TransformInfo -> *(![#Int!],!*TransformInfo)
+find_equal_arguments :: !Expression ![Expression] !BITVECT !FunDefType !Int !Int !ReadOnlyTI !*TransformInfo -> *(![#Int!],!*TransformInfo)
 find_equal_arguments (App {app_symb=symb=:{symb_kind=SK_Function {glob_module,glob_object}},app_args=[]}) args consumer_properties consumer_type cons_arg prod_index ro ti
 	| glob_module==ro.ro_main_dcl_module_n
 		# ({fun_arity,fun_type},ti) = ti!ti_fun_defs.[glob_object]
@@ -3823,14 +3823,14 @@ find_same_SK_GeneratedFunction_args [arg:args] fun_index arg_n
 find_same_SK_GeneratedFunction_args [] fun_index arg_n
 	= [#!]
 
-is_monomorphic_symbol_type :: !(Optional SymbolType) -> Bool
-is_monomorphic_symbol_type (Yes {st_vars=[],st_attr_vars=[]})
+is_monomorphic_symbol_type :: !FunDefType -> Bool
+is_monomorphic_symbol_type (FunDefType {st_vars=[],st_attr_vars=[]})
 	= True
 is_monomorphic_symbol_type _
 	= False
 
-is_monomorphic_symbol_type_for_monomorphic_arg :: !(Optional SymbolType) -> Bool
-is_monomorphic_symbol_type_for_monomorphic_arg (Yes {st_vars=vars,st_attr_vars=[],st_args=[arg:_]})
+is_monomorphic_symbol_type_for_monomorphic_arg :: !FunDefType -> Bool
+is_monomorphic_symbol_type_for_monomorphic_arg (FunDefType {st_vars=vars,st_attr_vars=[],st_args=[arg:_]})
 	= all_vars_occur vars arg
 where
 	all_vars_occur [type_var:type_vars] type = var_occurs_in_atype type_var.tv_info_ptr type && all_vars_occur type_vars type
@@ -3865,8 +3865,8 @@ find_same_Vars [arg:args] var_info_ptr arg_n
 find_same_Vars [] var_info_ptr arg_n
 	= [#!]
 
-filter_same_types :: !(Optional SymbolType) !Int ![#Int!] -> [#Int!]
-filter_same_types (Yes {st_args}) arg_n1 arg_ns
+filter_same_types :: !FunDefType !Int ![#Int!] -> [#Int!]
+filter_same_types (FunDefType {st_args}) arg_n1 arg_ns
 	# (arg1_type,arg_types) = get_arg_type 0 arg_n1 st_args
 	= filter_same_arg_types arg_ns (arg_n1+1) arg_types arg1_type
 where
@@ -4096,11 +4096,11 @@ function_is_good_producer (TransformedBody {tb_rhs}) fun_type linear_bit ro ti
 			= function_may_be_copied fun_type tb_rhs ro ti
 		= (False,ti)
 where
-	function_may_be_copied (Yes {st_args_strictness}) rhs ro ti
+	function_may_be_copied (FunDefType {st_args_strictness}) rhs ro ti
 		| is_not_strict st_args_strictness
 			= expression_may_be_copied rhs ro ti
 			= (False,ti)
-	function_may_be_copied No rhs ro ti
+	function_may_be_copied NoFunDefType rhs ro ti
 		= expression_may_be_copied rhs ro ti
 
 	// to optimize bimap
@@ -4160,7 +4160,7 @@ is_sexy_body (Let {let_strict_binds}) = isEmpty let_strict_binds
 	// extended to generate new functions when a strict let ends up during fusion in a non top level position (MW)
 is_sexy_body _ = True	
 
-is_higher_order_function (Yes {st_result={at_type=_ --> _}})
+is_higher_order_function (FunDefType {st_result={at_type=_ --> _}})
         = True
 is_higher_order_function _
         = False
@@ -4626,9 +4626,9 @@ where
 		transform_functions NoComponentMembers common_defs imported_funs ti
 			= ti
 
-		transform_function :: !(Optional SymbolType) !FunctionBody !SymbIdent !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo
+		transform_function :: !FunDefType !FunctionBody !SymbIdent !Int !{#CommonDefs} !{#{#FunType}} !*TransformInfo
 								-> (!FunctionBody,!*TransformInfo)
-		transform_function (Yes {st_args,st_args_strictness}) (TransformedBody tb) fun_symb transform_fusion common_defs imported_funs ti=:{ti_predef_symbols}
+		transform_function (FunDefType {st_args,st_args_strictness}) (TransformedBody tb) fun_symb transform_fusion common_defs imported_funs ti=:{ti_predef_symbols}
 			#! stdStrictLists_module_n = ti_predef_symbols.[PD_StdStrictLists].pds_def
 			   stdStrictMaybes_module_n = ti_predef_symbols.[PD_StdStrictMaybes].pds_def
 			   stdGeneric_module_n = ti_predef_symbols.[PD_StdGeneric].pds_def
@@ -4728,7 +4728,7 @@ where
 				-> (!*{!Component}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
 	add_new_function_to_group common_defs fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
-		  {fun_type = Yes ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
+		  {fun_type = FunDefType ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
 		  ets =
 			{ ets_type_defs							= imported_types
 			, ets_collected_conses					= collected_imports
@@ -4742,7 +4742,7 @@ where
 		# ft = { ft &  st_result = st_result, st_args = st_args }
 
 		| fi_properties bitand FI_Unused<>0
-			# gf_fun_def = {gf_fun_def & fun_type = Yes ft}
+			# gf_fun_def & fun_type = FunDefType ft
 			= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 
 		| fi_group_index >= size groups
@@ -4750,7 +4750,7 @@ where
 
 		| not (isComponentMember gf_fun_index groups.[fi_group_index].component_members)
 			= abort ("add_new_function_to_group INSANE!\n" +++ toString gf_fun_index +++ "," +++ toString fi_group_index)
-		# gf_fun_def = {gf_fun_def & fun_type = Yes ft}
+		# gf_fun_def & fun_type = FunDefType ft
 		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
 	where
 		isComponentMember index (ComponentMember member members)
@@ -4761,12 +4761,11 @@ where
 			= False
 
 	convert_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
-		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
-					= fun_defs![fun_index]
+		# (fun_def=:{fun_type = FunDefType fun_type, fun_info = {fi_properties}}, fun_defs) = fun_defs![fun_index]
 		  rem_annot	= fi_properties bitand FI_HasTypeSpec == 0
 		  (fun_type,contains_unexpanded_abs_syn_type,imported_types, collected_imports, type_heaps, var_heap)
 		  		= convertSymbolTypeWithoutExpandingAbstractSynTypes rem_annot common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
-		# fun_def	= { fun_def & fun_type = Yes fun_type }
+		# fun_def & fun_type = FunDefType fun_type
 		  fun_defs	= { fun_defs & [fun_index] = fun_def }
 		| contains_unexpanded_abs_syn_type
 			= (fun_defs, imported_types, collected_imports, [fun_index : fun_indices_with_abs_syn_types], type_heaps, var_heap)
@@ -4774,12 +4773,11 @@ where
 
 	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#CheckedTypeDef}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!*{#FunDef},!.{#{#CheckedTypeDef}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo))
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
-		# (fun_def=:{fun_type = Yes fun_type, fun_info = {fi_properties}}, fun_defs)
-					= fun_defs![fun_index]
+		# (fun_def=:{fun_type = FunDefType fun_type, fun_info = {fi_properties}}, fun_defs) = fun_defs![fun_index]
 		  rem_annot	= fi_properties bitand FI_HasTypeSpec == 0
 		  (fun_type,imported_types, collected_imports, type_heaps, var_heap)
 	  		= convertSymbolType rem_annot common_defs fun_type main_dcl_module_n imported_types collected_imports type_heaps var_heap
-	  	  fun_def = { fun_def & fun_type = Yes fun_type}
+	  	  fun_def & fun_type = FunDefType fun_type
 	  	  fun_defs = { fun_defs & [fun_index] = fun_def }
 		= (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 

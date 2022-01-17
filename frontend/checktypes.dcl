@@ -18,7 +18,7 @@ checkInstanceType :: !Index !GlobalIndex !ClassIdent !ClassArgs !InstanceType !S
 checkSuperClasses :: !ClassArgs ![TypeContext] !Index !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!ClassArgs, ![TypeContext], !u:{#CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 
-checkDynamicTypes :: !Index ![ExprInfoPtr] !(Optional SymbolType)
+checkDynamicTypes :: !Index ![ExprInfoPtr] !FunDefType
 		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
 	-> (!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
 

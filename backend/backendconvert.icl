@@ -634,7 +634,7 @@ declareGeneratedUnboxedRecordInstancesOfClass ali_first_instance_indices predef_
 				= declareInstances (member_n+1) n_class_members first_member_index backend
 
 		declareInstance :: Index FunDef -> BackEnder
-		declareInstance index {fun_ident={id_name}, fun_type=Yes type}
+		declareInstance index {fun_ident={id_name}, fun_type=FunDefType type}
 			=	beDeclareRuleType index main_dcl_module_n (id_name +++ ";" +++ toString index)
 			o`	beDefineRuleType index main_dcl_module_n (convertTypeAlt index main_dcl_module_n type array_dictionary_index)
 
@@ -1456,7 +1456,7 @@ convertRules rules main_dcl_module_n aliasDummyId array_dictionary_index be
 			=	convert t rulesP be
 
 convertRule :: Ident (Int,FunDef) Int GlobalIndex !*BackEndState -> *(!BEImpRuleP,!*BackEndState)
-convertRule aliasDummyId (index,{fun_type=Yes type,fun_body=body,fun_pos,fun_kind,fun_info})
+convertRule aliasDummyId (index,{fun_type=FunDefType type,fun_body=body,fun_pos,fun_kind,fun_info})
 		main_dcl_module_n array_dictionary_index bes
 	| fun_info.fi_properties bitand FI_FusedMember<>0
 		#! instance_function_index = fun_info.fi_def_level;

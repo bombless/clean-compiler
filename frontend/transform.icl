@@ -1350,7 +1350,7 @@ partitionate_called_function mod_index max_fun_nr fun_index pi ps
 	# (fun_def, ps) = ps!ps_fun_defs.[fun_index]
 	= case fun_def.fun_body of
 		CheckedBody body
-			| fun_def.fun_type=:Yes _ && index_in_ranges fun_index pi.pi_global_function_ranges
+			| fun_def.fun_type=:FunDefType _ && index_in_ranges fun_index pi.pi_global_function_ranges
 				-> (max_fun_nr, ps)
 			# fun_number = ps.ps_next_num
 			# (min_dep, ps) = visit_functions mod_index max_fun_nr fun_def.fun_info.fi_calls pi
@@ -1359,7 +1359,7 @@ partitionate_called_function mod_index max_fun_nr fun_index pi ps
 							   ps_next_num = inc fun_number, ps_deps = [FunctionOrIclMacroIndex fun_index : ps.ps_deps] })
 			-> try_to_close_group max_fun_nr (-1) fun_index fun_number min_dep pi ps
 		PartitioningFunction _ fun_number
-			| fun_def.fun_type=:Yes _ && index_in_ranges fun_index pi.pi_global_function_ranges
+			| fun_def.fun_type=:FunDefType _ && index_in_ranges fun_index pi.pi_global_function_ranges
 				-> (max_fun_nr, ps)
 			-> (fun_number, ps)
 		TransformedBody _

@@ -382,6 +382,10 @@ showGroups comps comp_index show_types fun_defs file
 		# (fun_defs, file) = show_group comp.group_members show_types fun_defs (file <<< "component " <<< comp_index <<< '\n')
 		= showGroups comps (inc comp_index) show_types fun_defs file
 
+instance <<< FunDefType where
+	(<<<) file (FunDefType fun_def_type) = file <<< fun_def_type
+	(<<<) file NoFunDefType = file
+
 show_group [] show_types fun_defs file
 	= (fun_defs, file <<< '\n')
 show_group [fun:funs] show_types fun_defs file
@@ -430,7 +434,7 @@ where
 	show_types [fun:funs] fun_defs file
 		# (fun_def, fun_defs) = fun_defs![fun]
 		# properties = { form_properties = cAttributed bitor cAnnotated, form_attr_position = No }
-		  (Yes ftype) = fun_def.fun_type
+		  (FunDefType ftype) = fun_def.fun_type
 		= show_types funs fun_defs (file <<< fun_def.fun_ident <<< " :: " <:: (properties, ftype, No) <<< '\n' )
 
 showDclModules :: !u:{#DclModule} !*File -> (!u:{#DclModule}, !*File)
