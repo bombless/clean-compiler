@@ -549,13 +549,14 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
 	  cui = { cui & cui_is_lifted_part = False }
 	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
-	  (st_args, (_, cus))	= mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], { cus & cus_var_env = cus_var_env })
+	  cus & cus_var_env = cus_var_env
+	  (st_args, cus) = clean_up_arg_types cui tst_lifted tst_args cus
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
 	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
-		= clean_up_type_contexts spec_type tst_context derived_context cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
+		= clean_up_type_contexts spec_type tst_context derived_context common_defs cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
-	  		= build_attribute_environment cus.cus_appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) cus.cus_attr_env [] [] cus_error
+			= build_attribute_environment cus.cus_appears_in_lifted_part max_attr_nr coercions cus.cus_attr_env cus_error
 	  (expr_heap, {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps})
 			= clean_up_expression_types case_and_let_exprs expr_heap
 					 {cuets_var_env=cus_var_env,cuets_heaps=type_heaps,cuets_var_store=cus.cus_var_store}
@@ -577,6 +578,25 @@ where
 				_
 					-> (all_vars, var_env)
 
+	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
+		| is_start_rule
+			| isEmpty st_context
+				| st_arity > 0
+					| st_arity == 1
+						= case st_args of
+							[{at_type = TB BT_World} : _]
+								-> cus_error
+							_
+								-> startRuleError "argument of Start rule should have type World.\n" cus_error
+						= startRuleError "Start rule has too many arguments.\n" cus_error
+					= cus_error
+				= startRuleError "Start rule cannot be overloaded.\n" cus_error
+			= cus_error
+
+clean_up_arg_types cui tst_lifted tst_args cus
+	# (st_args, (_, cus)) = mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], cus)
+	= (st_args,cus)
+where
 	clean_up_arg_type cui at=:{at_type = TFA avars type, at_attribute} (all_exi_vars, cus)
 		# (at_attribute, cus) 	= cleanUpTypeAttribute False cui at_attribute cus
 		  (type, cus)			= clean_up cui type cus
@@ -616,27 +636,27 @@ where
 						# cus = {cus & cus_error = liftedError var cus.cus_error, cus_var_env.[var_number] = TE}
 						-> ([{atv_attribute=var_attr, atv_variable=var} : exi_vars], all_vars, cus)
 
-	clean_up_result_type cui at cus
-		# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
-		| isEmpty cus_exis_vars
-			= (at, cus)
-			= (at, { cus & cus_error = existentialError cus.cus_error })
+clean_up_result_type cui at cus
+	# (at, cus=:{cus_exis_vars}) = clean_up cui at cus
+	| isEmpty cus_exis_vars
+		= (at, cus)
+		= (at, { cus & cus_error = existentialError cus.cus_error })
 
-	clean_up_type_contexts spec_type spec_context derived_context env type_heaps var_heap error
-		| spec_type
-			# (type_heaps,var_heap) = foldSt (mark_specified_context derived_context) spec_context (type_heaps,var_heap)
-			  (derived_context,var_heap) = remove_specified_contexts derived_context var_heap
-			  (type_heaps,var_heap) = mark_TAll_contexts derived_context spec_context type_heaps var_heap
-			  var_heap = if (derived_context=:[]) var_heap (mark_specified_polymorphic_contexts spec_context derived_context var_heap)
-			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-				= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
-			  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-				= foldSt clean_up_type_context spec_context (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
-			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
-			# (rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
-				= foldSt clean_up_type_context2 derived_context ([], NoErrorContexts, env, type_heaps, var_heap, error)
-			= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
-
+clean_up_type_contexts spec_type spec_context derived_context common_defs env type_heaps var_heap error
+	| spec_type
+		# (type_heaps,var_heap) = foldSt (mark_specified_context derived_context) spec_context (type_heaps,var_heap)
+		  (derived_context,var_heap) = remove_specified_contexts derived_context var_heap
+		  (type_heaps,var_heap) = mark_TAll_contexts derived_context spec_context type_heaps var_heap
+		  var_heap = if (derived_context=:[]) var_heap (mark_specified_polymorphic_contexts spec_context derived_context var_heap)
+		  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= foldSt clean_up_lifted_type_context derived_context ([], NoErrorContexts, env, var_heap, error)
+		  (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+			= foldSt clean_up_type_context spec_context (rev_contexts, ambiguous_or_missing_contexts, env, var_heap, error)
+		= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+		# (rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+			= foldSt clean_up_type_context2 derived_context ([], NoErrorContexts, env, type_heaps, var_heap, error)
+		= (reverse rev_contexts, ambiguous_or_missing_contexts, env, type_heaps, var_heap, error)
+where
 	mark_specified_context :: ![TypeContext] !TypeContext !*(*TypeHeaps,!*VarHeap) -> (!*TypeHeaps,!*VarHeap)
 	mark_specified_context [] spec_tc (type_heaps,var_heap)
 		= (type_heaps,var_heap)
@@ -881,8 +901,13 @@ where
 	replace_TempQV_by_TAll cv_arg_types
 		= [if type.at_type=:TempQV _ {type & at_type=TAll} type \\ type<-cv_arg_types]
 
-	build_attribute_environment :: !LargeBitvect !Index !Index !{! CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
-																							-> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
+build_attribute_environment :: !LargeBitvect !Index !{!CoercionTree} !*AttributeEnv !*ErrorAdmin
+							   -> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
+build_attribute_environment appears_in_lifted_part max_attr_nr coercions attr_env error
+	= build_attribute_environment appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) attr_env [] [] error
+where
+	build_attribute_environment :: !LargeBitvect !Index !Index !{!CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
+																						   -> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
 	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions already_build_inequalities attr_env attr_vars inequalities error
 		| attr_group_index == max_attr_nr
 			= (attr_env, attr_vars, inequalities, error)
@@ -935,66 +960,51 @@ where
 	is_new_inequality dem_var off_var [{ ai_demanded, ai_offered } : inequalities]
 		= (dem_var <> ai_demanded || off_var <> ai_offered) && is_new_inequality dem_var off_var inequalities
 
-	clean_up_expression_types :: ![ExprInfoPtr] !*ExpressionHeap !*CleanUpExprTypeState -> (!*ExpressionHeap,!*CleanUpExprTypeState)
-	clean_up_expression_types expr_ptrs expr_heap cuets
-		= foldSt clean_up_expression_type expr_ptrs (expr_heap, cuets)
-	where
-		clean_up_expression_type expr_ptr (expr_heap, cuets)
-			# (info, expr_heap) = readPtr expr_ptr expr_heap
-			= case info of
-				EI_CaseType case_type
-					# (case_type, cuets) = clean_up_expr_type case_type cuets
-					-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cuets)
-				EI_LetType let_type
-					# (let_type, cuets) = clean_up_expr_type let_type cuets
-					-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cuets)
-				EI_DictionaryType dict_type
-					# (dict_type, cuets) = clean_up_expr_type dict_type cuets
-					-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cuets)
-				EI_ContextWithVarContexts class_expressions var_contexts
-					# (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
-					-> (writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap,cuets)
-				where
-					clean_up_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) cuets
-						# (type_contexts,cuets) = clean_up_expr_type type_contexts cuets
-						  (arg_atype,cuets) = clean_up_expr_type arg_atype cuets
-						  (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
-						= (VarContext arg_n type_contexts arg_atype var_contexts,cuets)
-					clean_up_var_contexts NoVarContexts cuets
-						= (NoVarContexts,cuets)
-				EI_CaseTypeWithContexts case_type constructor_contexts
-					# (case_type, cuets) = clean_up_expr_type case_type cuets
-					  (constructor_contexts, cuets) = clean_up_constructor_contexts constructor_contexts cuets
-					-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cuets)
-				where
-					clean_up_constructor_contexts [(ds,type_contexts):constructor_contexts] cuets
-						# (type_contexts,cuets) = clean_up_type_contexts type_contexts cuets
-						  (constructor_contexts,cuets) = clean_up_constructor_contexts constructor_contexts cuets
-						= ([(ds,type_contexts):constructor_contexts],cuets)
-					clean_up_constructor_contexts [] cuets
-						= ([],cuets)
+clean_up_expression_types :: ![ExprInfoPtr] !*ExpressionHeap !*CleanUpExprTypeState -> (!*ExpressionHeap,!*CleanUpExprTypeState)
+clean_up_expression_types expr_ptrs expr_heap cuets
+	= foldSt clean_up_expression_type expr_ptrs (expr_heap, cuets)
+where
+	clean_up_expression_type expr_ptr (expr_heap, cuets)
+		# (info, expr_heap) = readPtr expr_ptr expr_heap
+		= case info of
+			EI_CaseType case_type
+				# (case_type, cuets) = clean_up_expr_type case_type cuets
+				-> (expr_heap <:= (expr_ptr, EI_CaseType case_type), cuets)
+			EI_LetType let_type
+				# (let_type, cuets) = clean_up_expr_type let_type cuets
+				-> (expr_heap <:= (expr_ptr, EI_LetType let_type), cuets)
+			EI_DictionaryType dict_type
+				# (dict_type, cuets) = clean_up_expr_type dict_type cuets
+				-> (expr_heap <:= (expr_ptr, EI_DictionaryType dict_type), cuets)
+			EI_ContextWithVarContexts class_expressions var_contexts
+				# (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
+				-> (writePtr expr_ptr (EI_ContextWithVarContexts class_expressions var_contexts) expr_heap,cuets)
+			where
+				clean_up_var_contexts (VarContext arg_n type_contexts arg_atype var_contexts) cuets
+					# (type_contexts,cuets) = clean_up_expr_type type_contexts cuets
+					  (arg_atype,cuets) = clean_up_expr_type arg_atype cuets
+					  (var_contexts,cuets) = clean_up_var_contexts var_contexts cuets
+					= (VarContext arg_n type_contexts arg_atype var_contexts,cuets)
+				clean_up_var_contexts NoVarContexts cuets
+					= (NoVarContexts,cuets)
+			EI_CaseTypeWithContexts case_type constructor_contexts
+				# (case_type, cuets) = clean_up_expr_type case_type cuets
+				  (constructor_contexts, cuets) = clean_up_constructor_contexts constructor_contexts cuets
+				-> (expr_heap <:= (expr_ptr, EI_CaseTypeWithContexts case_type constructor_contexts), cuets)
+			where
+				clean_up_constructor_contexts [(ds,type_contexts):constructor_contexts] cuets
+					# (type_contexts,cuets) = clean_up_type_contexts type_contexts cuets
+					  (constructor_contexts,cuets) = clean_up_constructor_contexts constructor_contexts cuets
+					= ([(ds,type_contexts):constructor_contexts],cuets)
+				clean_up_constructor_contexts [] cuets
+					= ([],cuets)
 
-					clean_up_type_contexts [type_contexts=:{tc_types}:constructor_contexts] cuets
-						# (tc_types,cuets) = clean_up_expr_type tc_types cuets
-						  (constructor_contexts,cuets) = clean_up_type_contexts constructor_contexts cuets
-						= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cuets)
-					clean_up_type_contexts [] cuets
-						= ([],cuets)
-
- 	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
- 		| is_start_rule
- 			| isEmpty st_context
-	 			| st_arity > 0
-	 				| st_arity == 1
-		 				= case st_args of
-		 					[{at_type = TB BT_World} : _]
-		 						-> cus_error
-		 					_
-		 						-> startRuleError "argument of Start rule should have type World.\n" cus_error
-						= startRuleError "Start rule has too many arguments.\n" cus_error						
-					= cus_error						
-	 			= startRuleError "Start rule cannot be overloaded.\n" cus_error
-	 		= cus_error
+				clean_up_type_contexts [type_contexts=:{tc_types}:constructor_contexts] cuets
+					# (tc_types,cuets) = clean_up_expr_type tc_types cuets
+					  (constructor_contexts,cuets) = clean_up_type_contexts constructor_contexts cuets
+					= ([{type_contexts & tc_types=tc_types}:constructor_contexts],cuets)
+				clean_up_type_contexts [] cuets
+					= ([],cuets)
 
 /*
 	In 'bindInstances t1 t2' type variables of t1 are bound to the corresponding subtypes of t2, provided that

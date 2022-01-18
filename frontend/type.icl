@@ -2433,11 +2433,24 @@ CreateInitialSymbolTypes start_index common_defs [fun : funs] (pre_def_symbols, 
 	  (pre_def_symbols, ts) = initial_symbol_type (start_index == fun) common_defs fd (pre_def_symbols, ts)
 	= CreateInitialSymbolTypes start_index common_defs funs (pre_def_symbols, ts)
 where
-	initial_symbol_type is_start_rule common_defs 
-				{fun_type=FunDefType ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env},fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
-				(pre_def_symbols, ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error})
-		# ts_error = setErrorPosition fun_ident fun_pos ts_error
-		  (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
+	initial_symbol_type is_start_rule common_defs {fun_type=FunDefType ft,fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos} (pre_def_symbols, ts)
+		# ts & ts_error = setErrorPosition fun_ident fun_pos ts.ts_error
+		  (ft_with_prop,lifted_args,fresh_fun_type,pre_def_symbols,ts)
+			= create_specified_symbol_type common_defs ft fun_lifted fi_dynamics pre_def_symbols ts
+		  ts & ts_fun_env.[fun] = SpecifiedType ft_with_prop lifted_args fresh_fun_type
+		= (pre_def_symbols, ts)
+	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}, fun_kind} (pre_def_symbols, ts)
+		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind == FK_Caf) fun_arity fun_lifted ts
+		  ts_type_heaps = ts.ts_type_heaps
+		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
+		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
+				= fresh_dynamics fi_dynamics (ts.ts_var_store, { ts_type_heaps & th_vars = th_vars }, ts.ts_var_heap, ts_expr_heap, pre_def_symbols)
+		= (pre_def_symbols, { ts & ts_fun_env = {ts.ts_fun_env & [fun] = UncheckedType st_gen}, ts_var_store = ts_var_store,
+								   ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap})
+
+	create_specified_symbol_type common_defs ft=:{st_arity,st_args,st_result,st_attr_vars,st_attr_env} fun_lifted fi_dynamics
+			pre_def_symbols ts=:{ts_type_heaps,ts_expr_heap,ts_td_infos,ts_error}
+		# (st_args, ps) = addPropagationAttributesToATypes common_defs st_args
 				{ prop_type_heaps = ts_type_heaps, prop_td_infos = ts_td_infos,
 				  prop_attr_vars = st_attr_vars, prop_attr_env = st_attr_env, prop_error = Yes ts_error}
 		  (st_result, {prop_type_heaps,prop_td_infos,prop_attr_vars,prop_error = Yes ts_error,prop_attr_env})
@@ -2450,18 +2463,9 @@ where
 
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
 		  		= fresh_dynamics fi_dynamics (ts.ts_var_store, ts.ts_type_heaps, ts.ts_var_heap, ts.ts_expr_heap, pre_def_symbols)
-		= (pre_def_symbols,
-				{ ts & ts_fun_env = { ts.ts_fun_env & [fun] = SpecifiedType ft_with_prop lifted_args
-					{fresh_fun_type & tst_arity = st_arity + fun_lifted, tst_args = lifted_args ++ fresh_fun_type.tst_args, tst_lifted = fun_lifted}},
-						ts_var_heap = ts_var_heap, ts_var_store = ts_var_store, ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps })
-	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}, fun_kind} (pre_def_symbols, ts)
-		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind == FK_Caf) fun_arity fun_lifted ts
-		  ts_type_heaps = ts.ts_type_heaps 
-		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
-		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
-		  		= fresh_dynamics fi_dynamics (ts.ts_var_store, { ts_type_heaps & th_vars = th_vars }, ts.ts_var_heap, ts_expr_heap, pre_def_symbols)
-		= (pre_def_symbols, { ts & ts_fun_env = {ts.ts_fun_env & [fun] = UncheckedType st_gen}, ts_var_store = ts_var_store,
-								   ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps, ts_var_heap = ts_var_heap})
+		  fresh_fun_type & tst_arity = st_arity + fun_lifted, tst_args = lifted_args ++ fresh_fun_type.tst_args, tst_lifted = fun_lifted
+		  ts & ts_var_heap = ts_var_heap, ts_var_store = ts_var_store, ts_expr_heap = ts_expr_heap, ts_type_heaps = ts_type_heaps
+		= (ft_with_prop,lifted_args,fresh_fun_type,pre_def_symbols,ts)
 
 	create_general_symboltype :: !Bool !Bool !Int !Int !*TypeState -> (!TempSymbolType, !*TypeState)
 	create_general_symboltype is_start_rule is_caf nr_of_args nr_of_lifted_args ts

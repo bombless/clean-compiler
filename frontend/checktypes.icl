@@ -936,20 +936,20 @@ new_demanded_attribute _ TA_Unique
 new_demanded_attribute dem_attr_kind _
 	= DAK_None /* dem_attr_kind */
 
-checkOpenArgAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
-												   -> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
-checkOpenArgAType mod_index scope dem_attr atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
+checkOpenArgAType :: !Index !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
+						-> (!AType,!(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
+checkOpenArgAType mod_index atype=:{at_type = TFA vars type, at_attribute} (ots, oti, cs)
 	# (vars, (oti, cs)) = add_universal_vars vars oti cs
-	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr { atype & at_type = type } (ots, oti, cs)
+	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope DAK_None {atype & at_type = type} (ots, oti, cs)
 	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
 	= ({checked_type & at_type = TFA vars checked_type.at_type }, (ots, oti, cs))
-checkOpenArgAType mod_index scope dem_attr atype=:{at_type = TFAC vars type contexts, at_attribute} (ots, oti, cs)
+checkOpenArgAType mod_index atype=:{at_type = TFAC vars type contexts, at_attribute} (ots, oti, cs)
 	# cs = add_universal_vars_again vars cs
-	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope dem_attr {atype & at_type = type} (ots, oti, cs)
+	  (checked_type, (ots, oti, cs)) = checkOpenAType mod_index cRankTwoScope DAK_None {atype & at_type = type} (ots, oti, cs)
 	  cs = {cs & cs_symbol_table = remove_universal_vars vars cs.cs_symbol_table}
 	= ({checked_type & at_type = TFAC vars checked_type.at_type contexts}, (ots, oti, cs))
-checkOpenArgAType mod_index scope dem_attr type ots_oti_cs
-	= checkOpenAType mod_index scope dem_attr type ots_oti_cs
+checkOpenArgAType mod_index type ots_oti_cs
+	= checkOpenAType mod_index cGlobalScope DAK_None type ots_oti_cs
 
 checkOpenAType :: !Index !Int !DemandedAttributeKind !AType !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState)
 												-> (!AType, !(!u:OpenTypeSymbols, !*OpenTypeInfo, !*CheckState))
@@ -1072,8 +1072,8 @@ checkOpenType mod_index scope dem_attr type cot_state
 	# ({at_type}, cot_state) = checkOpenAType mod_index scope dem_attr { at_type = type, at_attribute = TA_Multi } cot_state
 	= (at_type, cot_state)
 
-checkOpenArgATypes mod_index scope types cot_state
-	= mapSt (checkOpenArgAType mod_index scope DAK_None) types cot_state
+checkOpenArgATypes mod_index types cot_state
+	= mapSt (checkOpenArgAType mod_index) types cot_state
 
 add_universal_vars vars oti cs
 	= mapSt add_universal_var vars (oti, cs)
@@ -1246,7 +1246,7 @@ checkSymbolType is_function mod_index st=:{st_args,st_result,st_context,st_attr_
 	# ots = {ots_type_defs = type_defs, ots_modules = modules}
 	  oti = {oti_heaps = heaps, oti_all_vars = [], oti_all_attrs = [], oti_global_vars= []}
 	  (st_args,class_defs,ots,oti,cs) = check_argument_type_contexts st_args mod_index class_defs ots oti cs
-	  (st_args, cot_state) = checkOpenArgATypes mod_index cGlobalScope st_args (ots, oti, cs)
+	  (st_args, cot_state) = checkOpenArgATypes mod_index st_args (ots, oti, cs)
 	  (st_result, (ots, oti=:{oti_all_vars = st_vars,oti_all_attrs = st_attr_vars,oti_global_vars}, cs))
 	  	= checkOpenAType mod_index cGlobalScope DAK_None st_result cot_state	  
 	  oti = {oti & oti_all_vars = [], oti_all_attrs = []}
@@ -1431,7 +1431,7 @@ checkDynamicTypes :: !Index ![ExprInfoPtr] !FunDefType
 		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
 	-> (!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
 checkDynamicTypes mod_index dyn_type_ptrs NoFunDefType type_defs class_defs modules type_heaps expr_heap cs
-	# (type_defs, class_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules type_heaps expr_heap cs
+	# (type_defs, class_defs, modules, heaps, expr_heap, cs) = checkDynamics mod_index cGlobalScope dyn_type_ptrs type_defs class_defs modules type_heaps expr_heap cs
 	  (expr_heap, cs_symbol_table) = remove_global_type_variables_in_dynamics dyn_type_ptrs (expr_heap, cs.cs_symbol_table)
 	= (type_defs, class_defs, modules, heaps, expr_heap, { cs & cs_symbol_table = cs_symbol_table })
 where
@@ -1459,7 +1459,7 @@ where
 checkDynamicTypes mod_index dyn_type_ptrs (FunDefType {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
 	# (th_vars, cs_symbol_table) = foldSt add_type_variable_to_symbol_table st_vars (type_heaps.th_vars, cs_symbol_table)
 	  (type_defs, class_defs, modules, heaps, expr_heap, cs)
-	  	= checkDynamics mod_index (inc cModuleScope) dyn_type_ptrs type_defs class_defs modules
+		= checkDynamics mod_index cGlobalScope dyn_type_ptrs type_defs class_defs modules
 	  		{ type_heaps & th_vars = th_vars } expr_heap { cs & cs_symbol_table = cs_symbol_table }
 	  cs_symbol_table =	removeVariablesFromSymbolTable cModuleScope st_vars cs.cs_symbol_table
 	  (expr_heap, cs) = check_global_type_variables_in_dynamics dyn_type_ptrs (expr_heap, { cs & cs_symbol_table = cs_symbol_table })
