@@ -4,7 +4,13 @@ import StdEnv,StdOverloadedList,compare_types
 import syntax, typesupport, check, analtypes, overloading, unitype, refmark, predef, utilities, compare_constructor
 import check_instances, genericsupport
 
-::	FunctionType | TypeWithPropagationAttributes !SymbolType
+::	FunctionType
+	| SpecifiedType !SymbolType ![AType] !TempSymbolType
+	| ExpandedType !SymbolType !TempSymbolType !TempSymbolType
+	| SpecifiedLocalFunType !SymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] ![AType] !TempSymbolType
+	| ExpandedLocalFunType !SymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] !TempSymbolType !TempSymbolType
+	| TypeWithPropagationAttributes !SymbolType
+	| EmptyFunctionType
 
 ::	TypeInput =
 	! {	ti_common_defs	:: !{# CommonDefs }
@@ -143,7 +149,14 @@ where
 		# (changed_x, x, subst) =  arraySubst x subst
 		  (changed_y, y, subst) =  arraySubst y subst
 		= (changed_x || changed_y, (x,y), subst)
-		
+
+instance arraySubst (P a b) | arraySubst a & arraySubst b
+where
+	arraySubst (P x y) subst
+		# (changed_x, x, subst) =  arraySubst x subst
+		  (changed_y, y, subst) =  arraySubst y subst
+		= (changed_x || changed_y, P x y, subst)
+
 instance arraySubst [a] | arraySubst a
 where
 	arraySubst [] subst
@@ -153,6 +166,22 @@ where
 		| changed
 			= (True, [type : types ], subst)
 			= (False, t, subst)
+
+instance arraySubst [!a!] | arraySubst a
+where
+	arraySubst [!!] subst
+		= (False, [!!], subst)
+	arraySubst t=:[!type : types!] subst
+		# (changed, (type, types), subst) = arraySubst (type, types) subst
+		| changed
+			= (True, [!type : types!], subst)
+			= (False, t, subst)
+
+// for fresh_and_external_type_vars [!P TypeVar Type!]
+instance arraySubst TypeVar
+where
+	arraySubst tv subst
+		= (False, tv, subst)
 
 instance arraySubst TempSymbolType
 where
@@ -1610,6 +1639,11 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
 				  										  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 				-> (fun_type_copy, [], ts)
+			SpecifiedLocalFunType fun_type _ _ lifted_arg_types _
+				# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
+				  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
+														  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
+				-> (fun_type_copy, [], ts)
 			CheckedType fun_type
 				# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
@@ -1652,6 +1686,11 @@ getSymbolType pos ti=:{ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Loca
 			# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
 			  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
 			  										  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
+			-> (fun_type_copy, [], ts)
+		SpecifiedLocalFunType fun_type _ _ lifted_arg_types _
+			# (fun_type_copy=:{tst_args,tst_arity}, ts) = freshSymbolType (Yes pos) cWithoutFreshContextVars fun_type ti_common_defs ts
+			  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
+													  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 			-> (fun_type_copy, [], ts)
 		CheckedType fun_type
 			# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
@@ -2439,7 +2478,27 @@ where
 			= create_specified_symbol_type common_defs ft fun_lifted fi_dynamics pre_def_symbols ts
 		  ts & ts_fun_env.[fun] = SpecifiedType ft_with_prop lifted_args fresh_fun_type
 		= (pre_def_symbols, ts)
-	initial_symbol_type is_start_rule common_defs {fun_arity, fun_lifted, fun_info = {fi_dynamics}, fun_kind} (pre_def_symbols, ts)
+	initial_symbol_type is_start_rule common_defs {fun_type=LocalFunDefCheckedType external_type_vars external_attr_vars ft,
+			 fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
+			(pre_def_symbols, ts=:{ts_type_heaps,ts_error,ts_var_store,ts_attr_store})
+		# ts_error = setErrorPosition fun_ident fun_pos ts_error
+		  (fresh_and_external_type_vars,(type_var_heap,ts_var_store)) = mapStS fresh_external_type_variable external_type_vars (ts_type_heaps.th_vars,ts_var_store)
+			with
+				fresh_external_type_variable external_type_variable=:{tv_info_ptr} (var_heap, var_store)
+					# fresh_var = TempV var_store
+					= (P external_type_variable fresh_var, (writePtr tv_info_ptr (TVI_Type fresh_var) var_heap, inc var_store))
+		  (fresh_and_external_attr_vars,(attr_var_heap,ts_attr_store))	= mapStS fresh_external_attribute external_attr_vars (ts_type_heaps.th_attrs,ts_attr_store)
+			with
+				fresh_external_attribute external_attr_var=:{av_info_ptr} (attr_heap, attr_store)
+					# fresh_attr = TA_TempVar attr_store
+					= (P external_attr_var fresh_attr,(writePtr av_info_ptr (AVI_Attr fresh_attr) attr_heap, inc attr_store))
+		  ts_type_heaps & th_vars=type_var_heap, th_attrs=attr_var_heap
+		  ts & ts_var_store=ts_var_store, ts_attr_store=ts_attr_store, ts_type_heaps=ts_type_heaps, ts_error=ts_error
+		  (ft_with_prop,lifted_args,fresh_fun_type,pre_def_symbols,ts)
+			= create_specified_symbol_type common_defs ft fun_lifted fi_dynamics pre_def_symbols ts
+		  ts & ts_fun_env.[fun] = SpecifiedLocalFunType ft_with_prop fresh_and_external_type_vars fresh_and_external_attr_vars lifted_args fresh_fun_type
+		= (pre_def_symbols, ts)
+	initial_symbol_type is_start_rule common_defs {fun_type=NoFunDefType,fun_arity,fun_lifted,fun_info={fi_dynamics},fun_kind} (pre_def_symbols, ts)
 		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind == FK_Caf) fun_arity fun_lifted ts
 		  ts_type_heaps = ts.ts_type_heaps
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
@@ -2650,6 +2709,19 @@ where
 					-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
 					# ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_error=ts_error
 					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
+			ExpandedLocalFunType fun_type external_type_vars external_attr_vars tmp_fun_type exp_fun_type
+				# (clean_fun_type,ambiguous_or_missing_contexts,new_and_old_external_type_vars,new_and_old_external_attr_vars,type_var_env,attr_var_env,ts_type_heaps,ts_var_heap,ts_expr_heap,ts_error)
+					= cleanUpLocalSymbolType exp_fun_type external_type_vars external_attr_vars type_contexts type_ptrs coercion_env attr_partition
+										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
+				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
+				| ts_error.ea_ok
+					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
+						= check_local_function_type fun_type tmp_fun_type clean_fun_type new_and_old_external_type_vars new_and_old_external_attr_vars
+							external_type_vars external_attr_vars type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
+					  ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
+					-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
+					# ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_error=ts_error
+					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
 		  	UncheckedType exp_fun_type
 				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
@@ -2685,15 +2757,43 @@ where
 			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
 			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
 
+	check_local_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity,st_args,st_vars,st_attr_vars,st_context}
+								new_and_old_external_type_vars new_and_old_external_attr_vars external_type_vars external_attr_vars type_ptrs
+								defs fun_env attr_var_env type_heaps expr_heap error
+		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
+		| equi
+			# lifted_args = take tst_lifted st_args
+			  lifted_contexts = take (length st_context - length fun_type.st_context) st_context
+			  type_vars_in_lifted_args = [tv\\P tv _<|-external_type_vars]++drop (length fun_type.st_vars+Length external_type_vars) st_vars
+			  attr_vars_in_lifted_args = [av\\P av _<|-external_attr_vars]++take (length st_attr_vars-Length external_attr_vars-length fun_type.st_attr_vars) st_attr_vars
+			  (lifted_args,lifted_contexts,type_heaps) = replace_external_variables lifted_args lifted_contexts new_and_old_external_type_vars new_and_old_external_attr_vars type_vars_in_lifted_args attr_vars_in_lifted_args type_heaps
+			  type_with_lifted_arg_types = addLiftedArgumentsToLocalFunctionType fun_type tst_lifted lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts
+			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
+			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
+			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
+			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
+			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
+
 	check_caf_context fun_ident fun_pos FK_Caf {st_context=[_:_]} error
 		=	checkErrorWithPosition fun_ident fun_pos "CAF cannot be overloaded" error
 	check_caf_context _ _ _ _ error
 		=	error
 
 addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
-	= { st & st_args = take nr_of_lifted_arguments new_args ++ st_args, st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
-			 st_vars = st_vars ++ drop (length st_vars) new_vars, st_attr_vars = (take (length new_attrs - length st_attr_vars) new_attrs) ++ st_attr_vars,
-			 st_arity = st_arity + nr_of_lifted_arguments,st_context = take (length new_context - length st_context) new_context ++ st_context }
+	= {st & st_args = take nr_of_lifted_arguments new_args ++ st_args,
+			st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
+			st_vars = st_vars ++ drop (length st_vars) new_vars,
+			st_attr_vars = take (length new_attrs - length st_attr_vars) new_attrs ++ st_attr_vars,
+			st_arity = st_arity + nr_of_lifted_arguments,
+			st_context = take (length new_context - length st_context) new_context ++ st_context}
+
+addLiftedArgumentsToLocalFunctionType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts
+	= {st & st_args = lifted_args ++ st_args,
+			st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
+			st_vars = st_vars ++ type_vars_in_lifted_args,
+			st_attr_vars = attr_vars_in_lifted_args ++ st_attr_vars,
+			st_arity = st_arity + nr_of_lifted_arguments,
+			st_context = lifted_contexts ++ st_context}
 
 create_special_instances {si_array_instances,si_list_instances,si_tail_strict_list_instances,si_unboxed_maybe_instances,si_next_generated_unboxed_record_member_index}
 		fun_env_size common_defs fun_defs predef_symbols type_heaps error
@@ -3035,6 +3135,8 @@ where
 			= case env_type of
 				ExpandedType _ _ _
 					-> (coercions,ts_error,ts_fun_env)
+				ExpandedLocalFunType _ _ _ _ _
+					-> (coercions,ts_error,ts_fun_env)
 			  	UncheckedType {tst_args, tst_result}
 			  		# (coercions,ts_error)
 			  			= foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) [tst_result:tst_args]
@@ -3247,10 +3349,15 @@ where
 		= case fun_type of
 			UncheckedType tst
 				# (_, exp_tst, subst) = arraySubst tst subst
-				-> expand_function_types funs subst { ts_fun_env & [fun] = UncheckedType exp_tst}
+				-> expand_function_types funs subst {ts_fun_env & [fun] = UncheckedType exp_tst}
 			SpecifiedType ft _ tst
 				# (_, exp_tst, subst) = arraySubst tst subst
-				-> expand_function_types funs subst { ts_fun_env & [fun] = ExpandedType ft tst exp_tst}
+				-> expand_function_types funs subst {ts_fun_env & [fun] = ExpandedType ft tst exp_tst}
+			SpecifiedLocalFunType ft external_type_vars external_attr_vars _ tst
+				# (_, exp_tst, subst) = arraySubst tst subst
+				# (_, exp_external_type_vars, subst) = arraySubst external_type_vars subst
+				  ts_fun_env & [fun] = ExpandedLocalFunType ft exp_external_type_vars external_attr_vars tst exp_tst
+				-> expand_function_types funs subst ts_fun_env
 	expand_function_types [] subst ts_fun_env
 		= (subst, ts_fun_env)
 
@@ -3278,6 +3385,15 @@ where
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
 						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
 						-> update_function_types_in_component funs fun_env fun_defs
+						-> update_function_types_in_component funs fun_env fun_defs
+				LocalFunDefCheckedType _ _ fun_type
+					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+					| nr_of_lifted_arguments > 0
+						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
+						-> update_function_types_in_component funs fun_env fun_defs
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
 						-> update_function_types_in_component funs fun_env fun_defs
 		update_function_types_in_component [] fun_env fun_defs
 			= (fun_defs, fun_env)
@@ -3308,6 +3424,7 @@ where
 	where
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
+		type_of (SpecifiedLocalFunType _ _ _ _ tst) = tst
 	
 	create_erroneous_function_types group ts
 		= foldSt create_erroneous_function_type group ts
@@ -3315,15 +3432,21 @@ where
 	create_erroneous_function_type fun ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		= case env_type of
-			ExpandedType fun_type tmp_fun_type exp_fun_type
-				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tmp_fun_type.tst_lifted ts.ts_type_heaps
+			ExpandedType fun_type {tst_lifted} _
+				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
+				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
+			ExpandedLocalFunType fun_type _ _ {tst_lifted} _
+				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
 				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
 		  	UncheckedType tmp_fun_type
 		  		# (clean_fun_type, ts_type_heaps) = cleanSymbolType tmp_fun_type.tst_arity ts.ts_type_heaps
 				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }}
-			SpecifiedType fun_type _ tmp_fun_type
-				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tmp_fun_type.tst_lifted ts.ts_type_heaps
+			SpecifiedType fun_type _ {tst_lifted}
+				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
 				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
+			SpecifiedLocalFunType fun_type _ _ _ {tst_lifted}
+				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
+				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = {ts.ts_fun_env & [fun] = CheckedType fun_type}}
 			CheckedType _
 				-> ts
 

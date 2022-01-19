@@ -14,6 +14,8 @@ instance <<< (a,b,c,d,e,f) | <<< a & <<< b & <<< c & <<< d & <<< e & <<< f
 instance <<< (a,b,c,d,e,f,g) | <<< a & <<< b & <<< c & <<< d & <<< e & <<< f & <<< g
 instance <<< [a] | <<< a
 
+:: P a b = P !a !b
+
 ::	Bind a b =
 	{	bind_src :: !a
 	,	bind_dst :: !b

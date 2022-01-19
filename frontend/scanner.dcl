@@ -112,6 +112,7 @@ instance <<< FilePosition
 	|	GenericWithToken		//		with
 
 	|	ExistsToken				//		E.
+	|	ExistsExternalToken		//		E.^
 	|	ForAllToken				//		A.
 
 LazyJustToken :== 0

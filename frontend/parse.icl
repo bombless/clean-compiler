@@ -643,8 +643,8 @@ where
 want_rhs_of_def :: !ParseContext !(Optional (Ident, Bool), [ParsedExpr]) !Token !Position !ParseState -> (ParsedDefinition, !ParseState)
 want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
 	# (name, is_infix, pState) = check_name_and_fixity opt_name cHasNoPriority pState
-	  (tspec, pState) = wantSymbolType pState
 	| isDclContext parseContext
+		# (tspec, pState) = wantSymbolType pState
 		# (specials, pState) = optionalFunSpecials pState
 		#! def = PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) specials;
 		| not specials=:FSP_ABCCode _
@@ -654,7 +654,17 @@ want_rhs_of_def parseContext (opt_name, []) DoubleColonToken pos pState
 			= (def, wantEndOfDefinition "type definition" pState)
 			// } must be at end of line, make ; optional
 			= (def, optional_semicolon_without_layout_rule pState)
-		= (PD_TypeSpec pos name (if is_infix DefaultPriority NoPrio) (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+	# priority = if is_infix DefaultPriority NoPrio
+	| parseContext==cLocalContext
+		#  (token, pState) = nextToken TypeContext pState
+		| token =: ExistsExternalToken
+			# (external_type_var_or_attr_vars,pState) = parse_external_type_and_attr_vars pState
+			# (tspec, pState) = wantSymbolType pState
+			= (PD_LocalFunctionTypeSpec pos name priority external_type_var_or_attr_vars tspec, wantEndOfDefinition "type definition" pState)
+			# (tspec, pState) = wantSymbolType (tokenBack pState)
+			= (PD_TypeSpec pos name priority (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
+		# (tspec, pState) = wantSymbolType pState
+		= (PD_TypeSpec pos name priority (Yes tspec) FSP_None, wantEndOfDefinition "type definition" pState)
 want_rhs_of_def parseContext (opt_name, args) (PriorityToken prio) pos pState
 	# (name, _, pState) = check_name_and_fixity opt_name cHasPriority pState
 	  (token, pState) = nextToken TypeContext pState
@@ -724,6 +734,66 @@ want_rhs_of_def parseContext (Yes (name, is_infix), args) token pos pState
 		FK_Caf | isNotEmpty args
 			->	(PD_Function pos name is_infix []   rhs fun_kind, parseError "CAF" No "No arguments for a CAF" pState)
 		_	->	(PD_Function pos name is_infix args rhs fun_kind, pState)
+
+parse_external_type_and_attr_vars :: !ParseState -> (![!ATypeVarOrAttributeVar!],!ParseState)
+parse_external_type_and_attr_vars pState
+	# (external_type_var_or_attr_var,pState) = try_external_type_or_attr_var pState
+	| external_type_var_or_attr_var=:NoATypeVarOrAttributeVar
+		# pState = parseError "type and attribute variables" No "type or attribute variable" pState
+		# pState = wantToken TypeContext "type and attribute variables in types of free variables" ColonToken pState
+		= ([!!],pState);
+	# (external_type_var_or_attr_vars,pState) = parse_external_type_or_attr_vars pState
+	# pState = wantToken TypeContext "type and attribute variables in types of free variables" ColonToken pState
+	= ([!external_type_var_or_attr_var:external_type_var_or_attr_vars!],pState)
+where
+	try_external_type_or_attr_var pState
+		# (token, pState) = nextToken TypeContext pState
+		= case token of
+			IdentToken name
+				| isLowerCaseName name
+					# (id, pState) = stringToIdent name IC_Type pState
+					-> (ATypeVar {atv_attribute = TA_None, atv_variable = MakeTypeVar id},pState)
+			DotToken
+				# (typevar, pState)	= wantTypeVar pState
+				  (ident, pState) = stringToIdent typevar.tv_ident.id_name IC_TypeAttr pState
+				-> (ATypeVar {atv_attribute = TA_Var (makeAttributeVar ident), atv_variable = typevar}, pState)
+			AsteriskToken
+				# (typevar, pState)	= wantTypeVar pState
+				-> (ATypeVar {atv_attribute = TA_Unique, atv_variable = typevar},pState)
+			OpenToken
+				# (token2, pState) = nextToken TypeContext pState
+				-> case token2 of
+					IdentToken name
+						| isLowerCaseName name
+							-> want_attribute_variable_with_optional_type_variable name pState
+					_
+						-> (NoATypeVarOrAttributeVar,tokenBack (tokenBack pState))
+			_
+				-> (NoATypeVarOrAttributeVar,tokenBack pState)
+
+	want_attribute_variable_with_optional_type_variable name pState
+		# (ident, pState) = stringToIdent name IC_TypeAttr pState
+		# attr_var = makeAttributeVar ident
+		# pState = wantToken TypeContext "attribute variable with optional type variable" ColonToken pState
+		# (token, pState) = nextToken TypeContext pState
+		= case token of
+			IdentToken name
+				| isLowerCaseName name
+					# (id, pState) = stringToIdent name IC_Type pState
+					# pState = wantToken TypeContext "attribute variable with optional type variable" CloseToken pState
+					-> (ATypeVar {atv_attribute = TA_Var attr_var, atv_variable = MakeTypeVar id},pState)
+			CloseToken
+				-> (AttributeVar attr_var,pState)
+			_
+				# pState = wantToken TypeContext "attribute variable with optional type variable" CloseToken (tokenBack pState)
+				-> (AttributeVar attr_var,pState)
+
+	parse_external_type_or_attr_vars pState
+		# (external_type_var_or_attr_var,pState) = try_external_type_or_attr_var pState
+		| external_type_var_or_attr_var=:NoATypeVarOrAttributeVar
+			= ([!!],pState)
+			# (external_type_var_or_attr_vars,pState) = parse_external_type_or_attr_vars pState
+			= ([!external_type_var_or_attr_var:external_type_var_or_attr_vars!],pState)
 
 wantGenericFunctionDefinition name parseContext pos pState
 	//# (type, pState) = wantType pState

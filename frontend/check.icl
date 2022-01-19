@@ -1194,6 +1194,12 @@ where
 		  cs = if is_caf (check_caf_uniqueness ft.st_result.at_attribute cs) cs
 		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
 		= (FunDefType {ft & st_context = st_context}, type_defs, class_defs, modules, var_heap, type_heaps, cs)
+	check_function_type (LocalFunDefType external_atype_or_attr_vars ft) module_index is_caf type_defs class_defs modules var_heap type_heaps cs
+		# (external_type_vars,external_atype_attrs,ft,_,type_defs,class_defs,modules,type_heaps,cs)
+			= checkLocalFunctionType module_index external_atype_or_attr_vars ft FSP_None type_defs class_defs modules type_heaps cs
+		  cs = if is_caf (check_caf_uniqueness ft.st_result.at_attribute cs) cs
+		  (st_context, var_heap) = initializeContextVariables ft.st_context var_heap
+		= (LocalFunDefCheckedType external_type_vars external_atype_attrs {ft & st_context = st_context},type_defs,class_defs,modules,var_heap,type_heaps,cs)
 	check_function_type NoFunDefType module_index _ type_defs class_defs modules var_heap type_heaps cs
 		= (NoFunDefType, type_defs,  class_defs, modules, var_heap, type_heaps, cs)
 

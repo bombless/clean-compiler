@@ -198,6 +198,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	GenericWithToken		//		with
 
 	|	ExistsToken				//		E.
+	|	ExistsExternalToken		//		E.^
 	|	ForAllToken				//		A.
 
 LazyJustToken :== 0
@@ -757,8 +758,12 @@ Scan '?' input co
 Scan 'E' input TypeContext
 	# (eof,c1,input)		= ReadNormalChar input
 	| eof					= (IdentToken "E", input)
-	| c1 == '.'				= (ExistsToken, input)
-							= ScanIdentFast 1 (charBack input) TypeContext
+	| c1 == '.'
+		# (eof,c2,input)	= ReadNormalChar input
+		| eof				= (ExistsToken, input)
+		| c2=='^'			= (ExistsExternalToken, input)
+							= (ExistsToken, charBack input)
+		= ScanIdentFast 1 (charBack input) TypeContext
 Scan 'A' input TypeContext
 	# (eof,c1,input)		= ReadNormalChar input
 	| eof					= (IdentToken "A", input)
@@ -1758,6 +1763,7 @@ where
 	toString GenericOfToken				= "of"	
 
 	toString ExistsToken				= "E."
+	toString ExistsExternalToken		= "E.^"
 	toString ForAllToken				= "A."
 
 	toString token						= "toString (Token) does not know this token"

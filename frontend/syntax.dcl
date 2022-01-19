@@ -51,7 +51,6 @@ instance == FunctionOrMacroIndex
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
-				| STE_TypeAttribute !AttrVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
 				| STE_Imported !STE_Kind !ModuleN
 				| STE_DclFunction
@@ -79,6 +78,7 @@ instance == FunctionOrMacroIndex
 				| STE_BelongingSymbolExported
 				| STE_BelongingSymbolForExportedSymbol
 				| STE_TypeExtension
+				| ..
 
 ::	ModuleN:==Int;
 
@@ -268,6 +268,7 @@ cIsNotAFunction :== False
 	|	PD_NodeDef Position ParsedExpr Rhs
 	|	PD_Type ParsedTypeDef
 	|	PD_TypeSpec Position Ident Priority (Optional SymbolType) FunSpecials
+	|	PD_LocalFunctionTypeSpec !Position !Ident !Priority ![!ATypeVarOrAttributeVar!] !SymbolType
 	|	PD_Class ClassDef [ParsedDefinition]
 	|	PD_Instance ParsedInstanceAndMembers
 	|	PD_Instances [ParsedInstanceAndMembers]
@@ -283,6 +284,8 @@ cIsNotAFunction :== False
 
 ::	FunKind = FK_Function !Bool | FK_Macro | FK_Caf | FK_NodeDefOrFunction | FK_Unknown
 			| FK_FunctionWithDerive !Int !Int
+
+::	ATypeVarOrAttributeVar = ATypeVar !ATypeVar | AttributeVar !AttributeVar | NoATypeVarOrAttributeVar
 
 ::	StrictnessList = NotStrict | Strict !Int | StrictList !Int StrictnessList
 
@@ -758,6 +761,8 @@ FI_HasLocalGenerate :== 2048
 
 :: FunDefType	= FunDefType !SymbolType
 				| NoFunDefType
+				| LocalFunDefType ![!ATypeVarOrAttributeVar!] !SymbolType
+				| LocalFunDefCheckedType ![!TypeVar!] ![!AttributeVar!] !SymbolType
 
 ::	FunDef =
 	{	fun_ident		:: !Ident

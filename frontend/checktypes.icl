@@ -5,6 +5,10 @@ import syntax, checksupport, typesupport, utilities
 import genericsupport
 from explicitimports import search_qualified_ident,qualified_import_for_type,::NameSpaceN,TypeNameSpaceN,ClassNameSpaceN
 
+::	STE_Kind
+	| STE_TypeAttribute !AttrVarInfoPtr
+	| STE_UnusedTypeAttribute !AttrVarInfoPtr
+
 ::	TypeSymbols = 
 	{	ts_type_defs		:: !.{# CheckedTypeDef}
 	,	ts_cons_defs 		:: !.{# ConsDef}
@@ -781,8 +785,12 @@ determineAttributeVariable attr_var=:{av_ident=attr_name=:{id_info}} oti=:{oti_h
 														ste_def_level = cGlobalScope, ste_previous = entry })
 		  new_attr = { attr_var & av_info_ptr = new_attr_ptr}
 		= (new_attr, { oti & oti_heaps = { oti_heaps & th_attrs = th_attrs }, oti_all_attrs = [new_attr : oti_all_attrs] }, symbol_table)
-		# (STE_TypeAttribute attr_ptr) = ste_kind
-		= ({ attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
+	= case ste_kind of
+		STE_TypeAttribute attr_ptr
+			-> ({attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
+		STE_UnusedTypeAttribute attr_ptr
+			# symbol_table = writePtr id_info {entry & ste_kind = STE_TypeAttribute attr_ptr} symbol_table
+			-> ({attr_var & av_info_ptr = attr_ptr}, oti, symbol_table)
 
 ::	DemandedAttributeKind = DAK_Ignore | DAK_Unique | DAK_None
 
@@ -1233,6 +1241,116 @@ checkFunctionType :: !Index !SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#C
 checkFunctionType mod_index st specials type_defs class_defs modules heaps cs
 	= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
 
+checkLocalFunctionType :: !Index ![!ATypeVarOrAttributeVar!]
+										!SymbolType !FunSpecials !u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*CheckState
+	 -> (![!TypeVar!],![!AttributeVar!],!SymbolType,!FunSpecials,!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*CheckState)
+checkLocalFunctionType mod_index external_atype_or_attr_vars st specials type_defs class_defs modules heaps cs
+	# (external_type_vars,external_attr_vars,type_var_heap,attr_var_heap,symbol_table,error)
+		= define_external_atype_vars external_atype_or_attr_vars [!!] [!!] heaps.th_vars heaps.th_attrs cs.cs_symbol_table cs.cs_error
+	  (external_attr_vars,attr_var_heap,symbol_table,error)
+		= define_external_attr_vars external_atype_or_attr_vars external_attr_vars attr_var_heap symbol_table error
+	  cs & cs_symbol_table=symbol_table, cs_error=error
+	  heaps & th_vars=type_var_heap, th_attrs=attr_var_heap
+	  (checked_st,specials,type_defs,class_defs,modules,heaps,cs)
+		= checkSymbolType True mod_index st specials type_defs class_defs modules heaps cs
+	  (type_var_heap,symbol_table,error)
+		= check_external_type_vars_occur_and_remove external_type_vars heaps.th_vars cs.cs_symbol_table cs.cs_error
+	  (symbol_table,error) = check_external_external_attr_vars_occur_and_remove external_attr_vars symbol_table error
+	  heaps & th_vars=type_var_heap
+	  cs & cs_symbol_table=symbol_table, cs_error=error
+	= (external_type_vars,external_attr_vars,checked_st,specials,type_defs,class_defs,modules,heaps,cs)
+where
+	define_external_atype_vars :: ![!ATypeVarOrAttributeVar!]
+										![!TypeVar!] ![!AttributeVar!] !*TypeVarHeap !*AttrVarHeap !*SymbolTable !*ErrorAdmin
+									-> (![!TypeVar!],![!AttributeVar!],!*TypeVarHeap,!*AttrVarHeap,!*SymbolTable,!*ErrorAdmin)
+	define_external_atype_vars [!ATypeVar {atv_attribute,atv_variable=atv_variable=:{tv_ident={id_name}}}:external_atype_or_attr_vars!]
+			external_type_vars external_attr_vars type_var_heap attr_var_heap symbol_table error
+		# (new_attr,external_attr_vars,attr_var_heap,symbol_table)
+			= define_external_attr_var atv_attribute id_name external_attr_vars attr_var_heap symbol_table
+		# (external_type_vars,type_var_heap,symbol_table,error)
+			= define_external_type_var atv_variable new_attr external_type_vars type_var_heap symbol_table error
+		= define_external_atype_vars external_atype_or_attr_vars external_type_vars external_attr_vars type_var_heap attr_var_heap symbol_table error
+	define_external_atype_vars [!_:external_atype_or_attr_vars!] external_type_vars external_attr_vars type_var_heap attr_var_heap symbol_table error
+		= define_external_atype_vars external_atype_or_attr_vars external_type_vars external_attr_vars type_var_heap attr_var_heap symbol_table error
+	define_external_atype_vars [!!] external_type_vars external_attr_vars type_var_heap attr_var_heap symbol_table error
+		= (external_type_vars,external_attr_vars,type_var_heap,attr_var_heap,symbol_table,error)
+
+	define_external_attr_var :: !TypeAttribute !{#Char} ![!AttributeVar!] !*AttrVarHeap !*SymbolTable
+									 -> (!TypeAttribute,![!AttributeVar!],!*AttrVarHeap,!*SymbolTable)
+	define_external_attr_var (TA_Var attr_var=:{av_ident={id_info}}) var_ident external_attr_vars attr_var_heap symbol_table
+		# (entry=:{ste_kind,ste_def_level}, symbol_table) = readPtr id_info symbol_table
+		| ste_kind =: STE_Empty || ste_def_level == cModuleScope
+			# (new_attr_var,external_attr_vars,attr_var_heap,symbol_table)
+				= define_new_external_attr_var attr_var id_info entry external_attr_vars attr_var_heap symbol_table
+			= (TA_Var new_attr_var,external_attr_vars,attr_var_heap,symbol_table)
+			// no error, allow u:a and u:b
+			# (STE_UnusedTypeAttribute attr_ptr) = ste_kind
+			  new_attr = {attr_var & av_info_ptr = attr_ptr}
+			= (TA_Var new_attr,external_attr_vars,attr_var_heap,symbol_table)
+	define_external_attr_var TA_None var_ident external_attr_vars attr_var_heap symbol_table
+		= (TA_Multi,external_attr_vars,attr_var_heap,symbol_table)
+	define_external_attr_var type_attribute var_ident external_attr_vars attr_var_heap symbol_table
+		= (type_attribute,external_attr_vars,attr_var_heap,symbol_table)
+
+	define_external_type_var :: !TypeVar !TypeAttribute ![!TypeVar!] !*TypeVarHeap !*SymbolTable !*ErrorAdmin
+													-> (![!TypeVar!],!*TypeVarHeap,!*SymbolTable,!*ErrorAdmin)
+	define_external_type_var tv=:{tv_ident={id_info}} new_attr external_type_vars type_var_heap symbol_table error
+		# (entry=:{ste_kind,ste_def_level},symbol_table) = readPtr id_info symbol_table
+		| ste_kind =: STE_Empty || ste_def_level == cModuleScope
+			# (new_var_ptr, type_var_heap) = newPtr (TVI_AttrAndRefCount new_attr 0) type_var_heap
+			  new_var = {tv & tv_info_ptr = new_var_ptr}
+			  new_entry = {ste_index=NoIndex, ste_kind=STE_TypeVariable new_var_ptr, ste_def_level=cGlobalScope, ste_previous=entry}
+			  symbol_table = writePtr id_info new_entry symbol_table
+			= ([!new_var:external_type_vars!],type_var_heap,symbol_table,error)
+			# error = checkError tv.tv_ident "type variable already defined" error
+			= (external_type_vars,type_var_heap,symbol_table,error)
+
+	define_external_attr_vars :: ![!ATypeVarOrAttributeVar!] ![!AttributeVar!] !*AttrVarHeap !*SymbolTable !*ErrorAdmin
+														 -> (![!AttributeVar!],!*AttrVarHeap,!*SymbolTable,!*ErrorAdmin)
+	define_external_attr_vars [!AttributeVar attr_var=:{av_ident={id_info},av_info_ptr}:external_atype_or_attr_vars!] external_attr_vars attr_var_heap symbol_table error
+		# (entry=:{ste_kind,ste_def_level}, symbol_table) = readPtr id_info symbol_table
+		| ste_kind =: STE_Empty || ste_def_level == cModuleScope
+			# (new_attr_var,external_attr_vars,attr_var_heap,symbol_table)
+				= define_new_external_attr_var attr_var id_info entry external_attr_vars attr_var_heap symbol_table
+			= define_external_attr_vars external_atype_or_attr_vars external_attr_vars attr_var_heap symbol_table error
+			# error = checkError attr_var.av_ident "attribute variable already defined" error
+			= define_external_attr_vars external_atype_or_attr_vars external_attr_vars attr_var_heap symbol_table error
+	define_external_attr_vars [!_:external_atype_or_attr_vars!] external_attr_vars attr_var_heap symbol_table error
+		= define_external_attr_vars external_atype_or_attr_vars external_attr_vars attr_var_heap symbol_table error
+	define_external_attr_vars [!!] external_attr_vars attr_var_heap symbol_table error
+		= (external_attr_vars,attr_var_heap,symbol_table,error)
+
+	define_new_external_attr_var attr_var id_info entry external_attr_vars attr_var_heap symbol_table
+		#! (new_attr_ptr, attr_var_heap) = newPtr AVI_Empty attr_var_heap
+		# new_entry = {ste_index = NoIndex, ste_kind = STE_UnusedTypeAttribute new_attr_ptr, ste_def_level = cGlobalScope, ste_previous = entry}
+		  symbol_table = writePtr id_info new_entry symbol_table
+		  new_attr = {attr_var & av_info_ptr = new_attr_ptr}
+		= (new_attr,[!new_attr:external_attr_vars!],attr_var_heap,symbol_table)
+
+	check_external_type_vars_occur_and_remove [!{tv_info_ptr,tv_ident}:external_type_vars!] type_var_heap symbol_table error
+		# symbol_table = removeDefinitionFromSymbolTable cGlobalScope tv_ident symbol_table
+		# (tv_info, type_var_heap) = readPtr tv_info_ptr type_var_heap
+		| tv_info=:(TVI_AttrAndRefCount _ 0)
+			# error = checkError tv_ident "unused type variable" error
+			= check_external_type_vars_occur_and_remove external_type_vars type_var_heap symbol_table error
+			= check_external_type_vars_occur_and_remove external_type_vars type_var_heap symbol_table error
+	check_external_type_vars_occur_and_remove [!!] type_var_heap symbol_table error
+		= (type_var_heap,symbol_table,error)
+
+	check_external_external_attr_vars_occur_and_remove [!{av_ident=av_ident=:{id_info}}:external_attr_vars!] symbol_table error
+		| isNilPtr id_info // for TA_Anonymous
+			= check_external_external_attr_vars_occur_and_remove external_attr_vars symbol_table error
+		# ({ste_def_level,ste_kind,ste_previous}, symbol_table) = readPtr id_info symbol_table
+		| ste_def_level>=cGlobalScope
+			# symbol_table = writePtr id_info ste_previous symbol_table
+			| ste_def_level==cGlobalScope && ste_kind=:STE_UnusedTypeAttribute _
+				# error = checkError av_ident "unused attribute variable" error
+				= check_external_external_attr_vars_occur_and_remove external_attr_vars symbol_table error
+				= check_external_external_attr_vars_occur_and_remove external_attr_vars symbol_table error
+			= check_external_external_attr_vars_occur_and_remove external_attr_vars symbol_table error
+	check_external_external_attr_vars_occur_and_remove [!!] symbol_table error
+		= (symbol_table,error)
+
 checkMemberType :: !Index !SymbolType !u:{# CheckedTypeDef} !v:{# ClassDef} !u:{# DclModule} !*TypeHeaps !*CheckState
 	-> (!SymbolType, !u:{# CheckedTypeDef}, !v:{# ClassDef}, !u:{# DclModule}, !*TypeHeaps, !*CheckState)
 checkMemberType mod_index st type_defs class_defs modules heaps cs
@@ -1456,7 +1574,15 @@ where
 				| entry.ste_kind =: STE_Empty
 					= symbol_table
 					= symbol_table <:= (id_info, entry.ste_previous)
-checkDynamicTypes mod_index dyn_type_ptrs (FunDefType {st_vars}) type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
+checkDynamicTypes mod_index dyn_type_ptrs (FunDefType {st_vars}) type_defs class_defs modules type_heaps expr_heap cs
+	= checkDynamicTypesWithFunctionType mod_index dyn_type_ptrs st_vars type_defs class_defs modules type_heaps expr_heap cs
+checkDynamicTypes mod_index dyn_type_ptrs (LocalFunDefCheckedType _ _ {st_vars}) type_defs class_defs modules type_heaps expr_heap cs
+	= checkDynamicTypesWithFunctionType mod_index dyn_type_ptrs st_vars type_defs class_defs modules type_heaps expr_heap cs
+
+checkDynamicTypesWithFunctionType :: !Index ![ExprInfoPtr] ![TypeVar]
+		!u:{#CheckedTypeDef} !v:{#ClassDef} !u:{#DclModule} !*TypeHeaps !*ExpressionHeap !*CheckState
+	-> (!u:{#CheckedTypeDef},!v:{#ClassDef},!u:{#DclModule},!*TypeHeaps,!*ExpressionHeap,!*CheckState)
+checkDynamicTypesWithFunctionType mod_index dyn_type_ptrs st_vars type_defs class_defs modules type_heaps expr_heap cs=:{cs_symbol_table}
 	# (th_vars, cs_symbol_table) = foldSt add_type_variable_to_symbol_table st_vars (type_heaps.th_vars, cs_symbol_table)
 	  (type_defs, class_defs, modules, heaps, expr_heap, cs)
 		= checkDynamics mod_index cGlobalScope dyn_type_ptrs type_defs class_defs modules
@@ -2080,6 +2206,7 @@ where
 instance toVariable AttributeVar
 where
 	toVariable (STE_TypeAttribute info_ptr) ident = { av_ident = ident, av_info_ptr = info_ptr }
+	toVariable (STE_UnusedTypeAttribute info_ptr) ident = { av_ident = ident, av_info_ptr = info_ptr }
 
 instance <<< DynamicType
 where

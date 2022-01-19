@@ -800,6 +800,8 @@ instance check_completeness FunctionBody where
 instance check_completeness FunDefType where
 	check_completeness (FunDefType x) cci ccs
 		= check_completeness x cci ccs
+	check_completeness (LocalFunDefType _ x) cci ccs
+		= check_completeness x cci ccs
 	check_completeness NoFunDefType _ ccs
 		= ccs
 

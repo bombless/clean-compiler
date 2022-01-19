@@ -1048,12 +1048,16 @@ new_local_kind_variables_for_universal_vars type_vars type_var_heap as_kind_heap
 
 bindFreshKindVariablesToTypeVars :: [TypeVar] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
 bindFreshKindVariablesToTypeVars type_vars type_var_heap as_kind_heap
-	= foldSt new_kind type_vars (type_var_heap, as_kind_heap)
-where
-	new_kind :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
-	new_kind {tv_info_ptr} (type_var_heap, kind_heap)
-		# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
-		= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
+	= foldSt new_kind_for_type_var type_vars (type_var_heap, as_kind_heap)
+
+bindFreshKindVariablesToTypeVarsS :: [!TypeVar!] !*TypeVarHeap !*KindHeap -> (!*TypeVarHeap,!*KindHeap)
+bindFreshKindVariablesToTypeVarsS type_vars type_var_heap as_kind_heap
+	= foldStS new_kind_for_type_var type_vars (type_var_heap, as_kind_heap)
+
+new_kind_for_type_var :: !TypeVar !(!*TypeVarHeap,!*KindHeap) -> (!*TypeVarHeap,!*KindHeap)
+new_kind_for_type_var {tv_info_ptr} (type_var_heap, kind_heap)
+	# (kind_info_ptr, kind_heap) = freshKindVarInfoPtr kind_heap
+	= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
 	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
@@ -1174,6 +1178,12 @@ where
 		= case fun_type of
 			FunDefType symbol_type
 				# as & as_error = pushErrorPosition fun_ident fun_pos as.as_error
+				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos as
+				-> (icl_fun_defs, class_infos, expression_heap, {as & as_error = popErrorAdmin as.as_error})
+			LocalFunDefCheckedType external_type_vars _ symbol_type
+				# as & as_error = pushErrorPosition fun_ident fun_pos as.as_error
+				  (as_type_var_heap, as_kind_heap) = bindFreshKindVariablesToTypeVarsS external_type_vars as.as_type_var_heap as.as_kind_heap
+				  as & as_type_var_heap=as_type_var_heap, as_kind_heap=as_kind_heap
 				  (class_infos, as) = check_kinds_of_symbol_type common_defs symbol_type class_infos as
 				-> (icl_fun_defs, class_infos, expression_heap, {as & as_error = popErrorAdmin as.as_error})
 			NoFunDefType

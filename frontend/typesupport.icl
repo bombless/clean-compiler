@@ -20,8 +20,8 @@ import syntax, expand_types, unitype, utilities, checktypes
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
-::	FunctionType = CheckedType !SymbolType | SpecifiedType !SymbolType ![AType] !TempSymbolType
-				 | UncheckedType !TempSymbolType | ExpandedType !SymbolType !TempSymbolType !TempSymbolType  | EmptyFunctionType
+::	FunctionType = CheckedType !SymbolType
+				 | UncheckedType !TempSymbolType
 				 | ..
 
 ::	AttributeEnv	:== {! TypeAttribute }
@@ -414,6 +414,14 @@ liftedError type_var err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "type variable " <<< type_var <<< " of type of lifted argument appears in the specified type\n" }
 
+liftedTypeVarMissingError type_var err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "type variable " <<< type_var <<< " does not occur in the type of a lifted argument\n" }
+
+liftedAttributeVarMissingError type_var err
+	# err = errorHeading "Type error" err
+	= { err & ea_file = err.ea_file <<< "attribute variable " <<< type_var <<< " does not occur in the type of a lifted argument\n" }
+
 startRuleError mess err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< mess }
@@ -547,16 +555,17 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error, cus_exis_vars = [] }
 	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_is_lifted_part = True }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
-	  cui = { cui & cui_is_lifted_part = False }
-	  (lifted_vars, cus_var_env) = determine_type_vars nr_of_temp_vars [] cus_var_env
-	  cus & cus_var_env = cus_var_env
+	  cui & cui_is_lifted_part = False
+	  (lifted_vars, cus_var_env) = determine_lifted_type_vars nr_of_temp_vars cus_var_env
+	  cus & cus_var_env=cus_var_env
 	  (st_args, cus) = clean_up_arg_types cui tst_lifted tst_args cus
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
 	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
 		= clean_up_type_contexts spec_type tst_context derived_context common_defs cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
-	  (cus_attr_env, st_attr_vars, st_attr_env, cus_error)
+	  (cus_attr_env, attr_vars, lifted_attr_vars, st_attr_env, cus_error)
 			= build_attribute_environment cus.cus_appears_in_lifted_part max_attr_nr coercions cus.cus_attr_env cus_error
+	  st_attr_vars = lifted_attr_vars ++ attr_vars
 	  (expr_heap, {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps})
 			= clean_up_expression_types case_and_let_exprs expr_heap
 					 {cuets_var_env=cus_var_env,cuets_heaps=type_heaps,cuets_var_store=cus.cus_var_store}
@@ -567,14 +576,14 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  cus_attr_env = {cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr-1]}
 	= (st, ambiguous_or_missing_contexts, cus_var_env, cus_attr_env, cus_heaps, var_heap, expr_heap, cus_error)
 where
-	determine_type_vars to_index all_vars var_env
-		= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
+	determine_lifted_type_vars to_index var_env
+		= iFoldSt determine_lifted_type_var 0 to_index ([], var_env)
 	where
-		determine_type_var var_index (all_vars, var_env)
+		determine_lifted_type_var var_index (all_vars, var_env)
 			# (type, var_env) = var_env![var_index]
 			= case type of
 				TV var
-					-> ([var : all_vars], { var_env & [var_index] = TLifted var})
+					-> ([var : all_vars], {var_env & [var_index] = TLifted var})
 				_
 					-> (all_vars, var_env)
 
@@ -592,6 +601,98 @@ where
 					= cus_error
 				= startRuleError "Start rule cannot be overloaded.\n" cus_error
 			= cus_error
+
+cleanUpLocalSymbolType :: !TempSymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
+							!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+						-> (!SymbolType,!ErrorContexts,![!P TypeVarInfoPtr TypeVarInfoPtr!],![!P AttrVarInfoPtr AttrVarInfoPtr!],
+							!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+cleanUpLocalSymbolType {tst_arity,tst_args,tst_result,tst_context,tst_lifted} external_type_vars external_attr_vars derived_context
+		case_and_let_exprs coercions attr_part common_defs var_env attr_var_env heaps var_heap expr_heap error
+	#! nr_of_temp_vars = size var_env
+	#! max_attr_nr = size attr_var_env
+	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
+				cus_heaps = heaps, cus_var_store = 0, cus_attr_store = 0, cus_error = error, cus_exis_vars = [] }
+	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_is_lifted_part = True }
+
+	  (lifted_args, cus=:{cus_var_env,cus_error,cus_appears_in_lifted_part}) = clean_up cui (take tst_lifted tst_args) cus
+	  cui & cui_is_lifted_part = False
+	  (new_and_old_external_type_vars,cus_var_env,cus_error) = prevent_lift_of_external_type_vars external_type_vars cus_var_env cus_error
+	  (lifted_vars, cus_var_env) = determine_type_vars_and_restore_lifted_vars nr_of_temp_vars cus_var_env
+	  (new_and_old_external_attr_vars,cus_appears_in_lifted_part,cus_attr_env,cus_error)
+			= remove_external_attr_vars cui external_attr_vars cus_appears_in_lifted_part cus.cus_attr_env cus_error
+	  cus & cus_appears_in_lifted_part=cus_appears_in_lifted_part, cus_var_env=cus_var_env, cus_attr_env=cus_attr_env, cus_error=cus_error
+	  (st_args, cus) = clean_up_arg_types cui tst_lifted tst_args cus
+	  (st_result, cus) = clean_up_result_type cui tst_result cus
+	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
+		= clean_up_type_contexts cSpecifiedType tst_context derived_context common_defs cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
+	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
+	  (cus_attr_env, attr_vars, lifted_attr_vars, st_attr_env, cus_error)
+			= build_attribute_environment cus.cus_appears_in_lifted_part max_attr_nr coercions cus.cus_attr_env cus_error
+	  st_attr_vars = lifted_attr_vars ++ attr_vars
+	  (expr_heap, {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps})
+			= clean_up_expression_types case_and_let_exprs expr_heap
+					 {cuets_var_env=cus_var_env,cuets_heaps=type_heaps,cuets_var_store=cus.cus_var_store}
+	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
+			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
+	  cus_var_env = {cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars-1]}
+	  cus_attr_env = {cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr-1]}
+	= (st,ambiguous_or_missing_contexts,new_and_old_external_type_vars,new_and_old_external_attr_vars,cus_var_env,cus_attr_env,cus_heaps,var_heap,expr_heap,cus_error)
+where
+	prevent_lift_of_external_type_vars [!P {tv_ident,tv_info_ptr} (TempV var_index):external_type_vars!] var_env error
+		# (type, var_env) = var_env![var_index]
+		= case type of
+			TV var
+				# var_env & [var_index] = TLifted var // restored in determine_type_vars_and_restore_lifted_vars
+				# (new_and_old_external_type_vars,cus_var_env,cus_error) = prevent_lift_of_external_type_vars external_type_vars var_env error
+				-> ([!P var.tv_info_ptr tv_info_ptr:new_and_old_external_type_vars!],cus_var_env,cus_error)
+			_
+				# error = liftedTypeVarMissingError tv_ident error
+				-> prevent_lift_of_external_type_vars external_type_vars var_env error
+	prevent_lift_of_external_type_vars [!P {tv_ident} _:external_type_vars!] var_env error
+		# error = liftedTypeVarMissingError tv_ident error
+		= prevent_lift_of_external_type_vars external_type_vars var_env error
+	prevent_lift_of_external_type_vars [!!] var_env error
+		= ([!!],var_env,error)
+
+	determine_type_vars_and_restore_lifted_vars to_index var_env
+		= iFoldSt determine_type_var 0 to_index ([], var_env)
+	where
+		determine_type_var var_index (all_vars, var_env)
+			# (type, var_env) = var_env![var_index]
+			= case type of
+				TV var
+					-> ([var : all_vars], {var_env & [var_index] = TLifted var})
+				TLifted var
+					-> (all_vars, {var_env & [var_index] = TV var})
+				_
+					-> (all_vars, var_env)
+
+	remove_external_attr_vars cui [!P {av_ident,av_info_ptr} (TA_TempVar av_number):external_attr_vars!] appears_in_lifted_part attr_env error
+		# av_group_nr = cui.cui_attr_part.[av_number]
+		| bitvectSelect av_group_nr appears_in_lifted_part
+			# appears_in_lifted_part = bitvectReset av_group_nr appears_in_lifted_part
+			# (type_attribute,attr_env) = attr_env![av_group_nr]
+			= case type_attribute of
+				TA_Var av
+					# (new_and_old_external_attr_vars,appears_in_lifted_part,attr_env,error)
+						= remove_external_attr_vars cui external_attr_vars appears_in_lifted_part attr_env error
+					-> ([!P av.av_info_ptr av_info_ptr:new_and_old_external_attr_vars!],appears_in_lifted_part,attr_env,error)
+			# error = liftedAttributeVarMissingError av_ident error
+			= remove_external_attr_vars cui external_attr_vars appears_in_lifted_part attr_env error
+	remove_external_attr_vars cui [!!] appears_in_lifted_part attr_env error
+		= ([!!],appears_in_lifted_part,attr_env,error)
+
+determine_type_vars to_index all_vars var_env
+	= iFoldSt determine_type_var 0 to_index (all_vars, var_env)
+where
+	determine_type_var var_index (all_vars, var_env)
+		# (type, var_env) = var_env![var_index]
+		= case type of
+			TV var
+				-> ([var : all_vars], var_env)
+			_
+				-> (all_vars, var_env)
+
 
 clean_up_arg_types cui tst_lifted tst_args cus
 	# (st_args, (_, cus)) = mapSt (clean_up_arg_type cui) (drop tst_lifted tst_args) ([], cus)
@@ -902,58 +1003,64 @@ where
 		= [if type.at_type=:TempQV _ {type & at_type=TAll} type \\ type<-cv_arg_types]
 
 build_attribute_environment :: !LargeBitvect !Index !{!CoercionTree} !*AttributeEnv !*ErrorAdmin
-							   -> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
+			   -> (!*AttributeEnv,![AttributeVar],![AttributeVar],![AttrInequality],!*ErrorAdmin)
 build_attribute_environment appears_in_lifted_part max_attr_nr coercions attr_env error
-	= build_attribute_environment appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) attr_env [] [] error
+	= build_attribute_environment appears_in_lifted_part 0 max_attr_nr coercions (bitvectCreate max_attr_nr) attr_env [] [] [] error
 where
-	build_attribute_environment :: !LargeBitvect !Index !Index !{!CoercionTree} !*LargeBitvect !*AttributeEnv ![AttributeVar] ![AttrInequality] !*ErrorAdmin
-																						   -> (!*AttributeEnv,![AttributeVar],![AttrInequality],!*ErrorAdmin)
-	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions already_build_inequalities attr_env attr_vars inequalities error
+	build_attribute_environment :: !LargeBitvect !Index !Index !{!CoercionTree} !*LargeBitvect
+										!*AttributeEnv ![AttributeVar] ![AttributeVar] ![AttrInequality] !*ErrorAdmin
+									-> (!*AttributeEnv,![AttributeVar],![AttributeVar],![AttrInequality],!*ErrorAdmin)
+	build_attribute_environment appears_in_lifted_part attr_group_index max_attr_nr coercions already_build_inequalities attr_env
+			attr_vars lifted_attr_vars inequalities error
 		| attr_group_index == max_attr_nr
-			= (attr_env, attr_vars, inequalities, error)
+			= (attr_env, attr_vars, lifted_attr_vars, inequalities, error)
 		# (attr, attr_env) = attr_env![attr_group_index]
 		= case attr of
 			TA_Var attr_var
 				# already_build_inequalities = bitvectResetAll already_build_inequalities
 				# (ok, attr_env, inequalities,already_build_inequalities)
 						= build_inequalities appears_in_lifted_part (bitvectSelect attr_group_index appears_in_lifted_part)
-								attr_var coercions.[attr_group_index] coercions attr_env inequalities already_build_inequalities
+								attr_var coercions.[attr_group_index] coercions True attr_env inequalities already_build_inequalities
 				  error = case ok of
 				  			True
 				  				-> error
 				  			_
 				  				-> checkError "attribute variable of lifted argument appears in derived attribute inequality"
 				  					"" error
-				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities attr_env [attr_var : attr_vars] inequalities error
+				| bitvectSelect attr_group_index appears_in_lifted_part
+					# lifted_attr_vars = [attr_var : lifted_attr_vars]
+					-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities
+						attr_env attr_vars lifted_attr_vars inequalities error
+					# attr_vars = [attr_var : attr_vars]
+					-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities
+						attr_env attr_vars lifted_attr_vars inequalities error
 			TA_None
-				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities attr_env attr_vars inequalities error
+				-> build_attribute_environment appears_in_lifted_part (inc attr_group_index) max_attr_nr coercions already_build_inequalities
+					attr_env attr_vars lifted_attr_vars inequalities error
 
-	build_inequalities :: {#Int} Bool AttributeVar !CoercionTree {!CoercionTree} !*{!TypeAttribute}  [AttrInequality] !*LargeBitvect
-																	   -> (!Bool,!*{!TypeAttribute},![AttrInequality],!*LargeBitvect)
-	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right) 
-				coercions attr_env inequalities already_build_inequalities
-		# (ok1, attr_env, inequalities,already_build_inequalities)
-				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions attr_env inequalities already_build_inequalities
-		  (ok2, attr_env, inequalities,already_build_inequalities)
-		  		= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions attr_env inequalities already_build_inequalities
+	build_inequalities :: {#Int} Bool AttributeVar !CoercionTree {!CoercionTree} !Bool !*{!TypeAttribute}  [AttrInequality] !*LargeBitvect
+																			 -> (!Bool,!*{!TypeAttribute},![AttrInequality],!*LargeBitvect)
+	build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var (CT_Node dem_attr left right)
+				coercions ok attr_env inequalities already_build_inequalities
+		# (ok, attr_env, inequalities,already_build_inequalities)
+				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var left coercions ok attr_env inequalities already_build_inequalities
+		  (ok, attr_env, inequalities,already_build_inequalities)
+				= build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var right coercions ok attr_env inequalities already_build_inequalities
 		# (attr, attr_env) = attr_env![dem_attr]
 		= case attr of
 			TA_Var attr_var
 				| is_new_inequality attr_var off_var inequalities
 					# ok3 = off_appears_in_lifted_part == bitvectSelect dem_attr appears_in_lifted_part
-					-> (ok1 && ok2 && ok3, attr_env, [{ ai_demanded = attr_var, ai_offered = off_var } : inequalities],already_build_inequalities) 
-					-> (ok1 && ok2, attr_env, inequalities,already_build_inequalities)
+					-> (ok && ok3, attr_env, [{ai_demanded = attr_var, ai_offered = off_var} : inequalities],already_build_inequalities)
+					-> (ok, attr_env, inequalities,already_build_inequalities)
 			TA_None
 				# (already_build_inequality,already_build_inequalities) = bitvectTestAndSet dem_attr already_build_inequalities
 				| already_build_inequality
-					-> (ok1 && ok2, attr_env, inequalities,already_build_inequalities)
-				# (ok3, attr_env, inequalities,already_build_inequalities)
-						= build_inequalities appears_in_lifted_part off_appears_in_lifted_part 
-								off_var coercions.[dem_attr] coercions attr_env inequalities already_build_inequalities
-				#! ok3=ok3
-				-> (ok1 && ok2 && ok3, attr_env, inequalities,already_build_inequalities)
-	build_inequalities _ _ off_var tree coercions attr_env inequalities already_build_inequalities
-		= (True, attr_env, inequalities,already_build_inequalities)
+					-> (ok, attr_env, inequalities,already_build_inequalities)
+				-> build_inequalities appears_in_lifted_part off_appears_in_lifted_part off_var coercions.[dem_attr]
+								coercions ok attr_env inequalities already_build_inequalities
+	build_inequalities _ _ off_var tree coercions ok attr_env inequalities already_build_inequalities
+		= (ok, attr_env, inequalities,already_build_inequalities)
 
 	is_new_inequality dem_var off_var []
 		= True
@@ -2368,6 +2475,110 @@ addAttrEnvInequalities st_attr_env coercions th_attrs
 		# (AVI_Attr (TA_TempVar offered), th_attrs) = readPtr ai_offered.av_info_ptr th_attrs
 		  (AVI_Attr (TA_TempVar demanded), th_attrs) = readPtr ai_demanded.av_info_ptr th_attrs
   		= (newInequality offered demanded coercions, th_attrs)
+
+replace_external_variables :: ![AType] ![TypeContext] ![!P TypeVarInfoPtr TypeVarInfoPtr!] ![!P AttrVarInfoPtr AttrVarInfoPtr!]
+								![TypeVar] ![AttributeVar] !*TypeHeaps -> (![AType],![TypeContext],!*TypeHeaps)
+replace_external_variables lifted_args lifted_contexts new_and_old_external_type_vars new_and_old_external_attr_vars
+		type_vars_in_lifted_args attr_vars_in_lifted_args {th_vars=type_var_heap,th_attrs=attr_var_heap}
+	# type_var_heap = foldSt clear_binding_of_type_var type_vars_in_lifted_args type_var_heap
+	  type_var_heap = foldStS set_external_type_var_forwarding new_and_old_external_type_vars type_var_heap
+	  attr_var_heap = foldSt clear_binding_of_attr_var attr_vars_in_lifted_args attr_var_heap
+	  attr_var_heap = foldStS set_external_attr_var_forwarding new_and_old_external_attr_vars attr_var_heap
+	// new -> old
+	  (lifted_args,type_heaps) = replace_external_vars lifted_args {th_vars=type_var_heap,th_attrs=attr_var_heap}
+	  (lifted_contexts,type_heaps) = replace_external_vars lifted_contexts type_heaps
+	=  (lifted_args,lifted_contexts,type_heaps)
+where
+	clear_binding_of_type_var {tv_info_ptr} type_var_heap
+		= writePtr tv_info_ptr TVI_Empty type_var_heap
+
+	set_external_type_var_forwarding (P new_external_var old_external_var) type_var_heap
+		= writePtr new_external_var (TVI_TypeVar old_external_var) type_var_heap
+
+	clear_binding_of_attr_var {av_info_ptr} attr_var_heap
+		= writePtr av_info_ptr AVI_Empty attr_var_heap
+
+	set_external_attr_var_forwarding (P new_external_var old_external_var) attr_var_heap
+		= writePtr new_external_var (AVI_AttrVar old_external_var) attr_var_heap
+
+class replace_external_vars a :: !a !*TypeHeaps -> (!a,!*TypeHeaps)
+
+instance replace_external_vars [a] | replace_external_vars a where
+	replace_external_vars [e:l] type_heaps
+		# (e,type_heaps) = replace_external_vars e type_heaps
+		# (l,type_heaps) = replace_external_vars l type_heaps
+		= ([e:l],type_heaps)
+	replace_external_vars [] type_heaps
+		= ([],type_heaps)
+
+instance replace_external_vars AType where
+	replace_external_vars {at_attribute=at_attribute=:TA_Var {av_ident,av_info_ptr},at_type} type_heaps
+		# (at_type,type_heaps) = replace_external_vars at_type type_heaps
+		  (av_info,attr_var_heap) = readPtr av_info_ptr type_heaps.th_attrs
+		  type_heaps & th_attrs=attr_var_heap
+		= case av_info of
+			AVI_AttrVar old_external_var
+				-> ({at_attribute=TA_Var {av_ident=av_ident,av_info_ptr=old_external_var},at_type=at_type},type_heaps)
+			_
+				-> ({at_attribute=at_attribute,at_type=at_type},type_heaps)
+	replace_external_vars {at_attribute=at_attribute=:TA_RootVar {av_ident,av_info_ptr},at_type} type_heaps
+		# (at_type,type_heaps) = replace_external_vars at_type type_heaps
+		  (av_info,attr_var_heap) = readPtr av_info_ptr type_heaps.th_attrs
+		  type_heaps & th_attrs=attr_var_heap
+		= case av_info of
+			AVI_AttrVar old_external_var
+				-> ({at_attribute=TA_RootVar {av_ident=av_ident,av_info_ptr=old_external_var},at_type=at_type},type_heaps)
+			_
+				-> ({at_attribute=at_attribute,at_type=at_type},type_heaps)
+	replace_external_vars {at_attribute,at_type} type_heaps
+		# (at_type,type_heaps) = replace_external_vars at_type type_heaps
+		= ({at_attribute=at_attribute,at_type=at_type},type_heaps)
+
+instance replace_external_vars Type where
+	replace_external_vars type=:(TV {tv_ident,tv_info_ptr}) type_heaps
+		# (tv_info,type_var_heap) = readPtr tv_info_ptr type_heaps.th_vars
+		  type_heaps & th_vars=type_var_heap
+		= case tv_info of
+			TVI_TypeVar old_external_var
+				-> (TV {tv_ident=tv_ident,tv_info_ptr=old_external_var},type_heaps)
+			_
+				->  (type, type_heaps)
+	replace_external_vars (arg_type-->restype) type_heaps
+		# (arg_type,type_heaps) = replace_external_vars arg_type type_heaps
+		# (restype,type_heaps) = replace_external_vars restype type_heaps
+		= (arg_type-->restype,type_heaps)
+	replace_external_vars (TA tc types) type_heaps
+		# (types,type_heaps) = replace_external_vars types type_heaps
+		= (TA tc types, type_heaps)
+	replace_external_vars (TAS tc types strictness) type_heaps
+		# (types,type_heaps) = replace_external_vars types type_heaps
+		= (TAS tc types strictness, type_heaps)
+	replace_external_vars (cv=:(CV {tv_ident,tv_info_ptr}) :@: types) type_heaps
+		# (types,type_heaps) = replace_external_vars types type_heaps
+		  (tv_info,type_var_heap) = readPtr tv_info_ptr type_heaps.th_vars
+		  type_heaps & th_vars=type_var_heap
+		= case tv_info of
+			TVI_TypeVar old_external_var
+				-> (CV {tv_ident=tv_ident,tv_info_ptr=old_external_var} :@: types,type_heaps)
+			_
+				-> (cv :@: types, type_heaps)
+	replace_external_vars (TArrow1 type) type_heaps
+		# (type,type_heaps) = replace_external_vars type type_heaps
+		= (TArrow1 type,type_heaps)
+	replace_external_vars (TFA vars type) type_heaps
+		# (type,type_heaps) = replace_external_vars type type_heaps
+		= (TFA vars type,type_heaps)
+	replace_external_vars (TFAC vars type type_contexts) type_heaps
+		# (type,type_heaps) = replace_external_vars type type_heaps
+		# (type_contexts,type_heaps) = replace_external_vars type_contexts type_heaps
+		= (TFAC vars type type_contexts,type_heaps)
+	replace_external_vars type type_heaps
+		= (type, type_heaps)
+
+instance replace_external_vars TypeContext where
+	replace_external_vars tc=:{tc_types} type_heaps
+		# (tc_types,type_heaps) = replace_external_vars tc_types type_heaps
+		= ({tc & tc_types=tc_types},type_heaps)
 
 optBeautifulizeIdent :: !String -> Optional (!String, !LineNr)
 optBeautifulizeIdent id_name

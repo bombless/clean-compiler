@@ -2,6 +2,8 @@ implementation module general
 
 import StdEnv
 
+:: P a b = P !a !b
+
 ::	Bind a b =
 	{	bind_src :: !a
 	,	bind_dst :: !b

@@ -908,9 +908,6 @@ where
 		(STE_TypeVariable _) 
 			= file <<< "STE_TypeVariable"
 	(<<<) file
-		(STE_TypeAttribute _)
-			= file <<< "STE_TypeAttribute"
-	(<<<) file
 		(STE_BoundTypeVariable _)
 			= file <<< "STE_BoundTypeVariable"
 	(<<<) file

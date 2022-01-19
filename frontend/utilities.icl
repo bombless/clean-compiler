@@ -132,13 +132,24 @@ mapSt f [] s
 mapSt f l s :== map_st l s
 where
 	map_st [x : xs] s
-	 	# (x, s) = f x s
+		# (x, s) = f x s
 		  (xs, s) = map_st xs s
 		#! s = s
 		= ([x : xs], s)
 	map_st [] s
 		#! s = s
-	 	= ([], s)
+		= ([], s)
+
+mapStS f l s :== map_st l s
+where
+	map_st [!x : xs!] s
+		# (x, s) = f x s
+		  (xs, s) = map_st xs s
+		#! s = s
+		= ([!x : xs!], s)
+	map_st [!!] s
+		#! s = s
+		= ([!!], s)
 
 mapSt2 f l s1 s2 :== map_st2 l s1 s2
 where
@@ -231,6 +242,11 @@ foldSt op r l :== fold_st r l
 	where
 		fold_st [] st		= st
 		fold_st [a:x] st	= fold_st x (op a st)
+
+foldStS op l st :== fold_st l st
+	where
+		fold_st [!!] st		= st
+		fold_st [!a:x!] st	= fold_st x (op a st)
 
 // iFoldSt :: (Int -> .(.b -> .b)) !Int !Int .b -> .b
 iFoldSt op fr to st :== i_fold_st fr to st

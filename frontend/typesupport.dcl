@@ -43,6 +43,11 @@ cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !
 												   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 					-> (!SymbolType,!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 
+cleanUpLocalSymbolType :: !TempSymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
+							!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
+						-> (!SymbolType,!ErrorContexts,![!P TypeVarInfoPtr TypeVarInfoPtr!],![!P AttrVarInfoPtr AttrVarInfoPtr!],
+							!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
+
 set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> *TypeVarHeap
 
 equivalent :: !SymbolType !TempSymbolType !{#CommonDefs} !*AttributeEnv !*TypeHeaps -> (!Bool, !*AttributeEnv, !*TypeHeaps)
@@ -66,8 +71,8 @@ beautifulizeAttributes :: !SymbolType !*AttrVarHeap -> (!SymbolType, !.AttrVarHe
 	,	tst_attr_env	:: ![AttrCoercion]
 	}
 
-::	FunctionType = CheckedType !SymbolType | SpecifiedType !SymbolType ![AType] !TempSymbolType
-				 | UncheckedType !TempSymbolType | ExpandedType !SymbolType !TempSymbolType !TempSymbolType  | EmptyFunctionType
+::	FunctionType = CheckedType !SymbolType
+				 | UncheckedType !TempSymbolType
 				 | ..
 
 updateExpressionTypes :: !SymbolType !SymbolType ![ExprInfoPtr] !*TypeHeaps !*ExpressionHeap -> (!*TypeHeaps, !*ExpressionHeap)
@@ -94,6 +99,8 @@ addAttrEnvInequalities :: ![AttrInequality] !*Coercions !u:AttrVarHeap
 						-> (!.Coercions, !u:AttrVarHeap)
 	// assertion: the attribute variables point to (AVI_Attr (TA_TempVar nr)) where
 	// nr corresponds to the attribute variable
+replace_external_variables :: ![AType] ![TypeContext] ![!P TypeVarInfoPtr TypeVarInfoPtr!] ![!P AttrVarInfoPtr AttrVarInfoPtr!]
+								![TypeVar] ![AttributeVar] !*TypeHeaps -> (![AType],![TypeContext],!*TypeHeaps)
 optBeautifulizeIdent :: !String -> Optional (!String, !LineNr)
 	// convert something like "c;8;2" to Yes ("comprehension", 8)
 removeUnusedAttrVars :: !{!CoercionTree} ![Int] -> Coercions
