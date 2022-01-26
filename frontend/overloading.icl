@@ -1803,7 +1803,7 @@ where
 	remove_overloaded_function type_pattern_vars fun_index ([error_contexts:comp_error_contexts], fun_defs, fun_env, symbol_heap, type_code_info, var_heap, error, predef_symbols)
 		| error.ea_ok
 			# (fun_def, fun_defs) = fun_defs![fun_index]  
-			  (CheckedType st=:{st_context,st_args}, fun_env) = fun_env![fun_index]
+			  (CheckedType {st_context,st_args} _, fun_env) = fun_env![fun_index]
 			  {fun_body = TransformedBody {tb_args,tb_rhs},fun_info,fun_arity,fun_ident,fun_pos} = fun_def
 			  var_heap = mark_FPC_arguments st_args tb_args var_heap
 			  
@@ -2226,7 +2226,7 @@ where
 					#! fun_index = get_recursive_fun_index group_index symb_kind main_dcl_module_n ui.ui_fun_defs
 					| fun_index == NoIndex
 						-> (App { app & app_args = app_args }, ui)
-						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
+						# (CheckedType {st_context} _, ui) = ui!ui_fun_env.[fun_index]
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_ident) st_context app_args (ui.ui_var_heap, ui.ui_error)
 						-> (App { app & app_args = app_args }, { ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
 				EI_Context context_args
@@ -2237,7 +2237,7 @@ where
 					| fun_index == NoIndex
 						# app = { app & app_args = app_args}
 						-> (App app, examine_calls context_args ui)
-						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
+						# (CheckedType {st_context} _, ui) = ui!ui_fun_env.[fun_index]
 						  nr_of_context_args = length context_args
 						  nr_of_lifted_contexts = length st_context - nr_of_context_args
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_ident) (take nr_of_lifted_contexts st_context) app_args (ui.ui_var_heap,ui.ui_error)
@@ -2265,7 +2265,7 @@ where
 					| fun_index == NoIndex
 						# app = {app & app_args = app_args}
 						-> (App app, examine_calls context_args ui)
-						# (CheckedType {st_context}, ui) = ui!ui_fun_env.[fun_index]
+						# (CheckedType {st_context} _, ui) = ui!ui_fun_env.[fun_index]
 						  nr_of_context_args = length context_args
 						  nr_of_lifted_contexts = length st_context - nr_of_context_args
 						  (app_args, (ui_var_heap, ui_error)) = mapAppendSt (build_context_arg symb_ident) (take nr_of_lifted_contexts st_context) app_args (ui.ui_var_heap,ui.ui_error)

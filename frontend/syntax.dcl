@@ -1101,6 +1101,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 			|	TempQDV !TempVarId				// Auxiliary, used during type checking, existential type variable in dynamic pattern
 
 			|	TLifted !TypeVar				/* Auxiliary, used during type checking of lifted arguments */
+			|	TExternal !TypeVar				// Auxiliary, used during type checking of E.^ arguments
 			|	TQualifiedIdent !Ident !String ![AType]
 
 			|	TGenericFunctionInDictionary !(Global DefinedSymbol) !TypeKind !GlobalIndex /*GenericDict*/

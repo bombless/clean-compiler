@@ -1644,7 +1644,7 @@ getSymbolType pos ti=:{ti_functions,ti_common_defs,ti_main_dcl_module_n} {symb_k
 				  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
 														  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 				-> (fun_type_copy, [], ts)
-			CheckedType fun_type
+			CheckedType fun_type _
 				# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
 				  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 				-> (fun_type_copy, [], ts)
@@ -1692,7 +1692,7 @@ getSymbolType pos ti=:{ti_common_defs,ti_main_dcl_module_n} {symb_kind = SK_Loca
 			  (fun_type_copy, ts) = currySymbolType { fun_type_copy & tst_args = lifted_arg_types ++ fun_type_copy.tst_args,
 													  tst_arity = tst_arity + length lifted_arg_types } n_app_args ts
 			-> (fun_type_copy, [], ts)
-		CheckedType fun_type
+		CheckedType fun_type _
 			# (fun_type_copy, ts) = freshSymbolType (Yes pos) cWithFreshContextVars fun_type ti_common_defs ts
 			  (fun_type_copy,ts) = currySymbolType fun_type_copy n_app_args ts
 			-> (fun_type_copy, [], ts)
@@ -2698,32 +2698,32 @@ where
 		  ts & ts_error = setErrorPosition fun_ident fun_pos ts.ts_error
 		= case env_type of
 			ExpandedType fun_type tmp_fun_type exp_fun_type
-				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
+				# (clean_fun_type,lifted_attr_env,ambiguous_or_missing_contexts,type_var_env,attr_var_env,ts_type_heaps,ts_var_heap,ts_expr_heap,ts_error)
 					= cleanUpSymbolType is_start_rule cSpecifiedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
 										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
-			  			= check_function_type fun_type tmp_fun_type clean_fun_type type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
+						= check_function_type fun_type tmp_fun_type clean_fun_type lifted_attr_env type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
 					  ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
 					-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
 					# ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_error=ts_error
 					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
 			ExpandedLocalFunType fun_type external_type_vars external_attr_vars tmp_fun_type exp_fun_type
-				# (clean_fun_type,ambiguous_or_missing_contexts,new_and_old_external_type_vars,new_and_old_external_attr_vars,type_var_env,attr_var_env,ts_type_heaps,ts_var_heap,ts_expr_heap,ts_error)
+				# (clean_fun_type,lifted_attr_env,ambiguous_or_missing_contexts,new_and_old_external_type_vars,new_and_old_external_attr_vars,type_var_env,attr_var_env,ts_type_heaps,ts_var_heap,ts_expr_heap,ts_error)
 					= cleanUpLocalSymbolType exp_fun_type external_type_vars external_attr_vars type_contexts type_ptrs coercion_env attr_partition
 										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
 				| ts_error.ea_ok
 					# (ts_fun_env, attr_var_env, ts_type_heaps, ts_expr_heap, ts_error)
-						= check_local_function_type fun_type tmp_fun_type clean_fun_type new_and_old_external_type_vars new_and_old_external_attr_vars
+						= check_local_function_type fun_type tmp_fun_type clean_fun_type lifted_attr_env new_and_old_external_type_vars new_and_old_external_attr_vars
 							external_type_vars external_attr_vars type_ptrs defs ts.ts_fun_env attr_var_env ts_type_heaps ts_expr_heap ts_error
 					  ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
 					-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
 					# ts & ts_type_heaps=ts_type_heaps, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_error=ts_error
 					-> (type_var_env, NoErrorContexts, attr_var_env, out, ts)
 		  	UncheckedType exp_fun_type
-				# (clean_fun_type, ambiguous_or_missing_contexts, type_var_env, attr_var_env, ts_type_heaps, ts_var_heap, ts_expr_heap, ts_error)
+				# (clean_fun_type,lifted_attr_env,ambiguous_or_missing_contexts,type_var_env,attr_var_env,ts_type_heaps,ts_var_heap,ts_expr_heap,ts_error)
 					= cleanUpSymbolType is_start_rule cDerivedType exp_fun_type type_contexts type_ptrs coercion_env attr_partition
 										defs type_var_env attr_var_env ts.ts_type_heaps ts.ts_var_heap ts.ts_expr_heap ts.ts_error
 				  ts_error = check_caf_context fun_ident fun_pos fun_kind clean_fun_type ts_error
@@ -2742,22 +2742,23 @@ where
 				  				  				-> (clean_fun_type, th_attrs)	
 				  				-> (out <<< fun_ident <<< " :: " 
 				  						<:: (form, printable_type, Yes initialTypeVarBeautifulizer) <<< '\n', th_attrs)
-				  ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }
+				  ts_fun_env = {ts.ts_fun_env & [fun] = CheckedType clean_fun_type 0}
 				  ts & ts_type_heaps={ts_type_heaps & th_attrs=th_attrs}, ts_var_heap=ts_var_heap, ts_expr_heap=ts_expr_heap, ts_fun_env=ts_fun_env, ts_error=ts_error
 				-> (type_var_env, ambiguous_or_missing_contexts, attr_var_env, out, ts)
 
-	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity, st_args, st_vars, st_attr_vars, st_context} type_ptrs
+	check_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity,st_args,st_vars,st_attr_vars,st_context} lifted_attr_env type_ptrs
 						defs fun_env attr_var_env type_heaps expr_heap error
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
 		| equi
-			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context
+			# type_with_lifted_arg_types = addLiftedArgumentsToSymbolType fun_type tst_lifted st_args st_vars st_attr_vars st_context lifted_attr_env
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
-			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
+			  n_lifted_attr_ineqs = length lifted_attr_env
+			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types n_lifted_attr_ineqs}, attr_var_env, type_heaps, expr_heap, error)
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
 			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
 			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
 
-	check_local_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity,st_args,st_vars,st_attr_vars,st_context}
+	check_local_function_type fun_type tmp_fun_type=:{tst_lifted} clean_fun_type=:{st_arity,st_args,st_vars,st_attr_vars,st_context} lifted_attr_env
 								new_and_old_external_type_vars new_and_old_external_attr_vars external_type_vars external_attr_vars type_ptrs
 								defs fun_env attr_var_env type_heaps expr_heap error
 		# (equi, attr_var_env, type_heaps) = equivalent clean_fun_type tmp_fun_type defs attr_var_env type_heaps
@@ -2766,12 +2767,15 @@ where
 			  lifted_contexts = take (length st_context - length fun_type.st_context) st_context
 			  type_vars_in_lifted_args = [tv\\P tv _<|-external_type_vars]++drop (length fun_type.st_vars+Length external_type_vars) st_vars
 			  attr_vars_in_lifted_args = [av\\P av _<|-external_attr_vars]++take (length st_attr_vars-Length external_attr_vars-length fun_type.st_attr_vars) st_attr_vars
-			  (lifted_args,lifted_contexts,type_heaps) = replace_external_variables lifted_args lifted_contexts new_and_old_external_type_vars new_and_old_external_attr_vars type_vars_in_lifted_args attr_vars_in_lifted_args type_heaps
-			  type_with_lifted_arg_types = addLiftedArgumentsToLocalFunctionType fun_type tst_lifted lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts
+			  (lifted_args,lifted_contexts,lifted_attr_env,type_heaps)
+				= replace_external_variables lifted_args lifted_contexts lifted_attr_env new_and_old_external_type_vars new_and_old_external_attr_vars type_vars_in_lifted_args attr_vars_in_lifted_args type_heaps
+			  type_with_lifted_arg_types = addLiftedArgumentsToLocalFunctionType fun_type tst_lifted lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts lifted_attr_env
 			  (type_heaps, expr_heap) = updateExpressionTypes clean_fun_type type_with_lifted_arg_types type_ptrs type_heaps expr_heap
-			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types}, attr_var_env, type_heaps, expr_heap, error)
+			  n_lifted_attr_ineqs = length lifted_attr_env
+			= ({fun_env & [fun] = CheckedType type_with_lifted_arg_types n_lifted_attr_ineqs}, attr_var_env, type_heaps, expr_heap, error)
 			# (printable_type, th_attrs) = beautifulizeAttributes clean_fun_type type_heaps.th_attrs
-			# (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
+			  fun_type & st_attr_vars = [attr_var \\ P attr_var _<|-external_attr_vars]++fun_type.st_attr_vars
+			  (printable_type1, th_attrs) = beautifulizeAttributes fun_type th_attrs
 			= (fun_env, attr_var_env, { type_heaps & th_attrs = th_attrs }, expr_heap, specification_error printable_type printable_type1 error)
 
 	check_caf_context fun_ident fun_pos FK_Caf {st_context=[_:_]} error
@@ -2779,19 +2783,23 @@ where
 	check_caf_context _ _ _ _ error
 		=	error
 
-addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments new_args new_vars new_attrs new_context
+addLiftedArgumentsToSymbolType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context,st_attr_env}
+		nr_of_lifted_arguments new_args new_vars new_attrs new_context lifted_attr_env
 	= {st & st_args = take nr_of_lifted_arguments new_args ++ st_args,
 			st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
 			st_vars = st_vars ++ drop (length st_vars) new_vars,
 			st_attr_vars = take (length new_attrs - length st_attr_vars) new_attrs ++ st_attr_vars,
+			st_attr_env = lifted_attr_env ++ st_attr_env,
 			st_arity = st_arity + nr_of_lifted_arguments,
 			st_context = take (length new_context - length st_context) new_context ++ st_context}
 
-addLiftedArgumentsToLocalFunctionType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context} nr_of_lifted_arguments lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts
+addLiftedArgumentsToLocalFunctionType st=:{st_arity,st_args,st_args_strictness,st_vars,st_attr_vars,st_context,st_attr_env}
+		nr_of_lifted_arguments lifted_args type_vars_in_lifted_args attr_vars_in_lifted_args lifted_contexts lifted_attr_env
 	= {st & st_args = lifted_args ++ st_args,
 			st_args_strictness = insert_n_lazy_values_at_beginning nr_of_lifted_arguments st_args_strictness,
 			st_vars = st_vars ++ type_vars_in_lifted_args,
 			st_attr_vars = attr_vars_in_lifted_args ++ st_attr_vars,
+			st_attr_env = lifted_attr_env ++ st_attr_env,
 			st_arity = st_arity + nr_of_lifted_arguments,
 			st_context = lifted_contexts ++ st_context}
 
@@ -3372,7 +3380,7 @@ where
 	where
 		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
 		update_function_types_in_component [fun_index : funs] fun_env fun_defs
-			# (CheckedType checked_fun_type, fun_env) = fun_env![fun_index]
+			# (CheckedType checked_fun_type n_lifted_attr_ineqs, fun_env) = fun_env![fun_index]
 			# (fd, fun_defs) = fun_defs![fun_index]
 			= case fd.fun_type of
 				NoFunDefType
@@ -3383,6 +3391,7 @@ where
 					| nr_of_lifted_arguments > 0
 						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
 						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
 						-> update_function_types_in_component funs fun_env fun_defs
 						-> update_function_types_in_component funs fun_env fun_defs
@@ -3391,6 +3400,7 @@ where
 					| nr_of_lifted_arguments > 0
 						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
 									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
 						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
 						-> update_function_types_in_component funs fun_env fun_defs
 						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
@@ -3434,20 +3444,23 @@ where
 		= case env_type of
 			ExpandedType fun_type {tst_lifted} _
 				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
-				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
-			ExpandedLocalFunType fun_type _ _ {tst_lifted} _
+				-> {ts & ts_type_heaps = ts_type_heaps, ts_fun_env.[fun] = CheckedType fun_type 0}
+			ExpandedLocalFunType fun_type external_type_vars external_attr_vars {tst_lifted} _
+				# fun_type
+					& st_attr_vars = [attr_var \\ P attr_var _<|-external_attr_vars]++fun_type.st_attr_vars
+					, st_vars = [type_var \\ P type_var _<|-external_type_vars]++fun_type.st_vars
 				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
-				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
+				-> {ts & ts_type_heaps = ts_type_heaps, ts_fun_env.[fun] = CheckedType fun_type 0}
 		  	UncheckedType tmp_fun_type
 		  		# (clean_fun_type, ts_type_heaps) = cleanSymbolType tmp_fun_type.tst_arity ts.ts_type_heaps
-				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType clean_fun_type }}
+				-> {ts & ts_type_heaps = ts_type_heaps, ts_fun_env.[fun] = CheckedType clean_fun_type 0}
 			SpecifiedType fun_type _ {tst_lifted}
 				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
-				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = { ts.ts_fun_env & [fun] = CheckedType fun_type }}
+				-> {ts & ts_type_heaps = ts_type_heaps, ts_fun_env.[fun] = CheckedType fun_type 0}
 			SpecifiedLocalFunType fun_type _ _ _ {tst_lifted}
 				# (fun_type, ts_type_heaps) = extendSymbolType fun_type tst_lifted ts.ts_type_heaps
-				-> { ts & ts_type_heaps = ts_type_heaps, ts_fun_env = {ts.ts_fun_env & [fun] = CheckedType fun_type}}
-			CheckedType _
+				-> {ts & ts_type_heaps = ts_type_heaps, ts_fun_env.[fun] = CheckedType fun_type 0}
+			CheckedType _ _
 				-> ts
 
 	clear_var_heap fun_types common_defs var_heap
@@ -3591,7 +3604,7 @@ where
 
 instance <<< FunctionType
 where
-	(<<<) file (CheckedType _)
+	(<<<) file (CheckedType _ _)
 		= file <<< "CheckedType"
 	(<<<) file (SpecifiedType _ _ _)
 		= file <<< "SpecifiedType"
