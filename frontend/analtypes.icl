@@ -78,12 +78,12 @@ where
 		create_type_defs_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries icl_type_defs module_index
 						(dcl_modules, type_defs, marks, type_def_infos)
 			| inNumberSet module_index used_module_numbers
-				# ({com_type_defs,com_class_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
 				| module_index == main_dcl_module_index
 					= ( dcl_modules,
 							{ type_defs			& [module_index] = icl_type_defs },
 							{ marks				& [module_index] = createArray n_types_without_not_exported_dictionaries cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray n_types_without_not_exported_dictionaries EmptyTypeDefInfo })
+					# ({com_type_defs,com_class_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
 					# nr_of_types = size com_type_defs - size com_class_defs
 					= (	dcl_modules,
 							{ type_defs			& [module_index] = com_type_defs },
@@ -101,26 +101,36 @@ where
 	where
 		expand_synonym_type main_dcl_module_index gi=:{gi_module,gi_index} (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 			| gi_module<>main_dcl_module_index
-				= expand_synonym_type_not_in_icl_module main_dcl_module_index gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+				= expand_synonym_type_in_dcl_module gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 				# (td=:{td_rhs,td_attribute}, icl_type_defs) = icl_type_defs![gi_index]
 				= case td_rhs of
 					SynType type
 						# (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
-							= try_to_expand_synonym_type type td_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+							= try_to_expand_synonym_type_in_icl_module type td_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
 						-> case opt_type of
 							Yes type
 								# icl_type_defs = { icl_type_defs & [gi_index] = { td & td_rhs = SynType type}}
 								| gi_index < size dcl_modules.[main_dcl_module_index].dcl_common.com_type_defs
-									-> expand_synonym_type_not_in_icl_module main_dcl_module_index gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+									-> expand_synonym_type_in_dcl_module gi (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 									-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 							No
 								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
-					NewType {ds_index}
-						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+					NewType {ds_index=constructor_index}
+						# (cons_type,icl_cons_defs) = icl_cons_defs![constructor_index].cons_type
+						  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+							= try_to_expand_new_type_constructor_arg_in_icl_module cons_type new_type_defs icl_type_defs type_heaps dcl_modules
+						-> case opt_type of
+							Yes type
+								# icl_cons_defs = {icl_cons_defs & [constructor_index].cons_type.st_args = [type]}
+								| constructor_index < size dcl_modules.[main_dcl_module_index].dcl_common.com_cons_defs
+									-> expand_new_type_rhs_in_dcl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+								 	-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+							No
+								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 					_
 						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
-		expand_synonym_type_not_in_icl_module main_dcl_module_index gi=:{gi_module,gi_index} (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
+		expand_synonym_type_in_dcl_module gi=:{gi_module,gi_index} (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 			| size new_type_defs.[gi_module]==0
 				# (td=:{td_rhs,td_attribute}, dcl_modules) = dcl_modules![gi_module].dcl_common.com_type_defs.[gi_index]
 				= case td_rhs of
@@ -136,7 +146,7 @@ where
 							No
 								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 					NewType {ds_index}
-						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+						-> expand_new_type_rhs_in_dcl_module gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
 					_
 						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 				# (td=:{td_rhs,td_attribute}, new_type_defs) = new_type_defs![gi_module,gi_index]
@@ -151,26 +161,11 @@ where
 							No
 								-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 					NewType {ds_index}
-						-> expand_new_type_rhs gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+						-> expand_new_type_rhs_in_dcl_module gi_module ds_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
 					_
 						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
-		expand_new_type_rhs gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
-			| gi_module<>main_dcl_module_index
-				= expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
-				# (cons_type,icl_cons_defs) = icl_cons_defs![constructor_index].cons_type
-				  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
-					= try_to_expand_new_type_constructor_arg cons_type new_type_defs icl_type_defs type_heaps dcl_modules
-				= case opt_type of
-					Yes type
-						# icl_cons_defs = {icl_cons_defs & [constructor_index].cons_type.st_args = [type]}
-						| constructor_index < size dcl_modules.[main_dcl_module_index].dcl_common.com_cons_defs
-							-> expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
-						 	-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
-					No
-						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
-
-		expand_new_type_rhs_not_in_icl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
+		expand_new_type_rhs_in_dcl_module gi_module constructor_index new_type_defs icl_type_defs new_cons_defs icl_cons_defs type_heaps dcl_modules error
 			| size new_cons_defs.[gi_module]==0
 				# (cons_type,dcl_modules) = dcl_modules![gi_module].dcl_common.com_cons_defs.[constructor_index].cons_type
 				  (opt_type, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
@@ -193,8 +188,24 @@ where
 					No
 						-> (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 
+		try_to_expand_new_type_constructor_arg_in_icl_module {st_args=[type=:{at_attribute}]} new_type_defs icl_type_defs type_heaps dcl_modules
+			= try_to_expand_synonym_type_in_icl_module type at_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
 		try_to_expand_new_type_constructor_arg {st_args=[type=:{at_attribute}]} new_type_defs icl_type_defs type_heaps dcl_modules
 			= try_to_expand_synonym_type type at_attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
+		try_to_expand_synonym_type_in_icl_module type=:{at_type = TA {type_index={glob_object,glob_module}} types} attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= try_to_expand_synonym_type_in_icl_module_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+		try_to_expand_synonym_type_in_icl_module type=:{at_type = TAS {type_index={glob_object,glob_module}} types _} attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= try_to_expand_synonym_type_in_icl_module_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+		try_to_expand_synonym_type_in_icl_module type attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+			= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+
+		try_to_expand_synonym_type_in_icl_module_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+			| glob_module==main_dcl_module_index
+				# ({td_rhs,td_attribute,td_args}, icl_type_defs) = icl_type_defs![glob_object]
+				= try_to_expand td_rhs td_attribute td_args types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+				= try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
 
 		try_to_expand_synonym_type type=:{at_type = TA {type_index={glob_object,glob_module}} types} attribute (new_type_defs, icl_type_defs, type_heaps, dcl_modules)
 			= try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
@@ -204,20 +215,17 @@ where
 			= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
 
 		try_to_expand_synonym_type_for_TA glob_object glob_module types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
-			| glob_module==main_dcl_module_index
-				# ({td_rhs,td_attribute,td_args}, icl_type_defs) = icl_type_defs![glob_object]
-				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
 			| size new_type_defs.[glob_module]==0
 				# ({td_rhs,td_attribute,td_args}, dcl_modules) = dcl_modules![glob_module].dcl_common.com_type_defs.[glob_object]
-				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
+				= try_to_expand td_rhs td_attribute td_args types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
 				# ({td_rhs,td_attribute,td_args}, new_type_defs) = new_type_defs![glob_module,glob_object]
-				= try_to_expand td_rhs td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
-		where
-			try_to_expand (SynType {at_type}) td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
-				# (subst_rhs, type_heaps) = substituteType td_attribute attribute td_args types at_type type_heaps
-				= (Yes {type & at_type = subst_rhs }, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
-			try_to_expand _ td_attribute td_args attribute new_type_defs icl_type_defs type_heaps dcl_modules
-				= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+				= try_to_expand td_rhs td_attribute td_args types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+
+		try_to_expand (SynType {at_type}) td_attribute td_args types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+			# (subst_rhs, type_heaps) = substituteType td_attribute attribute td_args types at_type type_heaps
+			= (Yes {type & at_type = subst_rhs }, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
+		try_to_expand _ td_attribute td_args types type attribute new_type_defs icl_type_defs type_heaps dcl_modules
+			= (No, new_type_defs, icl_type_defs, type_heaps, dcl_modules)
 
 	update_modules_and_create_commondefs :: NumberSet *{*{#CheckedTypeDef}} *{#*{#ConsDef}} Int *{#DclModule} -> (!*{#DclModule},!*{#CommonDefs})
 	update_modules_and_create_commondefs used_module_numbers new_type_defs new_cons_defs nr_of_modules dcl_modules
