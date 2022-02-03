@@ -3728,7 +3728,13 @@ where
 			| has_converted_context
 				# fun & fun_type = FunDefType symbol_type
 				= (fun, st)
-				= (fun, st)		 
+				= (fun, st)
+		convert_function fun=:{fun_type=LocalFunDefCheckedType external_type_vars external_atype_attrs symbol_type, fun_ident, fun_pos} st
+			# (has_converted_context, symbol_type, st) = convert_contexts_in_symbol_type fun_ident fun_pos symbol_type st
+			| has_converted_context
+				# fun & fun_type = LocalFunDefCheckedType external_type_vars external_atype_attrs symbol_type
+				= (fun, st)
+				= (fun, st)
 		convert_function fun st
 			= (fun, st)
 
