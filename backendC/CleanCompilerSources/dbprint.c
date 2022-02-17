@@ -243,7 +243,7 @@ static void PrintTypeSymbol (TypeSymbol type_symbol, File file)
 void PrintRuleNode (Node node,Bool brackets,int n_leading_spaces,File file)
 {
 /*
-	if (IsOnACycle (node -> node_number))
+	if ((node -> node_mark & NODE_RHS_ON_A_CYCLE)!=0)
 		FPutS ("<C>", file);
 	PrintState (node -> node_state,file);
 */

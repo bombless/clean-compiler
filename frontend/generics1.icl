@@ -6370,6 +6370,7 @@ foldExpr f expr=:(Update expr1 sels expr2) st
 where
 	fold_sel f (RecordSelection _ _) st = st
 	fold_sel f (ArraySelection _ _ expr) st = foldExpr f expr st
+	fold_sel f (SafeArraySelection _ _ expr) st = foldExpr f expr st
 	fold_sel f (DictionarySelection _ _ _ expr) st = foldExpr f expr st
 foldExpr f expr=:(RecordUpdate _ expr1 binds) st
 	# st = f expr st

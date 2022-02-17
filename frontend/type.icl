@@ -2346,7 +2346,12 @@ requirementsOfSelector ti _ expr (RecordSelection field _) tc_coercible change_u
 	  req_type_coercions = [{ tc_demanded = hd tst_args, tc_offered = sel_expr_type, tc_position = CP_Expression sel_expr, tc_coercible = tc_coercible } : 
 	  			reqs.req_type_coercions ]
 	= (False, tst_result, ({ reqs & req_type_coercions = req_type_coercions }, ts))
-requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts) 
+requirementsOfSelector ti opt_expr expr (ArraySelection {glob_object = {ds_ident,ds_index},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts)
+	= requirementsOfArraySelector ti opt_expr expr ds_ident ds_index glob_module expr_ptr index_expr tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts)
+requirementsOfSelector ti opt_expr expr (SafeArraySelection {glob_object = {ds_ident,ds_index},glob_module} expr_ptr index_expr) tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts)
+	= requirementsOfArraySelector ti opt_expr expr ds_ident ds_index glob_module expr_ptr index_expr tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts)
+
+requirementsOfArraySelector ti opt_expr expr ds_ident ds_index glob_module expr_ptr index_expr tc_coercible change_uselect sel_expr_type sel_expr (reqs, ts)
 	# {me_type} = ti.ti_common_defs.[glob_module].com_member_defs.[ds_index]
 	  ({tst_attr_env,tst_args,tst_result,tst_context}, ts) = freshSymbolType (Yes (CP_Expression expr)) cWithFreshContextVars me_type ti.ti_common_defs ts
 	# (tst_args, tst_result, ts)

@@ -290,6 +290,9 @@ Clean (BETypeAlt :: BESymbolP BETypeArgP BETypeNodeP BackEnd -> (BETypeAltP, Bac
 BENodeP BENormalNode (BESymbolP symbol, BEArgP args);
 Clean (BENormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
 
+BENodeP BESafeNormalNode (BESymbolP symbol, BEArgP args);
+Clean (BESafeNormalNode :: BESymbolP BEArgP BackEnd -> (BENodeP, BackEnd))
+
 BENodeP BEMatchNode (int arity, BESymbolP symbol, BENodeP node);
 Clean (BEMatchNode :: Int BESymbolP BENodeP BackEnd -> (BENodeP, BackEnd))
 

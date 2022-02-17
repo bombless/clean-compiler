@@ -317,6 +317,10 @@ transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ro t
 	# (expr,ti) = transform expr ro ti
 	# (selections,ti) = transform_expressions_in_selectors selections ro ti
 	= ([ArraySelection ds ep expr:selections],ti)
+transform_expressions_in_selectors [SafeArraySelection ds ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([SafeArraySelection ds ep expr:selections],ti)
 transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ro ti
 	# (expr,ti) = transform expr ro ti
 	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
@@ -4902,6 +4906,8 @@ where
 		= fvi
 	clearVariables (ArraySelection _ _ expr) fvi
 		= clearVariables expr fvi
+	clearVariables (SafeArraySelection _ _ expr) fvi
+		= clearVariables expr fvi
 	clearVariables (DictionarySelection dict_var selections _ expr) fvi
 		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
 	
@@ -5023,6 +5029,8 @@ where
 	freeVariables (RecordSelection _ _) fvi
 		= fvi
 	freeVariables (ArraySelection _ _ expr) fvi
+		= freeVariables expr fvi
+	freeVariables (SafeArraySelection _ _ expr) fvi
 		= freeVariables expr fvi
 	freeVariables (DictionarySelection dict_var selections _ expr) fvi
 		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
@@ -5440,6 +5448,10 @@ where
 		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
 		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
 		= (ArraySelection array_select new_ptr index_expr, cs)
+	copy (SafeArraySelection array_select expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
+		= (SafeArraySelection array_select new_ptr index_expr, cs)
 	copy (DictionarySelection var selectors expr_ptr index_expr) ci cs=:{cs_symbol_heap}
 		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
 		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}

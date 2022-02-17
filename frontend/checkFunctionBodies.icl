@@ -780,16 +780,13 @@ where
 
 checkExpression free_vars (PE_Selection selector_kind expr [PS_Array index_expr]) e_input e_state e_info cs	
 	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
-	# (select_fun, selector_kind)
-		= case selector_kind of
-			ParsedNormalSelector
-				-> (PD_ArraySelectFun, NormalSelector)
-			ParsedUniqueSelector False
-				-> (PD_UnqArraySelectFun, UniqueSingleArraySelector/*NormalSelector*/)
-			ParsedUniqueSelector True
-				-> (PD_UnqArraySelectFun, UniqueSingleArraySelectorUniqueElementResult)
-	# (glob_select_symb, cs) = getPredefinedGlobalSymbol select_fun PD_StdArray STE_Member 2 cs
-	  (selector, free_vars, e_state, e_info, cs) = checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+	  (select_fun_index, selector_kind) = select_fun_index_and_kind_from_ParsedSelectorKind selector_kind
+	  (selector, free_vars, e_state, e_info, cs) = checkArraySelection select_fun_index 2 free_vars index_expr e_input e_state e_info cs
+	= (Selection selector_kind expr [selector], free_vars, e_state, e_info, cs)
+checkExpression free_vars (PE_Selection selector_kind expr [PS_SafeArray index_expr]) e_input e_state e_info cs
+	# (expr, free_vars, e_state, e_info, cs) = checkExpression free_vars expr e_input e_state e_info cs
+	  (select_fun_index, selector_kind) = select_fun_index_and_kind_from_ParsedSelectorKind selector_kind
+	  (selector, free_vars, e_state, e_info, cs) = checkSafeArraySelection select_fun_index 2 free_vars index_expr e_input e_state e_info cs
 	= (Selection selector_kind expr [selector], free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Selection selector_kind expr selectors) e_input e_state e_info cs	
 	# (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithSelection free_vars selectors e_input e_state e_info cs
@@ -799,6 +796,7 @@ checkExpression free_vars (PE_Selection selector_kind expr selectors) e_input e_
 			-> (Selection NormalSelector expr selectors, free_vars, e_state, e_info, cs)
 		ParsedUniqueSelector unique_element
 			-> (Selection UniqueSelector expr selectors, free_vars, e_state, e_info, cs)
+
 checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_info cs	
 	# (expr1, free_vars, e_state, e_info, cs) = checkExpression free_vars expr1 e_input e_state e_info cs
 	  (selectors, free_vars, e_state, e_info, cs) = checkSelectors cEndWithUpdate free_vars selectors e_input e_state e_info cs
@@ -1020,6 +1018,13 @@ where
 		= True
 checkExpression free_vars expr e_input e_state e_info cs
 	= abort "checkExpression (checkFunctionBodies.icl)" // <<- expr
+
+select_fun_index_and_kind_from_ParsedSelectorKind ParsedNormalSelector
+	= (PD_ArraySelectFun, NormalSelector)
+select_fun_index_and_kind_from_ParsedSelectorKind (ParsedUniqueSelector False)
+	= (PD_UnqArraySelectFun, UniqueSingleArraySelector/*NormalSelector*/)
+select_fun_index_and_kind_from_ParsedSelectorKind (ParsedUniqueSelector True)
+	= (PD_UnqArraySelectFun, UniqueSingleArraySelectorUniqueElementResult)
 
 transform_pattern :: !AuxiliaryPattern !CasePatterns !CasePatterns !(Env Ident VarInfoPtr) !(Optional (!Optional FreeVar, !Expression)) !Expression
 		!String !Position !*VarHeap !*ExpressionHeap !Dynamics !*CheckState
@@ -2559,10 +2564,12 @@ where
 
 	check_selector end_with_update free_vars (PS_Array index_expr) e_input e_state e_info cs
 		| end_with_update
-			# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArrayUpdateFun PD_StdArray STE_Member 3 cs
-			= checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
-			# (glob_select_symb, cs) = getPredefinedGlobalSymbol PD_ArraySelectFun PD_StdArray STE_Member 2 cs
-			= checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
+			= checkArraySelection PD_ArrayUpdateFun 3 free_vars index_expr e_input e_state e_info cs
+			= checkArraySelection PD_ArraySelectFun 2 free_vars index_expr e_input e_state e_info cs
+	check_selector end_with_update free_vars (PS_SafeArray index_expr) e_input e_state e_info cs
+		| end_with_update
+			= checkSafeArraySelection PD_ArrayUpdateFun 3 free_vars index_expr e_input e_state e_info cs
+			= checkSafeArraySelection PD_ArraySelectFun 2 free_vars index_expr e_input e_state e_info cs
 
 get_field_nr :: !Index !OptionalRecordName ![Global Index] !{#Char} !u:{#SelectorDef} !v:{# DclModule} !*CheckState
 		-> (!Index, !Index, !Index, u:{#SelectorDef}, v:{#DclModule}, !*CheckState)
@@ -2620,10 +2627,17 @@ determine_selector mod_index type_mod_index type_index [{glob_module, glob_objec
 				= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 		= determine_selector mod_index type_mod_index type_index selectors selector_defs modules
 
-checkArraySelection glob_select_symb free_vars index_expr e_input e_state e_info cs
-	# (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
+checkArraySelection select_fun_index select_fun_arity free_vars index_expr e_input e_state e_info cs
+	# (glob_select_symb, cs) = getPredefinedGlobalSymbol select_fun_index PD_StdArray STE_Member select_fun_arity cs
+	  (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
 	  (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
-	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, { e_state & es_expr_heap = es_expr_heap }, e_info, cs)
+	= (ArraySelection glob_select_symb new_info_ptr index_expr, free_vars, {e_state & es_expr_heap = es_expr_heap}, e_info, cs)
+
+checkSafeArraySelection select_fun_index select_fun_arity free_vars index_expr e_input e_state e_info cs
+	# (glob_select_symb, cs) = getPredefinedGlobalSymbol select_fun_index PD_StdArray STE_Member select_fun_arity cs
+	  (index_expr, free_vars, e_state, e_info, cs) = checkExpression free_vars index_expr e_input e_state e_info cs
+	  (new_info_ptr, es_expr_heap) = newPtr EI_Empty e_state.es_expr_heap
+	= (SafeArraySelection glob_select_symb new_info_ptr index_expr, free_vars, {e_state & es_expr_heap = es_expr_heap}, e_info, cs)
 
 checkFields :: !Index ![FieldAssignment] !OptionalRecordName !u:ExpressionInfo !*CheckState
 	-> (!Optional ((Global DefinedSymbol), Index, [Bind ParsedExpr (Global FieldSymbol)]), !u:ExpressionInfo, !*CheckState)

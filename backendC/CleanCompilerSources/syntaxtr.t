@@ -353,9 +353,16 @@ STRUCT (node,Node){
 
 	short			node_arity;
 	unsigned char	node_kind;		/* NodeKind */
-	signed char		node_number:2;	/* statesgen: -1,0 or 1,pattern_match ? */
-	Annotation		node_annotation:6;
+	unsigned int	node_mark:3;
+	Annotation		node_annotation:5;
 };
+
+#define NODE_RHS_MARKED 1
+#define NODE_RHS_ON_A_CYCLE 2
+#define NODE_RHS_MARKED_TUPLE_SELECTORS_NODE 1
+#define NODE_RHS_SAFE_INDEX 4
+#define NODE_LHS_MAY_FAIL 1
+#define NODE_LHS_PUSH_NODE_UNIQUE 1
 
 #ifdef TRANSFORM_PATTERNS_BEFORE_STRICTNESS_ANALYSIS
 # define node_node_id_ref_counts	node_su.su_u.u_case->case_node_id_ref_counts

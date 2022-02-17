@@ -1284,6 +1284,7 @@ instance toString 	KindInfo
 ::	ParsedSelection	= PS_Record !Ident !OptionalRecordName
 					| PS_QualifiedRecord !ModuleIdent !String !OptionalRecordName
 					| PS_Array  !ParsedExpr
+					| PS_SafeArray !ParsedExpr
 					| PS_Erroneous
 
 ::	OptionalRecordName
@@ -1434,6 +1435,7 @@ instance == OverloadedPatternType
 
 ::	Selection	= RecordSelection !(Global DefinedSymbol) !Int
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
+				| SafeArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
 ::	TypeCodeExpression	= TCE_Empty

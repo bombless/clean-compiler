@@ -1426,6 +1426,9 @@ instance e_corresponds Selection where
 	e_corresponds (ArraySelection dcl_selector _ dcl_index_expr) (ArraySelection icl_selector _ icl_index_expr)
 		=	e_corresponds dcl_selector icl_selector
 		o`	e_corresponds dcl_index_expr icl_index_expr
+	e_corresponds (SafeArraySelection dcl_selector _ dcl_index_expr) (SafeArraySelection icl_selector _ icl_index_expr)
+		=	e_corresponds dcl_selector icl_selector
+		o`	e_corresponds dcl_index_expr icl_index_expr
 	e_corresponds (DictionarySelection dcl_dict_var dcl_selections _ dcl_index_expr)
 				(DictionarySelection icl_dict_var icl_selections _ icl_index_expr)
 		=	e_corresponds dcl_dict_var icl_dict_var

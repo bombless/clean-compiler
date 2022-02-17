@@ -1084,20 +1084,13 @@ transformSequence (SQ_From pd_from frm)
 transformSequence (SQ_FromTo pd_from_to frm to)
 	=	predef_ident_expr pd_from_to ` frm ` to
 
-transformArrayUpdate :: ParsedExpr [Bind ParsedExpr ParsedExpr] -> ParsedExpr
-transformArrayUpdate expr updates
-	=	foldr (update (predef_ident_expr PD_ArrayUpdateFun)) expr updates
-	where
-		update :: ParsedExpr (Bind ParsedExpr ParsedExpr) ParsedExpr -> ParsedExpr
-		update updateIdent {bind_src=value, bind_dst=index} expr
-			=	updateIdent ` expr ` index ` value
-
 transformArrayDenot :: ArrayKind [ParsedExpr] -> ParsedExpr
 transformArrayDenot array_kind exprs
 	# create_array_call=cast_array_kind array_kind (predef_ident_expr PD__CreateArrayFun ` length exprs)
-	=	transformArrayUpdate
-			create_array_call
-			[{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+	= foldr update_array_element create_array_call [{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+where
+	update_array_element {bind_src=value, bind_dst=index} expr
+		= PE_Update expr [PS_SafeArray index] value
 
 cast_array_kind OverloadedArray array_expr = array_expr
 cast_array_kind array_kind array_expr = PE_TypeSignature array_kind array_expr

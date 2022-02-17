@@ -507,14 +507,17 @@ weightedRefCountOfCase rci=:{rci_depth} {case_expr} (EI_CaseTypeAndRefCounts cas
 
 instance weightedRefCount Selection
 where
+	weightedRefCount {rci_imported} (RecordSelection selector _) rs
+		= checkRecordSelector rci_imported selector rs
 	weightedRefCount rci=:{rci_imported} (ArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rs
+		# rs = weightedRefCount rci index_expr rs
+		= checkImportOfDclFunction rci_imported glob_module ds_index rs
+	weightedRefCount rci=:{rci_imported} (SafeArraySelection {glob_module,glob_object={ds_index}} _ index_expr) rs
 		# rs = weightedRefCount rci index_expr rs
 		= checkImportOfDclFunction rci_imported glob_module ds_index rs
 	weightedRefCount rci (DictionarySelection _ selectors _ index_expr) rs
 		# rs = weightedRefCount rci index_expr rs
 		= weightedRefCount rci selectors rs
-	weightedRefCount {rci_imported} (RecordSelection selector _) rs
-		= checkRecordSelector rci_imported selector rs
 
 weightedRefCountAddPatternExpr :: !RCInfo !Expression !(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap)
 							   -> (![CountedVariable],!(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap))
@@ -1030,6 +1033,9 @@ where
 	distributeLets di (ArraySelection selector expr_ptr expr) cp_info
 		# (expr, cp_info) = distributeLets di expr cp_info
 		= (ArraySelection selector expr_ptr expr, cp_info)
+	distributeLets di (SafeArraySelection selector expr_ptr expr) cp_info
+		# (expr, cp_info) = distributeLets di expr cp_info
+		= (SafeArraySelection selector expr_ptr expr, cp_info)
 	distributeLets di (DictionarySelection var selectors expr_ptr expr) cp_info
 		# (selectors, cp_info) = distributeLets di selectors cp_info
 		# (expr, cp_info) = distributeLets di expr cp_info
@@ -1922,6 +1928,9 @@ where
 	convertCases ci (ArraySelection selector expr_ptr index_expr) cs
 		# (index_expr, cs) = convertCases ci index_expr cs
 		= (ArraySelection selector expr_ptr index_expr, cs)
+	convertCases ci (SafeArraySelection selector expr_ptr index_expr) cs
+		# (index_expr, cs) = convertCases ci index_expr cs
+		= (SafeArraySelection selector expr_ptr index_expr, cs)
 	convertCases ci selector cs
 		= (selector, cs)
 
@@ -2214,6 +2223,9 @@ where
 	copy (ArraySelection selector expr_ptr index_expr) cp_info
 		# (index_expr, cp_info) = copy index_expr cp_info
 		= (ArraySelection selector expr_ptr index_expr, cp_info)
+	copy (SafeArraySelection selector expr_ptr index_expr) cp_info
+		# (index_expr, cp_info) = copy index_expr cp_info
+		= (SafeArraySelection selector expr_ptr index_expr, cp_info)
 	copy selector cp_info
 		= (selector, cp_info)
 

@@ -107,6 +107,9 @@ where
 	lift (ArraySelection array_select expr_ptr index_expr) ls
 		# (index_expr, ls) = lift index_expr ls
 		= (ArraySelection array_select expr_ptr index_expr, ls)
+	lift (SafeArraySelection array_select expr_ptr index_expr) ls
+		# (index_expr, ls) = lift index_expr ls
+		= (SafeArraySelection array_select expr_ptr index_expr, ls)
 	lift record_selection ls
 		= (record_selection, ls)
 
@@ -448,6 +451,10 @@ where
 		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
 		  (index_expr, us) = unfold index_expr { us & us_symbol_heap = us_symbol_heap}
 		= (ArraySelection array_select new_ptr index_expr, us)
+	unfold (SafeArraySelection array_select expr_ptr index_expr) us=:{us_symbol_heap}
+		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
+		  (index_expr, us) = unfold index_expr {us & us_symbol_heap = us_symbol_heap}
+		= (SafeArraySelection array_select new_ptr index_expr, us)
 	unfold (DictionarySelection var selectors expr_ptr index_expr) us=:{us_symbol_heap}
 		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
 		  (index_expr, us) = unfold index_expr { us & us_symbol_heap = us_symbol_heap}
@@ -1219,6 +1226,8 @@ where
 
 	has_no_curried_macro_Selections [ArraySelection array_select expr_ptr index_expr:selections]
 		= has_no_curried_macro_Expression index_expr && has_no_curried_macro_Selections selections
+	has_no_curried_macro_Selections [SafeArraySelection array_select expr_ptr index_expr:selections]
+		= has_no_curried_macro_Expression index_expr && has_no_curried_macro_Selections selections
 	has_no_curried_macro_Selections [record_selection:selections]
 		= has_no_curried_macro_Selections selections
 	has_no_curried_macro_Selections []
@@ -1764,6 +1773,9 @@ where
 	expand (ArraySelection array_select expr_ptr index_expr) ei
 		# (index_expr, ei) = expand index_expr ei
 		= (ArraySelection array_select expr_ptr index_expr, ei)
+	expand (SafeArraySelection array_select expr_ptr index_expr) ei
+		# (index_expr, ei) = expand index_expr ei
+		= (SafeArraySelection array_select expr_ptr index_expr, ei)
 	expand record_selection ei
 		= (record_selection, ei)
 
@@ -2210,6 +2222,9 @@ where
 	collectVariables (ArraySelection array_select expr_ptr index_expr) free_vars dynamics cos
 		# (index_expr, free_vars, dynamics, cos) = collectVariables index_expr free_vars dynamics cos
 		= (ArraySelection array_select expr_ptr index_expr, free_vars, dynamics, cos)
+	collectVariables (SafeArraySelection array_select expr_ptr index_expr) free_vars dynamics cos
+		# (index_expr, free_vars, dynamics, cos) = collectVariables index_expr free_vars dynamics cos
+		= (SafeArraySelection array_select expr_ptr index_expr, free_vars, dynamics, cos)
 	collectVariables (DictionarySelection dictionary_select selectors expr_ptr index_expr) free_vars dynamics cos
 		# ((index_expr,selectors), free_vars, dynamics, cos) = collectVariables (index_expr,selectors) free_vars dynamics cos
 		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, free_vars, dynamics, cos)
@@ -2450,20 +2465,22 @@ collectUpdateVarTupleSelect2Var var=:{var_ident,var_info_ptr,var_expr_ptr} array
 				-> (var, free_vars, dynamics, { cos & cos_var_heap = cos_var_heap})
 				-> (var, free_vars, dynamics, { cos & cos_var_heap = writePtr var_info_ptr (VI_Count (inc count) False) cos_var_heap })
 
-same_selections [ArraySelection array_select1 _ index_expr1:selections1] [ArraySelection array_select2 _ index_expr2:selections2]
-	= equal_index index_expr1 index_expr2 && same_selections selections1 selections2
-where
-	equal_index (Var {var_info_ptr=var_info_ptr1}) (Var {var_info_ptr=var_info_ptr2})
-		= var_info_ptr1==var_info_ptr2
-	equal_index (BasicExpr (BVInt i1)) (BasicExpr (BVInt i2))
-		= i1==i2
-	equal_index _ _
-		= False
 same_selections [RecordSelection {glob_module=m1,glob_object={ds_index=i1}} f1:selections1] [RecordSelection {glob_module=m2,glob_object={ds_index=i2}} f2:selections2]
 	= f1==f2 && m1==m2 && i1==i2 && same_selections selections1 selections2
+same_selections [ArraySelection array_select1 _ index_expr1:selections1] [ArraySelection array_select2 _ index_expr2:selections2]
+	= equal_index index_expr1 index_expr2 && same_selections selections1 selections2
+same_selections [SafeArraySelection array_select1 _ index_expr1:selections1] [SafeArraySelection array_select2 _ index_expr2:selections2]
+	= equal_index index_expr1 index_expr2 && same_selections selections1 selections2
 same_selections [] []
 	= True
 same_selections selections update_selections
+	= False
+
+equal_index (Var {var_info_ptr=var_info_ptr1}) (Var {var_info_ptr=var_info_ptr2})
+	= var_info_ptr1==var_info_ptr2
+equal_index (BasicExpr (BVInt i1)) (BasicExpr (BVInt i2))
+	= i1==i2
+equal_index _ _
 	= False
 
 instance <<< (Ptr a)
@@ -2507,6 +2524,8 @@ where
 instance reset_free_var_heap_pointers Selection
 where
 	reset_free_var_heap_pointers (ArraySelection array_select expr_ptr index_expr) var_heap
+		= reset_free_var_heap_pointers index_expr var_heap
+	reset_free_var_heap_pointers (SafeArraySelection array_select expr_ptr index_expr) var_heap
 		= reset_free_var_heap_pointers index_expr var_heap
 	reset_free_var_heap_pointers (DictionarySelection var selectors expr_ptr index_expr) var_heap
 		= reset_free_var_heap_pointers index_expr (reset_free_var_heap_pointers selectors var_heap)

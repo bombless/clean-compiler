@@ -866,6 +866,8 @@ instance check_completeness Selection where
 		= check_whether_ident_is_imported sd_field glob_module ds_index ste_field cci ccs
 	check_completeness (ArraySelection _ _ index_expr) cci ccs
 		= check_completeness index_expr cci ccs
+	check_completeness (SafeArraySelection _ _ index_expr) cci ccs
+		= check_completeness index_expr cci ccs
 	check_completeness (DictionarySelection _ selections _ index_expr) cci ccs
 		= check_completeness selections cci
 		  (check_completeness index_expr cci ccs)

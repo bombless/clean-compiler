@@ -557,6 +557,9 @@ instance convertDynamics Selection where
 	convertDynamics cinp (ArraySelection selector expr_ptr expr) ci
 		# (expr, ci) = convertDynamics cinp expr ci
 		= (ArraySelection selector expr_ptr expr, ci)
+	convertDynamics cinp (SafeArraySelection selector expr_ptr expr) ci
+		# (expr, ci) = convertDynamics cinp expr ci
+		= (SafeArraySelection selector expr_ptr expr, ci)
 	convertDynamics cinp (DictionarySelection var selectors expr_ptr expr) ci
 		# (expr, ci) = convertDynamics cinp expr ci
 		= (DictionarySelection var selectors expr_ptr expr, ci)

@@ -469,6 +469,7 @@ instance <<< Selection
 where
 	(<<<) file (RecordSelection selector _) = file <<< selector
 	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (SafeArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
 	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
 
 instance <<< LocalDefs
@@ -529,6 +530,7 @@ instance <<< ParsedSelection
 where
 	(<<<) file (PS_Record selector _)	= file <<< selector
 	(<<<) file (PS_Array index_expr)	= file <<< '[' <<< index_expr <<< ']'
+	(<<<) file (PS_SafeArray index_expr) = file <<< '[' <<< index_expr <<< ']'
 	(<<<) file PS_Erroneous				= file <<< "Erroneous selector" // PK
 
 instance <<< FieldNameOrQualifiedFieldName

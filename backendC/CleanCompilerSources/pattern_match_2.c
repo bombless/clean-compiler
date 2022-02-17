@@ -108,7 +108,7 @@ static NodeP new_push_node (Symbol symbol,int arity,ArgP arguments)
 	push_node->node_arity=arity;
 	push_node->node_arguments=arguments;
 	push_node->node_push_symbol=symbol;
-	push_node->node_number=0;	/* if !=0 then unique */
+	push_node->node_mark=0;	/* if !=0 then unique */
 	
 	return push_node;
 }
@@ -516,7 +516,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 					error_in_function ("determine_failing_cases_and_adjust_ref_counts");
 
 				default_may_fail=determine_failing_cases_and_adjust_ref_counts (arg_node->node_arguments->arg_node,node_id_ref_count_list_p);
-				arg_node->node_number=default_may_fail;
+				arg_node->node_mark |= default_may_fail; /* NODE_LHS_MAY_FAIL */
 
 				if (default_may_fail){
 					/* NodeP default_rhs_node; */
@@ -567,7 +567,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 
 				case_may_fail=determine_failing_cases_and_adjust_ref_counts (arg_node->node_arguments->arg_node,node_id_ref_count_list_p);
 				
-				arg_node->node_number=case_may_fail;
+				arg_node->node_mark |= case_may_fail; /* NODE_LHS_MAY_FAIL */
 				
 				switch_may_fail=case_may_fail;
 			} else
@@ -621,7 +621,7 @@ static int determine_failing_cases_and_adjust_ref_counts (NodeP node,NodeIdRefCo
 							*/
 						}
 
-						arg_node->node_number=case_may_fail;
+						arg_node->node_mark |= case_may_fail; /* NODE_LHS_MAY_FAIL */
 						break;
 					}
 					case DefaultNode:

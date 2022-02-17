@@ -1162,6 +1162,11 @@ where
 		| found
 			= (True,pos)
 		= find_var_position_in_selections selections
+	find_var_position_in_selections [SafeArraySelection _ _ expr:selections]
+		# (found,pos) = find_var_position_in_expression expr
+		| found
+			= (True,pos)
+		= find_var_position_in_selections selections
 	find_var_position_in_selections [DictionarySelection _ d_selections _ expr:selections]
 		# (found,pos) = find_var_position_in_expression expr
 		| found

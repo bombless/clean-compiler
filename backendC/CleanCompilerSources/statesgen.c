@@ -2628,7 +2628,7 @@ static Bool ArgInAStrictContext (Args arg, StateS demstate, Bool semistrict, int
 	argnode=arg->arg_node;
 	
 	if (argnode->node_kind!=NodeIdNode){
-		if (semistrict && argnode->node_number<0){
+		if (semistrict && (argnode->node_mark & NODE_RHS_ON_A_CYCLE)!=0){
 			parallel = NodeInASemiStrictContext (argnode,local_scope);
 			argnode->node_state.state_kind = SemiStrict;
 		} else
@@ -3587,8 +3587,8 @@ static NodeId NodeIdStackTop;
 
 static Bool MarkComponentNodesOnACycle (Node node,int group_number)
 {
-	if (node->node_number!=0)
-		return node->node_number<0;
+	if ((node->node_mark & NODE_RHS_MARKED)!=0)
+		return (node->node_mark & NODE_RHS_ON_A_CYCLE)!=0;
 	
 	switch (node->node_kind){
 		case NodeIdNode:
@@ -3598,11 +3598,11 @@ static Bool MarkComponentNodesOnACycle (Node node,int group_number)
 			node_id=node->node_node_id;
 			
 			if (node_id->nid_mark & ON_A_CYCLE_MASK && node_id->nid_number==group_number){
-				node->node_number=-1;
+				node->node_mark |= NODE_RHS_MARKED | NODE_RHS_ON_A_CYCLE;
 				MarkComponentNodesOnACycle (node_id->nid_node,group_number);
 				return True;
 			} else {
-				node->node_number=1;
+				node->node_mark |= NODE_RHS_MARKED;
 				return False;
 			}
 		}
@@ -3616,13 +3616,13 @@ static Bool MarkComponentNodesOnACycle (Node node,int group_number)
 		
 			on_a_cycle=False;
 			
-			node->node_number=1;
+			node->node_mark |= NODE_RHS_MARKED;
 			for_l (arg,node->node_arguments,arg_next)
 				if (MarkComponentNodesOnACycle (arg->arg_node,group_number))
 					on_a_cycle=True;
 			
 			if (on_a_cycle)
-				node->node_number=-1;
+				node->node_mark |= NODE_RHS_ON_A_CYCLE;
 			
 			return on_a_cycle;
 		}

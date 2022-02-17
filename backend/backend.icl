@@ -172,7 +172,7 @@ BEPredefineMaybeConstructorSymbol :: !Int !Int !BESymbKind !Int !BackEnd -> Back
 BEPredefineMaybeConstructorSymbol a0 a1 a2 a3 a4 = code {
 	ccall BEPredefineMaybeConstructorSymbol "IIII:V:p"
 }
-// void BEPredefineMaybeConstructorSymbol (int constructorIndex, int moduleIndex, BESymbKind symbolKind,int head_strictness);
+// void BEPredefineMaybeConstructorSymbol (int constructorIndex,int moduleIndex,BESymbKind symbolKind,int head_strictness);
 
 BEPredefineListTypeSymbol :: !Int !Int !BETypeSymbKind !Int !Int !BackEnd -> BackEnd;
 BEPredefineListTypeSymbol a0 a1 a2 a3 a4 a5 = code {
@@ -196,7 +196,7 @@ BEAdjustStrictJustInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustStrictJustInstance a0 a1 a2 = code {
 	ccall BEAdjustStrictJustInstance "II:V:p"
 }
-// void BEAdjustStrictJustInstance (int functionIndex, int moduleIndex);
+// void BEAdjustStrictJustInstance (int functionIndex,int moduleIndex);
 
 BEAdjustUnboxedListDeconsInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustUnboxedListDeconsInstance a0 a1 a2 = code {
@@ -208,7 +208,7 @@ BEAdjustUnboxedFromJustInstance :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustUnboxedFromJustInstance a0 a1 a2 = code {
 	ccall BEAdjustUnboxedFromJustInstance "II:V:p"
 }
-// void BEAdjustUnboxedFromJustInstance (int functionIndex, int moduleIndex);
+// void BEAdjustUnboxedFromJustInstance (int functionIndex,int moduleIndex);
 
 BEAdjustOverloadedNilFunction :: !Int !Int !BackEnd -> BackEnd;
 BEAdjustOverloadedNilFunction a0 a1 a2 = code {
@@ -299,6 +299,12 @@ BENormalNode a0 a1 a2 = code {
 	ccall BENormalNode "pp:p:p"
 }
 // BENodeP BENormalNode (BESymbolP symbol,BEArgP args);
+
+BESafeNormalNode :: !BESymbolP !BEArgP !BackEnd -> (!BENodeP,!BackEnd);
+BESafeNormalNode a0 a1 a2 = code {
+	ccall BESafeNormalNode "pp:p:p"
+}
+// BENodeP BESafeNormalNode (BESymbolP symbol,BEArgP args);
 
 BEMatchNode :: !Int !BESymbolP !BENodeP !BackEnd -> (!BENodeP,!BackEnd);
 BEMatchNode a0 a1 a2 a3 = code {
@@ -670,13 +676,13 @@ BEParseCommandArgs :: !BackEnd -> (!Int,!BackEnd);
 BEParseCommandArgs a0 = code {
 	ccall BEParseCommandArgs ":I:p"
 }
-// int BEParseCommandArgs (void);
+// int BEParseCommandArgs ();
 
 BEGenerateStatesAndOptimise :: !BackEnd -> (!Int,!BackEnd);
 BEGenerateStatesAndOptimise a0 = code {
 	ccall BEGenerateStatesAndOptimise ":I:p"
 }
-// int BEGenerateStatesAndOptimise (void);
+// int BEGenerateStatesAndOptimise ();
 
 BEGenerateCode :: !String !BackEnd -> (!Bool,!BackEnd);
 BEGenerateCode a0 a1 = code {
@@ -749,6 +755,18 @@ BEDynamicTempTypeSymbol a0 = code {
 	ccall BEDynamicTempTypeSymbol ":p:p"
 }
 // BETypeSymbolP BEDynamicTempTypeSymbol ();
+
+BESetABCFile :: !Int !BackEnd -> BackEnd;
+BESetABCFile a0 a1 = code {
+	ccall BESetABCFile "p:V:p"
+}
+// void BESetABCFile (void* a0);
+
+BESetStdErrorFile :: !Int !BackEnd -> BackEnd;
+BESetStdErrorFile a0 a1 = code {
+	ccall BESetStdErrorFile "p:V:p"
+}
+// void BESetStdErrorFile (void* a0);
 kBEVersionCurrent:==0x02116000;
 kBEVersionOldestDefinition:==0x02100401;
 kBEVersionOldestImplementation:==0x02100401;
@@ -827,15 +845,3 @@ BELhsNodeId:==0;
 BERhsNodeId:==1;
 BEIsNotACaf:==0;
 BEIsACaf:==1;
-
-BESetABCFile :: !Int !BackEnd -> BackEnd;
-BESetABCFile a0 a1 = code {
-	ccall BESetABCFile "p:V:p"
-}
-// void BESetABCFile (void *a0);
-
-BESetStdErrorFile :: !Int !BackEnd -> BackEnd;
-BESetStdErrorFile a0 a1 = code {
-	ccall BESetStdErrorFile "p:V:p"
-}
-// void BESetStdErrorFile (void *a0);
