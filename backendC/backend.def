@@ -44,6 +44,7 @@ EXPORTS
  BETypeArgs
  BETypeAlt
  BENormalNode
+ BESafeNormalNode
  BEMatchNode
  BETupleSelectNode
  BEIfNode
@@ -81,8 +82,8 @@ EXPORTS
  BEDefineExtensibleAlgebraicType
  BEDefineRecordType
  BEAbstractType
- BEConstructorList
  BENoConstructors
+ BEConstructorList
  BEFieldList
  BESetMemberTypeOfField
  BESetDictionaryFieldOfMember
@@ -113,11 +114,11 @@ EXPORTS
  BEExportField
  BEExportFunction
  BEDefineImportedObjsAndLibs
+ BEInsertForeignExport
  BESetMainDclModuleN
  BEStrictPositions
  BEGetIntFromArray
  BEDeclareDynamicTypeSymbol
  BEDynamicTempTypeSymbol
- BEInsertForeignExport
  BESetABCFile
  BESetStdErrorFile
