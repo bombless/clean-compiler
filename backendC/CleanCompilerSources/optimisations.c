@@ -1275,7 +1275,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 								function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 								function_node->node_state=LazyState;
-								function_node->node_mark=0;
+								function_node->node_mark=arg_node->node_mark & NODE_RHS_SAFE_INDEX;
 								
 								new_arg=NewArgument (function_node);
 								new_arg->arg_state=LazyState;
@@ -1970,7 +1970,7 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 	rhs_root=NewNode (node->node_symbol,NULL,node->node_arity);
 #endif
 	rhs_root->node_state=LazyState;
-	rhs_root->node_mark=0;
+	rhs_root->node_mark=node->node_mark & NODE_RHS_SAFE_INDEX;
 	
 	function_arity=0;
 
