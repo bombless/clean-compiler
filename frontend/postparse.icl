@@ -1087,9 +1087,9 @@ transformSequence (SQ_FromTo pd_from_to frm to)
 transformArrayDenot :: ArrayKind [ParsedExpr] -> ParsedExpr
 transformArrayDenot array_kind exprs
 	# create_array_call=cast_array_kind array_kind (predef_ident_expr PD__CreateArrayFun ` length exprs)
-	= foldr update_array_element create_array_call [{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+	= foldl update_array_element create_array_call [{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
 where
-	update_array_element {bind_src=value, bind_dst=index} expr
+	update_array_element expr {bind_src=value, bind_dst=index}
 		= PE_Update expr [PS_SafeArray index] value
 
 cast_array_kind OverloadedArray array_expr = array_expr
