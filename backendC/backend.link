@@ -43,6 +43,7 @@
 /EXPORT: BETypeArgs
 /EXPORT: BETypeAlt
 /EXPORT: BENormalNode
+/EXPORT: BESafeNormalNode
 /EXPORT: BEMatchNode
 /EXPORT: BETupleSelectNode
 /EXPORT: BEIfNode
