@@ -2718,7 +2718,7 @@ where
 				-> (SafeArraySelection array_select expr_ptr index_expr, ui)
 			EI_Selection selectors record_var context_args
 				# (var_ident, var_info_ptr, ui_var_heap, ui_error) = getClassVariable ds_ident record_var ui.ui_var_heap ui.ui_error
-				-> (DictionarySelection {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} selectors expr_ptr index_expr,
+				-> (SafeDictionarySelection {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} selectors expr_ptr index_expr,
 							{ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
   	updateExpression group_index selection ui
 		= (selection, ui)

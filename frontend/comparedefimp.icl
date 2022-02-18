@@ -1434,6 +1434,11 @@ instance e_corresponds Selection where
 		=	e_corresponds dcl_dict_var icl_dict_var
 		o`	e_corresponds dcl_selections icl_selections
 		o`	e_corresponds dcl_index_expr icl_index_expr
+	e_corresponds (SafeDictionarySelection dcl_dict_var dcl_selections _ dcl_index_expr)
+				(SafeDictionarySelection icl_dict_var icl_selections _ icl_index_expr)
+		=	e_corresponds dcl_dict_var icl_dict_var
+		o`	e_corresponds dcl_selections icl_selections
+		o`	e_corresponds dcl_index_expr icl_index_expr
 		
 instance e_corresponds DynamicExpr where
 	e_corresponds dcl icl

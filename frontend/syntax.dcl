@@ -1437,6 +1437,7 @@ instance == OverloadedPatternType
 				| ArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| SafeArraySelection !(Global DefinedSymbol) !ExprInfoPtr !Expression
 				| DictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
+				| SafeDictionarySelection !BoundVar ![Selection] !ExprInfoPtr !Expression
 
 ::	TypeCodeExpression	= TCE_Empty
 						| TCE_Var 			!VarInfoPtr

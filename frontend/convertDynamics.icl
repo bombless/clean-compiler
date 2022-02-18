@@ -563,6 +563,9 @@ instance convertDynamics Selection where
 	convertDynamics cinp (DictionarySelection var selectors expr_ptr expr) ci
 		# (expr, ci) = convertDynamics cinp expr ci
 		= (DictionarySelection var selectors expr_ptr expr, ci)
+	convertDynamics cinp (SafeDictionarySelection var selectors expr_ptr expr) ci
+		# (expr, ci) = convertDynamics cinp expr ci
+		= (SafeDictionarySelection var selectors expr_ptr expr, ci)
 
 convertExprTypeCode :: !ConversionInput !TypeCodeExpression !*ConversionState
 	->	(!Expression, !*ConversionState)

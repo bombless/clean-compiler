@@ -898,28 +898,28 @@ transformArrayComprehension array_kind expr qualifiers ca
 	  create_array_expr = predef_ident_expr PD__CreateArrayFun
 	| same_index_for_update_and_array_generators qualifiers
 		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
-		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
+		# update = PE_Update c_a_ident_exp [PS_SafeArray c_i_ident_exp] expr
 		| size_of_generators_can_be_computed_quickly qualifiers
 			# {qual_generators,qual_let_defs,qual_filter,qual_position,qual_filename} = hd_qualifier
-			# qual_generators = [index_generator : qual_generators]
-			# (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
-			# new_array = PE_List [create_array_expr,size_exp]
+			  qual_generators = [index_generator : qual_generators]
+			  (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
+			  new_array = PE_List [create_array_expr,size_exp]
 			  new_array = cast_array_kind array_kind new_array
-			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
+			  (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
 			= (makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier],ca)
 
 			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-			# new_array = PE_List [create_array_expr,length]
+			  new_array = PE_List [create_array_expr,length]
 			  new_array = cast_array_kind array_kind new_array
 			  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] }]
 			= transformUpdateComprehension [new_array] [update] [c_a_ident_exp] c_a_ident_exp qualifiers ca
 
 		# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-		# new_array = PE_List [create_array_expr,length]
+		  new_array = PE_List [create_array_expr,length]
 		  new_array = cast_array_kind array_kind new_array
-		# inc = get_predef_id PD_IncFun
+		  inc = get_predef_id PD_IncFun
 		  new_array_and_index =	[new_array,PE_Basic (BVInt 0)]
-		  update = [PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
+		  update = [PE_Update c_a_ident_exp [PS_SafeArray c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
 		= transformUpdateComprehension new_array_and_index update [c_a_ident_exp,c_i_ident_exp] c_a_ident_exp qualifiers ca
 
 All p l :== all l

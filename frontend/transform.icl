@@ -461,14 +461,24 @@ where
 		  (var_expr, us) = unfoldVariable var us
 		= case var_expr of 
 			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
-				# [RecordSelection _ field_index:_] = selectors
-				  (App { app_symb = {symb_ident, symb_kind = SK_Function array_select}}) =  app_args !! field_index
-				-> (ArraySelection { array_select & glob_object = { ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
-							new_ptr index_expr, us)
+				-> (ArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, us)
 			Var var
 				-> (DictionarySelection var selectors new_ptr index_expr, us)
+	unfold (SafeDictionarySelection var selectors expr_ptr index_expr) us=:{us_symbol_heap}
+		# (new_ptr, us_symbol_heap) = newPtr EI_Empty us_symbol_heap
+		  (index_expr, us) = unfold index_expr {us & us_symbol_heap = us_symbol_heap}
+		  (var_expr, us) = unfoldVariable var us
+		= case var_expr of
+			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
+				-> (SafeArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, us)
+			Var var
+				-> (SafeDictionarySelection var selectors new_ptr index_expr, us)
 	unfold record_selection us
 		= (record_selection, us)
+
+array_select_from_dictionary app_args [RecordSelection _ field_index:_]
+	# (App {app_symb = {symb_ident, symb_kind = SK_Function array_select}}) = app_args !! field_index
+	= {array_select & glob_object = {ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
 
 instance unfold FreeVar
 where
@@ -2219,6 +2229,8 @@ where
 
 instance collectVariables Selection
 where
+	collectVariables record_selection=:(RecordSelection _ _) free_vars dynamics cos
+		= (record_selection, free_vars, dynamics, cos)
 	collectVariables (ArraySelection array_select expr_ptr index_expr) free_vars dynamics cos
 		# (index_expr, free_vars, dynamics, cos) = collectVariables index_expr free_vars dynamics cos
 		= (ArraySelection array_select expr_ptr index_expr, free_vars, dynamics, cos)
@@ -2228,8 +2240,9 @@ where
 	collectVariables (DictionarySelection dictionary_select selectors expr_ptr index_expr) free_vars dynamics cos
 		# ((index_expr,selectors), free_vars, dynamics, cos) = collectVariables (index_expr,selectors) free_vars dynamics cos
 		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, free_vars, dynamics, cos)
-	collectVariables record_selection free_vars dynamics cos
-		= (record_selection, free_vars, dynamics, cos)
+	collectVariables (SafeDictionarySelection dictionary_select selectors expr_ptr index_expr) free_vars dynamics cos
+		# ((index_expr,selectors), free_vars, dynamics, cos) = collectVariables (index_expr,selectors) free_vars dynamics cos
+		= (SafeDictionarySelection dictionary_select selectors expr_ptr index_expr, free_vars, dynamics, cos)
 
 instance collectVariables [a] | collectVariables a
 where
@@ -2523,14 +2536,16 @@ where
 
 instance reset_free_var_heap_pointers Selection
 where
+	reset_free_var_heap_pointers (RecordSelection _ _) var_heap
+		= var_heap
 	reset_free_var_heap_pointers (ArraySelection array_select expr_ptr index_expr) var_heap
 		= reset_free_var_heap_pointers index_expr var_heap
 	reset_free_var_heap_pointers (SafeArraySelection array_select expr_ptr index_expr) var_heap
 		= reset_free_var_heap_pointers index_expr var_heap
 	reset_free_var_heap_pointers (DictionarySelection var selectors expr_ptr index_expr) var_heap
 		= reset_free_var_heap_pointers index_expr (reset_free_var_heap_pointers selectors var_heap)
-	reset_free_var_heap_pointers record_selection var_heap
-		= var_heap
+	reset_free_var_heap_pointers (SafeDictionarySelection var selectors expr_ptr index_expr) var_heap
+		= reset_free_var_heap_pointers index_expr (reset_free_var_heap_pointers selectors var_heap)
 
 instance reset_free_var_heap_pointers FreeVar
 where

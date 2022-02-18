@@ -2193,6 +2193,8 @@ where
 							(convertArgs [expr1, index, expr2])
 				DictionarySelection dictionaryVar dictionarySelections _ index
 					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
+				SafeDictionarySelection dictionaryVar dictionarySelections _ index
+					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
 	convertExpr (Update expr1 selections expr2)
 		=	case lastSelection of
 				RecordSelection _ _
@@ -2202,6 +2204,12 @@ where
 				SafeArraySelection {glob_object={ds_index}, glob_module} _ index
 					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
 				DictionarySelection dictionaryVar dictionarySelections _ index
+					->	beNormalNode (beFunction0 BEDictionaryUpdateFunSymbol)
+								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
+						with
+							dictionary
+								=	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections)
+				SafeDictionarySelection dictionaryVar dictionarySelections _ index
 					->	beNormalNode (beFunction0 BEDictionaryUpdateFunSymbol)
 								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
 						with
@@ -2251,6 +2259,11 @@ where
 	convertSelection expression (kind, SafeArraySelection {glob_object={ds_index}, glob_module} _ index)
 		=	beNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
 	convertSelection expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
+		= convertDictionarySelection kind expression dictionaryVar dictionarySelections index
+	convertSelection expression (kind, SafeDictionarySelection dictionaryVar dictionarySelections _ index)
+		= convertDictionarySelection kind expression dictionaryVar dictionarySelections index
+
+	convertDictionarySelection kind expression dictionaryVar dictionarySelections index
 		=	case kind of
 				BESelector
 					->	beNormalNode (beBasicSymbol BEApplySymb)

@@ -520,6 +520,10 @@ where
 		# (_, _, ai) = consumerRequirements index_expr common_defs ai
 		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
 		= aiUnifyClassifications CActive cc_var ai
+	reqs_of_selector common_defs (SafeDictionarySelection dict_var _ _ index_expr) ai
+		# (_, _, ai) = consumerRequirements index_expr common_defs ai
+		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
+		= aiUnifyClassifications CActive cc_var ai
 
 instance consumerRequirements App where
 	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_ident}, app_args}
@@ -1562,6 +1566,8 @@ where
 		= count_locals index_expr n
 	count_selector_locals (DictionarySelection _ _ _ index_expr) n
 		= count_locals index_expr n
+	count_selector_locals (SafeDictionarySelection _ _ _ index_expr) n
+		= count_locals index_expr n
 
 add_unused_args fun fun_index args ref_counts group_strictness
 	= SwitchNewOld
@@ -1869,6 +1875,10 @@ instance producerRequirements Selection where
 	producerRequirements (SafeArraySelection _ _ expr) prs
 		= producerRequirements expr prs
 	producerRequirements (DictionarySelection _ sels _ expr) prs
+		# (safe,prs)	= producerRequirements expr prs
+		| safe			= producerRequirements sels prs
+						= (safe,prs)
+	producerRequirements (SafeDictionarySelection _ sels _ expr) prs
 		# (safe,prs)	= producerRequirements expr prs
 		| safe			= producerRequirements sels prs
 						= (safe,prs)

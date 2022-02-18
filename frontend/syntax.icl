@@ -469,8 +469,9 @@ instance <<< Selection
 where
 	(<<<) file (RecordSelection selector _) = file <<< selector
 	(<<<) file (ArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
-	(<<<) file (SafeArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< '>' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (SafeArraySelection {glob_object={ds_index}} _ index_expr) = file <<< '<' <<< ds_index <<< ">~[" <<< index_expr <<< ']'
 	(<<<) file (DictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ')' <<< '[' <<< index_expr <<< ']'
+	(<<<) file (SafeDictionarySelection var selections _ index_expr) = file <<< '(' <<< var <<< '.' <<< selections <<< ")~[" <<< index_expr <<< ']'
 
 instance <<< LocalDefs
 where

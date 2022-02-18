@@ -326,6 +326,11 @@ transform_expressions_in_selectors [DictionarySelection bv dictionary_selections
 	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
 	# (selections,ti) = transform_expressions_in_selectors selections ro ti
 	= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
+transform_expressions_in_selectors [SafeDictionarySelection bv dictionary_selections ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([SafeDictionarySelection bv dictionary_selections ep expr:selections],ti)
 transform_expressions_in_selectors [] ro ti
 	= ([],ti)
 
@@ -4910,6 +4915,8 @@ where
 		= clearVariables expr fvi
 	clearVariables (DictionarySelection dict_var selections _ expr) fvi
 		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
+	clearVariables (SafeDictionarySelection dict_var selections _ expr) fvi
+		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
 	
 ////////////////
 
@@ -5033,6 +5040,8 @@ where
 	freeVariables (SafeArraySelection _ _ expr) fvi
 		= freeVariables expr fvi
 	freeVariables (DictionarySelection dict_var selections _ expr) fvi
+		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
+	freeVariables (SafeDictionarySelection dict_var selections _ expr) fvi
 		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
 	
 removeVariables global_variables var_heap
@@ -5458,14 +5467,24 @@ where
 		  (var_expr, cs) = copyVariable var ci cs
 		= case var_expr of 
 			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
-				# [RecordSelection _ field_index:_] = selectors
-				  (App { app_symb = {symb_ident, symb_kind = SK_Function array_select}}) =  app_args !! field_index
-				-> (ArraySelection { array_select & glob_object = { ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
-							new_ptr index_expr, cs)
+				-> (ArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, cs)
 			Var var
 				-> (DictionarySelection var selectors new_ptr index_expr, cs)
+	copy (SafeDictionarySelection var selectors expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci {cs & cs_symbol_heap = cs_symbol_heap}
+		  (var_expr, cs) = copyVariable var ci cs
+		= case var_expr of 
+			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
+				-> (SafeArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, cs)
+			Var var
+				-> (SafeDictionarySelection var selectors new_ptr index_expr, cs)
 	copy record_selection ci cs
 		= (record_selection, cs)
+
+array_select_from_dictionary app_args [RecordSelection _ field_index:_]
+	# (App {app_symb = {symb_ident, symb_kind = SK_Function array_select}}) = app_args !! field_index
+	= {array_select & glob_object = {ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
 
 instance copy FreeVar
 where

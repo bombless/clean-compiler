@@ -1175,6 +1175,14 @@ where
 		| found
 			= (True,pos)
 		= find_var_position_in_selections selections
+	find_var_position_in_selections [SafeDictionarySelection _ d_selections _ expr:selections]
+		# (found,pos) = find_var_position_in_expression expr
+		| found
+			= (True,pos)
+		# (found,pos) = find_var_position_in_selections d_selections
+		| found
+			= (True,pos)
+		= find_var_position_in_selections selections
 	find_var_position_in_selections []
 		= (False,NoPos)
 

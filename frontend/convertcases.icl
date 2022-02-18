@@ -518,6 +518,9 @@ where
 	weightedRefCount rci (DictionarySelection _ selectors _ index_expr) rs
 		# rs = weightedRefCount rci index_expr rs
 		= weightedRefCount rci selectors rs
+	weightedRefCount rci (SafeDictionarySelection _ selectors _ index_expr) rs
+		# rs = weightedRefCount rci index_expr rs
+		= weightedRefCount rci selectors rs
 
 weightedRefCountAddPatternExpr :: !RCInfo !Expression !(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap)
 							   -> (![CountedVariable],!(![CountedVariable],!Optional [[VarInfoPtr]],![SymbKind],!*VarHeap,!*ExpressionHeap))
@@ -1030,6 +1033,8 @@ where
 
 instance distributeLets Selection
 where
+	distributeLets _ selection=:(RecordSelection _ _) cp_info
+		= (selection, cp_info)
 	distributeLets di (ArraySelection selector expr_ptr expr) cp_info
 		# (expr, cp_info) = distributeLets di expr cp_info
 		= (ArraySelection selector expr_ptr expr, cp_info)
@@ -1040,8 +1045,10 @@ where
 		# (selectors, cp_info) = distributeLets di selectors cp_info
 		# (expr, cp_info) = distributeLets di expr cp_info
 		= (DictionarySelection var selectors expr_ptr expr, cp_info)
-	distributeLets _ selection cp_info
-		= (selection, cp_info)
+	distributeLets di (SafeDictionarySelection var selectors expr_ptr expr) cp_info
+		# (selectors, cp_info) = distributeLets di selectors cp_info
+		# (expr, cp_info) = distributeLets di expr cp_info
+		= (SafeDictionarySelection var selectors expr_ptr expr, cp_info)
 
 instance distributeLets [a] | distributeLets a
 where
@@ -1921,18 +1928,22 @@ where
 
 instance convertCases Selection  
 where
-	convertCases ci (DictionarySelection record selectors expr_ptr index_expr) cs
-		# (index_expr, cs) = convertCases ci index_expr cs
-		  (selectors, cs) = convertCases ci selectors cs
-		= (DictionarySelection record selectors expr_ptr index_expr, cs)
+	convertCases ci selector=:(RecordSelection _ _) cs
+		= (selector, cs)
 	convertCases ci (ArraySelection selector expr_ptr index_expr) cs
 		# (index_expr, cs) = convertCases ci index_expr cs
 		= (ArraySelection selector expr_ptr index_expr, cs)
 	convertCases ci (SafeArraySelection selector expr_ptr index_expr) cs
 		# (index_expr, cs) = convertCases ci index_expr cs
 		= (SafeArraySelection selector expr_ptr index_expr, cs)
-	convertCases ci selector cs
-		= (selector, cs)
+	convertCases ci (DictionarySelection record selectors expr_ptr index_expr) cs
+		# (index_expr, cs) = convertCases ci index_expr cs
+		  (selectors, cs) = convertCases ci selectors cs
+		= (DictionarySelection record selectors expr_ptr index_expr, cs)
+	convertCases ci (SafeDictionarySelection record selectors expr_ptr index_expr) cs
+		# (index_expr, cs) = convertCases ci index_expr cs
+		  (selectors, cs) = convertCases ci selectors cs
+		= (SafeDictionarySelection record selectors expr_ptr index_expr, cs)
 
 convertNonRootFail ci=:{ci_group_index, ci_common_defs} ident cs
 	# result_type
@@ -2215,19 +2226,24 @@ where
 
 instance copy Selection  
 where
-	copy (DictionarySelection record selectors expr_ptr index_expr) cp_info
-		# (index_expr, cp_info) = copy index_expr cp_info
-		  (selectors, cp_info) = copy selectors cp_info
-		  (record, cp_info) = copy record cp_info
-		= (DictionarySelection record selectors expr_ptr index_expr, cp_info)
+	copy selector=:(RecordSelection _ _) cp_info
+		= (selector, cp_info)
 	copy (ArraySelection selector expr_ptr index_expr) cp_info
 		# (index_expr, cp_info) = copy index_expr cp_info
 		= (ArraySelection selector expr_ptr index_expr, cp_info)
 	copy (SafeArraySelection selector expr_ptr index_expr) cp_info
 		# (index_expr, cp_info) = copy index_expr cp_info
 		= (SafeArraySelection selector expr_ptr index_expr, cp_info)
-	copy selector cp_info
-		= (selector, cp_info)
+	copy (DictionarySelection record selectors expr_ptr index_expr) cp_info
+		# (index_expr, cp_info) = copy index_expr cp_info
+		  (selectors, cp_info) = copy selectors cp_info
+		  (record, cp_info) = copy record cp_info
+		= (DictionarySelection record selectors expr_ptr index_expr, cp_info)
+	copy (SafeDictionarySelection record selectors expr_ptr index_expr) cp_info
+		# (index_expr, cp_info) = copy index_expr cp_info
+		  (selectors, cp_info) = copy selectors cp_info
+		  (record, cp_info) = copy record cp_info
+		= (SafeDictionarySelection record selectors expr_ptr index_expr, cp_info)
 
 instance copy Case
 where

@@ -871,6 +871,9 @@ instance check_completeness Selection where
 	check_completeness (DictionarySelection _ selections _ index_expr) cci ccs
 		= check_completeness selections cci
 		  (check_completeness index_expr cci ccs)
+	check_completeness (SafeDictionarySelection _ selections _ index_expr) cci ccs
+		= check_completeness selections cci
+		  (check_completeness index_expr cci ccs)
 
 instance check_completeness SelectorDef where
 	check_completeness {sd_type} cci ccs
