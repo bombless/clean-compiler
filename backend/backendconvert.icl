@@ -2257,7 +2257,7 @@ where
 	convertSelection expression (kind, ArraySelection {glob_object={ds_index}, glob_module} _ index)
 		=	beNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
 	convertSelection expression (kind, SafeArraySelection {glob_object={ds_index}, glob_module} _ index)
-		=	beNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
+		= beFunction2 BESafeNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
 	convertSelection expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
 		= convertDictionarySelection kind expression dictionaryVar dictionarySelections index
 	convertSelection expression (kind, SafeDictionarySelection dictionaryVar dictionarySelections _ index)

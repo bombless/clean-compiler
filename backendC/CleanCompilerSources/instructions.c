@@ -715,6 +715,7 @@ enum {
 #define Ipush_array "push_array"
 #define Ipush_arraysize "push_arraysize"
 #define Iselect "select"
+#define Iselect_nc "select_nc"
 #define Iupdate "update"
 #define Iupdate_nc "update_nc"
 #define Ireplace "replace"
@@ -1667,6 +1668,13 @@ static void GenArraySelect (Label elemdesc, int asize, int bsize)
 	put_arguments_nn_b (asize, bsize);
 }
 
+static void GenArraySelectNoCheck (Label elemdesc, int asize, int bsize)
+{
+	put_instruction_ (Iselect_nc);
+	GenLabel (elemdesc);
+	put_arguments_nn_b (asize, bsize);
+}
+
 static void GenArrayUpdate (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Iupdate);
@@ -1769,7 +1777,10 @@ static void CallArrayFunctionWithNodeMark (SymbDef array_def,Bool is_jsr,StateP 
 			put_arguments_nn_b (asize,bsize);
 			break;
 		case ArraySelectFun:
-			GenArraySelect (&elem_desc,asize,bsize);
+			if ((node_mark & NODE_RHS_SAFE_INDEX)==0)
+				GenArraySelect (&elem_desc,asize,bsize);
+			else
+				GenArraySelectNoCheck (&elem_desc,asize,bsize);
 			if (elem_is_lazy){
 				if (is_jsr)
 					GenJsrEval (0);
@@ -1790,6 +1801,12 @@ static void CallArrayFunctionWithNodeMark (SymbDef array_def,Bool is_jsr,StateP 
 			GenArraySelect (&elem_desc,asize,bsize);
 			break;
 #endif
+			GenPushA (0);
+			if ((node_mark & NODE_RHS_SAFE_INDEX)==0)
+				GenArraySelect (&elem_desc,asize,bsize);
+			else
+				GenArraySelectNoCheck (&elem_desc,asize,bsize);
+			break;
 		case _UnqArraySelectFun:
 			GenPushA (0);
 			GenArraySelect (&elem_desc,asize,bsize);
