@@ -649,12 +649,12 @@ where
 			{ ft_ident = fun_ident
 			, ft_arity = 0
 			, ft_priority = NoPrio
-			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict} 
+			, ft_type = {st_vars=[],st_attr_vars=[],st_arity=0,st_args=[],st_result={at_type=TE,at_attribute=TA_Multi},st_attr_env=[],st_context=[],st_args_strictness=NotStrict}
 			, ft_pos = gc_pos
 			, ft_specials = FSP_None
 			, ft_type_ptr = var_info_ptr
 			}
-		= (fun, var_heap)
+		= (fun,var_heap)
 
 NewEntry symbol_table symb_ptr def_kind def_index level previous :==
 	 symbol_table <:= (symb_ptr,{  ste_kind = def_kind, ste_index = def_index, ste_def_level = level, ste_previous = previous })
