@@ -5631,7 +5631,7 @@ where
 					  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
 					  cs & cs_symbol_heap
 						= case case_info of
-							EI_Extended (EEI_ActiveCase aci) ei
+							EI_Extended (EEI_ActiveCase aci=:{aci_opt_unfolder=Yes _}) ei
 								# aci & aci_opt_unfolder = No
 								-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
 							_
@@ -5663,6 +5663,21 @@ where
 							= (exprs,var_heap)
 						bind_variables_for_exprs [] exprs var_heap
 							= (exprs,var_heap)
+				VI_Expression expr
+					| not expr=:Var _
+						// make case inactive, otherwise incorrect if unfolding fun_f in case fun_f yields case (f a) and later f becomes a producer
+						# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+						  cs & cs_symbol_heap
+							= case case_info of
+								EI_Extended (EEI_ActiveCase aci=:{aci_opt_unfolder=Yes _}) ei
+									# aci & aci_opt_unfolder = No
+									-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
+								_
+									-> cs_symbol_heap
+						# (expr,cs) = copyVariable var ci cs
+						-> (expr @ exprs, cs)
+						# (expr,cs) = copyVariable var ci cs
+						-> (expr @ exprs, cs)
 				_
 					# (expr,cs) = copyVariable var ci cs
 					-> (expr @ exprs, cs)
