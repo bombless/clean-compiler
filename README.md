@@ -36,6 +36,70 @@ The versions of these packages are kept in sync. This means:
   Normally you will want to use this dependency with an exact version
   constraint, e.g. `=1.0.0`.
 
+## Updating
+
+When pulling in new commits from upstream, follow the following steps:
+
+Set up the repositories:
+
+```bash
+git clone git@gitlab.com:clean-and-itasks/base/compiler.git
+cd compiler
+git remote add upstream https://gitlab.science.ru.nl/clean-compiler-and-rts/compiler.git
+```
+
+Update the `main` branch by merging changes:
+
+```bash
+git fetch --no-tags upstream
+git checkout main
+git merge upstream/master
+```
+
+You may now have to resolve conflicts (and finish the merge with `git commit`).
+
+Update the version in `nitrile.yml` and add changelog entries:
+
+```bash
+vim -p nitrile.yml CHANGELOG.md
+git commit -am 'Bump version to VERSION; add changelog entries'
+```
+
+To update the `itasks` branch, first merge the upstream `itask` and then merge
+the version and changelog changes:
+
+```bash
+git checkout itasks
+git merge upstream/itask
+git merge main
+```
+
+After each merge you may have to resolve conflicts (and finish the merge with
+`git commit`). You may also have to add extra changelog entries if the `itask`
+branch includes more changes.
+
+Push all branches:
+
+```bash
+git push origin refs/remotes/upstream/itask:refs/heads/upstream-itask
+git push origin refs/remotes/upstream/master:refs/heads/upstream-master
+git push origin main:main
+git push origin itasks:itasks
+```
+
+Head over to https://gitlab.com/clean-and-itasks/base/compiler/-/network/main
+to check that all looks good. No commit should be listed twice.
+
+If all looks good and pipelines succeed, you can tag the new heads and push the
+tags:
+
+```bash
+git tag -s VERSION -m VERSION main
+git push origin VERSION
+git tag -s VERSION-itasks -m VERSION-itasks main
+git push origin VERSION-itasks
+```
+
 ## Maintainer & license
 
 This project is maintained by [Camil Staps][].
