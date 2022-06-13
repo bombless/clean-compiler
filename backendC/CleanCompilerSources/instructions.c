@@ -715,7 +715,9 @@ enum {
 #define Ipush_array "push_array"
 #define Ipush_arraysize "push_arraysize"
 #define Iselect "select"
+#define Iselect_nc "select_nc"
 #define Iupdate "update"
+#define Iupdate_nc "update_nc"
 #define Ireplace "replace"
 
 #define Ipush_arg "push_arg"
@@ -1652,19 +1654,6 @@ static void CallFunction2 (Label label, SymbDef def, Bool isjsr, StateS root_sta
 		GenJmp (label);
 }
 
-void CallFunction (Label label, SymbDef def, Bool isjsr, Node root)
-{
-	if (def->sdef_arfun<NoArrayFun)
-		CallArrayFunction (def,isjsr,&root->node_state);
-	else
-		CallFunction2 (label, def, isjsr, root->node_state, root->node_arguments, root->node_arity);
-}
-
-void CallFunction1 (Label label, SymbDef def, StateS root_state, Args fun_args, int arity)
-{
-	CallFunction2 (label, def, True, root_state, fun_args, arity);
-}
-
 static void GenArraySize (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Ipush_arraysize);
@@ -1679,11 +1668,25 @@ static void GenArraySelect (Label elemdesc, int asize, int bsize)
 	put_arguments_nn_b (asize, bsize);
 }
 
+static void GenArraySelectNoCheck (Label elemdesc, int asize, int bsize)
+{
+	put_instruction_ (Iselect_nc);
+	GenLabel (elemdesc);
+	put_arguments_nn_b (asize, bsize);
+}
+
 static void GenArrayUpdate (Label elemdesc, int asize, int bsize)
 {
 	put_instruction_ (Iupdate);
 	GenLabel (elemdesc);
 	put_arguments_nn_b (asize, bsize);	
+}
+
+static void GenArrayUpdateNoCheck (Label elemdesc, int asize, int bsize)
+{
+	put_instruction_ (Iupdate_nc);
+	GenLabel (elemdesc);
+	put_arguments_nn_b (asize, bsize);
 }
 
 static void GenArrayReplace (Label elemdesc, int asize, int bsize)
@@ -1693,11 +1696,7 @@ static void GenArrayReplace (Label elemdesc, int asize, int bsize)
 	put_arguments_nn_b (asize, bsize);
 }
 
-#if CLEAN2
-static int CaseFailNumber;
-#endif
-
-void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
+static void CallArrayFunctionWithNodeMark (SymbDef array_def,Bool is_jsr,StateP node_state_p,int node_mark)
 {
 	LabDef elem_desc;
 	int asize, bsize;
@@ -1718,7 +1717,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			function_state_p = array_def->sdef_rule->rule_state_p;
 			break;
 		default:
-			error_in_function ("CallArrayFunction");
+			error_in_function ("CallArrayFunctionWithNodeMark");
 			break;
 	}
 
@@ -1733,7 +1732,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			if (function_state_p[0].state_type==TupleState)
 				array_state=function_state_p[0].state_tuple_arguments[0];
 			else
-				error_in_function ("CallArrayFunction");
+				error_in_function ("CallArrayFunctionWithNodeMark");
 			break;
 		default:
 			array_state = function_state_p[0];
@@ -1753,7 +1752,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			else if (elem_state.state_object==RealObj)
 				elem_desc.lab_name = "REAL32";
 			else
-				error_in_function ("CallArrayFunction");
+				error_in_function ("CallArrayFunctionWithNodeMark");
 
 			asize = 0;
 			bsize = 1;
@@ -1764,7 +1763,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 
 		elem_is_lazy = elem_state.state_type==SimpleState && elem_state.state_kind==OnA;
 	} else
-		error_in_function ("CallArrayFunction");
+		error_in_function ("CallArrayFunctionWithNodeMark");
 
 	switch (fkind){
 		case CreateArrayFun:
@@ -1778,7 +1777,10 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			put_arguments_nn_b (asize,bsize);
 			break;
 		case ArraySelectFun:
-			GenArraySelect (&elem_desc,asize,bsize);
+			if ((node_mark & NODE_RHS_SAFE_INDEX)==0)
+				GenArraySelect (&elem_desc,asize,bsize);
+			else
+				GenArraySelectNoCheck (&elem_desc,asize,bsize);
 			if (elem_is_lazy){
 				if (is_jsr)
 					GenJsrEval (0);
@@ -1799,6 +1801,12 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			GenArraySelect (&elem_desc,asize,bsize);
 			break;
 #endif
+			GenPushA (0);
+			if ((node_mark & NODE_RHS_SAFE_INDEX)==0)
+				GenArraySelect (&elem_desc,asize,bsize);
+			else
+				GenArraySelectNoCheck (&elem_desc,asize,bsize);
+			break;
 		case _UnqArraySelectFun:
 			GenPushA (0);
 			GenArraySelect (&elem_desc,asize,bsize);
@@ -1809,7 +1817,7 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			int record_or_array_a_size,record_or_array_b_size;
 			
 			if (node_state_p->state_type!=TupleState)
-				error_in_function ("CallArrayFunction");
+				error_in_function ("CallArrayFunctionWithNodeMark");
 
 			DetermineSizeOfState (node_state_p->state_tuple_arguments[1],&record_or_array_a_size,&record_or_array_b_size);
 			
@@ -1873,7 +1881,10 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 			break;
 		}
 		case ArrayUpdateFun:
-			GenArrayUpdate (& elem_desc, asize, bsize);
+			if ((node_mark & NODE_RHS_SAFE_INDEX)==0)
+				GenArrayUpdate (& elem_desc, asize, bsize);
+			else
+				GenArrayUpdateNoCheck (& elem_desc, asize, bsize);
 			break;
 		case ArrayReplaceFun:
 			GenArrayReplace (& elem_desc, asize, bsize);
@@ -1891,6 +1902,28 @@ void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 		DetermineSizeOfState (*node_state_p,&asize,&bsize);
 		GenRtn (asize,bsize,*node_state_p);
 	}	
+}
+
+void CallFunction (Label label, SymbDef def, Bool isjsr, Node root)
+{
+	if (def->sdef_arfun<NoArrayFun)
+		CallArrayFunctionWithNodeMark (def,isjsr,&root->node_state,root->node_mark);
+	else
+		CallFunction2 (label, def, isjsr, root->node_state, root->node_arguments, root->node_arity);
+}
+
+void CallFunction1 (Label label, SymbDef def, StateS root_state, Args fun_args, int arity)
+{
+	CallFunction2 (label, def, True, root_state, fun_args, arity);
+}
+
+#if CLEAN2
+static int CaseFailNumber;
+#endif
+
+void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
+{
+	return CallArrayFunctionWithNodeMark (array_def,is_jsr,node_state_p,0);
 }
 
 void GenNewContext (Label contlab, int offset)

@@ -90,7 +90,7 @@ NewNodeIdNode (NodeIdP node_id)
 	NodeP node				= CompAllocType (struct node);
 
 	node->node_annotation	= NoAnnot;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 	node->node_kind			= NodeIdNode;
 	node->node_node_id		= node_id;
 	node->node_arguments	= NULL;
@@ -107,7 +107,7 @@ NewSelectorNode (SymbolP symb, Args args, int arity)
 	node	= CompAllocType (struct node);
 
 	node->node_annotation	= NoAnnot;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 	node->node_kind			= SelectorNode;
 	node->node_arguments	= args;
 	node->node_symbol		= symb;
@@ -124,7 +124,7 @@ NewNodeByKind (NodeKind nodeKind, SymbolP symb, Args args, int arity)
 	node = CompAllocType (struct node);
 
 	node->node_annotation	= NoAnnot;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 	node->node_kind			= nodeKind;
 	node->node_arguments	= args;
 	node->node_symbol		= symb;
@@ -147,7 +147,7 @@ NewUpdateNode (SymbDef sdef, Args args, int arity)
 	node = CompAllocType (struct node);
 
 	node->node_annotation	= NoAnnot;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 	node->node_kind			= UpdateNode;
 	node->node_arguments	= args;
 	node->node_sdef			= sdef;

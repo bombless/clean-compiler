@@ -633,14 +633,20 @@ where
 
 instance countVarsFindCalls Selection
 where
+	countVarsFindCalls record_selection=:(RecordSelection _ _) cvfci cvfcs
+		= (record_selection, cvfcs)
 	countVarsFindCalls (ArraySelection array_select expr_ptr index_expr) cvfci cvfcs
 		# (index_expr, cvfcs) = countVarsFindCalls index_expr cvfci cvfcs
 		= (ArraySelection array_select expr_ptr index_expr, cvfcs)
+	countVarsFindCalls (SafeArraySelection array_select expr_ptr index_expr) cvfci cvfcs
+		# (index_expr, cvfcs) = countVarsFindCalls index_expr cvfci cvfcs
+		= (SafeArraySelection array_select expr_ptr index_expr, cvfcs)
 	countVarsFindCalls (DictionarySelection dictionary_select selectors expr_ptr index_expr) cvfci cvfcs
 		# ((index_expr,selectors), cvfcs) = countVarsFindCalls (index_expr,selectors) cvfci cvfcs
 		= (DictionarySelection dictionary_select selectors expr_ptr index_expr, cvfcs)
-	countVarsFindCalls record_selection cvfci cvfcs
-		= (record_selection, cvfcs)
+	countVarsFindCalls (SafeDictionarySelection dictionary_select selectors expr_ptr index_expr) cvfci cvfcs
+		# ((index_expr,selectors), cvfcs) = countVarsFindCalls (index_expr,selectors) cvfci cvfcs
+		= (SafeDictionarySelection dictionary_select selectors expr_ptr index_expr, cvfcs)
 
 instance countVarsFindCalls [a] | countVarsFindCalls a
 where

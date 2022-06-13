@@ -462,6 +462,8 @@ instance refMark Selection
 where
 	refMark free_vars _ _ (ArraySelection _ _ index_expr) rms 
 		= refMark free_vars NotASelector No index_expr rms 
+	refMark free_vars _ _ (SafeArraySelection _ _ index_expr) rms
+		= refMark free_vars NotASelector No index_expr rms
 	refMark free_vars _ _ _ rms 
 		= rms 
 

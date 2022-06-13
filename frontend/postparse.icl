@@ -46,6 +46,13 @@ prefixAndPositionToIdentExp prefix {lc_line, lc_column} ca=:{ca_hash_table}
 	# ({boxed_ident=ident}, ca_hash_table) = putIdentInHashTable (prefix +++ ";" +++ toString lc_line +++ ";" +++ toString lc_column) IC_Expression ca_hash_table
 	= (PE_Ident ident, { ca & ca_hash_table = ca_hash_table } )
 
+patternPrefixAndPositionToIdentExp :: !ParsedExpr !String !LineAndColumn !*CollectAdmin -> (!ParsedExpr, !*CollectAdmin)
+patternPrefixAndPositionToIdentExp (PE_Ident ident) prefix gen_position ca
+	| isLowerCaseName ident.id_name
+		= prefixAndPositionToIdentExp (ident.id_name+++";"+++prefix) gen_position ca
+patternPrefixAndPositionToIdentExp _ prefix gen_position ca
+	= prefixAndPositionToIdentExp prefix gen_position ca
+
 (`) infixl 9
 (`) f a
 	:== apply f (toParsedExpr a)
@@ -534,7 +541,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 	  pattern = PE_Tuple [gen_pattern, array]
 	= case index_generator of
 		No
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp pattern "g_i" gen_position ca
 			  inc = get_predef_id PD_IncFun
 			# dec_n = PE_List [n,PE_Ident sub,PE_Basic (BVInt 1)]
 			# transformed_generator
@@ -543,7 +550,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 			  		,	tg_lhs_arg = [i, n, array]
 			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
 			  		,	tg_case_end_pattern = PE_Basic (BVB True)
-					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_Array i]
+					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_SafeArray i]
 					,	tg_element_is_uselect=True
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [PE_List [PE_Ident inc, i], n, array]
@@ -560,7 +567,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 			  		,	tg_lhs_arg = [n,array]
 			  		,	tg_case_end_expr = PE_List [i,PE_Ident less_or_equal, n]
 			  		,	tg_case_end_pattern = PE_Basic (BVB True)
-					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_Array i]
+					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_SafeArray i]
 					,	tg_element_is_uselect=True
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [n,array]
@@ -574,7 +581,7 @@ transformGenerator {gen_kind=IsArrayGenerator, gen_expr, gen_pattern, gen_positi
 					,	tg_lhs_arg = [array]
 			  		,	tg_case_end_expr = PE_Empty
 			  		,	tg_case_end_pattern = PE_Empty
-					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_Array i]
+					,	tg_element = PE_Selection (ParsedUniqueSelector True) array [PS_SafeArray i]
 					,	tg_element_is_uselect=True
 					,	tg_pattern = pattern
 					,	tg_rhs_continuation = [array]
@@ -594,7 +601,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 		| is_zero_expression from_exp
 			= case index_generator of
 				No
-					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 					# inc = get_predef_id PD_IncFun
 					  less_or_equal = get_predef_id PD_LessOrEqualFun
 					# transformed_generator
@@ -640,7 +647,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_FromTo pd_from_to_index from_
 							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,Yes (i,[([],to_exp,n):size_expressions]),0,ca)
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 			# inc = get_predef_id PD_IncFun
 			  less_or_equal = get_predef_id PD_LessOrEqualFun
 			# transformed_generator
@@ -664,7 +671,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 		| is_zero_expression from_exp
 			= case index_generator of
 				No
-					# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+					# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 					# inc = get_predef_id PD_IncFun
 					# transformed_generator
 					  	=	{	tg_expr = ([],[from_exp])
@@ -693,7 +700,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 							,	tg_pos = LinePos qual_filename gen_position.lc_line
 							}
 					-> (transformed_generator,index_generator,0,ca)
-			# (i, ca) = prefixAndPositionToIdentExp "g_i" gen_position ca
+			# (i, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_i" gen_position ca
 			# inc = get_predef_id PD_IncFun
 			# transformed_generator
 			  	=	{	tg_expr = ([],[from_exp])
@@ -710,7 +717,7 @@ transformGenerator {gen_kind, gen_expr=PE_Sequ (SQ_From pd_from_index from_exp),
 			= (transformed_generator,index_generator,0,ca)
 transformGenerator {gen_kind, gen_expr, gen_pattern, gen_position} qual_filename index_generator ca
 	# (list, ca) = prefixAndPositionToIdentExp "g_l" gen_position ca
-	  (hd, ca) = prefixAndPositionToIdentExp "g_h" gen_position ca
+	  (hd, ca) = patternPrefixAndPositionToIdentExp gen_pattern "g_h" gen_position ca
 	  (tl, ca) = prefixAndPositionToIdentExp "g_t" gen_position ca
 	  (gen_var_case1, ca) = prefixAndPositionToIdent "g_c1" gen_position ca
 	  (gen_var_case2, ca) = prefixAndPositionToIdent "g_c2" gen_position ca
@@ -898,28 +905,28 @@ transformArrayComprehension array_kind expr qualifiers ca
 	  create_array_expr = predef_ident_expr PD__CreateArrayFun
 	| same_index_for_update_and_array_generators qualifiers
 		# index_generator = {gen_kind=IsListGenerator, gen_pattern=c_i_ident_exp, gen_expr=PE_Sequ (SQ_From PD_From (PE_Basic (BVInt 0))), gen_position=qual_position}
-		# update = PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr
+		# update = PE_Update c_a_ident_exp [PS_SafeArray c_i_ident_exp] expr
 		| size_of_generators_can_be_computed_quickly qualifiers
 			# {qual_generators,qual_let_defs,qual_filter,qual_position,qual_filename} = hd_qualifier
-			# qual_generators = [index_generator : qual_generators]
-			# (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
-			# new_array = PE_List [create_array_expr,size_exp]
+			  qual_generators = [index_generator : qual_generators]
+			  (transformedGenerators,index_generator,size_exp,ca) = transformGeneratorsAndReturnSize qual_generators qual_filename No PE_Empty ca
+			  new_array = PE_List [create_array_expr,size_exp]
 			  new_array = cast_array_kind array_kind new_array
-			# (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
+			  (transformed_qualifier,ca) = CreateTransformedQualifierFromTransformedGenerators transformedGenerators [c_a_ident_exp] [new_array] qual_let_defs qual_filter qual_position qual_filename ca
 			= (makeUpdateComprehensionFromTransFormedQualifiers [update] [c_a_ident_exp] c_a_ident_exp [transformed_qualifier],ca)
 
 			# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-			# new_array = PE_List [create_array_expr,length]
+			  new_array = PE_List [create_array_expr,length]
 			  new_array = cast_array_kind array_kind new_array
 			  qualifiers = [{hd_qualifier & qual_generators = [index_generator : hd_qualifier.qual_generators] }]
 			= transformUpdateComprehension [new_array] [update] [c_a_ident_exp] c_a_ident_exp qualifiers ca
 
 		# (length, ca) = computeSize qualifiers qual_position hd_qualifier.qual_filename ca
-		# new_array = PE_List [create_array_expr,length]
+		  new_array = PE_List [create_array_expr,length]
 		  new_array = cast_array_kind array_kind new_array
-		# inc = get_predef_id PD_IncFun
+		  inc = get_predef_id PD_IncFun
 		  new_array_and_index =	[new_array,PE_Basic (BVInt 0)]
-		  update = [PE_Update c_a_ident_exp [PS_Array  c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
+		  update = [PE_Update c_a_ident_exp [PS_SafeArray c_i_ident_exp] expr,PE_List [PE_Ident inc,c_i_ident_exp]]
 		= transformUpdateComprehension new_array_and_index update [c_a_ident_exp,c_i_ident_exp] c_a_ident_exp qualifiers ca
 
 All p l :== all l
@@ -977,11 +984,11 @@ size_of_generator_can_be_computed_quickly _
 size_of_generators_can_be_computed_quickly qualifiers=:[qualifier=:{qual_generators,qual_filter=No}]
 	= All size_of_generator_can_be_computed_quickly qual_generators && not (All is_from_generator qual_generators)
 	where
-		is_from_generator {gen_pattern,gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
+		is_from_generator {gen_kind=IsListGenerator,gen_expr=PE_Sequ (SQ_From PD_From from_exp)}
 			= True
-		is_from_generator {gen_pattern,gen_kind=IsStrictListGenerator,gen_expr=PE_Sequ (SQ_From PD_FromS from_exp)}
+		is_from_generator {gen_kind=IsStrictListGenerator,gen_expr=PE_Sequ (SQ_From PD_FromS from_exp)}
 			= True
-		is_from_generator {gen_pattern,gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
+		is_from_generator {gen_kind=IsOverloadedListGenerator,gen_expr=PE_Sequ (SQ_From _ from_exp)}
 			= True
 		is_from_generator _
 			= False
@@ -1084,20 +1091,13 @@ transformSequence (SQ_From pd_from frm)
 transformSequence (SQ_FromTo pd_from_to frm to)
 	=	predef_ident_expr pd_from_to ` frm ` to
 
-transformArrayUpdate :: ParsedExpr [Bind ParsedExpr ParsedExpr] -> ParsedExpr
-transformArrayUpdate expr updates
-	=	foldr (update (predef_ident_expr PD_ArrayUpdateFun)) expr updates
-	where
-		update :: ParsedExpr (Bind ParsedExpr ParsedExpr) ParsedExpr -> ParsedExpr
-		update updateIdent {bind_src=value, bind_dst=index} expr
-			=	updateIdent ` expr ` index ` value
-
 transformArrayDenot :: ArrayKind [ParsedExpr] -> ParsedExpr
 transformArrayDenot array_kind exprs
 	# create_array_call=cast_array_kind array_kind (predef_ident_expr PD__CreateArrayFun ` length exprs)
-	=	transformArrayUpdate
-			create_array_call
-			[{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+	= foldl update_array_element create_array_call [{bind_dst=toParsedExpr i, bind_src=expr} \\ expr <- exprs & i <- [0..]]
+where
+	update_array_element expr {bind_src=value, bind_dst=index}
+		= PE_Update expr [PS_SafeArray index] value
 
 cast_array_kind OverloadedArray array_expr = array_expr
 cast_array_kind array_kind array_expr = PE_TypeSignature array_kind array_expr

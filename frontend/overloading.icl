@@ -2698,17 +2698,28 @@ where
 
 instance updateExpression Selection
 where
-  	updateExpression group_index (ArraySelection selector=:{glob_object={ds_ident}} expr_ptr index_expr) ui
+	updateExpression group_index (ArraySelection {glob_object={ds_ident}} expr_ptr index_expr) ui
 		# (index_expr, ui) = updateExpression group_index index_expr ui
 		  (symb_info, ui_symbol_heap) = readPtr expr_ptr ui.ui_symbol_heap
-		  ui = { ui & ui_symbol_heap = ui_symbol_heap }
+		  ui & ui_symbol_heap = ui_symbol_heap
 		= case symb_info of
 			EI_Instance array_select []
 				-> (ArraySelection array_select expr_ptr index_expr, ui)
 			EI_Selection selectors record_var context_args
 				# (var_ident, var_info_ptr, ui_var_heap, ui_error) = getClassVariable ds_ident record_var ui.ui_var_heap ui.ui_error
-				-> (DictionarySelection { var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr } selectors expr_ptr index_expr,
-							{ ui & ui_var_heap = ui_var_heap, ui_error = ui_error })
+				-> (DictionarySelection {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} selectors expr_ptr index_expr,
+							{ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
+	updateExpression group_index (SafeArraySelection {glob_object={ds_ident}} expr_ptr index_expr) ui
+		# (index_expr, ui) = updateExpression group_index index_expr ui
+		  (symb_info, ui_symbol_heap) = readPtr expr_ptr ui.ui_symbol_heap
+		  ui & ui_symbol_heap = ui_symbol_heap
+		= case symb_info of
+			EI_Instance array_select []
+				-> (SafeArraySelection array_select expr_ptr index_expr, ui)
+			EI_Selection selectors record_var context_args
+				# (var_ident, var_info_ptr, ui_var_heap, ui_error) = getClassVariable ds_ident record_var ui.ui_var_heap ui.ui_error
+				-> (SafeDictionarySelection {var_ident = var_ident, var_info_ptr = var_info_ptr, var_expr_ptr = nilPtr} selectors expr_ptr index_expr,
+							{ui & ui_var_heap = ui_var_heap, ui_error = ui_error})
   	updateExpression group_index selection ui
 		= (selection, ui)
 

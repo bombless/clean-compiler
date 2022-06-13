@@ -74,7 +74,7 @@ static void PrintNodeDefs (NodeDefs defs, Bool brackets);
 
 static void PrintNode (Node node, Bool brackets)
 {
-	if (IsOnACycle (node -> node_number))
+	if ((node -> node_mark & NODE_RHS_ON_A_CYCLE)!=0)
 		FPutS ("<C>", StdError);
 	PrintState (node -> node_state);
 	if (node -> node_kind == NormalNodeKind)

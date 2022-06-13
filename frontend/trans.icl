@@ -317,11 +317,20 @@ transform_expressions_in_selectors [ArraySelection ds ep expr : selections] ro t
 	# (expr,ti) = transform expr ro ti
 	# (selections,ti) = transform_expressions_in_selectors selections ro ti
 	= ([ArraySelection ds ep expr:selections],ti)
+transform_expressions_in_selectors [SafeArraySelection ds ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([SafeArraySelection ds ep expr:selections],ti)
 transform_expressions_in_selectors [DictionarySelection bv dictionary_selections ep expr : selections] ro ti
 	# (expr,ti) = transform expr ro ti
 	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
 	# (selections,ti) = transform_expressions_in_selectors selections ro ti
 	= ([DictionarySelection bv dictionary_selections ep expr:selections],ti)
+transform_expressions_in_selectors [SafeDictionarySelection bv dictionary_selections ep expr : selections] ro ti
+	# (expr,ti) = transform expr ro ti
+	# (dictionary_selections,ti) = transform_expressions_in_selectors dictionary_selections ro ti
+	# (selections,ti) = transform_expressions_in_selectors selections ro ti
+	= ([SafeDictionarySelection bv dictionary_selections ep expr:selections],ti)
 transform_expressions_in_selectors [] ro ti
 	= ([],ti)
 
@@ -1608,7 +1617,6 @@ generateFunction app_symb fd=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_i
 	  uvar		= [arg \\ prod <-: prods & arg <- tb_args | isUnused prod]
 	  				with
 	  					isUnused PR_Unused = True
-//	  					isUnused (PR_EqualRemove _) = True
 	  					isUnused _ = False
 	  
 	  new_fun_args				= das.das_vars
@@ -2244,7 +2252,6 @@ determine_arg (PR_EqualRemove arg_index) _ form=:{fv_info_ptr} prod_index (_,ro)
 	# (succ, das_subst, das_type_heaps)
 	  	= unify prod_type arg_type type_input das_subst das_type_heaps
 	| not succ
-		| False ---> ("prod_type",prod_type,"\narg_type",arg_type) = undef
 		= abort "Error in compiler: unification in module trans failed\n"
 	# no_arg_type = {ats_types = [], ats_strictness = NotStrict}
 	  das_arg_types & [prod_index] = no_arg_type
@@ -4902,7 +4909,11 @@ where
 		= fvi
 	clearVariables (ArraySelection _ _ expr) fvi
 		= clearVariables expr fvi
+	clearVariables (SafeArraySelection _ _ expr) fvi
+		= clearVariables expr fvi
 	clearVariables (DictionarySelection dict_var selections _ expr) fvi
+		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
+	clearVariables (SafeDictionarySelection dict_var selections _ expr) fvi
 		= clearVariables dict_var (clearVariables selections (clearVariables expr fvi))
 	
 ////////////////
@@ -5024,7 +5035,11 @@ where
 		= fvi
 	freeVariables (ArraySelection _ _ expr) fvi
 		= freeVariables expr fvi
+	freeVariables (SafeArraySelection _ _ expr) fvi
+		= freeVariables expr fvi
 	freeVariables (DictionarySelection dict_var selections _ expr) fvi
+		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
+	freeVariables (SafeDictionarySelection dict_var selections _ expr) fvi
 		= freeVariables dict_var (freeVariables selections (freeVariables expr fvi))
 	
 removeVariables global_variables var_heap
@@ -5440,20 +5455,34 @@ where
 		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
 		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
 		= (ArraySelection array_select new_ptr index_expr, cs)
+	copy (SafeArraySelection array_select expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
+		= (SafeArraySelection array_select new_ptr index_expr, cs)
 	copy (DictionarySelection var selectors expr_ptr index_expr) ci cs=:{cs_symbol_heap}
 		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
 		  (index_expr, cs) = copy index_expr ci { cs & cs_symbol_heap = cs_symbol_heap}
 		  (var_expr, cs) = copyVariable var ci cs
 		= case var_expr of 
 			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
-				# [RecordSelection _ field_index:_] = selectors
-				  (App { app_symb = {symb_ident, symb_kind = SK_Function array_select}}) =  app_args !! field_index
-				-> (ArraySelection { array_select & glob_object = { ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
-							new_ptr index_expr, cs)
+				-> (ArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, cs)
 			Var var
 				-> (DictionarySelection var selectors new_ptr index_expr, cs)
+	copy (SafeDictionarySelection var selectors expr_ptr index_expr) ci cs=:{cs_symbol_heap}
+		# (new_ptr, cs_symbol_heap) = newPtr EI_Empty cs_symbol_heap
+		  (index_expr, cs) = copy index_expr ci {cs & cs_symbol_heap = cs_symbol_heap}
+		  (var_expr, cs) = copyVariable var ci cs
+		= case var_expr of 
+			App {app_symb={symb_kind= SK_Constructor _ }, app_args}
+				-> (SafeArraySelection (array_select_from_dictionary app_args selectors) new_ptr index_expr, cs)
+			Var var
+				-> (SafeDictionarySelection var selectors new_ptr index_expr, cs)
 	copy record_selection ci cs
 		= (record_selection, cs)
+
+array_select_from_dictionary app_args [RecordSelection _ field_index:_]
+	# (App {app_symb = {symb_ident, symb_kind = SK_Function array_select}}) = app_args !! field_index
+	= {array_select & glob_object = {ds_ident = symb_ident, ds_arity = 2, ds_index = array_select.glob_object}}
 
 instance copy FreeVar
 where
@@ -5602,7 +5631,7 @@ where
 					  (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
 					  cs & cs_symbol_heap
 						= case case_info of
-							EI_Extended (EEI_ActiveCase aci) ei
+							EI_Extended (EEI_ActiveCase aci=:{aci_opt_unfolder=Yes _}) ei
 								# aci & aci_opt_unfolder = No
 								-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
 							_
@@ -5634,6 +5663,21 @@ where
 							= (exprs,var_heap)
 						bind_variables_for_exprs [] exprs var_heap
 							= (exprs,var_heap)
+				VI_Expression expr
+					| not expr=:Var _
+						// make case inactive, otherwise incorrect if unfolding fun_f in case fun_f yields case (f a) and later f becomes a producer
+						# (case_info, cs_symbol_heap) = readPtr case_info_ptr cs.cs_symbol_heap
+						  cs & cs_symbol_heap
+							= case case_info of
+								EI_Extended (EEI_ActiveCase aci=:{aci_opt_unfolder=Yes _}) ei
+									# aci & aci_opt_unfolder = No
+									-> writePtr case_info_ptr (EI_Extended (EEI_ActiveCase aci) ei) cs_symbol_heap
+								_
+									-> cs_symbol_heap
+						# (expr,cs) = copyVariable var ci cs
+						-> (expr @ exprs, cs)
+						# (expr,cs) = copyVariable var ci cs
+						-> (expr @ exprs, cs)
 				_
 					# (expr,cs) = copyVariable var ci cs
 					-> (expr @ exprs, cs)

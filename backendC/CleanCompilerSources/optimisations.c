@@ -1215,7 +1215,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 					
 					function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 					function_node->node_state=LazyState;
-					function_node->node_number=0;
+					function_node->node_mark=0;
 					
 					new_arg=NewArgument (function_node);
 					new_arg->arg_state=LazyState;
@@ -1275,7 +1275,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 								function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 								function_node->node_state=LazyState;
-								function_node->node_number=0;
+								function_node->node_mark=arg_node->node_mark & NODE_RHS_SAFE_INDEX;
 								
 								new_arg=NewArgument (function_node);
 								new_arg->arg_state=LazyState;
@@ -1300,7 +1300,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						
 						function_node=NewNode (arg_node->node_symbol,NULL,0);
 						function_node->node_state=LazyState;
-						function_node->node_number=0;
+						function_node->node_mark=0;
 						
 						new_arg=NewArgument (function_node);
 						new_arg->arg_state=LazyState;
@@ -1330,7 +1330,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						
 						tuple_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						tuple_node->node_state=LazyState;
-						tuple_node->node_number=0;
+						tuple_node->node_mark=0;
 						
 						new_arg=NewArgument (tuple_node);
 						new_arg->arg_state=LazyState;
@@ -1356,7 +1356,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 						
 						function_node=NewNode (arg_node->node_symbol,NULL,0);
 						function_node->node_state=LazyState;
-						function_node->node_number=0;
+						function_node->node_mark=0;
 						
 						new_arg=NewArgument (function_node);
 						new_arg->arg_state=LazyState;
@@ -1424,7 +1424,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 										function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 										function_node->node_state=LazyState;
-										function_node->node_number=0;
+										function_node->node_mark=0;
 										
 										new_arg=NewArgument (function_node);
 										new_arg->arg_state=LazyState;
@@ -1462,7 +1462,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						function_node->node_state=LazyState;
-						function_node->node_number=0;
+						function_node->node_mark=0;
 						
 						new_arg=NewArgument (function_node);
 						new_arg->arg_state=LazyState;
@@ -1510,7 +1510,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 						function_node=NewNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 						function_node->node_state=LazyState;
-						function_node->node_number=1;
+						function_node->node_mark |= NODE_RHS_MARKED /* ? */;
 						
 						node_def_p->def_mark |= NODE_DEF_SELECT_AND_REMOVE_MASK;
 						
@@ -1545,7 +1545,7 @@ static char *create_arguments_for_local_function (NodeP node_p,ArgS ***arg_h,Arg
 
 				selector_node=NewSelectorNode (arg_node->node_symbol,NULL,arg_node->node_arity);
 				selector_node->node_state=LazyState;
-				selector_node->node_number=0;
+				selector_node->node_mark=0;
 
 				new_arg=NewArgument (selector_node);
 				new_arg->arg_state=LazyState;
@@ -1679,7 +1679,7 @@ static char *create_arguments_for_partially_applied_local_function (NodeP node_p
 		arg_node=arg->arg_node;
 		
 		function_node=NewNode (arg_node->node_symbol,NULL,0);
-		function_node->node_number=0;
+		function_node->node_mark=0;
 		if (arg_node->node_symbol->symb_kind==definition)
 			function_node->node_state=StrictState;
 		else
@@ -1766,7 +1766,7 @@ static ImpRuleP create_new_partially_applied_local_function (Node node,int old_f
 	rhs_root=NewNode (node->node_symbol,NULL,old_function_arity);
 # endif
 	rhs_root->node_state=LazyState;
-	rhs_root->node_number=0;
+	rhs_root->node_mark=0;
 	
 	function_arity=0;
 
@@ -1970,7 +1970,7 @@ static struct node *create_new_local_function (Node node,StateP function_state_p
 	rhs_root=NewNode (node->node_symbol,NULL,node->node_arity);
 #endif
 	rhs_root->node_state=LazyState;
-	rhs_root->node_number=0;
+	rhs_root->node_mark=node->node_mark & NODE_RHS_SAFE_INDEX;
 	
 	function_arity=0;
 
@@ -2472,7 +2472,7 @@ static NodeP replace_node_by_unique_fill_node (NodeP node,NodeP push_node,int no
 	push_node->node_push_size=node_size;
 	
 	--push_node->node_arguments->arg_node->node_node_id->nid_refcount;
-	push_node->node_number=1;
+	push_node->node_mark |= NODE_LHS_PUSH_NODE_UNIQUE;
 
 	return node_copy;
 }
@@ -3120,7 +3120,7 @@ static void optimise_strict_constructor_in_lazy_context (NodeP node,FreeUniqueNo
 						tuple_selectors_node=NewNodeByKind (TupleSelectorsNode,NULL,NewArgument (node),1);
 						tuple_selectors_node->node_state=tuple_node->node_state;
 						tuple_selectors_node->node_node=tuple_node;
-						tuple_selectors_node->node_number=0;
+						tuple_selectors_node->node_mark=0;
 						node_id->nid_node_def->def_node=tuple_selectors_node;
 					}
 				} else if (tuple_node->node_kind==NormalNode && tuple_node->node_symbol->symb_kind==select_symb){
@@ -3142,7 +3142,7 @@ static void optimise_strict_constructor_in_lazy_context (NodeP node,FreeUniqueNo
 									tuple_selectors_node=NewNodeByKind (TupleSelectorsNode,NULL,NewArgument (node),1);
 									tuple_selectors_node->node_state=tuple_node2_p->node_state.state_tuple_arguments[element_n];
 									tuple_selectors_node->node_node=tuple_node;
-									tuple_selectors_node->node_number=1;
+									tuple_selectors_node->node_mark=NODE_RHS_MARKED_TUPLE_SELECTORS_NODE;
 									node_id->nid_node_def->def_node=tuple_selectors_node;
 								}
 							}
@@ -4149,7 +4149,7 @@ static void MarkTupleSelectorsNode (NodeIdP node_id,NodeP tuple_node)
 		int i,arity;
 		Node select_nodes[32];
 
-		if (tuple_node->node_number==1){
+		if ((tuple_node->node_mark & NODE_RHS_MARKED_TUPLE_SELECTORS_NODE)!=0){
 			if (tuple_node->node_node->node_kind==NodeIdNode)
 				tuple_node->node_node->node_arguments->arg_state=tuple_node->node_state;
 			else {
@@ -4210,7 +4210,7 @@ static void MarkTupleSelectorsNode (NodeIdP node_id,NodeP tuple_node)
 			}
 		
 		*arg_pp=NULL;
-	} else if (tuple_node->node_number==1)
+	} else if ((tuple_node->node_mark & NODE_RHS_MARKED_TUPLE_SELECTORS_NODE)!=0)
 		tuple_node->node_state=tuple_node->node_node->node_state;
 
 	MarkDependentNodeDefs (tuple_node->node_node);
@@ -4818,7 +4818,7 @@ void OptimiseRules (ImpRules rules,SymbDef start_sdef)
 				NodeP call_node_p;
 				
 				call_node_p=rule_p->rule_lazy_call_node;
-				if (call_node_p->node_number==0 && !(call_node_p->node_state.state_type==SimpleState && call_node_p->node_state.state_kind==SemiStrict)){
+				if (call_node_p->node_mark & 3==0 /* ? */ && !(call_node_p->node_state.state_type==SimpleState && call_node_p->node_state.state_kind==SemiStrict)){
 					StateP function_arg_state_p;
 					ArgP arg_p;
 

@@ -212,9 +212,9 @@ where
 		with
 			compare_arguments (App app1) (App app2)						= app1 =< app2
 			compare_arguments (Var v1) (Var v2)							= v1 =< v2
-			compare_arguments (fun1 @ args1) (fun2 @ args2)				= (fun1,args1) =< (fun2,args2) 
-			compare_arguments EE EE										= Equal		
-			compare_arguments _ _										= Greater		
+			compare_arguments (fun1 @ args1) (fun2 @ args2)				= (fun1,args1) =< (fun2,args2)
+			compare_arguments EE EE										= Equal
+			compare_arguments _ _										= Greater
 		| less_constructor expr1 expr2
 			= Smaller
 			= Greater
@@ -356,7 +356,7 @@ instance < MemberDef
 where
 	(<) md1 md2 = md1.me_ident.id_name < md2.me_ident.id_name
 
-(CAND) infix 3 :: !(!CompareValue, ![(Ident,Ident)]) (CompareValue, [(Ident,Ident)]) -> (CompareValue,  [(Ident,Ident)])
+(CAND) infix 3 :: !(!CompareValue, ![(Ident,Ident)]) (CompareValue, ![(Ident,Ident)]) -> (CompareValue, ![(Ident,Ident)])
 (CAND) (cv1,vlist1) cl2
 	| cv1 == Equal
 		= case cl2 of

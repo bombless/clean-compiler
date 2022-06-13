@@ -2187,7 +2187,13 @@ where
 					->	beNormalNode
 							(beFunctionSymbol ds_index glob_module)
 							(convertArgs [expr1, index, expr2])
+				SafeArraySelection {glob_object={ds_index}, glob_module} _ index
+					-> beFunction2 BESafeNormalNode
+							(beFunctionSymbol ds_index glob_module)
+							(convertArgs [expr1, index, expr2])
 				DictionarySelection dictionaryVar dictionarySelections _ index
+					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
+				SafeDictionarySelection dictionaryVar dictionarySelections _ index
 					->	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections @ [expr1, index, expr2])
 	convertExpr (Update expr1 selections expr2)
 		=	case lastSelection of
@@ -2195,7 +2201,15 @@ where
 					->	beUpdateNode (beArgs selection (convertArgs [Selection NormalSelector expr2 [lastSelection]]))
 				ArraySelection {glob_object={ds_index}, glob_module} _ index
 					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
+				SafeArraySelection {glob_object={ds_index}, glob_module} _ index
+					->	beNormalNode (beSpecialArrayFunctionSymbol BE_ArrayUpdateFun ds_index glob_module) (beArgs selection (convertArgs [index, expr2]))
 				DictionarySelection dictionaryVar dictionarySelections _ index
+					->	beNormalNode (beFunction0 BEDictionaryUpdateFunSymbol)
+								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
+						with
+							dictionary
+								=	convertExpr (Selection NormalSelector (Var dictionaryVar) dictionarySelections)
+				SafeDictionarySelection dictionaryVar dictionarySelections _ index
 					->	beNormalNode (beFunction0 BEDictionaryUpdateFunSymbol)
 								(beArgs dictionary (beArgs selection (convertArgs [index, expr2])))
 						with
@@ -2242,18 +2256,14 @@ where
 		=	beSelectorNode kind (beFieldSymbol ds_index glob_module) (beArgs expression beNoArgs)
 	convertSelection expression (kind, ArraySelection {glob_object={ds_index}, glob_module} _ index)
 		=	beNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
-	where
-		beArraySelectionSymbol BESelector ds_index glob_module
-			= beFunctionSymbol ds_index glob_module
-		beArraySelectionSymbol BESelector_U ds_index glob_module
-			= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
-		beArraySelectionSymbol BESelector_F ds_index glob_module
-			= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
-		beArraySelectionSymbol BESelector_L ds_index glob_module
-			= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
-		beArraySelectionSymbol BESelector_N ds_index glob_module
-			= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
+	convertSelection expression (kind, SafeArraySelection {glob_object={ds_index}, glob_module} _ index)
+		= beFunction2 BESafeNormalNode (beArraySelectionSymbol kind ds_index glob_module) (beArgs expression (convertArgs [index]))
 	convertSelection expression (kind, DictionarySelection dictionaryVar dictionarySelections _ index)
+		= convertDictionarySelection kind expression dictionaryVar dictionarySelections index
+	convertSelection expression (kind, SafeDictionarySelection dictionaryVar dictionarySelections _ index)
+		= convertDictionarySelection kind expression dictionaryVar dictionarySelections index
+
+	convertDictionarySelection kind expression dictionaryVar dictionarySelections index
 		=	case kind of
 				BESelector
 					->	beNormalNode (beBasicSymbol BEApplySymb)
@@ -2285,6 +2295,17 @@ where
 						= [RecordSelection {rs & glob_object.ds_index=6} 6]	// ds_ident not updated, but is not used
 				replace_select_by_uselect [selection:selections]
 					= [selection:replace_select_by_uselect selections]
+
+	beArraySelectionSymbol BESelector ds_index glob_module
+		= beFunctionSymbol ds_index glob_module
+	beArraySelectionSymbol BESelector_U ds_index glob_module
+		= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
+	beArraySelectionSymbol BESelector_F ds_index glob_module
+		= beSpecialArrayFunctionSymbol BE_UnqArraySelectFun ds_index glob_module
+	beArraySelectionSymbol BESelector_L ds_index glob_module
+		= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
+	beArraySelectionSymbol BESelector_N ds_index glob_module
+		= beSpecialArrayFunctionSymbol BE_UnqArraySelectLastFun ds_index glob_module
 
 :: DefaultCase
 	=	DefaultCase Expression

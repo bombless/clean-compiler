@@ -1408,7 +1408,7 @@ BENodeP BEOverloadedPushNode (int arity,BESymbolP symbol,BEArgP arguments,BENode
 	push_node->node_push_symbol = symbol;
 	push_node->node_decons_node = decons_node;
 	push_node->node_node_ids	= nodeIds;
-	push_node->node_number		= 0;
+	push_node->node_mark		= 0;
 
 	Assert (arguments->arg_node->node_kind == NodeIdNode);
 	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
@@ -1604,7 +1604,7 @@ BENormalNode (BESymbolP symbol, BEArgP args)
 	node->node_symbol		= symbol;
 	node->node_arity		= CountArgs (args);
 	node->node_arguments	= args;
-	node->node_number=0;
+	node->node_mark=0;
 
 	/* +++ hackerdiehack */
 	if (symbol->symb_kind == definition)
@@ -1612,6 +1612,27 @@ BENormalNode (BESymbolP symbol, BEArgP args)
 
 	return (node);
 } /* BENormalNode */
+
+BENodeP
+BESafeNormalNode (BESymbolP symbol, BEArgP args)
+{
+	NodeP	node;
+
+	node	= ConvertAllocType (NodeS);
+
+	node->node_annotation	= NoAnnot;
+	node->node_kind			= NormalNode;
+	node->node_symbol		= symbol;
+	node->node_arity		= CountArgs (args);
+	node->node_arguments	= args;
+	node->node_mark = NODE_RHS_SAFE_INDEX;
+
+	/* +++ hackerdiehack */
+	if (symbol->symb_kind == definition)
+		node	= GenerateApplyNodes (node, node->node_arity, symbol->symb_def->sdef_arity);
+
+	return node;
+}
 
 BENodeP
 BEMatchNode (int arity, BESymbolP symbol, BENodeP node)
@@ -1628,7 +1649,7 @@ BEMatchNode (int arity, BESymbolP symbol, BENodeP node)
 	matchNode->node_symbol		= symbol;
 	matchNode->node_arity		= arity;
 	matchNode->node_arguments	= BEArgs (node, NULL);
-	matchNode->node_number=0;
+	matchNode->node_mark=0;
 
 	return (matchNode);
 } /* BEMatchNode */
@@ -1656,7 +1677,7 @@ BETupleSelectNode (int arity, int index, BENodeP node)
 	select->node_symbol		= symbol;
 	select->node_arity		= index+1;
 	select->node_arguments	= BEArgs (node, NULL);
-	select->node_number		= 0;
+	select->node_mark		= 0;
 
 	return (select);
 } /* BETupleSelectNode */
@@ -1673,7 +1694,7 @@ BEIfNode (BENodeP cond, BENodeP then, BENodeP elsje)
 	node->node_symbol		= gBasicSymbols [if_symb];
 	node->node_arguments	= BEArgs (cond, BEArgs (then, BEArgs (elsje, NULL)));
 	node->node_arity		= 3;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 
 	return (node);
 } /* BEIfNode */
@@ -1697,7 +1718,7 @@ BEGuardNode (BENodeP cond, BENodeDefP thenNodeDefs, BEStrictNodeIdP thenStricts,
 	node->node_kind					= IfNode;
 	node->node_contents.contents_if	= thenElseInfo;
 	node->node_arguments			= BEArgs (cond, BEArgs (then, BEArgs (elsje, NULL)));
-	node->node_number				= 0;
+	node->node_mark					= 0;
 
 	switch (elsje->node_kind)
 	{
@@ -2036,7 +2057,7 @@ BEPushNode (int arity, BESymbolP symbol, BEArgP arguments, BENodeIdListP nodeIds
 	pushNode->node_arguments	= arguments;
 	pushNode->node_push_symbol = symbol;
 	pushNode->node_node_ids		= nodeIds;
-	pushNode->node_number		= 0;
+	pushNode->node_mark			= 0;
 
 	Assert (arguments->arg_node->node_kind == NodeIdNode);
 	Assert (arguments->arg_node->node_node_id->nid_ref_count_sign == -1);
@@ -2060,7 +2081,7 @@ BESelectorNode (BESelectorKind selectorKind, BESymbolP fieldSymbol, BEArgP args)
 	node->node_symbol		= fieldSymbol;
 	node->node_arity		= selectorKind;
 	node->node_arguments	= args;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 
 	return (node);
 } /* BESelectorNode */
@@ -2087,7 +2108,7 @@ BEUpdateNode (BEArgP args)
 	node->node_sdef			= record_sdef;
 	node->node_arity		= n_args;
 	node->node_arguments	= args;
-	node->node_number=0;
+	node->node_mark=0;
 
 	return (node);
 } /* BEUpdateNode */
@@ -2104,7 +2125,7 @@ BENodeIdNode (BENodeIdP nodeId, BEArgP args)
 	node->node_node_id		= nodeId;
 	node->node_arity		= CountArgs (args);
 	node->node_arguments	= args;
-	node->node_number		= 0;
+	node->node_mark			= 0;
 
 	return (node);
 } /* BENodeIdNode */

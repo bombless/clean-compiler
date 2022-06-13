@@ -2616,7 +2616,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 
 		rhs_root=NewNode (node->node_sdef->sdef_type->type_constructors->cl_constructor_symbol,NULL,n_arguments);
 		rhs_root->node_state=*strict_record_state_p;
-		rhs_root->node_number=0;
+		rhs_root->node_mark=0;
 
 		lhs_old_fields_arg_p=&lhs_root->node_arguments;
 		lhs_new_fields_arg_p=&lhs_new_fields_p;
@@ -2680,7 +2680,7 @@ SymbDef CreateUpdateFunction (ArgS *record_arg,ArgS *first_field_arg,Node node
 
 		rhs_root=NewUpdateNode (node->node_sdef,rhs_record_arg,n_arguments);
 		rhs_root->node_state=*strict_record_state_p;
-		rhs_root->node_number=0;
+		rhs_root->node_mark=0;
 
 		lhs_arg_p=&lhs_record_arg->arg_next;
 		rhs_arg_p=&rhs_record_arg->arg_next;
@@ -2821,7 +2821,7 @@ SymbDef create_select_function (Symbol selector_symbol,int selector_kind)
 								state_mark=0,
 								state_tuple_arguments=tuple_state_arguments);
 			
-	rhs_root->node_number=0;
+	rhs_root->node_mark=0;
 
 	update_imp_rule=create_simple_imp_rule (lhs_root,rhs_root,select_function_sdef);
 
@@ -2926,7 +2926,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 		push_node->node_arity=result_arity+n_dictionaries;
 		push_node->node_arguments=arg1;
 		push_node->node_push_symbol=constructor_symbol;
-		push_node->node_number=0;	/* if !=0 then unique */
+		push_node->node_mark=0;	/* if !=0 then unique */
 
 		last_node_id_p=&push_node->node_node_ids;
 
@@ -3044,7 +3044,7 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 	lhs_root->node_state=StrictState;
 
 	rhs_root->node_state=StrictState;
-	rhs_root->node_number=0;
+	rhs_root->node_mark=0;
 	
 	match_imp_rule=create_simple_imp_rule (lhs_root,rhs_root,match_function_sdef);
 
@@ -3082,7 +3082,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 
 	rhs_root=NewNodeIdNode (node_id);
 	rhs_root->node_state=StrictState;
-	rhs_root->node_number=0;
+	rhs_root->node_mark=0;
 
 	arg2=NewArgument (rhs_root);
 	arg1=NewArgument (NewNodeIdNode (constructor_node_node_id));
@@ -3094,7 +3094,7 @@ SymbDef create_select_and_match_function (SymbolP constructor_symbol,int n_dicti
 	push_node->node_arity=1+n_dictionaries;
 	push_node->node_arguments=arg1;
 	push_node->node_push_symbol=constructor_symbol;
-	push_node->node_number=0;	/* if !=0 then unique */
+	push_node->node_mark=0;	/* if !=0 then unique */
 
 	if (n_dictionaries==0){
 		push_node->node_node_ids=CompAllocType (NodeIdListElementS);
@@ -4979,7 +4979,7 @@ static int generate_code_for_switch_node (NodeP node,int asp,int bsp,struct esc 
 			ArgP arg2;
 			
 			for_l (arg2,node->node_arguments,arg_next){
-				if (arg2->arg_node->node_kind==CaseNode && arg2->arg_node->node_number)
+				if (arg2->arg_node->node_kind==CaseNode && (arg2->arg_node->node_mark & NODE_LHS_MAY_FAIL)!=0)
 					or_then_record_update_marks (case_node->node_node_id_ref_counts);
 			}
 #endif
@@ -5214,7 +5214,7 @@ static int generate_code_for_push_node (NodeP node,int asp,int bsp,struct esc *e
 		}
 	} else {
 #ifdef REUSE_UNIQUE_NODES
-		if (node->node_number!=0){
+		if ((node->node_mark & NODE_LHS_PUSH_NODE_UNIQUE)!=0){
 			if (b_size==0)
 				GenPushArgsU (asp-node_id_p->nid_a_index,a_size,a_size);
 			else

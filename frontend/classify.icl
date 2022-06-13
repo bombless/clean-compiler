@@ -508,15 +508,22 @@ instance consumerRequirements Expression where
 requirementsOfSelectors selectors common_defs ai
 	= foldSt (reqs_of_selector common_defs) selectors ai
 where
+	reqs_of_selector common_defs (RecordSelection _ _) ai
+		= ai
 	reqs_of_selector common_defs (ArraySelection _ _ index_expr) ai
+		# (_, _, ai) = consumerRequirements index_expr common_defs ai
+		= ai
+	reqs_of_selector common_defs (SafeArraySelection _ _ index_expr) ai
 		# (_, _, ai) = consumerRequirements index_expr common_defs ai
 		= ai
 	reqs_of_selector common_defs (DictionarySelection dict_var _ _ index_expr) ai
 		# (_, _, ai) = consumerRequirements index_expr common_defs ai
 		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
 		= aiUnifyClassifications CActive cc_var ai
-	reqs_of_selector common_defs (RecordSelection _ _) ai
-		= ai
+	reqs_of_selector common_defs (SafeDictionarySelection dict_var _ _ index_expr) ai
+		# (_, _, ai) = consumerRequirements index_expr common_defs ai
+		  (cc_var, _, ai) = consumerRequirements dict_var common_defs ai
+		= aiUnifyClassifications CActive cc_var ai
 
 instance consumerRequirements App where
 	consumerRequirements {app_symb={symb_kind = SK_Function {glob_module,glob_object},symb_ident}, app_args}
@@ -1551,12 +1558,16 @@ count_case_guard_locals {fv_count} n
 count_selector_locals selectors n
 	= foldSt count_selector_locals selectors n
 where
+	count_selector_locals (RecordSelection _ _) n
+		= n
 	count_selector_locals (ArraySelection _ _ index_expr) n
+		= count_locals index_expr n
+	count_selector_locals (SafeArraySelection _ _ index_expr) n
 		= count_locals index_expr n
 	count_selector_locals (DictionarySelection _ _ _ index_expr) n
 		= count_locals index_expr n
-	count_selector_locals (RecordSelection _ _) n
-		= n
+	count_selector_locals (SafeDictionarySelection _ _ _ index_expr) n
+		= count_locals index_expr n
 
 add_unused_args fun fun_index args ref_counts group_strictness
 	= SwitchNewOld
@@ -1861,7 +1872,13 @@ instance producerRequirements Selection where
 		= (True,prs)
 	producerRequirements (ArraySelection _ _ expr) prs
 		= producerRequirements expr prs
+	producerRequirements (SafeArraySelection _ _ expr) prs
+		= producerRequirements expr prs
 	producerRequirements (DictionarySelection _ sels _ expr) prs
+		# (safe,prs)	= producerRequirements expr prs
+		| safe			= producerRequirements sels prs
+						= (safe,prs)
+	producerRequirements (SafeDictionarySelection _ sels _ expr) prs
 		# (safe,prs)	= producerRequirements expr prs
 		| safe			= producerRequirements sels prs
 						= (safe,prs)
