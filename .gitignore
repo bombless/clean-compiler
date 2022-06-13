@@ -1,0 +1,15 @@
+*.a
+*.abc
+*.o
+*.obj
+
+*.exp
+*.lib
+
+*.dll
+*.exe
+
+exe/cocl*
+
+base-compiler-*.tar.gz
+nitrile-packages/

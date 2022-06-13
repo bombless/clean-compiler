@@ -1,0 +1,91 @@
+name: base-compiler
+url: https://gitlab.com/clean-and-itasks/base/compiler
+maintainer: Camil Staps
+contact_email: clean@camilstaps.nl
+description: The Clean compiler.
+license: BSD-2-Clause
+version: 1.0
+type: Application
+build_dependencies:
+  argenv: ^1.0
+  base-clm: ^1.0
+  base-stdenv: ^1.0
+  base-compiler-bootstrap: ^1.0
+  base-code-generator: ^1.0
+  base-rts: ^1.0
+dependencies:
+  base-stdenv: ^1.0
+src:
+  - backend
+  - frontend
+  - main
+
+package:
+  extra_files:
+    - LICENSE
+    - README.md
+
+clm_options:
+  heap: 256M
+  stack: 4M
+  garbage_collector: MarkingCollector
+  print_result: false
+  print_time: false
+  check_indices: true
+
+rules:
+  posix:
+    extra_build:
+      cocl:
+        depends: [backend]
+        script:
+          - clm:
+              main: cocl
+              target: exe/cocl
+    extra_src:
+      - main-unix
+
+  linux and x64:
+    extra_build:
+      backend:
+        script:
+          - C_INCLUDE_PATH="$PWD/nitrile-packages/linux-x64/base-rts/misc/src"
+          - export C_INCLUDE_PATH
+          - CFLAGS="-DTARGET='\"linux-x64\"'" make -C backendC/CleanCompilerSources -f Makefile.linux64
+          - make -C main-unix all
+          - mkdir -p main-unix/Clean\ System\ Files
+          - cp backendC/CleanCompilerSources/backend.a main-unix/Clean\ System\ Files
+
+  linux and x86:
+    extra_build:
+      backend:
+        script:
+          - C_INCLUDE_PATH="$PWD/nitrile-packages/linux-x86/base-rts/misc/src"
+          - export C_INCLUDE_PATH
+          - CFLAGS="-DTARGET='\"linux-x86\"'" make -C backendC/CleanCompilerSources -f Makefile
+          - CFLAGS=-m32 make -C main-unix all
+          - mkdir -p main-unix/Clean\ System\ Files
+          - cp backendC/CleanCompilerSources/backend.a main-unix/Clean\ System\ Files
+
+  windows:
+    extra_src:
+      - backend/Windows
+      - main-windows
+    extra_package:
+      extra_files:
+        - src: backendC/backend.dll
+          dst: exe/backend.dll
+    extra_build:
+      cocl:
+        depends: [backend]
+        script:
+          - clm:
+              main: cocl
+              target: exe/cocl.exe
+
+  windows and x64:
+    extra_build:
+      backend:
+        script:
+          - make -C backendC/CleanCompilerSources -f Makefile.windows64
+          - make -C main-windows all

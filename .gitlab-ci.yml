@@ -1,0 +1,76 @@
+image: cleanlang/nitrile:bootstrap
+
+stages: [build, publish]
+
+build-linux-x64:
+  stage: build
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq build-essential gcc git
+    - nitrile update
+    - nitrile fetch
+  script:
+    - nitrile build
+    # rebuild with the new compiler
+    - cp exe/cocl nitrile-packages/linux-x64/.home/exe
+    - git clean -e 'nitrile-packages' -xfd
+    - nitrile build
+    - nitrile package
+  artifacts:
+    paths:
+      - base-compiler-*.tar.gz
+
+build-linux-x86:
+  stage: build
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq build-essential gcc gcc-multilib git libc6-i386
+    - nitrile update
+    - nitrile --arch=x86 fetch
+  script:
+    - nitrile --arch=x86 build
+    # rebuild with the new compiler
+    - cp exe/cocl nitrile-packages/linux-x86/.home/exe
+    - git clean -e 'nitrile-packages' -xfd
+    - nitrile --arch=x86 build
+    - nitrile --arch=x86 package
+  artifacts:
+    paths:
+      - base-compiler-*.tar.gz
+
+build-windows-x64:
+  stage: build
+  tags: [windows]
+  before_script:
+    # We need to get the environment set by a batch script; see https://stackoverflow.com/a/41399983:
+    - >-
+      cmd /c '"C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 & set'
+      | select-string '^([^=]*)=(.*)$'
+      | foreach-object { [Environment]::SetEnvironmentVariable($_.Matches[0].Groups[1].Value, $_.Matches[0].Groups[2].Value) }
+    # Used in the build step
+    - choco install -y make
+    # Install nitrile
+    - Set-ExecutionPolicy ByPass -Scope Process -Force
+    - (New-Object System.Net.WebClient).DownloadString('https://clean-lang.org/install.ps1') | powershell -Command -
+    - $Env:PATH += ";${Env:APPDATA}\Nitrile\bin"
+    # Nitrile dependencies
+    - nitrile update
+    - nitrile fetch
+  script:
+    - nitrile build
+    # rebuild with the new compiler
+    - cp backendC/backend.dll nitrile-packages/windows-x64/.home/exe
+    - cp exe/cocl.exe nitrile-packages/windows-x64/.home/exe
+    - git clean -e 'nitrile-packages' -xfd
+    - nitrile build
+    - nitrile package
+  artifacts:
+    paths:
+      - base-compiler-*.tar.gz
+
+publish:
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - nitrile publish --targets=linux-x64,linux-x86,windows-x64

@@ -1,0 +1,24 @@
+{"packages":{"linux-x86":[{"name":"argenv"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-clm"
+                          ,"version":"1.4.2"}
+                         ,{"name":"base-code-generator"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-compiler-bootstrap"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-rts"
+                          ,"version":"1.1.0"}
+                         ,{"name":"base-stdenv"
+                          ,"version":"1.0.0"}]
+            ,"linux-x64":[{"name":"argenv"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-clm"
+                          ,"version":"1.4.2"}
+                         ,{"name":"base-code-generator"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-compiler-bootstrap"
+                          ,"version":"1.0.0"}
+                         ,{"name":"base-rts"
+                          ,"version":"1.1.0"}
+                         ,{"name":"base-stdenv"
+                          ,"version":"1.0.0"}]}}

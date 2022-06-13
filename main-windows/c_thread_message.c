@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <windows.h>
 #include "Clean.h"
-#include "thread_message.h"
+#include "c_thread_message.h"
 
 static int CleanCompiler_message_nunber;
 
