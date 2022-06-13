@@ -1,4 +1,4 @@
-// this is for MacOS
+// this is for Unix
 implementation module CoclSystemDependent
 
 import StdEnv
@@ -8,11 +8,12 @@ import ipc
 from filesystem import ensureDirectoryExists
 import DirectorySeparator
 
-import code from "cDirectory_c.o"
+import code from "backend.a"
+import code from "cDirectory.o"
 import code from "ipc_c.o"
 
 PathSeparator
-	:==	','
+	:==	':'
 
 SystemDependentDevices :: [a]
 SystemDependentDevices
