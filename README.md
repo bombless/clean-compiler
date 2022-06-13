@@ -78,6 +78,14 @@ After each merge you may have to resolve conflicts (and finish the merge with
 `git commit`). You may also have to add extra changelog entries if the `itask`
 branch includes more changes.
 
+The version of `lib-compiler-itasks` needs to be set to the same value as
+`base-compiler-itasks` (which follows `base-compiler`). Do this manually:
+
+```base
+vim nitrile.yml
+git commit --amend nitrile.yml
+```
+
 Push all branches:
 
 ```bash
