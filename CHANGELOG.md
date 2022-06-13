@@ -1,5 +1,9 @@
 # Changelog
 
+#### v2.0.1
+
+- Chore: allow `base-stdenv` ^2.0.
+
 ## v2.0
 
 - Enhancement: use ABC instructions `select_nc` and `update_nc` for array
