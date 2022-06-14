@@ -28,6 +28,7 @@ typedef enum {
 	IntObj, BoolObj, CharObj, RealObj, FileObj,
 	TupleObj, RecordObj,
 	ArrayObj, StrictArrayObj, UnboxedArrayObj, PackedArrayObj,
+	ArrayP2Obj, StrictArrayP2Obj, UnboxedArrayP2Obj, PackedArrayP2Obj,
 	ListObj, MaybeObj,
 	WorldObj, ProcIdObj, RedIdObj
 #ifdef CLEAN2
@@ -37,9 +38,9 @@ typedef enum {
 } ObjectKind;
 
 #if ABSTRACT_OBJECT
-# define BASIC_ELEMS_STRING "uuibcrfaaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uuibcrfaaaaaaaaaaaaippa" /* index by ObjectKind */
 #else
-# define BASIC_ELEMS_STRING "uibcrfaaaaaaaaippa" /* index by ObjectKind */
+# define BASIC_ELEMS_STRING "uibcrfaaaaaaaaaaaaippa" /* index by ObjectKind */
 #endif
 
 typedef enum {
@@ -52,7 +53,7 @@ typedef enum {
 	apply_symb, if_symb, fail_symb, seq_symb,
 	select_symb,
 	Nr_Of_Predef_FunsOrConses,
-	definition = 20, instance_symb,
+	definition = 24, instance_symb,
 	erroneous_symb
 } SymbKind;
 
@@ -70,13 +71,12 @@ STRUCT (state,State){
 	short							state_arity;
 	unsigned char 					state_kind:4;	/* StateKind, for SimpleState */
 	unsigned char					state_mark:4;
-	unsigned char					state_object:6;	/* ObjectKind, for SimpleState */
+	unsigned char					state_object:5;	/* ObjectKind, for SimpleState */
+	unsigned char					state_arrayp2:1;/* for ArrayState */
 	unsigned char					state_type:2;	/* StateType */
 };
 
 #define state_unq_type_args state_descr.sd_unq_type_args
-
-#define STATE_UNIQUE_TYPE_ARGUMENTS_MASK 8
 
 # define state_record_symbol		state_descr.sd_rs->rs_symb
 # define state_record_arguments		state_descr.sd_rs->rs_args
@@ -90,6 +90,7 @@ typedef struct state		*States;
 #define STATE_ELEMENTS_UPDATEABLE_MASK 2		/* for TupleState */
 #define STATE_PACKED_ARRAY_MASK 2				/* for ArrayState */
 #define STATE_UNIQUE_MASK 4
+#define STATE_UNIQUE_TYPE_ARGUMENTS_MASK 8
 
 typedef struct record_state_descr {
 	struct symbol_def *		rs_symb;

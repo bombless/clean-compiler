@@ -33,6 +33,7 @@ instance <<< FilePosition
 	|	CurlyCloseToken			//		}
 	|	SquareOpenToken			//		[
 	|	SquareCloseToken		//		]
+	|	ColonCurlyCloseToken	//		:}
 
 	|	DotToken				//		.
 	|	SemicolonToken			//		;

@@ -1090,6 +1090,10 @@ predefineSymbols {dcl_common} predefs
 				,	(PD_StrictArrayType, 1, BEStrictArrayType)
 				,	(PD_UnboxedArrayType, 1, BEUnboxedArrayType)
 				,	(PD_PackedArrayType, 1, BEPackedArrayType)
+				,	(PD_LazyArrayP2Type, 1, BEArrayP2Type)
+				,	(PD_StrictArrayP2Type, 1, BEStrictArrayP2Type)
+				,	(PD_UnboxedArrayP2Type, 1, BEUnboxedArrayP2Type)
+				,	(PD_PackedArrayP2Type, 1, BEPackedArrayP2Type)
 				:	[(index, index-PD_Arity2TupleType+2, BETupleType) \\ index <- [PD_Arity2TupleType..PD_Arity32TupleType]]
 				]
 

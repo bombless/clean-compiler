@@ -2085,6 +2085,22 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob
 				= (file <<< "String", opt_beautifulizer)
 			| glob_object==PD_UnitTypeIndex
 				= (file <<< "()", opt_beautifulizer)
+			| glob_object==PD_LazyArrayTypeIndex
+				= (file <<< "{}", opt_beautifulizer)
+			| glob_object==PD_StrictArrayTypeIndex
+				= (file <<< "{!}", opt_beautifulizer)
+			| glob_object==PD_UnboxedArrayTypeIndex
+				= (file <<< "{#}", opt_beautifulizer)
+			| glob_object==PD_PackedArrayTypeIndex
+				= (file <<< "{32#}", opt_beautifulizer)
+			| glob_object==PD_LazyArrayP2TypeIndex
+				= (file <<< "{:}", opt_beautifulizer)
+			| glob_object==PD_StrictArrayP2TypeIndex
+				= (file <<< "{!:}", opt_beautifulizer)
+			| glob_object==PD_UnboxedArrayP2TypeIndex
+				= (file <<< "{#:}", opt_beautifulizer)
+			| glob_object==PD_PackedArrayP2TypeIndex
+				= (file <<< "{32#:}", opt_beautifulizer)
 				= (file <<< type_ident, opt_beautifulizer)
 		| glob_object==PD_ListTypeIndex
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
@@ -2106,6 +2122,14 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object==PD_PackedArrayTypeIndex
 			= writeWithinBrackets "{32#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_LazyArrayP2TypeIndex
+			= writeWithinBrackets "{" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_StrictArrayP2TypeIndex
+			= writeWithinBrackets "{!" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_UnboxedArrayP2TypeIndex
+			= writeWithinBrackets "{#" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_PackedArrayP2TypeIndex
+			= writeWithinBrackets "{32#" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object==PD_MaybeTypeIndex

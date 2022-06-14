@@ -119,6 +119,7 @@ ScanOptionNoNewOffsideForSeqLetBit:==4;
 	|	CurlyCloseToken			//		}
 	|	SquareOpenToken			//		[
 	|	SquareCloseToken		//		]
+	|	ColonCurlyCloseToken	//		:}
 
 	|	DotToken				//		.
 	|	SemicolonToken			//		;
@@ -748,7 +749,7 @@ Scan c0=:':' input co
 		| eof				= ScanOperator 1 input [c1, c0] co
 		| c2 == '='			= (ColonDefinesToken, input)
 							= ScanOperator 1 (charBack input) [c1, c0] co
-	// c1 <> '='
+	| c1 == '}'				= (ColonCurlyCloseToken, input)
 	| isSpecialChar c1		= ScanOperator 1 input [c1, c0] co
 							= (ColonToken, charBack input)
 Scan '\'' input co			= ScanChar input
@@ -1683,6 +1684,7 @@ where
 	toString CurlyCloseToken			= "}"
 	toString SquareOpenToken			= "["
 	toString SquareCloseToken			= "]"
+	toString ColonCurlyCloseToken		= ":}"
 
 	toString DotToken					= "."
 	toString SemicolonToken				= ";"

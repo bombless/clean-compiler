@@ -116,6 +116,22 @@ makePackedArraySymbol arity
 	#! packed_array_ident = predefined_idents.[PD_PackedArrayType]
 	= MakeNewTypeSymbIdent packed_array_ident arity
 
+makeLazyArrayP2Symbol arity
+	#! lazy_arrayp2_ident = predefined_idents.[PD_LazyArrayP2Type]
+	= MakeNewTypeSymbIdent lazy_arrayp2_ident arity
+
+makeStrictArrayP2Symbol arity
+	#! strict_array_ident = predefined_idents.[PD_StrictArrayP2Type]
+	= MakeNewTypeSymbIdent strict_array_ident arity
+
+makeUnboxedArrayP2Symbol arity
+	#! unboxed_array_ident = predefined_idents.[PD_UnboxedArrayP2Type]
+	= MakeNewTypeSymbIdent unboxed_array_ident arity
+
+makePackedArrayP2Symbol arity
+	#! packed_array_ident = predefined_idents.[PD_PackedArrayP2Type]
+	= MakeNewTypeSymbIdent packed_array_ident arity
+
 makeTupleTypeSymbol form_arity act_arity
 	#! tuple_ident = predefined_idents.[GetTupleTypeIndex form_arity]
 	= MakeNewTypeSymbIdent tuple_ident act_arity
@@ -3501,37 +3517,75 @@ trySimpleTypeT CurlyOpenToken attr pState
 		| token =: CurlyCloseToken
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeUnboxedArrayP2Symbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype, pState)			= wantAType_strictness_ignoredT token pState
-  			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
-  			  array_symbol = makeUnboxedArraySymbol 1
-  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makeUnboxedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makeUnboxedArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "unboxed array type" (Yes token) "} or :}" pState
+				  array_symbol = makeUnboxedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token =: ExclamationToken
 		# (token, pState) = nextToken TypeContext pState
 		| token =: CurlyCloseToken
 			# array_symbol = makeStrictArraySymbol 0
 			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeStrictArrayP2Symbol 0
+			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype,pState)			= wantAType_strictness_ignoredT token pState
-  			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
-  			  array_symbol = makeStrictArraySymbol 1
-  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makeStrictArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makeStrictArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "strict array type" (Yes token) "} or :}" pState
+				  array_symbol = makeStrictArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token =: (IntToken "32")
 		# pState = wantToken TypeContext "packed array type" HashToken pState
-		# (token, pState) = nextToken TypeContext pState
+		  (token, pState) = nextToken TypeContext pState
 		| token =: CurlyCloseToken
 			# array_symbol =  makePackedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol =  makePackedArrayP2Symbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype, pState) = wantAType_strictness_ignoredT token pState
-			  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
-			  array_symbol    = makePackedArraySymbol 1
-			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makePackedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makePackedArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "packed array type" (Yes token) "} or :}" pState
+				  array_symbol = makePackedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+	| token =: ColonCurlyCloseToken
+		# array_symbol = makeLazyArrayP2Symbol 0
+		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
   	// otherwise
 		# (atype,pState)			= wantAType_strictness_ignoredT token pState
-		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
-		  array_symbol = makeLazyArraySymbol 1
-		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+		  (token, pState) = nextToken TypeContext pState
+		| token =: CurlyCloseToken
+			# array_symbol = makeLazyArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeLazyArrayP2Symbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			# pState = parseError "lazy array type" (Yes token) "} or :}" pState
+			# array_symbol = makeLazyArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+
 trySimpleTypeT StringTypeToken attr pState
 	# type = makeStringType
 	= (ParseOk, {at_attribute = attr, at_type = type}, pState)

@@ -7023,6 +7023,9 @@ void InitCoding (void)
 	InitBasicDescriptor (ArrayObj, "ARRAY", SizeOfAStackElem);
 	InitBasicDescriptor (UnboxedArrayObj, "ARRAY", SizeOfAStackElem);
 
+	InitBasicDescriptor (ArrayP2Obj, "ARRAY", SizeOfAStackElem);
+	InitBasicDescriptor (UnboxedArrayP2Obj, "ARRAY", SizeOfAStackElem);
+
 	InitBasicDescriptor (WorldObj, "WORLD", SizeOfAStackElem);
 	InitBasicDescriptor (ProcIdObj, "PROCID", SizeOfProcId);
 	InitBasicDescriptor (RedIdObj, "REDID", SizeOfInt);

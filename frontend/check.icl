@@ -3847,6 +3847,10 @@ where
 				<=< adjustPredefSymbolAndCheckIndex PD_StrictArrayType mod_index PD_StrictArrayTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedArrayType mod_index PD_UnboxedArrayTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_PackedArrayType mod_index PD_PackedArrayTypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_LazyArrayP2Type mod_index PD_LazyArrayP2TypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_StrictArrayP2Type mod_index PD_StrictArrayP2TypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedArrayP2Type mod_index PD_UnboxedArrayP2TypeIndex STE_Type
+				<=< adjustPredefSymbolAndCheckIndex PD_PackedArrayP2Type mod_index PD_PackedArrayP2TypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_MaybeType mod_index PD_MaybeTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_StrictMaybeType mod_index PD_StrictMaybeTypeIndex STE_Type
 				<=< adjustPredefSymbolAndCheckIndex PD_UnboxedMaybeType mod_index PD_UnboxedMaybeTypeIndex STE_Type

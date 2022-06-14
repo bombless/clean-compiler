@@ -56,6 +56,10 @@ predefined_idents
 					[PD_StrictArrayType] = i "_!Array",
 					[PD_UnboxedArrayType] = i PD_UnboxedArray_String,
 					[PD_PackedArrayType] = i "_32#Array",
+					[PD_LazyArrayP2Type] = i "_ArrayP2",
+					[PD_StrictArrayP2Type] = i "_!ArrayP2",
+					[PD_UnboxedArrayP2Type] = i "_#ArrayP2",
+					[PD_PackedArrayP2Type] = i "_32#ArrayP2",
 					[PD_MaybeType] = i "_Maybe",
 					[PD_StrictMaybeType] = i "_!Maybe",
 					[PD_UnboxedMaybeType] = i "_#Maybe",
@@ -198,6 +202,11 @@ predefined_idents
 					[PD_TC__StrictArray] = i "TC__StrictArray",
 					[PD_TC__UnboxedArray] = i "TC__UnboxedArray",
 					[PD_TC__PackedArray] = i "TC__PackedArray",
+
+					[PD_TC__LazyArrayP2] = i "TC__LazyArrayP2",
+					[PD_TC__StrictArrayP2] = i "TC__StrictArrayP2",
+					[PD_TC__UnboxedArrayP2] = i "TC__UnboxedArrayP2",
+					[PD_TC__PackedArrayP2] = i "TC__PackedArrayP2",
 
 					[PD_TC__Maybe] = i "TC__Maybe",
 					[PD_TC__StrictMaybe] = i "TC__StrictMaybe",
@@ -345,6 +354,10 @@ where
 			<<= (local_predefined_idents, PD_StrictArrayType)
 			<<= (local_predefined_idents, PD_UnboxedArrayType)
 			<<= (local_predefined_idents, PD_PackedArrayType)
+			<<= (local_predefined_idents, PD_LazyArrayP2Type)
+			<<= (local_predefined_idents, PD_StrictArrayP2Type)
+			<<= (local_predefined_idents, PD_UnboxedArrayP2Type)
+			<<= (local_predefined_idents, PD_PackedArrayP2Type)
 			<<= (local_predefined_idents, PD_MaybeType) <<= (local_predefined_idents, PD_JustSymbol) <<= (local_predefined_idents, PD_NoneSymbol)
 			<<= (local_predefined_idents, PD_StrictMaybeType) <<= (local_predefined_idents, PD_StrictJustSymbol) <<= (local_predefined_idents, PD_StrictNoneSymbol)
 			<<= (local_predefined_idents, PD_UnboxedMaybeType) <<= (local_predefined_idents, PD_UnboxedJustSymbol) <<= (local_predefined_idents, PD_UnboxedNoneSymbol)
@@ -515,10 +528,17 @@ buildPredefinedModule support_dynamics pre_def_symbols
 	  (overloaded_list_def,overloaded_cons_def,overloaded_nil_def,pre_def_symbols)
 		= make_list_definition PD_OverloadedListType PD_OverloadedConsSymbol PD_OverloadedNilSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
 
-	  (array_def, pre_def_symbols)		= make_type_def PD_LazyArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
-	  (strict_def, pre_def_symbols)		= make_type_def PD_StrictArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
-	  (unboxed_def, pre_def_symbols)	= make_type_def PD_UnboxedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
-	  (packed_def, pre_def_symbols)	= make_type_def PD_PackedArrayType [type_var] (AbstractType cAllBitsClear) pre_def_symbols
+	  type_var_l = [type_var]
+	  abstract_type_rhs = AbstractType cAllBitsClear
+	  (array_def, pre_def_symbols)	= make_type_def PD_LazyArrayType    type_var_l abstract_type_rhs pre_def_symbols
+	  (strict_def, pre_def_symbols)	= make_type_def PD_StrictArrayType  type_var_l abstract_type_rhs pre_def_symbols
+	  (unboxed_def, pre_def_symbols)= make_type_def PD_UnboxedArrayType type_var_l abstract_type_rhs pre_def_symbols
+	  (packed_def, pre_def_symbols)	= make_type_def PD_PackedArrayType  type_var_l abstract_type_rhs pre_def_symbols
+
+	  (arrayp2_def, pre_def_symbols)   = make_type_def PD_LazyArrayP2Type    type_var_l abstract_type_rhs pre_def_symbols
+	  (s_arrayp2_def, pre_def_symbols) = make_type_def PD_StrictArrayP2Type  type_var_l abstract_type_rhs pre_def_symbols
+	  (u_arrayp2_def, pre_def_symbols) = make_type_def PD_UnboxedArrayP2Type type_var_l abstract_type_rhs pre_def_symbols
+	  (p_arrayp2_def, pre_def_symbols) = make_type_def PD_PackedArrayP2Type  type_var_l abstract_type_rhs pre_def_symbols
 
 	  (maybe_def,just_def,none_def,pre_def_symbols)
 		= make_maybe_definition PD_MaybeType PD_JustSymbol PD_NoneSymbol pre_mod_ident type_var type_var_with_attr NotStrict pre_def_symbols
@@ -532,7 +552,8 @@ buildPredefinedModule support_dynamics pre_def_symbols
 	  (unit_type_def,unit_cons_def,pre_def_symbols) = make_unit_definition pre_mod_ident pre_def_symbols
 
 	  array_and_unit_type_defs
-		= [array_def,strict_def,unboxed_def,packed_def,maybe_def,strict_maybe_def,unboxed_maybe_def,overloaded_maybe_def,unit_type_def]
+		= [array_def,strict_def,unboxed_def,packed_def,arrayp2_def,s_arrayp2_def,u_arrayp2_def,p_arrayp2_def,
+		   maybe_def,strict_maybe_def,unboxed_maybe_def,overloaded_maybe_def,unit_type_def]
 	  cons_defs = [just_def,none_def,strict_just_def,strict_none_def,
 				   unboxed_just_def,unboxed_none_def,overloaded_just_def,overloaded_none_def,unit_cons_def]
 	  (type_defs, cons_defs, pre_def_symbols)
