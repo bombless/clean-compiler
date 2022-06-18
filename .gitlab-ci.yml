@@ -1,4 +1,4 @@
-image: cleanlang/nitrile:bootstrap
+image: cleanlang/nitrile:0.3
 
 stages: [build, publish]
 
