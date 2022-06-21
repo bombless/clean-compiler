@@ -417,7 +417,7 @@ unifyTypes t1=:(TAS cons_id1 cons_args1 _) attr1 t2=:(TAS cons_id2 cons_args2 _)
 unifyTypes (arg_type1 --> res_type1) attr1 (arg_type2 --> res_type2) attr2 modules subst heaps
 	= unify (arg_type1,res_type1) (arg_type2,res_type2) modules subst heaps
 unifyTypes TArrow attr1 TArrow attr2 modules subst heaps
-	= (True, subst, heaps)	
+	= (True, subst, heaps)
 unifyTypes (TArrow1 t1) attr1 (TArrow1 t2) attr2 modules subst heaps
 	= unify t1 t2 modules subst heaps	
 unifyTypes (cons_var :@: types) attr1 type2 attr2 modules subst heaps
@@ -2671,7 +2671,7 @@ specification_error type type1 err
 	# err = { err & ea_file = err.ea_file <<< " " <:: (format, type1, Yes initialTypeVarBeautifulizer) <<< '\n' }
 	= err
 
-cleanUpAndCheckFunctionTypes :: ![Int] ![FunctionRequirements] ![(Int,[Ptr ExprInfo])] !Int !(Optional Bool) !{#CommonDefs} ![TypeContext] !{!CoercionTree}
+cleanUpAndCheckFunctionTypes :: ![Int] ![FunctionRequirements] ![(Int,[ExprInfoPtr])] !Int !(Optional Bool) !{#CommonDefs} ![TypeContext] !{!CoercionTree}
 								!{#Int} !*{!Type} !*{!TypeAttribute} !*(![ErrorContexts],!*File,!*TypeState) -> (![ErrorContexts],!*File,!*TypeState)
 cleanUpAndCheckFunctionTypes [] _ _ start_index _
 								defs type_contexts coercion_env attr_partition type_var_env attr_var_env (rev_comp_error_contexts,out,ts)
@@ -2945,11 +2945,11 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 
 	# ts_error = {ea_file = file, ea_loc = [], ea_ok = True }
 	  ti_common_defs = {{dcl_common \\ {dcl_common} <-: dcl_modules } & [main_dcl_module_n] = icl_defs }
-	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }	  
+	  ti_functions	 = {dcl_functions \\ {dcl_functions} <-: dcl_modules }
 
 	  class_instances = { {  IT_Empty \\ i <- [0 .. dec (size com_class_defs)] } \\ {com_class_defs} <-: ti_common_defs }
 	  state = collect_imported_instances icl_imported_instances ti_common_defs ts_error class_instances hp_type_heaps.th_vars td_infos
-	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs state
+	  (ts_error, class_instances, th_vars, td_infos) = collect_and_check_instances (size icl_defs.com_instance_defs) ti_common_defs main_dcl_module_n state
 	  (class_instances,th_vars,ts_error) = check_if_class_instances_overlap class_instances ti_common_defs th_vars ts_error
 	  ts = { ts_fun_env = InitFunEnv fun_env_size, ts_var_heap = hp_var_heap, ts_expr_heap = hp_expression_heap, ts_generic_heap = hp_generic_heap, ts_var_store = 0, ts_attr_store = FirstAttrVar, ts_cons_variables = [], ts_exis_variables = [],
 			 ts_type_heaps = { hp_type_heaps & th_vars = th_vars }, ts_td_infos = td_infos, ts_error = ts_error, ts_fun_defs=fun_defs }
@@ -2967,91 +2967,6 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 			ts_td_infos, {hp_var_heap = ts_var_heap, hp_expression_heap = ts_expr_heap, hp_type_heaps = ts_type_heaps, hp_generic_heap=ts_generic_heap },
 			predef_symbols, ts_error.ea_file, out)
 where
-	collect_imported_instances [!{gii_module_n,gii_instance_n}:imported_instances!] common_defs error class_instances type_var_heap td_infos
-		# (error, class_instances, type_var_heap, td_infos)
-			= update_instances_of_class common_defs gii_module_n gii_instance_n (error, class_instances, type_var_heap, td_infos)
-		= collect_imported_instances imported_instances common_defs error class_instances type_var_heap td_infos
-	collect_imported_instances [!!] common_defs error class_instances type_var_heap td_infos
-		= (error, class_instances, type_var_heap, td_infos)
-
-	collect_and_check_instances nr_of_instances common_defs state
-		= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
-
-	update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
-		#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
-		  (instances, class_instances) = class_instances![gi_module,gi_index]
-		  instances = insert ins_index mod_index instances
-		  class_instances = {class_instances & [gi_module,gi_index]=instances}
-		  (error, type_var_heap, td_infos)
-					= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
-		= (error, class_instances, type_var_heap, td_infos)
-	where
-		insert :: !Index !Index !*InstanceTree -> *InstanceTree
-		insert new_ins_index new_ins_module IT_Empty
-			= IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty
-		insert new_ins_index new_ins_module (IT_Node ins=:{glob_module,glob_object} it_less it_greater)
-			| new_ins_module==glob_module
-				| new_ins_index<glob_object
-					= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
-				| new_ins_index>glob_object
-					= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
-					= IT_Node ins it_less it_greater
-			| new_ins_module<glob_module
-				= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
-				= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
-
-	check_types_of_instances ins_pos common_defs class_module class_index types state
-		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
-		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars 0 types state
-	where
-		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [type : types] state
-			| cons_vars bitand (1 << arg_nr) <> 0
-				# state = check_type_of_constructor_variable ins_pos common_defs type state
-				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
-				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
-		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [] state
-			= state
-
-		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
-			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
-		check_type_of_constructor_variable ins_pos common_defs type=:(TAS {type_index={glob_module,glob_object},type_arity} types _) (error, type_var_heap, td_infos)
-			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
-		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
-			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
-				type_var_heap, td_infos)
-//AA..
-/*
-		// ??? not sure if it is correct
-		check_type_of_constructor_variable ins_pos common_defs TArrow (error, type_var_heap, td_infos)
-			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
-				type_var_heap, td_infos)
-		check_type_of_constructor_variable ins_pos common_defs type=:(TArrow1 arg_type) (error, type_var_heap, td_infos)
-			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
-				type_var_heap, td_infos)		
-*/
-//..AA				
-		check_type_of_constructor_variable ins_pos common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
-			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
-				type_var_heap, td_infos)
-		check_type_of_constructor_variable ins_pos common_defs type state
-			= state
-
-		check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
-			# {td_arity,td_ident} = common_defs.[glob_module].com_type_defs.[glob_object]
-			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
-			| tdi_properties bitand cIsNonCoercible == 0
-				# ({sc_neg_vect}, type_var_heap, td_infos)
-					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
-				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)							
-				= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error, type_var_heap, td_infos)
-		where
-			check_sign type neg_signs arg_nr error
-				| arg_nr == 0
-					= error
-					| neg_signs bitand 1 == 0
-						= check_sign type (neg_signs >> 1) (dec arg_nr) error
-						= checkError type " all arguments of an instance type should have a non-negative sign" error
-
 	type_instances list_inferred_types ir_from ir_to class_instances ti funs_and_state
 		| ir_from == ir_to
 			= funs_and_state
@@ -3064,23 +2979,9 @@ where
 			#! comp = comps.[group_index]	
 			# funs_and_state = type_component list_inferred_types comp.group_members class_instances ti funs_and_state
 			= type_components list_inferred_types (inc group_index) comps class_instances ti funs_and_state
-/*
-	show_component comp fun_defs
-		= foldSt show_fun comp ([], fun_defs)
-	where
-		show_fun fun_index (names, fun_defs)
-			# ({fun_ident}, fun_defs) = fun_defs![fun_index]
-			= ([fun_ident : names], fun_defs)
-*/
-	get_index_of_start_rule predef_symbols
-		# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
-		| pds_def <> NoIndex && pds_module == main_dcl_module_n
-			= (pds_def, predef_symbols)
-			= (NoIndex, predef_symbols)
-	
+
 	type_component list_inferred_types comp class_instances ti=:{ti_common_defs} (type_error, predef_symbols, special_instances, out, ts)
-		# (start_index, predef_symbols) = get_index_of_start_rule predef_symbols
-//		# (functions, fun_defs) = show_component comp fun_defs
+		# (start_index, predef_symbols) = get_index_of_start_rule main_dcl_module_n predef_symbols
 		# (predef_symbols, ts) = CreateInitialSymbolTypes start_index ti_common_defs comp (predef_symbols, ts)
 		| not ts.ts_error.ea_ok
 			= (True, predef_symbols, special_instances, out, create_erroneous_function_types comp
@@ -3116,8 +3017,7 @@ where
 		  		= build_coercion_env fun_reqs subst coercion_env ti_common_defs cons_var_vects ts_td_infos os_type_heaps os_error
 		  (subst, ts_fun_env) = expand_function_types comp subst ts.ts_fun_env
 		  ({coer_offered,coer_demanded},ts_error,ts_fun_env)
-		  		= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)
-		  				comp (coercions,ts_error,ts_fun_env)
+				= add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
 		  (attr_partition, coer_demanded) = partitionateAttributes coer_offered coer_demanded
 		  (coer_demanded, ts_error) = check_existential_attributes ts_exis_variables attr_partition coer_demanded ts_error
 		  attr_var_env = createArray nr_of_attr_vars TA_None
@@ -3142,145 +3042,44 @@ where
 					ts_expr_heap = ts_expr_heap, ts_error = { ts_error & ea_ok = True },
 				  	ts_var_heap = ts_var_heap, ts_type_heaps = { ts_type_heaps & th_vars =  tci_type_var_heap, th_attrs =  tci_attr_var_heap },
 				  	ts_fun_env = ts_fun_env, ts_fun_defs=fun_defs})
+
+	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+	update_function_types group_index comps fun_env fun_defs
+		| group_index == size comps
+			= (fun_defs, fun_env)
+			#! comp = comps.[group_index]
+			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
+			= update_function_types (inc group_index) comps fun_env fun_defs
 	where
-		add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (coercions,ts_error,ts_fun_env)
-			# (env_type, ts_fun_env) = ts_fun_env![fun]
-			= case env_type of
-				ExpandedType _ _ _
-					-> (coercions,ts_error,ts_fun_env)
-				ExpandedLocalFunType _ _ _ _ _
-					-> (coercions,ts_error,ts_fun_env)
-			  	UncheckedType {tst_args, tst_result}
-			  		# (coercions,ts_error)
-			  			= foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) [tst_result:tst_args]
-							(coercions,ts_error)
-					-> (coercions,ts_error,ts_fun_env)
-
-		add_unicity_of_essentially_unique_type :: {#CommonDefs} AType *(*Coercions,*ErrorAdmin) -> (!*Coercions,!*ErrorAdmin)
-		add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} (coercions,ts_error)
-			# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
-			= case td_attribute of
-				TA_Unique
-					// the type is essentially unique
-					# (ok,coercions) = tryToMakeUnique av_number coercions
-					| ok
-						-> (coercions,ts_error)
-						-> (coercions,type_not_unique_error td_ident ts_error)
-				_
-					-> (coercions,ts_error)
-		add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TAS {type_index} _ _} (coercions,ts_error)
-			# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
-			= case td_attribute of
-				TA_Unique
-					// the type is essentially unique
-					# (ok,coercions) = tryToMakeUnique av_number coercions
-					| ok
-						-> (coercions,ts_error)
-						-> (coercions,type_not_unique_error td_ident ts_error)
-				_
-					-> (coercions,ts_error)
-		add_unicity_of_essentially_unique_type _ _ coercions_and_ts_error
-			= coercions_and_ts_error
-
-		type_not_unique_error type_name err
-			# err = errorHeading "Uniqueness error " err
-			= {err & ea_file = err.ea_file <<< "* annotated type " <<< type_name <<< " occurs non unique in inferred function type"<<< '\n'}
-
-	unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
-	unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] ti subst heaps ts_error
-		# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position fe_ident ti) (reverse req_type_coercion_groups) (subst, heaps, ts_error)
-		= unify_requirements_of_functions reqs_list ti subst heaps ts_error
-	unify_requirements_of_functions [] ti subst heaps ts_error
-		= (subst, heaps, ts_error)
-
-  	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
- 						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
-	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
-		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
-	unify_requirements_within_one_position fun_ident ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
-		# ts_error = setErrorPosition fun_ident tcg_position ts_error
-		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
-
-	build_initial_coercion_env [{fe_requirements={req_attr_coercions}} : reqs_list] coercion_env
-		= build_initial_coercion_env reqs_list (add_to_initial_coercion_env req_attr_coercions coercion_env)
-	build_initial_coercion_env [] coercion_env
-		= coercion_env
-
-	add_to_initial_coercion_env [{ac_offered,ac_demanded} : attr_coercions] coercion_env
-		= add_to_initial_coercion_env attr_coercions (newInequality ac_offered ac_demanded coercion_env)
-	add_to_initial_coercion_env [] coercion_env
-		= coercion_env
-
-	determine_cons_variables variables vect_and_subst
-		= foldSt determine_cons_variable variables vect_and_subst
-	where	
-		determine_cons_variable tv_number (bitvects, subst)
-			# (type, subst) = subst![tv_number]
-			= case type of
-				TE
-					-> (set_bit tv_number bitvects, subst)	// ---> ("determine_cons_variable1", tv_number)
-				TempV var_number
-					-> (set_bit var_number bitvects, subst)	// ---> ("determine_cons_variable2", var_number)
-				_
-					-> (bitvects, subst)
-
-	build_coercion_env :: [FunctionRequirements] *{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!.{!Type},!.Coercions,!.{#.{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin);
-	build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		# (subst, coercion_env, type_signs, type_var_heap, error)
-			= foldSt (build_coercion_env_for_alternative fe_ident common_defs cons_var_vects)
-					req_type_coercion_groups
-					(subst, coercion_env, type_signs, type_var_heap, error)
-		= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
-	build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		= (subst, coercion_env, type_signs, type_var_heap, error)
-
-	build_coercion_env_for_alternative fun_ident common_defs cons_var_vects {tcg_position, tcg_type_coercions}
-										(subst, coercion_env, type_signs, type_var_heap, error)
-		# error = setErrorPosition fun_ident tcg_position error
-		= add_to_coercion_env tcg_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-
-	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		# (opt_error_info, subst, coercion_env, type_signs, type_var_heap)
-				= determineAttributeCoercions tc_offered tc_demanded tc_coercible False
-						subst coercion_env common_defs cons_var_vects type_signs
-						type_var_heap
-		  (coercion_env, error)
-			= case opt_error_info of
-				No
-					-> (coercion_env, error)
-				Yes (positions, exp_off_type)
-					# (error=:{ea_file})
-							= errorHeading "Uniqueness error" error
-					  (coercion_env, copy_coercion_env)
-					  		= copyCoercions coercion_env
-					  format
-					  		= { form_properties = cMarkAttribute,
-					  			form_attr_position = Yes (Reverse positions, copy_coercion_env) }			
-					  ea_file = 
-					  	case tc_position of
-					  		CP_FunArg _ _
-					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
-					  		CP_SymbArgAndExpression _ _ _
-					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
-					  		CP_LiftedFunArg _ _
-					  			-> ea_file <<< "\"" <<< tc_position <<< "\" "
-					  		_
-					  			-> ea_file
-					  ea_file = ea_file	<<< "attribute at position indicated by ^ could not be coerced "
-					  					 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
-					-> (coercion_env, { error & ea_file = ea_file })
-		= add_to_coercion_env attr_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-	add_to_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
-		= (subst, coercion_env, type_signs, type_var_heap, error)
-
-	check_existential_attributes ts_exis_variables partition coercions ts_error
-		= foldSt (check_existential_attributes_at_pos partition) ts_exis_variables (coercions, ts_error)
-	where
-		check_existential_attributes_at_pos partition (pos, attr_vars) (coercions, ts_error)
-			# (ok, coercions) = checkExistentionalAttributeVars attr_vars partition coercions
-			| ok
-				= (coercions, ts_error)
-				= (coercions, existentialError pos ts_error)
+		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
+		update_function_types_in_component [fun_index : funs] fun_env fun_defs
+			# (CheckedType checked_fun_type n_lifted_attr_ineqs, fun_env) = fun_env![fun_index]
+			# (fd, fun_defs) = fun_defs![fun_index]
+			= case fd.fun_type of
+				NoFunDefType
+					# fun_defs & [fun_index] = {fd & fun_type = FunDefType checked_fun_type}
+					-> update_function_types_in_component funs fun_env fun_defs
+				FunDefType fun_type
+					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+					| nr_of_lifted_arguments > 0
+						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
+						-> update_function_types_in_component funs fun_env fun_defs
+						-> update_function_types_in_component funs fun_env fun_defs
+				LocalFunDefCheckedType _ _ fun_type
+					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
+					| nr_of_lifted_arguments > 0
+						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
+									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
+									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
+						-> update_function_types_in_component funs fun_env fun_defs
+						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
+						-> update_function_types_in_component funs fun_env fun_defs
+		update_function_types_in_component [] fun_env fun_defs
+			= (fun_defs, fun_env)
 
 	collect_and_expand_overloaded_calls [] calls subst_and_heap
 		= (calls, subst_and_heap)
@@ -3336,9 +3135,232 @@ where
 	expand_constructor_contexts [] subst
 		= (False,[],subst)
 
-	expand_case_or_let_types info_ptrs subst_expr_heap
-		= foldSt expand_case_or_let_type info_ptrs subst_expr_heap
+add_unicity_of_essentially_unique_types_for_functions ti_common_defs comp coercions ts_error ts_fun_env
+	= foldSt (add_unicity_of_essentially_unique_types_for_function ti_common_defs)
+				comp (coercions,ts_error,ts_fun_env)
+where
+	add_unicity_of_essentially_unique_types_for_function ti_common_defs fun (coercions,ts_error,ts_fun_env)
+		# (env_type, ts_fun_env) = ts_fun_env![fun]
+		= case env_type of
+			ExpandedType _ _ _
+				-> (coercions,ts_error,ts_fun_env)
+			ExpandedLocalFunType _ _ _ _ _
+				-> (coercions,ts_error,ts_fun_env)
+			UncheckedType {tst_args, tst_result}
+				# (coercions,ts_error)
+					= foldSt (foldATypeSt (add_unicity_of_essentially_unique_type ti_common_defs) (\x st -> st)) [tst_result:tst_args]
+						(coercions,ts_error)
+				-> (coercions,ts_error,ts_fun_env)
 
+	add_unicity_of_essentially_unique_type :: {#CommonDefs} AType *(*Coercions,*ErrorAdmin) -> (!*Coercions,!*ErrorAdmin)
+	add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} (coercions,ts_error)
+		# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+		= case td_attribute of
+			TA_Unique
+				// the type is essentially unique
+				# (ok,coercions) = tryToMakeUnique av_number coercions
+				| ok
+					-> (coercions,ts_error)
+					-> (coercions,type_not_unique_error td_ident ts_error)
+			_
+				-> (coercions,ts_error)
+	add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TAS {type_index} _ _} (coercions,ts_error)
+		# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
+		= case td_attribute of
+			TA_Unique
+				// the type is essentially unique
+				# (ok,coercions) = tryToMakeUnique av_number coercions
+				| ok
+					-> (coercions,ts_error)
+					-> (coercions,type_not_unique_error td_ident ts_error)
+			_
+				-> (coercions,ts_error)
+	add_unicity_of_essentially_unique_type _ _ coercions_and_ts_error
+		= coercions_and_ts_error
+
+	type_not_unique_error type_name err
+		# err = errorHeading "Uniqueness error " err
+		= {err & ea_file = err.ea_file <<< "* annotated type " <<< type_name <<< " occurs non unique in inferred function type"<<< '\n'}
+
+collect_imported_instances [!{gii_module_n,gii_instance_n}:imported_instances!] common_defs error class_instances type_var_heap td_infos
+	# (error, class_instances, type_var_heap, td_infos)
+		= update_instances_of_class common_defs gii_module_n gii_instance_n (error, class_instances, type_var_heap, td_infos)
+	= collect_imported_instances imported_instances common_defs error class_instances type_var_heap td_infos
+collect_imported_instances [!!] common_defs error class_instances type_var_heap td_infos
+	= (error, class_instances, type_var_heap, td_infos)
+
+collect_and_check_instances nr_of_instances common_defs main_dcl_module_n state
+	= iFoldSt (update_instances_of_class common_defs main_dcl_module_n) 0 nr_of_instances state
+
+update_instances_of_class common_defs mod_index ins_index (error, class_instances, type_var_heap, td_infos)
+	#!{ins_class_index={gi_module,gi_index},ins_type={it_types},ins_pos} = common_defs.[mod_index].com_instance_defs.[ins_index]
+	  (instances, class_instances) = class_instances![gi_module,gi_index]
+	  instances = insert ins_index mod_index instances
+	  class_instances & [gi_module,gi_index]=instances
+	  (error, type_var_heap, td_infos)
+				= check_types_of_instances ins_pos common_defs gi_module gi_index it_types (error, type_var_heap, td_infos)
+	= (error, class_instances, type_var_heap, td_infos)
+where
+	insert :: !Index !Index !*InstanceTree -> *InstanceTree
+	insert new_ins_index new_ins_module IT_Empty
+		= IT_Node {glob_object = new_ins_index,glob_module = new_ins_module} IT_Empty IT_Empty
+	insert new_ins_index new_ins_module (IT_Node ins=:{glob_module,glob_object} it_less it_greater)
+		| new_ins_module==glob_module
+			| new_ins_index<glob_object
+				= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+			| new_ins_index>glob_object
+				= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
+				= IT_Node ins it_less it_greater
+		| new_ins_module<glob_module
+			= IT_Node ins (insert new_ins_index new_ins_module it_less) it_greater
+			= IT_Node ins it_less (insert new_ins_index new_ins_module it_greater)
+
+	check_types_of_instances ins_pos common_defs class_module class_index types state
+		# {class_cons_vars} = common_defs.[class_module].com_class_defs.[class_index]
+		= check_instances_of_constructor_variables ins_pos common_defs class_cons_vars 0 types state
+	where
+		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [type : types] state
+			| cons_vars bitand (1 << arg_nr) <> 0
+				# state = check_type_of_constructor_variable ins_pos common_defs type state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
+				= check_instances_of_constructor_variables ins_pos common_defs cons_vars (arg_nr+1) types state
+		check_instances_of_constructor_variables ins_pos common_defs cons_vars arg_nr [] state
+			= state
+
+		check_type_of_constructor_variable ins_pos common_defs type=:(TA {type_index={glob_module,glob_object},type_arity} types) (error, type_var_heap, td_infos)
+			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
+		check_type_of_constructor_variable ins_pos common_defs type=:(TAS {type_index={glob_module,glob_object},type_arity} types _) (error, type_var_heap, td_infos)
+			= check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
+		check_type_of_constructor_variable ins_pos common_defs type=:(arg_type --> result_type) (error, type_var_heap, td_infos)
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
+				type_var_heap, td_infos)
+		check_type_of_constructor_variable ins_pos common_defs type=:(cv :@: types) (error, type_var_heap, td_infos)
+			= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error,
+				type_var_heap, td_infos)
+		check_type_of_constructor_variable ins_pos common_defs type state
+			= state
+
+		check_type_of_constructor_variable_for_TA glob_module glob_object type_arity types ins_pos common_defs type error type_var_heap td_infos
+			# {td_arity,td_ident} = common_defs.[glob_module].com_type_defs.[glob_object]
+			  ({tdi_properties,tdi_cons_vars}, td_infos) = td_infos![glob_module].[glob_object]
+			| tdi_properties bitand cIsNonCoercible == 0
+				# ({sc_neg_vect}, type_var_heap, td_infos)
+					= signClassification glob_object glob_module [TopSignClass \\ cv <- tdi_cons_vars ] common_defs type_var_heap td_infos
+				= (check_sign type (sc_neg_vect >> type_arity) (td_arity - type_arity) error, type_var_heap, td_infos)
+				= (checkErrorWithPosition empty_id ins_pos " instance type should be coercible" error, type_var_heap, td_infos)
+		where
+			check_sign type neg_signs arg_nr error
+				| arg_nr == 0
+					= error
+					| neg_signs bitand 1 == 0
+						= check_sign type (neg_signs >> 1) (dec arg_nr) error
+						= checkError type " all arguments of an instance type should have a non-negative sign" error
+
+get_index_of_start_rule main_dcl_module_n predef_symbols
+	# ({pds_def, pds_module}, predef_symbols) = predef_symbols![PD_Start]
+	| pds_def <> NoIndex && pds_module == main_dcl_module_n
+		= (pds_def, predef_symbols)
+		= (NoIndex, predef_symbols)
+
+unify_requirements_of_functions :: ![FunctionRequirements] !TypeInput !*{!Type} !*TypeHeaps !*ErrorAdmin -> (!*{!Type},!*TypeHeaps,!*ErrorAdmin)
+unify_requirements_of_functions [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] ti subst heaps ts_error
+	# (subst, heaps, ts_error) = foldSt (unify_requirements_within_one_position fe_ident ti) (reverse req_type_coercion_groups) (subst, heaps, ts_error)
+	= unify_requirements_of_functions reqs_list ti subst heaps ts_error
+where
+	unify_requirements_within_one_position :: !Ident !TypeInput !TypeCoercionGroup !(*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+						-> (*{!Type}, !*TypeHeaps, !*ErrorAdmin)
+	unify_requirements_within_one_position _ ti {tcg_type_coercions, tcg_position=NoPos} (subst, heaps, ts_error)
+		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
+	unify_requirements_within_one_position fun_ident ti {tcg_type_coercions, tcg_position} (subst, heaps, ts_error)
+		# ts_error = setErrorPosition fun_ident tcg_position ts_error
+		= unify_coercions (reverse tcg_type_coercions) ti subst heaps ts_error
+unify_requirements_of_functions [] ti subst heaps ts_error
+	= (subst, heaps, ts_error)
+
+build_initial_coercion_env [{fe_requirements={req_attr_coercions}} : reqs_list] coercion_env
+	= build_initial_coercion_env reqs_list (add_to_initial_coercion_env req_attr_coercions coercion_env)
+where
+	add_to_initial_coercion_env [{ac_offered,ac_demanded} : attr_coercions] coercion_env
+		= add_to_initial_coercion_env attr_coercions (newInequality ac_offered ac_demanded coercion_env)
+	add_to_initial_coercion_env [] coercion_env
+		= coercion_env
+build_initial_coercion_env [] coercion_env
+	= coercion_env
+
+determine_cons_variables variables vect_and_subst
+	= foldSt determine_cons_variable variables vect_and_subst
+where
+	determine_cons_variable tv_number (bitvects, subst)
+		# (type, subst) = subst![tv_number]
+		= case type of
+			TE
+				-> (set_bit tv_number bitvects, subst)	// ---> ("determine_cons_variable1", tv_number)
+			TempV var_number
+				-> (set_bit var_number bitvects, subst)	// ---> ("determine_cons_variable2", var_number)
+			_
+				-> (bitvects, subst)
+
+build_coercion_env :: [FunctionRequirements] *{!Type} *Coercions {#CommonDefs} {#Int} *{#*{#TypeDefInfo}} *TypeHeaps !*ErrorAdmin -> (!.{!Type},!.Coercions,!.{#.{#TypeDefInfo}},!.TypeHeaps,!.ErrorAdmin);
+build_coercion_env [{fe_requirements={req_type_coercion_groups},fe_ident} : reqs_list] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+	# (subst, coercion_env, type_signs, type_var_heap, error)
+		= foldSt (build_coercion_env_for_alternative fe_ident common_defs cons_var_vects)
+				req_type_coercion_groups
+				(subst, coercion_env, type_signs, type_var_heap, error)
+	= build_coercion_env reqs_list subst coercion_env common_defs cons_var_vects  type_signs type_var_heap error
+build_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+	= (subst, coercion_env, type_signs, type_var_heap, error)
+
+build_coercion_env_for_alternative fun_ident common_defs cons_var_vects {tcg_position, tcg_type_coercions}
+									(subst, coercion_env, type_signs, type_var_heap, error)
+	# error = setErrorPosition fun_ident tcg_position error
+	= add_to_coercion_env tcg_type_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+where
+	add_to_coercion_env [{tc_offered,tc_demanded,tc_coercible,tc_position} : attr_coercions] subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+		# (opt_error_info, subst, coercion_env, type_signs, type_var_heap)
+				= determineAttributeCoercions tc_offered tc_demanded tc_coercible False
+						subst coercion_env common_defs cons_var_vects type_signs
+						type_var_heap
+		  (coercion_env, error)
+			= case opt_error_info of
+				No
+					-> (coercion_env, error)
+				Yes (positions, exp_off_type)
+					# (error=:{ea_file})
+							= errorHeading "Uniqueness error" error
+					  (coercion_env, copy_coercion_env)
+							= copyCoercions coercion_env
+					  format
+							= { form_properties = cMarkAttribute,
+								form_attr_position = Yes (Reverse positions, copy_coercion_env) }
+					  ea_file =
+						case tc_position of
+							CP_FunArg _ _
+								-> ea_file <<< "\"" <<< tc_position <<< "\" "
+							CP_SymbArgAndExpression _ _ _
+								-> ea_file <<< "\"" <<< tc_position <<< "\" "
+							CP_LiftedFunArg _ _
+								-> ea_file <<< "\"" <<< tc_position <<< "\" "
+							_
+								-> ea_file
+					  ea_file = ea_file	<<< "attribute at position indicated by ^ could not be coerced "
+										 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
+					-> (coercion_env, { error & ea_file = ea_file })
+		= add_to_coercion_env attr_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+	add_to_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
+		= (subst, coercion_env, type_signs, type_var_heap, error)
+
+check_existential_attributes ts_exis_variables partition coercions ts_error
+	= foldSt (check_existential_attributes_at_pos partition) ts_exis_variables (coercions, ts_error)
+where
+	check_existential_attributes_at_pos partition (pos, attr_vars) (coercions, ts_error)
+		# (ok, coercions) = checkExistentionalAttributeVars attr_vars partition coercions
+		| ok
+			= (coercions, ts_error)
+			= (coercions, existentialError pos ts_error)
+
+expand_case_or_let_types info_ptrs subst_expr_heap
+	= foldSt expand_case_or_let_type info_ptrs subst_expr_heap
+where
 	expand_case_or_let_type info_ptr (subst, expr_heap)
 		= case (readPtr info_ptr expr_heap) of
 			(EI_CaseType case_type, expr_heap)
@@ -3357,66 +3379,27 @@ where
 					-> (subst, expr_heap <:= (info_ptr, EI_CaseTypeWithContexts case_type contexts))
 					-> (subst, expr_heap)
 
-	expand_function_types :: ![Int] !*{!Type} *{! FunctionType} -> (!*{!Type}, *{! FunctionType})
-	expand_function_types [fun : funs] subst ts_fun_env
-		# (fun_type, ts_fun_env) = ts_fun_env![fun]
-		= case fun_type of
-			UncheckedType tst
-				# (_, exp_tst, subst) = arraySubst tst subst
-				-> expand_function_types funs subst {ts_fun_env & [fun] = UncheckedType exp_tst}
-			SpecifiedType ft _ tst
-				# (_, exp_tst, subst) = arraySubst tst subst
-				-> expand_function_types funs subst {ts_fun_env & [fun] = ExpandedType ft tst exp_tst}
-			SpecifiedLocalFunType ft external_type_vars external_attr_vars _ tst
-				# (_, exp_tst, subst) = arraySubst tst subst
-				# (_, exp_external_type_vars, subst) = arraySubst external_type_vars subst
-				  ts_fun_env & [fun] = ExpandedLocalFunType ft exp_external_type_vars external_attr_vars tst exp_tst
-				-> expand_function_types funs subst ts_fun_env
-	expand_function_types [] subst ts_fun_env
-		= (subst, ts_fun_env)
+expand_function_types :: ![Int] !*{!Type} *{! FunctionType} -> (!*{!Type}, *{! FunctionType})
+expand_function_types [fun : funs] subst ts_fun_env
+	# (fun_type, ts_fun_env) = ts_fun_env![fun]
+	= case fun_type of
+		UncheckedType tst
+			# (_, exp_tst, subst) = arraySubst tst subst
+			-> expand_function_types funs subst {ts_fun_env & [fun] = UncheckedType exp_tst}
+		SpecifiedType ft _ tst
+			# (_, exp_tst, subst) = arraySubst tst subst
+			-> expand_function_types funs subst {ts_fun_env & [fun] = ExpandedType ft tst exp_tst}
+		SpecifiedLocalFunType ft external_type_vars external_attr_vars _ tst
+			# (_, exp_tst, subst) = arraySubst tst subst
+			  (_, exp_external_type_vars, subst) = arraySubst external_type_vars subst
+			  ts_fun_env & [fun] = ExpandedLocalFunType ft exp_external_type_vars external_attr_vars tst exp_tst
+			-> expand_function_types funs subst ts_fun_env
+expand_function_types [] subst ts_fun_env
+	= (subst, ts_fun_env)
 
-	update_function_types :: !Index !{!Group} !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-	update_function_types group_index comps fun_env fun_defs
-		| group_index == size comps
-			= (fun_defs, fun_env)
-			#! comp = comps.[group_index]	
-			# (fun_defs, fun_env) = update_function_types_in_component comp.group_members fun_env fun_defs
-			= update_function_types (inc group_index) comps fun_env fun_defs
-
-	where
-		update_function_types_in_component :: ![Index] !*{!FunctionType} !*{#FunDef} -> (!*{#FunDef}, !*{!FunctionType})
-		update_function_types_in_component [fun_index : funs] fun_env fun_defs
-			# (CheckedType checked_fun_type n_lifted_attr_ineqs, fun_env) = fun_env![fun_index]
-			# (fd, fun_defs) = fun_defs![fun_index]
-			= case fd.fun_type of
-				NoFunDefType
-					# fun_defs & [fun_index] = {fd & fun_type = FunDefType checked_fun_type}
-					-> update_function_types_in_component funs fun_env fun_defs
-				FunDefType fun_type
-					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
-					| nr_of_lifted_arguments > 0
-						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
-									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
-						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
-						-> update_function_types_in_component funs fun_env fun_defs
-						-> update_function_types_in_component funs fun_env fun_defs
-				LocalFunDefCheckedType _ _ fun_type
-					# nr_of_lifted_arguments = checked_fun_type.st_arity - fun_type.st_arity
-					| nr_of_lifted_arguments > 0
-						# fun_type = addLiftedArgumentsToSymbolType fun_type nr_of_lifted_arguments
-									checked_fun_type.st_args checked_fun_type.st_vars checked_fun_type.st_attr_vars checked_fun_type.st_context
-									(take n_lifted_attr_ineqs checked_fun_type.st_attr_env)
-						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
-						-> update_function_types_in_component funs fun_env fun_defs
-						# fun_defs & [fun_index] = {fd & fun_type = FunDefType fun_type}
-						-> update_function_types_in_component funs fun_env fun_defs
-		update_function_types_in_component [] fun_env fun_defs
-			= (fun_defs, fun_env)
-	
-	type_functions group ti ts
-		= mapSt (type_function ti) group ts
-
+type_functions group ti ts
+	= mapSt (type_function ti) group ts
+where
 	type_function ti fun_index ts=:{ts_fun_env, ts_var_heap, ts_error, ts_fun_defs}
 		# (fd, ts_fun_defs)		= ts_fun_defs![fun_index]
 		  (type, ts_fun_env)	= ts_fun_env![fun_index]
@@ -3441,10 +3424,10 @@ where
 		type_of (UncheckedType tst)		= tst
 		type_of (SpecifiedType _ _ tst) = tst
 		type_of (SpecifiedLocalFunType _ _ _ _ tst) = tst
-	
-	create_erroneous_function_types group ts
-		= foldSt create_erroneous_function_type group ts
-		
+
+create_erroneous_function_types group ts
+	= foldSt create_erroneous_function_type group ts
+where
 	create_erroneous_function_type fun ts
 		# (env_type, ts) = ts!ts_fun_env.[fun]
 		= case env_type of
@@ -3469,25 +3452,25 @@ where
 			CheckedType _ _
 				-> ts
 
-	clear_var_heap fun_types common_defs var_heap
-		# var_heap = mapArraySt clear_functions_in_module fun_types var_heap
-		= mapArraySt clear_members_in_module common_defs var_heap
-	where
-		clear_functions_in_module module_types var_heap
-			= mapArraySt clear_function module_types var_heap
+clear_var_heap fun_types common_defs var_heap
+	# var_heap = mapArraySt clear_functions_in_module fun_types var_heap
+	= mapArraySt clear_members_in_module common_defs var_heap
+where
+	clear_functions_in_module module_types var_heap
+		= mapArraySt clear_function module_types var_heap
 
-		clear_function {ft_type_ptr} var_heap
-			| isNilPtr ft_type_ptr
-				= var_heap
-				= var_heap <:= (ft_type_ptr, VI_Empty)
+	clear_function {ft_type_ptr} var_heap
+		| isNilPtr ft_type_ptr
+			= var_heap
+			= var_heap <:= (ft_type_ptr, VI_Empty)
 
-		clear_members_in_module common_def var_heap
-			= mapArraySt clear_member common_def.com_member_defs var_heap
+	clear_members_in_module common_def var_heap
+		= mapArraySt clear_member common_def.com_member_defs var_heap
 
-		clear_member {me_type_ptr} var_heap
-			| isNilPtr me_type_ptr
-				= var_heap
-				= var_heap <:= (me_type_ptr, VI_Empty)
+	clear_member {me_type_ptr} var_heap
+		| isNilPtr me_type_ptr
+			= var_heap
+			= var_heap <:= (me_type_ptr, VI_Empty)
 
 mapArraySt f a s :== map_a_st 0 a s
 where

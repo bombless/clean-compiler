@@ -245,7 +245,7 @@ typeIsNonCoercible cons_vars (_ :@: _)
 typeIsNonCoercible _ _
 	= False
 
-class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool,!a, !*{! Type}, !*LiftState)
+class lift a :: !{#CommonDefs} !{#BOOLVECT} !a !*{!Type} !*LiftState -> (!Bool, !a, !*{!Type}, !*LiftState)
 
 liftTypeApplication modules cons_vars t0=:(TA cons_id=:{type_ident,type_index={glob_object,glob_module},type_arity,type_prop=type_prop0} cons_args) subst ls
 	# ({tdi_kinds}, ls) = ls!ls_td_infos.[glob_module].[glob_object]
@@ -629,26 +629,11 @@ coerceAttributes (TA_TempVar av_number1) (TA_TempVar av_number2) {pos_sign,neg_s
 		= (True, coercions)
 	| pos_sign
 		| neg_sign
-			# (ok, coercions) = new_inequality av_number1 av_number2 coercions
-			| ok
-				= new_inequality av_number2 av_number1 coercions
-				= (False, coercions)
+			= equalize_attribute_vars av_number1 av_number2 coercions
 			= new_inequality av_number1 av_number2 coercions
 	| neg_sign
 		= new_inequality av_number2 av_number1 coercions
 		= (True, coercions)
-where
-	new_inequality :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
-	new_inequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
-		| isNonUnique coer_offered.[off_attr]
-			| isUnique coer_demanded.[dem_attr]
-				= (False, coercions)
-				= (True, makeNonUnique dem_attr coercions)
-		| isUnique coer_demanded.[dem_attr]
-			= (True, makeUnique off_attr coercions)
-		| isNonUnique coer_offered.[dem_attr] || isUnique coer_demanded.[off_attr]
-			= (True, coercions)
-			= (True, newInequality off_attr dem_attr coercions)
 coerceAttributes TA_Unique (TA_TempVar av_number) {neg_sign} coercions=:{coer_offered}
 	| isNonUnique coer_offered.[av_number]
 		= (False, coercions)
@@ -671,6 +656,25 @@ coerceAttributes TA_Multi TA_Unique _ coercions
 	= (False, coercions)
 coerceAttributes off_attr dem_attr _ coercions
 	= (True, coercions)
+
+equalize_attribute_vars :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+equalize_attribute_vars av_number1 av_number2 coercions
+	# (ok, coercions) = new_inequality av_number1 av_number2 coercions
+	| ok
+		= new_inequality av_number2 av_number1 coercions
+		= (False, coercions)
+
+new_inequality :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+new_inequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
+	| isNonUnique coer_offered.[off_attr]
+		| isUnique coer_demanded.[dem_attr]
+			= (False, coercions)
+			= (True, makeNonUnique dem_attr coercions)
+	| isUnique coer_demanded.[dem_attr]
+		= (True, makeUnique off_attr coercions)
+	| isNonUnique coer_offered.[dem_attr] || isUnique coer_demanded.[off_attr]
+		= (True, coercions)
+		= (True, newInequality off_attr dem_attr coercions)
 
 newInequality :: !Int !Int !*Coercions -> *Coercions 
 newInequality off_attr dem_attr coercions=:{coer_demanded, coer_offered}
@@ -1400,7 +1404,6 @@ lift_pos_list_with_offered_type modules cons_vars [off_type:off_types] ts0=:[t0:
 				= (False, ts0, subst, ls)
 lift_pos_list_with_offered_type modules cons_vars [] [] sign_class subst ls
 	= (False, [], subst, ls)
-
 
 liftRemainingSubstitutions :: !*{!Type} !{#CommonDefs} !{#BOOLVECT} !Int !*TypeHeaps !*TypeDefInfos -> (*{! Type}, !Int, !*TypeHeaps, !*TypeDefInfos)
 liftRemainingSubstitutions subst modules cons_vars attr_store type_heaps td_infos 
