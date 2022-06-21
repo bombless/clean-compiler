@@ -3156,6 +3156,7 @@ where
 							(coercions,ts_error)
 					-> (coercions,ts_error,ts_fun_env)
 
+		add_unicity_of_essentially_unique_type :: {#CommonDefs} AType *(*Coercions,*ErrorAdmin) -> (!*Coercions,!*ErrorAdmin)
 		add_unicity_of_essentially_unique_type common_defs {at_attribute=TA_TempVar av_number, at_type=TA {type_index} _} (coercions,ts_error)
 			# {td_attribute,td_ident} = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object]
 			= case td_attribute of

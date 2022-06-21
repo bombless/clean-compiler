@@ -299,7 +299,7 @@ collectSymbolTypeAttrVars type=:{st_attr_vars, st_result, st_args} attrVarHeap
 	=	({type & st_attr_vars = st_attr_vars}, attrVarHeap)
 
 /* maybe should collect st_vars as well (these are not used currently) */
-class collectAttrVars a :: a ([AttributeVar], *AttrVarHeap) -> ([AttributeVar], *AttrVarHeap)
+class collectAttrVars a :: a !(![AttributeVar],!*AttrVarHeap) -> (![AttributeVar],!*AttrVarHeap)
 
 instance collectAttrVars AType where
 	collectAttrVars {at_attribute, at_type} collect
