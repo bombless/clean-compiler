@@ -998,6 +998,20 @@ where
 	bind_kind_vars NoClassArgs [] type_var_heap kind_heap
 		= (type_var_heap,kind_heap)
 
+	bind_kind_avars (AClassArg {atv_variable={tv_info_ptr}} type_vars) [kind_info_ptr:kind_ptrs] type_var_heap kind_heap
+		= bind_kind_avars type_vars kind_ptrs (writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap) kind_heap
+	bind_kind_avars (AClassArgPattern {atv_variable={tv_info_ptr}} pattern_type_vars type_vars) [kind_info_ptr:kind_ptrs] type_var_heap kind_heap
+		| pattern_type_vars=:[]
+			# type_var_heap = writePtr tv_info_ptr (TVI_TypeKind kind_info_ptr) type_var_heap
+			= bind_kind_avars type_vars kind_ptrs type_var_heap kind_heap
+			# (kind_info,kind_heap) = readPtr kind_info_ptr kind_heap
+			  (var_kind,type_var_heap,kind_heap) = bind_pattern_kind_vars pattern_type_vars kind_info type_var_heap kind_heap
+			  (var_info_ptr,kind_heap) = newPtr var_kind kind_heap
+			  type_var_heap = writePtr tv_info_ptr (TVI_TypeKind var_info_ptr) type_var_heap
+			= bind_kind_avars type_vars kind_ptrs type_var_heap kind_heap
+	bind_kind_avars ANoClassArgs [] type_var_heap kind_heap
+		= (type_var_heap,kind_heap)
+
 	bind_pattern_kind_vars [{atv_variable={tv_info_ptr}}:pattern_type_vars] result_kind type_var_heap kind_heap
 		# (result_kind,type_var_heap,kind_heap) = bind_pattern_kind_vars pattern_type_vars result_kind type_var_heap kind_heap
 		  (kind_info,kind_info_ptr,kind_heap) = freshKindVarAndInfoPtr kind_heap
@@ -1021,7 +1035,7 @@ where
 		  other_contexts = tl st_context
 		  (class_infos, as) = determine_kinds_of_context_classes other_contexts class_infos_and_as
 		  as_type_var_heap = clear_variables st_vars as.as_type_var_heap
-		  (as_type_var_heap,as_kind_heap) = bind_kind_vars me_class_vars class_kind_vars as_type_var_heap as.as_kind_heap
+		  (as_type_var_heap,as_kind_heap) = bind_kind_avars me_class_vars class_kind_vars as_type_var_heap as.as_kind_heap
 		  (as_type_var_heap, as_kind_heap) = fresh_kind_vars_for_unbound_vars st_vars as_type_var_heap as_kind_heap
 		  as = determine_kinds_type_list modules [st_result:st_args] { as & as_type_var_heap = as_type_var_heap, as_kind_heap = as_kind_heap}
 		= determine_kinds_of_type_contexts modules other_contexts class_infos as

@@ -51,6 +51,7 @@ instance == FunctionOrMacroIndex
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
+				| STE_FunDepTypeVariable !TypeVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
 				| STE_Imported !STE_Kind !ModuleN
 				| STE_DclFunction
@@ -409,6 +410,7 @@ cNameLocationDependent :== True
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
+	,	class_fun_dep_vars	:: !BITVECT
 	}
 
 ::	ClassArgs
@@ -431,11 +433,16 @@ cNameLocationDependent :== True
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
-	,	me_class_vars	:: !ClassArgs
+	,	me_class_vars	:: !AClassArgs
 	,	me_default_implementation :: !MemberDefault
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
+
+::	AClassArgs
+	= AClassArg !ATypeVar !AClassArgs
+	| AClassArgPattern !ATypeVar ![ATypeVar] !AClassArgs
+	| ANoClassArgs
 
 :: GenericDef = 
 	{	gen_ident		:: !Ident		// the generics name in IC_Generic
@@ -1145,6 +1152,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
 					| TVI_Attr !TypeAttribute
+					| TVI_TypeAttribute !TypeAttribute
 					| ..
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo

@@ -1661,14 +1661,14 @@ where
 								-> DeriveDefault generic_ident no_index (Yes {igi_ident=member_ident,igi_g_index=no_index})
 					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
 									me_default_implementation = default_implementation,
-									me_offset = NoIndex, me_class_vars = NoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+									me_offset = NoIndex, me_class_vars = ANoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
 					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 				_
 					# mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio,
 									me_default_implementation = NoMemberDefault,
-									me_offset = NoIndex, me_class_vars = NoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
+									me_offset = NoIndex, me_class_vars = ANoClassArgs, me_class = {glob_module = NoIndex, glob_object = NoIndex}, me_type_ptr = nilPtr }
 					  (mem_defs,mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
 							= check_symbols_of_class_members defs type_context macro_count ca
 					-> ([mem_def : mem_defs],mem_macros,default_members_without_type,macro_members,new_macro_count,ca)
@@ -1691,7 +1691,7 @@ where
 			| not (has_PD_DeriveInstanceMember_in_where bodies)
 				# macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
 				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex, 
-								me_class_vars = NoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_class_vars = ANoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
 								me_default_implementation = MacroMemberDefault macro_member, me_type_ptr = nilPtr }
 				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 						= check_symbols_of_class_members defs type_context (macro_count+1) ca
@@ -1700,7 +1700,7 @@ where
 				# bodies = set_PD_DeriveInstanceMember_arity_in_where st_arity bodies
 				  macro = MakeNewImpOrDefFunction macro_ident st_arity bodies FK_Macro prio opt_type pos
 				  mem_def = {	me_ident = name, me_type = type, me_pos = pos, me_priority = prio, me_offset = NoIndex,
-								me_class_vars = NoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
+								me_class_vars = ANoClassArgs, me_class = { glob_module = NoIndex, glob_object = NoIndex},
 								me_default_implementation = MacroMemberDefaultWithDerive macro_member, me_type_ptr = nilPtr }
 				  (mem_defs,mem_macros,default_members_without_type,macro_members,macro_count,ca)
 						= check_symbols_of_class_members defs type_context (macro_count+1) ca

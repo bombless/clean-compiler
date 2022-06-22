@@ -23,7 +23,8 @@ frontSyntaxTree cached_dcl_macros cached_dcl_mods main_dcl_module_n predef_symbo
 defaultFrontEndOptions :: FrontEndOptions
 defaultFrontEndOptions
 	= { feo_up_to_phase = FrontEndPhaseAll,
-		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False } }
+		feo_fusion = { compile_with_fusion = False, generic_fusion = False, strip_unused = False },
+		feo_allow_undecidable_instances = False }
 
 frontEndInterface :: !(Optional (*File,{#Char},{#Char})) !FrontEndOptions !Ident !SearchPaths !{#DclModule} !*{#*{#FunDef}} !(Optional Bool) !Bool (ModTimeFunction *Files)
 																		 !*PredefinedSymbols !*HashTable !*Files !*File !*File !*File !(Optional *File) !*Heaps
@@ -52,7 +53,8 @@ frontEndInterface opt_file_dir_time options mod_ident search_paths cached_dcl_mo
 
 
   	# (ok, icl_mod, dcl_mods, groups, cached_dcl_macros,main_dcl_module_n,heaps, predef_symbols, symbol_table, error, directly_imported_dcl_modules)
-  	  	= checkModule mod global_fun_range mod_functions support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod modules cached_dcl_modules cached_dcl_macros predef_symbols symbol_table error heaps
+		= checkModule mod global_fun_range mod_functions support_dynamics dynamic_type_used dcl_module_n_in_cache optional_dcl_mod modules options.feo_allow_undecidable_instances
+			cached_dcl_modules cached_dcl_macros predef_symbols symbol_table error heaps
 
 	  hash_table & hte_symbol_heap = symbol_table
 

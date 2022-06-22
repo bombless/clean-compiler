@@ -116,6 +116,7 @@ abc_file_name_in_clean_system_files_folder mod_dir mod_name error files
 	,	listTypes :: ListTypesOption
 	,	fusion_options :: !FusionOptions
 	,	compile_for_dynamics	:: !Bool
+	,	allow_undecidable_instances :: !Bool
 	,	generate_tcl_file :: !Bool
 	}
 
@@ -134,6 +135,7 @@ InitialCoclOptions =
 	,	listTypes = {lto_showAttributes = True, lto_listTypesKind = ListTypesNone}
 	,	fusion_options = {compile_with_fusion = False, generic_fusion = False, strip_unused = False}
 	,	compile_for_dynamics	= False
+	,	allow_undecidable_instances = False
 	,	generate_tcl_file = False
 	}
 
@@ -210,6 +212,8 @@ parseCommandLine ["-lset":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesStrictExports}
 parseCommandLine ["-lat":args] options
 	= parseCommandLine args {options & listTypes.lto_listTypesKind = ListTypesAll}
+parseCommandLine [arg1=:"-aui":args] options
+	= parseCommandLine args {options & allow_undecidable_instances = True}
 parseCommandLine [arg1=:"-tcl":args] options
 	# (args,modules,options) = parseCommandLine args {options & generate_tcl_file = True, compile_for_dynamics = True}
 	= ([arg1:args],modules,options)
@@ -306,7 +310,8 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 				(Yes options.listTypes.lto_showAttributes)
 				No
 	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
-		= frontEndInterface opt_file_dir_time {feo_up_to_phase=FrontEndPhaseAll,feo_fusion=options.fusion_options}
+		= frontEndInterface opt_file_dir_time
+			{feo_up_to_phase=FrontEndPhaseAll,feo_fusion=options.fusion_options,feo_allow_undecidable_instances=options.allow_undecidable_instances}
 			moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types options.compile_for_dynamics fmodificationtime
 			predef_symbols hash_table files error io out tcl_file heaps
 
@@ -347,7 +352,7 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 								->	arg
 			No
 				-> (False,{},var_heap,type_var_heap,attrHeap,error,out,files)
-	# heaps = {heaps & hp_var_heap=var_heap, hp_type_heaps = {th_vars=type_var_heap, th_attrs=attrHeap}}
+	# heaps & hp_var_heap=var_heap, hp_type_heaps = {th_vars=type_var_heap, th_attrs=attrHeap}
 	# (closed, files) = fclose out files
 	| not closed
 		=	abort ("couldn't close out file \"" +++ options.outPath +++ "\"\n")

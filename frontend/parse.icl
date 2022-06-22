@@ -1795,11 +1795,11 @@ wantClassDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition
 wantClassDefinition parseContext pos pState
 	# (might_be_a_class, class_or_member_name, prio, pState) = want_class_or_member_name pState
 	  (class_variables, pState) = wantList "class variable(s)" try_class_variable pState
-	  (class_arity, class_args, class_cons_vars) = convert_class_variables class_variables 0 0
+	  (class_arity, class_args, class_fun_dep_vars, class_cons_vars) = convert_class_variables class_variables 0 0 0
 	  (contexts, pState) = optionalContext pState
   	  (token, pState) = nextToken TypeContext pState
 	| token =: DoubleColonToken
-		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_cons_vars contexts pState
+		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_fun_dep_vars class_cons_vars contexts pState
 	| might_be_a_class
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
@@ -1807,7 +1807,7 @@ wantClassDefinition parseContext pos pState
 			  (members, pState) = wantMemberDefinitions (SetClassDefsContext parseContext) pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-							class_macro_members = {},
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
 						  }
 	    	  pState = wantEndGroup "class" pState
@@ -1818,8 +1818,8 @@ wantClassDefinition parseContext pos pState
 			# pState = tokenBack pState
 			  (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
   			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
-							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars, 
-							class_macro_members = {},
+							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
 						  }
 	  		  pState = wantEndOfDefinition "class definition" pState
@@ -1862,42 +1862,56 @@ wantClassDefinition parseContext pos pState
 			want_name token pState
 				= ("", parseError "Class Definition" (Yes token) "<identifier>" pState)
 
-		want_overloaded_function pos member_name prio class_arity class_args class_cons_vars contexts pState
+		want_overloaded_function pos member_name prio class_arity class_args class_fun_dep_vars class_cons_vars contexts pState
 			# (tspec, pState) = wantSymbolType pState
 			  (member_id, pState) = stringToIdent member_name IC_Expression pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
 			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
 		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-  			  				class_macro_members = {},
- 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
+							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
    						  }
 	 		  pState = wantEndOfDefinition "overloaded function" pState
 			= (PD_Class class_def [member], pState)
 
 		try_class_variable pState
 			# (token, pState) = nextToken TypeContext pState
-			| token =: DotToken
-				# (type_var, pState) = wantTypeVar pState
-				= (True, (True,type_var,[]), pState)
-			| token=:OpenToken
-				# (type_var,pState) = wantTypeVar pState
-				  (type_vars,pState) = wantList "class variable argument(s)" tryQuantifiedTypeVar pState
-				  pState = wantToken TypeContext "class variable arguments" CloseToken pState
-				= (True, (False,type_var,type_vars), pState)
-			# (succ, type_var, pState) = tryTypeVarT token pState
-			= (succ, (False,type_var,[]), pState)
+			= case token of
+				IdentToken "~"
+					# (token, pState) = nextToken TypeContext pState
+					-> case token of
+						DotToken
+							# (type_var, pState) = wantTypeVar pState
+							= (True, (1, 1, type_var, []), pState)
+						_
+							# (type_var, pState) = wantTypeVarT token pState
+							= (True, (1, 0, type_var, []), pState)
+				OpenToken
+					# (type_var,pState) = wantTypeVar pState
+					  (type_vars,pState) = wantList "class variable argument(s)" tryQuantifiedTypeVar pState
+					  pState = wantToken TypeContext "class variable arguments" CloseToken pState
+					-> (True, (0,0,type_var,type_vars), pState)
+				DotToken
+					# (type_var, pState) = wantTypeVar pState
+					-> (True, (0, 1, type_var, []), pState)
+				_
+					# (succ, type_var, pState) = tryTypeVarT token pState
+					-> (succ, (0, 0, type_var, []), pState)
 
-		convert_class_variables [] arg_nr cons_vars
-			= (arg_nr, NoClassArgs, cons_vars)
-		convert_class_variables [(annot,var,[]) : class_vars] arg_nr cons_vars
-			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
-			| annot
-				= (arity, ClassArg var class_vars, cons_vars bitor (1 << arg_nr))
-				= (arity, ClassArg var class_vars, cons_vars)
-		convert_class_variables [(_,var,vars) : class_vars] arg_nr cons_vars
-			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
-			= (arity, ClassArgPattern var vars class_vars, cons_vars)
+		convert_class_variables [(fun_dep_var,annot,var,[]) : class_vars] arg_nr fun_dep_vars cons_vars
+			# (arity, class_vars, fun_dep_vars, cons_vars)
+				= convert_class_variables class_vars (arg_nr+1) fun_dep_vars cons_vars
+			#! fun_dep_vars = (fun_dep_vars<<1) bitor fun_dep_var
+			   cons_vars = (cons_vars<<1) bitor annot
+			= (arity, ClassArg var class_vars, fun_dep_vars, cons_vars)
+		convert_class_variables [(_,_,var,vars) : class_vars] arg_nr fun_dep_vars cons_vars
+			# (arity, class_vars, fun_dep_vars, cons_vars)
+				= convert_class_variables class_vars (inc arg_nr) fun_dep_vars cons_vars
+			#! cons_vars = cons_vars<<1
+			= (arity, ClassArgPattern var vars class_vars, fun_dep_vars, cons_vars)
+		convert_class_variables [] arg_nr fun_dep_vars cons_vars
+			= (arg_nr, NoClassArgs, fun_dep_vars, cons_vars)
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState
@@ -2534,8 +2548,18 @@ wantTypeVar pState
 	# (succ, type_var, pState) = tryTypeVar pState
 	| succ
 		= (type_var, pState)
-		# (token, pState) = nextToken TypeContext pState
-		= (MakeTypeVar erroneousIdent, parseError "Type Variable" (Yes token) "type variable" pState)
+		= wantTypeVarError pState
+
+wantTypeVarT :: !Token !ParseState -> (!TypeVar, !ParseState)
+wantTypeVarT token pState
+	# (succ, type_var, pState) = tryTypeVarT token pState
+	| succ
+		= (type_var, pState)
+		= wantTypeVarError pState
+
+wantTypeVarError pState
+	# (token, pState) = nextToken TypeContext pState
+	= (MakeTypeVar erroneousIdent, parseError "Type Variable" (Yes token) "type variable" pState)
 
 tryAttributedTypeVar :: !ParseState -> (!Bool, ATypeVar, !ParseState)
 tryAttributedTypeVar pState
