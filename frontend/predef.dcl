@@ -280,77 +280,78 @@ PD_CGenTypeArrow			:== 242
 PD_CGenTypeApp				:== 243
 
 PD_GenericBimap				:== 244
+PD_GenericBinumap			:== 245
 
-PD__SystemEnumStrict:==245
+PD__SystemEnumStrict:==246
 
-PD_FromS					:== 246
-PD_FromTS					:== 247
-PD_FromSTS					:== 248
-PD_FromU					:== 249
-PD_FromUTS					:== 250
-PD_FromO					:== 251
+PD_FromS					:== 247
+PD_FromTS					:== 248
+PD_FromSTS					:== 249
+PD_FromU					:== 250
+PD_FromUTS					:== 251
+PD_FromO					:== 252
 
-PD_FromThenS				:== 252
-PD_FromThenTS				:== 253
-PD_FromThenSTS				:== 254
-PD_FromThenU				:== 255
-PD_FromThenUTS				:== 256
-PD_FromThenO				:== 257
+PD_FromThenS				:== 253
+PD_FromThenTS				:== 254
+PD_FromThenSTS				:== 255
+PD_FromThenU				:== 256
+PD_FromThenUTS				:== 257
+PD_FromThenO				:== 258
 
-PD_FromToS					:== 258
-PD_FromToTS					:== 259
-PD_FromToSTS				:== 260
-PD_FromToU					:== 261
-PD_FromToUTS				:== 262
-PD_FromToO					:== 263
+PD_FromToS					:== 259
+PD_FromToTS					:== 260
+PD_FromToSTS				:== 261
+PD_FromToU					:== 262
+PD_FromToUTS				:== 263
+PD_FromToO					:== 264
 
-PD_FromThenToS				:== 264
-PD_FromThenToTS				:== 265
-PD_FromThenToSTS			:== 266
-PD_FromThenToU				:== 267
-PD_FromThenToUTS			:== 268
-PD_FromThenToO				:== 269
+PD_FromThenToS				:== 265
+PD_FromThenToTS				:== 266
+PD_FromThenToSTS			:== 267
+PD_FromThenToU				:== 268
+PD_FromThenToUTS			:== 269
+PD_FromThenToO				:== 270
 
-PD_Dyn__to_TypeCodeConstructor	:== 270
-PD_TypeCodeConstructor :== 271
+PD_Dyn__to_TypeCodeConstructor	:== 271
+PD_TypeCodeConstructor :== 272
 
-PD_TC_Int			:== 272
-PD_TC_Char			:== 273
-PD_TC_Real			:== 274
-PD_TC_Bool			:== 275
-PD_TC_Dynamic		:== 276
-PD_TC_File			:== 277
-PD_TC_World			:== 278
+PD_TC_Int			:== 273
+PD_TC_Char			:== 274
+PD_TC_Real			:== 275
+PD_TC_Bool			:== 276
+PD_TC_Dynamic		:== 277
+PD_TC_File			:== 278
+PD_TC_World			:== 279
 
-PD_TC__Arrow		:== 279
+PD_TC__Arrow		:== 280
 
-PD_TC__List			:== 280
-PD_TC__StrictList	:== 281
-PD_TC__UnboxedList	:== 282
-PD_TC__TailStrictList	:== 283
-PD_TC__StrictTailStrictList	:== 284
-PD_TC__UnboxedTailStrictList	:== 285
+PD_TC__List			:== 281
+PD_TC__StrictList	:== 282
+PD_TC__UnboxedList	:== 283
+PD_TC__TailStrictList	:== 284
+PD_TC__StrictTailStrictList	:== 285
+PD_TC__UnboxedTailStrictList	:== 286
 
-PD_TC__Tuple2		:== 286
-PD_TC__Tuple32		:== 316
+PD_TC__Tuple2		:== 287
+PD_TC__Tuple32		:== 317
 
-PD_TC__LazyArray	:== 317
-PD_TC__StrictArray	:== 318
-PD_TC__UnboxedArray	:== 319
-PD_TC__PackedArray	:== 320
+PD_TC__LazyArray	:== 318
+PD_TC__StrictArray	:== 319
+PD_TC__UnboxedArray	:== 320
+PD_TC__PackedArray	:== 321
 
-PD_TC__LazyArrayP2	:== 321
-PD_TC__StrictArrayP2	:== 322
-PD_TC__UnboxedArrayP2	:== 323
-PD_TC__PackedArrayP2	:== 324
+PD_TC__LazyArrayP2	:== 322
+PD_TC__StrictArrayP2	:== 323
+PD_TC__UnboxedArrayP2	:== 324
+PD_TC__PackedArrayP2	:== 325
 
-PD_TC__Maybe		:== 325
-PD_TC__StrictMaybe	:== 326
-PD_TC__UnboxedMaybe	:== 327
+PD_TC__Maybe		:== 326
+PD_TC__StrictMaybe	:== 327
+PD_TC__UnboxedMaybe	:== 328
 
-PD_TC__Unit			:== 328
+PD_TC__Unit			:== 329
 
-PD_NrOfPredefSymbols		:== 329
+PD_NrOfPredefSymbols		:== 330
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

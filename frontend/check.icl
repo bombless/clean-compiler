@@ -4027,7 +4027,8 @@ where
 			= cs
 				<=< adjust_predef_symbols PD_TypeUNIT PD_TypeGenericDict0 mod_index STE_Type
 				<=< adjust_predef_symbols PD_ConsUNIT PD_CGenTypeApp mod_index STE_Constructor
-				<=< adjustPredefSymbol PD_GenericBimap mod_index (STE_Generic -1)
+				<=< adjustPredefSymbol PD_GenericBimap			mod_index (STE_Generic -1)
+				<=< adjustPredefSymbolNoNotDefinedError PD_GenericBinumap mod_index (STE_Generic -1)
 		| mod_index==cs_predef_symbols.[PD_StdMisc].pds_def
 			= cs
 				<=< adjustPredefSymbol PD_abort				mod_index STE_DclFunction
@@ -4067,11 +4068,18 @@ adjustPredefSymbol predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_erro
 	| pre_index <> NoIndex
 		= { cs & cs_predef_symbols.[predef_index] = { pds_def = pre_index, pds_module = mod_index }}
 		= { cs & cs_error = checkError pre_id " function not defined" cs_error }
-where
-	determine_index_of_symbol {ste_kind, ste_index} symb_kind
-		| ste_kind == symb_kind
-			= ste_index
-			= NoIndex
+
+adjustPredefSymbolNoNotDefinedError predef_index mod_index symb_kind cs=:{cs_symbol_table,cs_error}
+	# pre_id = predefined_idents.[predef_index]
+	#! pre_index = determine_index_of_symbol (sreadPtr pre_id.id_info cs_symbol_table) symb_kind
+	| pre_index <> NoIndex
+		= {cs & cs_predef_symbols.[predef_index] = {pds_def = pre_index, pds_module = mod_index}}
+		= cs
+
+determine_index_of_symbol {ste_kind, ste_index} symb_kind
+	| ste_kind == symb_kind
+		= ste_index
+		= NoIndex
 
 adjustPredefSymbolAndCheckIndex predef_index mod_index symbol_index symb_kind cs=:{cs_symbol_table,cs_error}
 	# pre_id = predefined_idents.[predef_index]
