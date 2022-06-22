@@ -1,6 +1,8 @@
 implementation module check
 
 import StdEnv, compare_types
+import StdStrictLists
+from StdOverloadedList import IsMemberM
 
 import syntax, expand_types, parse, checksupport, utilities, checktypes, transform, predef
 import explicitimports, comparedefimp, checkFunctionBodies, containers, typesupport
@@ -2137,6 +2139,10 @@ checkDclModules imports_of_icl_mod dcl_modules macro_defs heaps cs=:{cs_symbol_t
 					-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsOnly expl_imp_indices, cs_symbol_table)
 				ImportSymbolsAll
 					->  (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsAll, cs_symbol_table)
+				ImportSymbolsAllSomeQualified import_symbols
+					# (expl_imp_symbols_accu, nr_of_expl_imp_symbols, expl_imp_indices, cs_symbol_table)
+						= get_expl_imp_symbols import_symbols (expl_imp_symbols_accu, nr_of_expl_imp_symbols, [], cs_symbol_table)
+					-> (expl_imp_symbols_accu, nr_of_expl_imp_symbols, ImportSymbolsAllSomeQualified expl_imp_indices, cs_symbol_table)
 		  ({ste_index}, cs_symbol_table) = readPtr import_module.id_info cs_symbol_table
 		  explicit_import = {ei_module_n=ste_index, ei_position=import_file_position,
 		  					 ei_symbols=expl_imp_indices, ei_qualified=import_qualified}
@@ -2207,7 +2213,7 @@ checkDclComponent components_importing_module_a expl_imp_indices mod_indices
 			  			False
 			  				-> (expl_imp_infos, dcl_modules, cs)
 			#! nr_of_modules = size dcl_modules
-			# modules_in_component_set = foldSt bitvectSet mod_indices (bitvectCreate nr_of_modules)
+			# modules_in_component_set = foldSt bitvectSet mod_indices (bitvectCreate (nr_of_modules+1))
 			  (dcl_imported_module_numbers, dcl_modules)
 			  		= foldSt (\imports_per_module state
 					  			-> foldSt compute_used_module_nrs imports_per_module state)
@@ -2217,8 +2223,8 @@ checkDclComponent components_importing_module_a expl_imp_indices mod_indices
 			  (expl_imp_info, expl_imp_infos)
 			  		= replace expl_imp_infos component_nr cDummyArray
 			  (imports, (dcl_modules, _, expl_imp_info, cs))
-					= mapSt (solveExplicitImports expl_imp_indices_ikh modules_in_component_set) mod_indices
-							(dcl_modules, bitvectCreate nr_of_modules, expl_imp_info, cs)
+					= mapSt (solveExplicitImports expl_imp_indices_ikh modules_in_component_set mod_indices) mod_indices
+							(dcl_modules, bitvectCreate (nr_of_modules+1), expl_imp_info, cs)
 			| not cs.cs_error.ea_ok
 				-> (component_nr-1, expl_imp_infos, dcl_modules, macro_defs, heaps, cs)
 			# imports_ikh
@@ -2278,12 +2284,12 @@ checkDclComponent components_importing_module_a expl_imp_indices mod_indices
 		# ({dcls_local_for_import, dcls_import}, dcl_modules) = dcl_modules![mod_index].dcl_declared
 		= updateExplImpInfoForCachedModule components_importing_module_a.[mod_index] mod_index dcls_import dcls_local_for_import expl_imp_infos dcl_modules cs_symbol_table
 
-	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit,si_qualified_explicit} (dcl_modules, macro_defs,hp_expression_heap, cs)
+	check_expl_imp_completeness_of_dcl_mod_within_non_trivial_component mod_index {si_explicit,si_qualified_explicit,si_qualified_hidden_explicit} (dcl_modules, macro_defs,hp_expression_heap, cs)
 		# ({dcl_declared}, dcl_modules) = dcl_modules![mod_index]
 		  ({dcls_local_for_import, dcls_import}) = dcl_declared
 		  (dcl_modules,cs) = addDeclarationsOfDclModToSymbolTable mod_index dcls_local_for_import dcls_import dcl_modules cs
 		  (dcl_modules, macro_defs,hp_expression_heap, cs=:{cs_symbol_table})
-		  		= checkExplicitImportCompleteness si_explicit si_qualified_explicit dcl_modules macro_defs hp_expression_heap cs
+				= checkExplicitImportCompleteness si_explicit si_qualified_explicit si_qualified_hidden_explicit dcl_modules macro_defs hp_expression_heap cs
 		  cs_symbol_table = removeImportsAndLocalsOfModuleFromSymbolTable dcl_declared cs.cs_symbol_table
 		= (dcl_modules, macro_defs,hp_expression_heap, { cs & cs_symbol_table = cs_symbol_table })
 
@@ -2948,7 +2954,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  (nr_of_modules, dcl_modules)	= usize dcl_modules
 	  (dcl_macros, dcl_modules) = dcl_modules![main_dcl_module_n].dcl_macros
 
-	  modules_in_component_set = bitvectCreate nr_of_modules
+	  modules_in_component_set = bitvectCreate (nr_of_modules+1)
 
 	  (imports, dcl_modules, cs)
 			= determine_explicit_imports expl_imp_info.[nr_of_icl_component] expl_imp_indices nr_of_modules modules_in_component_set dcl_modules cs
@@ -2961,13 +2967,13 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  (dcls_import_list, dcl_modules, cs)
 	  		= addImportedSymbolsToSymbolTable nr_of_modules (Yes dcl_macros) modules_in_component_set imports_ikh dcl_modules cs
 
-	  {si_qualified_explicit} = ikhSearch` nr_of_modules imports_ikh
+	  {si_qualified_explicit,si_qualified_hidden_explicit} = ikhSearch` nr_of_modules imports_ikh
 	  (dcl_modules, macro_defs,hp_expression_heap, cs)
-			= checkExplicitImportCompleteness imports.si_explicit si_qualified_explicit dcl_modules macro_defs heaps.hp_expression_heap cs
+			= checkExplicitImportCompleteness imports.si_explicit si_qualified_explicit si_qualified_hidden_explicit dcl_modules macro_defs heaps.hp_expression_heap cs
 	  heaps	= { heaps & hp_expression_heap=hp_expression_heap }
 
 	  (modified_ste_kinds,symbol_table,dcl_modules)
-		= store_qualified_explicit_imports_in_symbol_table si_qualified_explicit [] cs.cs_symbol_table dcl_modules
+		= store_qualified_explicit_imports_in_symbol_table si_qualified_explicit si_qualified_hidden_explicit [] cs.cs_symbol_table dcl_modules
 
 	#! first_inst_index = size icl_functions
 	# com_instance_defs = icl_common.com_instance_defs
@@ -3056,7 +3062,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 	  			  ef_cons_defs = icl_common.com_cons_defs, ef_member_defs = icl_common.com_member_defs, ef_generic_defs = icl_common.com_generic_defs,
 	  			  ef_modules = dcl_modules, ef_macro_defs=macro_defs, ef_is_macro_fun = False }
 
-	# (icl_functions, e_info, heaps, cs) = checkAndPartitionateIclMacros main_dcl_module_n def_macro_indices local_functions_index_offset icl_functions e_info heaps cs
+	  (icl_functions, e_info, heaps, cs) = checkAndPartitionateIclMacros main_dcl_module_n def_macro_indices local_functions_index_offset icl_functions e_info heaps cs
 	  (icl_functions, e_info, heaps, cs) = checkGlobalFunctionsInRanges icl_global_functions_ranges main_dcl_module_n local_functions_index_offset icl_functions e_info heaps cs
 
 	  cs = check_start_rule mod_type mod_ident icl_global_functions_ranges cs
@@ -3088,7 +3094,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 
 	  dcl_modules = e_info.ef_modules
 
-	  icl_imported_instances = collect_imported_instances icl_imported si_qualified_explicit
+	  icl_imported_instances = collect_imported_instances icl_imported si_qualified_explicit si_qualified_hidden_explicit
 	  
 	| cs_error.ea_ok
 		# {hp_var_heap,hp_type_heaps=hp_type_heaps=:{th_vars},hp_expression_heap} = heaps
@@ -3167,7 +3173,7 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 			# (entry, cs_symbol_table) = readPtr id_info cs_symbol_table
 			# cs = { cs & cs_symbol_table = cs_symbol_table <:= (id_info, { entry & ste_kind = STE_ClosedModule })}
 			  {ste_kind = STE_Module mod, ste_index} = entry
-			  solved_imports = { si_explicit=[], si_qualified_explicit=[], si_implicit=[] }			  	
+			  solved_imports = { si_explicit=[], si_qualified_explicit=[], si_qualified_hidden_explicit=[], si_implicit=[] }
 			  imports_ikh = ikhInsert` False cPredefinedModuleIndex solved_imports ikhEmpty
 			  (deferred_stuff, (_, modules, macro_defs, heaps, cs))
 					= checkPredefinedDclModule EndNumbers [] imports_ikh False cDummyArray support_dynamics mod ste_index cDummyArray modules macro_defs heaps cs
@@ -3281,8 +3287,8 @@ check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports m
 		determine_explicit_imports component_expl_imp_info expl_imp_indices nr_of_modules modules_in_component_set dcl_modules cs
 			# expl_imp_indices_ikh = ikhInsert` False nr_of_modules expl_imp_indices ikhEmpty
 			# (imports, (dcl_modules, _, _, cs))
-				= solveExplicitImports expl_imp_indices_ikh modules_in_component_set nr_of_modules
-										(dcl_modules, bitvectCreate nr_of_modules, component_expl_imp_info, cs)
+				= solveExplicitImports expl_imp_indices_ikh modules_in_component_set [nr_of_modules] nr_of_modules
+										(dcl_modules, bitvectCreate (nr_of_modules+1), component_expl_imp_info, cs)
 			= (imports, dcl_modules, cs)
 
 specified_member_type_incorrect_error error_code cs_error
@@ -3476,28 +3482,51 @@ addImportedSymbolsToSymbolTable :: Int (Optional IndexRange) {#Int} (IntKeyHasht
 																				   -> ([Declaration],*{#DclModule},*CheckState)
 addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_component_set imports_ikh dcl_modules cs
 	#! nr_of_dcl_modules = size dcl_modules
-	# {si_explicit, si_implicit} = ikhSearch` importing_mod imports_ikh
-	  (decls_accu, visited_modules, dcl_modules, cs)
-	  		= foldSt (add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod
-	  					modules_in_component_set imports_ikh)
-	  				si_implicit ([], bitvectCreate nr_of_dcl_modules, dcl_modules, cs)
-	= foldSt (add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod) si_explicit (decls_accu, dcl_modules, cs)
+	# {si_explicit,si_implicit,si_qualified_hidden_explicit} = ikhSearch` importing_mod imports_ikh
+	  cs & cs_symbol_table = mark_hidden_symbols si_qualified_hidden_explicit cs.cs_symbol_table
+	  (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
+			= foldSt (add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod modules_in_component_set imports_ikh)
+					si_implicit ([], bitvectCreate (nr_of_dcl_modules+1), [], dcl_modules, cs)
+	  (decls_accu, dcl_modules, cs)
+		= foldSt (add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod) si_explicit (decls_accu, dcl_modules, cs)
+	  cs & cs_symbol_table = remove_hidden_symbols si_qualified_hidden_explicit (remove_hidden_symbols_of_component_modules hidden_symbols cs.cs_symbol_table)
+	= (decls_accu, dcl_modules, cs)
   where
+	mark_hidden_symbols :: [([QualifiedAndHiddenDeclaration],ModuleN)] *SymbolTable -> *SymbolTable
+	mark_hidden_symbols [(qualified_hidden_explicit_import_of_module,_):qualified_hidden_explicit_imports] symbol_table
+		# symbol_table = mark_hidden_symbols_of_module qualified_hidden_explicit_import_of_module symbol_table
+	 	= mark_hidden_symbols qualified_hidden_explicit_imports symbol_table
+	where
+		mark_hidden_symbols_of_module :: [QualifiedAndHiddenDeclaration] *SymbolTable -> *SymbolTable
+		mark_hidden_symbols_of_module [QualifiedHiddenDeclaration declaration=:(Declaration {decl_ident={id_info},decl_kind}):qualified_hidden_explicit_declarations] symbol_table
+			# (entry=:{ste_kind},symbol_table) = readPtr id_info symbol_table
+			  symbol_table = writePtr id_info {entry & ste_kind=STE_Hidden declaration ste_kind} symbol_table
+			= mark_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		mark_hidden_symbols_of_module [QualifiedNotHiddenDeclaration _:qualified_hidden_explicit_declarations] symbol_table
+			= mark_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		mark_hidden_symbols_of_module [QualifiedSomeNotHiddenDeclaration declaration=:(Declaration {decl_ident={id_info},decl_kind}) _:qualified_hidden_explicit_declarations] symbol_table
+			# (entry=:{ste_kind},symbol_table) = readPtr id_info symbol_table
+			  symbol_table = writePtr id_info {entry & ste_kind=STE_Hidden declaration ste_kind} symbol_table
+			= mark_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		mark_hidden_symbols_of_module [] symbol_table
+			= symbol_table
+	mark_hidden_symbols [] symbol_table
+		= symbol_table
+
 	add_impl_imported_symbols_with_new_error_pos opt_macro_range importing_mod modules_in_component_set imports_ikh
-			(mod_index, position) (decls_accu, visited_modules, dcl_modules, cs)
+			(mod_index, position) (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 		# cs = pushErrorPosition import_ident position cs
-		  (decls_accu, visited_modules, dcl_modules, cs)
+		  (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 		  		= add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set imports_ikh
-						mod_index (decls_accu, visited_modules, dcl_modules, cs)
-		= (decls_accu, visited_modules, dcl_modules, popErrorAdmin cs)
+						mod_index (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
+		= (decls_accu, visited_modules, hidden_symbols, dcl_modules, popErrorAdmin cs)
 
 	add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set imports_ikh mod_index
-			(decls_accu, visited_modules, dcl_modules, cs)
+			(decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 		| bitvectSelect mod_index visited_modules
-			= (decls_accu, visited_modules, dcl_modules, cs)
+			= (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 		# visited_modules = bitvectSet mod_index visited_modules 
-		  ({ dcls_import, dcls_local_for_import }, dcl_modules)
-				= dcl_modules![mod_index].dcl_declared
+		  ({dcls_import,dcls_local_for_import},dcl_modules) = dcl_modules![mod_index].dcl_declared
 		  (decls_accu,dcl_modules,cs)
 		  		= foldlArraySt (add_declaration opt_macro_range importing_mod)
 		  				dcls_local_for_import (decls_accu,dcl_modules,cs)
@@ -3506,17 +3535,18 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 			# (decls_accu,dcl_modules,cs)
 			  		= foldlArraySt (add_declaration opt_macro_range importing_mod)
 			  				dcls_import (decls_accu,dcl_modules,cs)
-			= (decls_accu, visited_modules, dcl_modules, cs)
-		# {si_explicit, si_implicit} = ikhSearch` mod_index imports_ikh
+			= (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
+		# {si_explicit,si_implicit,si_qualified_hidden_explicit} = ikhSearch` mod_index imports_ikh
+		  (hidden_symbols,symbol_table)
+			= mark_hidden_symbols_in_module_in_component si_qualified_hidden_explicit mod_index hidden_symbols cs.cs_symbol_table
+		  cs & cs_symbol_table = symbol_table
 		  (decls_accu,dcl_modules,cs)
-				= foldSt (\(decls, _) state ->
+				= foldSt (\ (decls, _) state ->
 							foldSt (add_declaration opt_macro_range importing_mod) decls state
 						  ) si_explicit (decls_accu,dcl_modules,cs)
-		= foldSt (\(mod_index, _) state 
-					-> add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set
-						 imports_ikh mod_index state)
-				si_implicit
-				(decls_accu, visited_modules, dcl_modules, cs)
+		= foldSt (\ (mod_index, _) state ->
+					add_impl_imported_symbols opt_macro_range importing_mod modules_in_component_set imports_ikh mod_index state
+				  ) si_implicit (decls_accu, visited_modules, hidden_symbols, dcl_modules, cs)
 
 	add_expl_imported_symbols_with_new_error_pos opt_macro_range importing_mod (decls, position) (decls_accu, dcl_modules, cs)
 		# cs = pushErrorPosition import_ident position cs
@@ -3526,21 +3556,83 @@ addImportedSymbolsToSymbolTable importing_mod opt_macro_range modules_in_compone
 	add_declaration :: (Optional IndexRange) Int Declaration *([Declaration],!*{#DclModule},*CheckState) -> (![Declaration],!*{#DclModule},!*CheckState)
 	add_declaration opt_dcl_macro_range importing_mod declaration (decls_accu,dcl_modules,cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu],dcl_modules,cs)
 			= (decls_accu,dcl_modules,cs)
 
 	add_expl_imp_declaration opt_dcl_macro_range importing_mod declaration (decls_accu, dcl_modules, cs)
 		# (not_already_imported,dcl_modules,cs)
-				= add_declaration_to_symbol_table_ opt_dcl_macro_range declaration importing_mod dcl_modules cs
+				= add_declaration_to_symbol_table opt_dcl_macro_range declaration importing_mod dcl_modules cs
 		| not_already_imported
 			= ([declaration:decls_accu], dcl_modules, cs)
 		= (decls_accu, dcl_modules, cs)
 
-add_declaration_to_symbol_table_ opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
+	mark_hidden_symbols_in_module_in_component :: [([QualifiedAndHiddenDeclaration],ModuleN)] ModuleN
+													[Declaration] *SymbolTable -> (![Declaration],!*SymbolTable)
+	mark_hidden_symbols_in_module_in_component [(qualified_hidden_explicit_import_of_module,_):qualified_hidden_explicit_imports] mod_index hidden_symbols symbol_table
+		# (hidden_symbols,symbol_table)
+			= mark_hidden_symbols_in_module_in_component_of_module qualified_hidden_explicit_import_of_module mod_index hidden_symbols symbol_table
+		= mark_hidden_symbols_in_module_in_component qualified_hidden_explicit_imports mod_index hidden_symbols symbol_table
+	where
+		mark_hidden_symbols_in_module_in_component_of_module :: [QualifiedAndHiddenDeclaration] ModuleN
+																[Declaration] *SymbolTable -> (![Declaration],!*SymbolTable)
+		mark_hidden_symbols_in_module_in_component_of_module
+				[QualifiedSomeNotHiddenDeclaration declaration=:(Declaration {decl_ident={id_info},decl_kind,decl_index}) modules_with_decl:qualified_hidden_explicit_declarations]
+				mod_index hidden_symbols symbol_table
+			# (entry=:{ste_kind},symbol_table) = readPtr id_info symbol_table
+			| symbol_already_hidden ste_kind decl_kind decl_index || isMember mod_index modules_with_decl
+				= mark_hidden_symbols_in_module_in_component_of_module qualified_hidden_explicit_declarations mod_index hidden_symbols symbol_table
+				# symbol_table = writePtr id_info {entry & ste_kind=STE_Hidden declaration ste_kind} symbol_table
+				  hidden_symbols = [declaration:hidden_symbols]
+				= mark_hidden_symbols_in_module_in_component_of_module qualified_hidden_explicit_declarations mod_index hidden_symbols symbol_table
+		where
+			symbol_already_hidden (STE_Hidden (Declaration {decl_kind=hidden_decl_kind,decl_index}) ste_kind) imp_def_kind=:(STE_Imported def_kind def_mod) def_index
+				# (STE_Imported hidden_kind hidden_mod_index) = hidden_decl_kind
+				| def_kind==hidden_kind && def_mod==hidden_mod_index && def_index==decl_index
+					= True
+					= symbol_already_hidden ste_kind imp_def_kind def_index
+			symbol_already_hidden ste_kind imp_def_kind def_index
+				= False
+		mark_hidden_symbols_in_module_in_component_of_module [_:qualified_hidden_explicit_declarations] mod_index hidden_symbols symbol_table
+			= mark_hidden_symbols_in_module_in_component_of_module qualified_hidden_explicit_declarations mod_index hidden_symbols symbol_table
+		mark_hidden_symbols_in_module_in_component_of_module [] mod_index hidden_symbols symbol_table
+			= (hidden_symbols,symbol_table)
+	mark_hidden_symbols_in_module_in_component [] mod_index hidden_symbols symbol_table
+		= (hidden_symbols,symbol_table)
+
+	remove_hidden_symbols :: [([QualifiedAndHiddenDeclaration],ModuleN)] *SymbolTable -> *SymbolTable
+	remove_hidden_symbols [(qualified_hidden_explicit_import_of_module,_):qualified_hidden_explicit_imports] symbol_table
+		# symbol_table = remove_hidden_symbols_of_module qualified_hidden_explicit_import_of_module symbol_table
+		= remove_hidden_symbols qualified_hidden_explicit_imports symbol_table
+	where
+		remove_hidden_symbols_of_module :: [QualifiedAndHiddenDeclaration] *SymbolTable -> *SymbolTable
+		remove_hidden_symbols_of_module [QualifiedHiddenDeclaration (Declaration {decl_ident={id_info}}):qualified_hidden_explicit_declarations] symbol_table
+			# (entry=:{ste_kind=STE_Hidden _ ste_kind},symbol_table) = readPtr id_info symbol_table
+			  symbol_table = writePtr id_info {entry & ste_kind=ste_kind} symbol_table
+			= remove_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		remove_hidden_symbols_of_module [QualifiedNotHiddenDeclaration _:qualified_hidden_explicit_declarations] symbol_table
+			= remove_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		remove_hidden_symbols_of_module [QualifiedSomeNotHiddenDeclaration (Declaration {decl_ident={id_info}}) _:qualified_hidden_explicit_declarations] symbol_table
+			# (entry=:{ste_kind=STE_Hidden _ ste_kind},symbol_table) = readPtr id_info symbol_table
+			  symbol_table = writePtr id_info {entry & ste_kind=ste_kind} symbol_table
+			= remove_hidden_symbols_of_module qualified_hidden_explicit_declarations symbol_table
+		remove_hidden_symbols_of_module [] symbol_table
+			= symbol_table
+	remove_hidden_symbols [] symbol_table
+		= symbol_table
+
+	remove_hidden_symbols_of_component_modules :: [Declaration] *SymbolTable -> *SymbolTable
+	remove_hidden_symbols_of_component_modules [Declaration {decl_ident={id_info}}:hidden_declarations] symbol_table
+		# (entry=:{ste_kind=STE_Hidden _ ste_kind},symbol_table) = readPtr id_info symbol_table
+		  symbol_table = writePtr id_info {entry & ste_kind=ste_kind} symbol_table
+		= remove_hidden_symbols_of_component_modules hidden_declarations symbol_table
+	remove_hidden_symbols_of_component_modules [] symbol_table
+		= symbol_table
+
+add_declaration_to_symbol_table opt_dcl_macro_range (Declaration {decl_kind=STE_FunctionOrMacro _, decl_ident, decl_index}) _ dcl_modules cs
 	= addImportedFunctionOrMacro opt_dcl_macro_range decl_ident decl_index dcl_modules cs
-add_declaration_to_symbol_table_ yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
+add_declaration_to_symbol_table yes_for_icl_module (Declaration {decl_kind=decl_kind=:STE_Imported def_kind def_mod, decl_ident, decl_index, decl_pos}) importing_mod dcl_modules cs
 	= addSymbol yes_for_icl_module decl_ident decl_pos decl_kind def_kind decl_index def_mod importing_mod dcl_modules cs
 
 updateExplImpInfo :: [Int] Index {!Declaration} {!Declaration} u:{#DclModule} ExplImpInfos *SymbolTable 
@@ -3800,9 +3892,9 @@ checkDclModule2 dcl_imported_module_numbers components_importing_module imports_
 	  (dcls_import_list, modules, cs)
 	  		= addImportedSymbolsToSymbolTable mod_index No modules_in_component_set imports_ikh modules cs
 
-	  qualified_explicit_imports = (ikhSearch` mod_index imports_ikh).si_qualified_explicit
+	  {si_qualified_explicit,si_qualified_hidden_explicit} = ikhSearch` mod_index imports_ikh
 	  (modified_ste_kinds,symbol_table,modules)
-		= store_qualified_explicit_imports_in_symbol_table qualified_explicit_imports [] cs.cs_symbol_table modules
+		= store_qualified_explicit_imports_in_symbol_table si_qualified_explicit si_qualified_hidden_explicit [] cs.cs_symbol_table modules
 	  cs = {cs & cs_symbol_table=symbol_table}
 
 	  dcls_import					= { el \\ el<-dcls_import_list }
@@ -3843,8 +3935,8 @@ checkDclModule2 dcl_imported_module_numbers components_importing_module imports_
 	  (modules, macro_defs, hp_expression_heap, cs)
 			= case is_on_cycle of
 				False
-					# {si_explicit,si_qualified_explicit} = ikhSearch` mod_index imports_ikh
-					-> checkExplicitImportCompleteness si_explicit si_qualified_explicit  modules macro_defs hp_expression_heap cs
+					# {si_explicit,si_qualified_explicit,si_qualified_hidden_explicit} = ikhSearch` mod_index imports_ikh
+					-> checkExplicitImportCompleteness si_explicit si_qualified_explicit si_qualified_hidden_explicit modules macro_defs hp_expression_heap cs
 				True
 					-> (modules, macro_defs, hp_expression_heap, cs)
 
