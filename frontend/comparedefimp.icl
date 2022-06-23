@@ -199,8 +199,7 @@ where
 			= (icl_class_defs, icl_member_defs, comp_st)
 
 	compare_classes dcl_class_def dcl_member_defs icl_class_def icl_member_defs comp_st=:{comp_type_var_heap}
-		# comp_type_var_heap = initialiseClassArgs dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
-		  comp_st = { comp_st & comp_type_var_heap = comp_type_var_heap }
+		# comp_st & comp_type_var_heap = initialiseClassArgs dcl_class_def.class_args icl_class_def.class_args comp_type_var_heap
 		# (ok, comp_st) = compare dcl_class_def.class_context icl_class_def.class_context comp_st
 		| not ok
 			= (False, icl_member_defs, comp_st)
@@ -214,6 +213,8 @@ where
 		| n_dcl_class_macro_members <> size icl_class_def.class_macro_members
 			= (False, icl_member_defs, comp_st)
 		| sort_clas_macro_members dcl_class_def.class_macro_members <> sort_clas_macro_members icl_class_def.class_macro_members
+			= (False, icl_member_defs, comp_st)
+		| dcl_class_def.class_fun_dep_vars <> icl_class_def.class_fun_dep_vars
 			= (False, icl_member_defs, comp_st)
 			= (True, icl_member_defs, comp_st)
 
