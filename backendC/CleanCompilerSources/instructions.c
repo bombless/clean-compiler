@@ -1767,12 +1767,12 @@ static void CallArrayFunctionWithNodeMark (SymbDef array_def,Bool is_jsr,StateP 
 
 	switch (fkind){
 		case CreateArrayFun:
-			put_instruction_ ("create_array");
+			put_instruction_ (array_state.state_arrayp2 ? "create_arrayp2" : "create_array");
 			GenLabel (&elem_desc);
 			put_arguments_nn_b (asize,bsize);
 			break;
 		case _CreateArrayFun:
-			put_instruction_ ("create_array_");
+			put_instruction_ (array_state.state_arrayp2 ? "create_arrayp2_" : "create_array_");
 			GenLabel (&elem_desc);
 			put_arguments_nn_b (asize,bsize);
 			break;

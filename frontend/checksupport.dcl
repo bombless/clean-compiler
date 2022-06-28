@@ -31,7 +31,7 @@ cNeedStdStrictMaybes	:== 64
 
 ::	CheckState = { cs_symbol_table :: !.SymbolTable, cs_predef_symbols :: !.PredefinedSymbols, cs_error :: !.ErrorAdmin,cs_x :: !.CheckStateX }
 
-::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int, x_check_dynamic_types :: !Bool }
+::	CheckStateX = {x_needed_modules :: !BITVECT,x_main_dcl_module_n :: !Int, x_check_dynamic_types :: !Bool, x_allow_undecidable_instances :: !Bool}
 
 ::	Group = { group_members :: ![Int] }
 

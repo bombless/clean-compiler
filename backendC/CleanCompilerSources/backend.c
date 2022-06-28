@@ -226,6 +226,11 @@ InitPredefinedSymbols (void)
 	gBasicTypeSymbols [unboxed_array_type]	= PredefinedTypeSymbol (unboxed_array_type, 1);
 	gBasicTypeSymbols [packed_array_type]	= PredefinedTypeSymbol (packed_array_type, 1);
 
+	gBasicTypeSymbols [arrayp2_type]		= PredefinedTypeSymbol (arrayp2_type, 1);
+	gBasicTypeSymbols [strict_arrayp2_type]	= PredefinedTypeSymbol (strict_arrayp2_type, 1);
+	gBasicTypeSymbols [unboxed_arrayp2_type]= PredefinedTypeSymbol (unboxed_arrayp2_type, 1);
+	gBasicTypeSymbols [packed_arrayp2_type]	= PredefinedTypeSymbol (packed_arrayp2_type, 1);
+
 	gBasicTypeSymbols [fun_type]	= PredefinedTypeSymbol (fun_type, 2);
 
 	ApplySymbol	= PredefinedSymbol (apply_symb, 2);
@@ -642,9 +647,13 @@ BESpecialArrayFunctionSymbol (BEArrayFunKind arrayFunKind, int functionIndex, in
 			case strict_array_type:
 			case unboxed_array_type:
 			case packed_array_type:
+			case strict_arrayp2_type:
+			case unboxed_arrayp2_type:
+			case packed_arrayp2_type:
 				elementType->type_node_annotation	= StrictAnnot;
 				break;
 			case array_type:
+			case arrayp2_type:
 				break;
 			default:
 				Assert (False);
@@ -3452,6 +3461,7 @@ BEArg (CleanString arg)
 static void init_unboxed_list_symbols (void)
 {
 	StateP array_state_p,strict_array_state_p,unboxed_array_state_p,packed_array_state_p;
+	StateP arrayp2_state_p,strict_arrayp2_state_p,unboxed_arrayp2_state_p,packed_arrayp2_state_p;
 	int i;
 	
 	for (i=0; i<Nr_Of_Predef_Types; ++i){
@@ -3480,6 +3490,7 @@ static void init_unboxed_list_symbols (void)
 	array_state_p->state_arity = 1;
 	array_state_p->state_array_arguments = ConvertAllocType (StateS);
 	array_state_p->state_mark = 0;
+	array_state_p->state_arrayp2 = 0;
 	SetUnaryState (&array_state_p->state_array_arguments[0],OnA,UnknownObj);
 
 	unboxed_list_symbols[array_type][0].symb_state_p=array_state_p;
@@ -3491,6 +3502,7 @@ static void init_unboxed_list_symbols (void)
 	strict_array_state_p->state_arity = 1;
 	strict_array_state_p->state_array_arguments = ConvertAllocType (StateS);
 	strict_array_state_p->state_mark = 0;
+	strict_array_state_p->state_arrayp2 = 0;
 	strict_array_state_p->state_array_arguments[0] = StrictState;
 
 	unboxed_list_symbols[strict_array_type][0].symb_state_p=strict_array_state_p;
@@ -3502,6 +3514,7 @@ static void init_unboxed_list_symbols (void)
 	unboxed_array_state_p->state_arity = 1;
 	unboxed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
 	unboxed_array_state_p->state_mark = 0;
+	unboxed_array_state_p->state_arrayp2 = 0;
 	unboxed_array_state_p->state_array_arguments [0] = StrictState;
 
 	unboxed_list_symbols[unboxed_array_type][0].symb_state_p=unboxed_array_state_p;
@@ -3513,11 +3526,60 @@ static void init_unboxed_list_symbols (void)
 	packed_array_state_p->state_arity = 1;
 	packed_array_state_p->state_array_arguments = ConvertAllocType (StateS);
 	packed_array_state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
+	packed_array_state_p->state_arrayp2 = 0;
 	packed_array_state_p->state_array_arguments [0] = StrictState;
 
 	unboxed_list_symbols[packed_array_type][0].symb_state_p=packed_array_state_p;
 	unboxed_list_symbols[packed_array_type][1].symb_state_p=packed_array_state_p;
 	unboxed_maybe_symbols[packed_array_type].symb_state_p=packed_array_state_p;
+
+	arrayp2_state_p=ConvertAllocType (StateS);
+	arrayp2_state_p->state_type = ArrayState;
+	arrayp2_state_p->state_arity = 1;
+	arrayp2_state_p->state_array_arguments = ConvertAllocType (StateS);
+	arrayp2_state_p->state_mark = 0;
+	arrayp2_state_p->state_arrayp2 = 1;
+	SetUnaryState (&arrayp2_state_p->state_array_arguments[0],OnA,UnknownObj);
+
+	unboxed_list_symbols[arrayp2_type][0].symb_state_p=arrayp2_state_p;
+	unboxed_list_symbols[arrayp2_type][1].symb_state_p=arrayp2_state_p;
+	unboxed_maybe_symbols[arrayp2_type].symb_state_p=arrayp2_state_p;
+
+	strict_arrayp2_state_p=ConvertAllocType (StateS);
+	strict_arrayp2_state_p->state_type = ArrayState;
+	strict_arrayp2_state_p->state_arity = 1;
+	strict_arrayp2_state_p->state_array_arguments = ConvertAllocType (StateS);
+	strict_arrayp2_state_p->state_mark = 0;
+	strict_arrayp2_state_p->state_arrayp2 = 1;
+	strict_arrayp2_state_p->state_array_arguments[0] = StrictState;
+
+	unboxed_list_symbols[strict_arrayp2_type][0].symb_state_p=strict_arrayp2_state_p;
+	unboxed_list_symbols[strict_arrayp2_type][1].symb_state_p=strict_arrayp2_state_p;
+	unboxed_maybe_symbols[strict_arrayp2_type].symb_state_p=strict_arrayp2_state_p;
+
+	unboxed_arrayp2_state_p=ConvertAllocType (StateS);
+	unboxed_arrayp2_state_p->state_type = ArrayState;
+	unboxed_arrayp2_state_p->state_arity = 1;
+	unboxed_arrayp2_state_p->state_array_arguments = ConvertAllocType (StateS);
+	unboxed_arrayp2_state_p->state_mark = 0;
+	unboxed_arrayp2_state_p->state_arrayp2 = 1;
+	unboxed_arrayp2_state_p->state_array_arguments [0] = StrictState;
+
+	unboxed_list_symbols[unboxed_arrayp2_type][0].symb_state_p=unboxed_arrayp2_state_p;
+	unboxed_list_symbols[unboxed_arrayp2_type][1].symb_state_p=unboxed_arrayp2_state_p;
+	unboxed_maybe_symbols[unboxed_arrayp2_type].symb_state_p=unboxed_arrayp2_state_p;
+
+	packed_arrayp2_state_p=ConvertAllocType (StateS);
+	packed_arrayp2_state_p->state_type = ArrayState;
+	packed_arrayp2_state_p->state_arity = 1;
+	packed_arrayp2_state_p->state_array_arguments = ConvertAllocType (StateS);
+	packed_arrayp2_state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
+	packed_arrayp2_state_p->state_arrayp2 = 1;
+	packed_arrayp2_state_p->state_array_arguments [0] = StrictState;
+
+	unboxed_list_symbols[packed_arrayp2_type][0].symb_state_p=packed_arrayp2_state_p;
+	unboxed_list_symbols[packed_arrayp2_type][1].symb_state_p=packed_arrayp2_state_p;
+	unboxed_maybe_symbols[packed_arrayp2_type].symb_state_p=packed_arrayp2_state_p;
 }
 #endif
 

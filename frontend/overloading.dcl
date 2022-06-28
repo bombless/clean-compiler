@@ -2,6 +2,7 @@ definition module overloading
 
 import StdEnv
 import syntax, typesupport
+from unitype import ::BOOLVECT
 from check_instances import ::SortedInstances
 
 ::	InstanceTree
@@ -28,22 +29,31 @@ from check_instances import ::SortedInstances
 	,	si_tail_strict_list_instances		:: ![ArrayInstance]
 	,	si_unboxed_maybe_instances			:: ![ArrayInstance]
 	}
-	
-::	OverloadingState =
-	{	os_type_heaps			:: !.TypeHeaps
-	,	os_var_heap				:: !.VarHeap
-	,	os_symbol_heap			:: !.ExpressionHeap
-	,	os_generic_heap			:: !.GenericHeap
-	,	os_predef_symbols		:: !.PredefinedSymbols
-	,	os_special_instances	:: !.SpecialInstances
-	,	os_error				:: !.ErrorAdmin				
-	}
 
 ::	LocalTypePatternVariable
 ::	DictionaryTypes :== [(Index, [ExprInfoPtr])]
 
-tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], Index)] !Int !{# CommonDefs } !ClassInstanceInfo !*Coercions !*OverloadingState
-	-> (![TypeContext], !*Coercions, ![LocalTypePatternVariable], DictionaryTypes, !*OverloadingState)
+::	OverloadedExpressions =
+	{	oe_expr_ptrs	:: ![ExprInfoPtr]
+	,	oe_fun_index	:: !Index
+	}
+
+:: ReducedOverloadedApplication
+:: ReducedOverloadedContext
+
+finishContextReduction :: ![ReducedOverloadedContext] ![ExprInfoPtr] !Int !{#CommonDefs} !ClassInstanceInfo
+	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*SpecialInstances !*Coercions !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedApplication], ![TypeContext], ![LocalTypePatternVariable], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols,
+		!*SpecialInstances , !*Coercions, !*{!Type}, !*ErrorAdmin)
+
+startContextReduction :: ![OverloadedExpressions] ![[TypeContext]] !{# CommonDefs } !ClassInstanceInfo
+	!*VarHeap !*TypeHeaps !*ExpressionHeap  !*PredefinedSymbols !*{!Type} !*ErrorAdmin
+	-> (![ReducedOverloadedContext], ![ExprInfoPtr], !*VarHeap, !*TypeHeaps, !*ExpressionHeap, !*PredefinedSymbols, !*{!Type}, !*ErrorAdmin)
+
+addDictionaries :: ![[TypeContext]] ![TypeContext] ![ReducedOverloadedApplication] !{# CommonDefs }
+	!*Heaps !*{!Type} !*ErrorAdmin -> (![TypeContext], !DictionaryTypes, !*Heaps, !*{!Type}, !*ErrorAdmin)
+
+uniqueError :: a b *ErrorAdmin -> *ErrorAdmin | writeType b & <<< a
 
 ::	TypeCodeInfo =
 	{	tci_type_var_heap					:: !.TypeVarHeap
@@ -54,3 +64,5 @@ tryToSolveOverloading :: ![(Optional [TypeContext], [ExprInfoPtr], Index)] !Int 
 removeOverloadedFunctions :: ![Index] ![LocalTypePatternVariable] ![ErrorContexts] !Int !*{#FunDef} !*{! FunctionType} !*ExpressionHeap
 														   !*TypeCodeInfo !*VarHeap !*ErrorAdmin !*{#PredefinedSymbol}
 		-> (!*{#FunDef},!*{!FunctionType},!*ExpressionHeap,!*TypeCodeInfo,!*VarHeap,!*ErrorAdmin,!*{#PredefinedSymbol})
+
+liftNewVarSubstitutions :: ![ReducedOverloadedContext] !Int !*{!Type} -> (!*{#BOOLVECT},!*{!Type})

@@ -4,17 +4,17 @@ maintainer: Camil Staps
 contact_email: clean@camilstaps.nl
 description: The Clean compiler.
 license: BSD-2-Clause
-version: 2.0.1
+version: 3.0.0
 type: Application
 build_dependencies:
   argenv: ^1.0
   base-clm: ^1.0
-  base-stdenv: ^1.0
+  base-stdenv: ^2.1
   base-compiler-bootstrap: ^1.0
-  base-code-generator: ^1.0
-  base-rts: ^1.0
+  base-code-generator: ^2.0
+  base-rts: ^2.0
 dependencies:
-  base-stdenv: ^1.0 || ^2.0
+  base-stdenv: ^2.1
 src:
   - backend
   - frontend
@@ -26,7 +26,7 @@ package:
     - README.md
 
 clm_options:
-  heap: 256M
+  heap: 512M
   stack: 4M
   garbage_collector: MarkingCollector
   print_result: false
@@ -89,3 +89,61 @@ rules:
         script:
           - make -C backendC/CleanCompilerSources -f Makefile.windows64
           - make -C main-windows all
+
+---
+
+name: lib-compiler
+url: https://gitlab.com/clean-and-itasks/base/compiler
+maintainer: Camil Staps
+contact_email: clean@camilstaps.nl
+description: A library with the base-compiler sources.
+license: BSD-2-Clause
+version: 3.0.0
+type: Library
+dependencies:
+  argenv: ^1.0.0
+  base-stdenv: ^1.0 || ^2.0
+src:
+  - backend
+  - frontend
+  - main
+package:
+  exclude:
+    - backend/Mac/
+    - backend/Windows/
+rules:
+  x64:
+    extra_build:
+      backend:
+        script:
+          - nitrile build --arch=x64 --name=base-compiler --only=backend
+
+  x86:
+    extra_build:
+      backend:
+        script:
+          - nitrile build --arch=x86 --name=base-compiler --only=backend
+
+  posix:
+    extra_src:
+      - main-unix
+    extra_package:
+      include:
+        - backend.a
+        - cDirectory.o
+        - ipc_c.o
+        - set_return_code_c.o
+
+  windows:
+    extra_src:
+      - backend/Windows
+      - main-windows
+    extra_package:
+      include:
+        - backend_library
+        - cDirectory.obj
+        - c_set_return_code.obj
+        - c_thread_message.obj
+      extra_files:
+        - src: backendC/backend.dll
+          dst: exe/backend.dll

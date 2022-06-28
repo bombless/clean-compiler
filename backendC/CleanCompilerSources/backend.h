@@ -122,8 +122,9 @@ typedef int	BETypeSymbKind;
 Clean (:: BETypeSymbKind :== Int)
 enum {
 	BEIntType, BEBoolType, BECharType, BERealType,
-	BEFileType, BEWorldType, BEProcIdType, BERedIdType,
-	BEFunType, BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEPackedArrayType,
+	BEFileType, BEWorldType, BEProcIdType, BERedIdType, BEFunType,
+	BEArrayType, BEStrictArrayType, BEUnboxedArrayType, BEPackedArrayType,
+	BEArrayP2Type, BEStrictArrayP2Type, BEUnboxedArrayP2Type, BEPackedArrayP2Type,
 	BEListType, BEMaybeType, BETupleType,
 	BEDynamicType, BEApplyType
 };

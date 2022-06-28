@@ -116,6 +116,22 @@ makePackedArraySymbol arity
 	#! packed_array_ident = predefined_idents.[PD_PackedArrayType]
 	= MakeNewTypeSymbIdent packed_array_ident arity
 
+makeLazyArrayP2Symbol arity
+	#! lazy_arrayp2_ident = predefined_idents.[PD_LazyArrayP2Type]
+	= MakeNewTypeSymbIdent lazy_arrayp2_ident arity
+
+makeStrictArrayP2Symbol arity
+	#! strict_array_ident = predefined_idents.[PD_StrictArrayP2Type]
+	= MakeNewTypeSymbIdent strict_array_ident arity
+
+makeUnboxedArrayP2Symbol arity
+	#! unboxed_array_ident = predefined_idents.[PD_UnboxedArrayP2Type]
+	= MakeNewTypeSymbIdent unboxed_array_ident arity
+
+makePackedArrayP2Symbol arity
+	#! packed_array_ident = predefined_idents.[PD_PackedArrayP2Type]
+	= MakeNewTypeSymbIdent packed_array_ident arity
+
 makeTupleTypeSymbol form_arity act_arity
 	#! tuple_ident = predefined_idents.[GetTupleTypeIndex form_arity]
 	= MakeNewTypeSymbIdent tuple_ident act_arity
@@ -312,7 +328,8 @@ wantModule :: !*File !{#Char} !Bool !Ident !Bool !*HashTable !*File !*Files
 				   -> (!Bool,!Bool,!ParsedModule,!*HashTable,!*File,!*Files)
 wantModule file modification_time iclmodule file_id=:{id_name} support_dynamics hash_table error files
 	# scanState = openScanner file id_name file_name_extension
-	# hash_table=set_hte_mark (if iclmodule 1 0) hash_table
+	# hash_table = set_hte_mark (if iclmodule 1 0) hash_table
+	  hash_table = remove_qualified_idents_from_hash_table hash_table
 	# (ok,dynamic_type_used,mod,hash_table,file,files) = initModule file_name modification_time scanState hash_table error files
 	  hash_table=set_hte_mark 0 hash_table
 	= (ok,dynamic_type_used,mod,hash_table,file,files)
@@ -488,7 +505,7 @@ try_definition parseContext ImportToken pos pState
 		# (importedObjects, pState) = wantCodeImports pState
 		= (True, PD_ImportedObjects importedObjects, pState)
 		# pState = tokenBack pState
-		# (imports, pState) = wantImports pState
+		# (imports, pState) = wantImports parseContext pState
 		= (True, PD_Import imports, pState)
 try_definition parseContext FromToken pos pState
 	| ~(isGlobalContext parseContext)
@@ -1596,53 +1613,125 @@ wantLocals pState
 	imports and exports
 */
 
-wantImports :: !ParseState -> (![ParsedImport], !ParseState)
-wantImports pState
-	# (imports, pState) = wantModuleImports FunctionContext (IC_Module NoQualifiedIdents) pState
+wantImports :: !ParseContext !ParseState -> (![ParsedImport], !ParseState)
+wantImports parseContext pState
+	# (imports, pState) = wantImportOfModulesOrModuleWithQualifiedAndHidden parseContext pState
 	  pState = wantEndOfDefinition "imports" pState
 	= (imports, pState)
 
-wantModuleImports :: !ScanContext !IdentClass !ParseState -> (![Import], !ParseState)
-wantModuleImports scanContext ident_class pState
-	# (import_qualified, first_name, pState) = wantOptionalQualifiedAndModuleName pState
+wantImportOfModulesOrModuleWithQualifiedAndHidden :: !ParseContext !ParseState -> (![ParsedImport], !ParseState)
+wantImportOfModulesOrModuleWithQualifiedAndHidden parseContext pState
+	| isIclContext parseContext
+		# (token, pState) = nextToken ModuleNameContext pState
+		= wantImportOfModulesOrModuleWithQualifiedAndHiddenT token pState
+	= wantModuleImports (IC_Module NoQualifiedIdents) pState
+
+wantImportOfModulesOrModuleWithQualifiedAndHiddenT :: !Token !ParseState -> (![Import], !ParseState)
+wantImportOfModulesOrModuleWithQualifiedAndHiddenT token pState
+	| is_not_qualified_module_name token
+		# first_name = not_qualified_module_nameT token
+		  ident_class = IC_Module NoQualifiedIdents
+		  (first_ident, pState) = stringToIdent first_name ident_class pState
+		  (file_name, line_nr, pState)	= getFileAndLineNr pState
+		  position = LinePos file_name line_nr
+		  (token, pState) = nextToken FunctionContext pState
+		= case token of
+			DoubleArrowToken
+				# pState = wantToken GeneralContext "import" (IdentToken "qualified") pState
+				  (import_symbols, pState) = wantImportDeclarations pState
+				  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAllSomeQualified import_symbols, import_file_position = position, import_qualified = NotQualified}
+				-> ([module_import], pState)
+			_
+				# module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = NotQualified}
+				-> parseOptionalModuleImportsT token module_import ident_class pState
+		= wantModuleImportsT token (IC_Module NoQualifiedIdents) pState
+where
+	is_not_qualified_module_name (IdentToken name) = name<>"qualified"
+	is_not_qualified_module_name (UnderscoreIdentToken name) = True
+	is_not_qualified_module_name (QualifiedIdentToken _ _) = True
+	is_not_qualified_module_name _ = False
+
+	not_qualified_module_nameT (IdentToken name) = name
+	not_qualified_module_nameT (UnderscoreIdentToken name) = name
+	not_qualified_module_nameT (QualifiedIdentToken module_dname module_fname) = module_dname+++"."+++module_fname
+
+wantModuleImports :: !IdentClass !ParseState -> (![Import], !ParseState)
+wantModuleImports ident_class pState
+	# (token, pState) = nextToken ModuleNameContext pState
+	= wantModuleImportsT token ident_class pState
+
+wantModuleImportsT :: !Token !IdentClass !ParseState -> (![Import], !ParseState)
+wantModuleImportsT token ident_class pState
+	# (import_qualified, first_name, pState) = wantOptionalQualifiedAndModuleNameT token pState
 	  (first_ident, pState) = stringToIdent first_name ident_class pState
 	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  position = LinePos file_name line_nr
+	  (token, pState) = nextToken FunctionContext pState
+	  (import_qualified,token,pState) = parse_optional_as_module_name import_qualified token pState
 	  module_import = {import_module = first_ident, import_symbols = ImportSymbolsAll, import_file_position = position, import_qualified = import_qualified}
-	  (token, pState) = nextToken scanContext pState
-	| token =: CommaToken
-		# (rest, pState) = wantModuleImports scanContext ident_class pState
-		= ([module_import : rest], pState)
+	= parseOptionalModuleImportsT token module_import ident_class pState
+where
+	parse_optional_as_module_name import_qualified=:Qualified token=:(IdentToken "as") pState
+		# (mod_name, pState) = wantModuleName pState
+		  (mod_ident, pState) = stringToIdent mod_name (IC_Module NoQualifiedIdents) pState
+		  (token, pState) = nextToken FunctionContext pState
+		= (QualifiedAs mod_ident,token,pState)
+	parse_optional_as_module_name import_qualified token pState
+		= (import_qualified,token,pState)
+
+parseOptionalModuleImportsT :: !Token !Import !IdentClass !ParseState -> (![Import], !ParseState)
+parseOptionalModuleImportsT CommaToken module_import ident_class pState
+	# (rest, pState) = wantModuleImports ident_class pState
+	= ([module_import : rest], pState)
+parseOptionalModuleImportsT token module_import ident_class pState
 	= ([module_import], tokenBack pState)
 
 wantFromImports :: !ParseState -> (!ParsedImport, !ParseState)
 wantFromImports pState
 	# (mod_name, pState) = wantModuleName pState
 	  (mod_ident, pState) = stringToIdent mod_name (IC_Module NoQualifiedIdents) pState
-	  pState = wantToken GeneralContext "from imports" ImportToken pState
-	  (file_name, line_nr, pState)	= getFileAndLineNr pState
 	  (token, pState) = nextToken GeneralContext pState
-	| case token of IdentToken "qualified" -> True ; _ -> False
-		# (import_symbols, pState) = wantImportDeclarations pState
+	= case token of
+		ImportToken
+			-> wantOptionalQualifiedAndImportDeclarations mod_ident pState
+		IdentToken "as"
+			# (as_mod_name, pState) = wantModuleName pState
+			  (as_mod_ident, pState) = stringToIdent as_mod_name (IC_Module NoQualifiedIdents) pState
+			  pState = wantToken GeneralContext "from imports" ImportToken pState
+			  pState = wantToken GeneralContext "from imports" (IdentToken "qualified") pState
+			  (file_name, line_nr, pState) = getFileAndLineNr pState
+			  (import_symbols, pState) = wantImportDeclarations pState
+			  pState = wantEndOfDefinition "from imports" pState
+			-> ({import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
+				 import_file_position = LinePos file_name line_nr, import_qualified = QualifiedAs as_mod_ident}, pState)
+		_
+			# pState = parseError "from imports" (Yes token) "import or as" pState
+			-> wantOptionalQualifiedAndImportDeclarations mod_ident pState
+	where
+	wantOptionalQualifiedAndImportDeclarations mod_ident pState
+		# (file_name, line_nr, pState)	= getFileAndLineNr pState
+		  (token, pState) = nextToken GeneralContext pState
+		| token=:(IdentToken "qualified")
+			# (import_symbols, pState) = wantImportDeclarations pState
+			  pState = wantEndOfDefinition "from imports" pState
+			= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
+				  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
+		# (import_symbols, pState) = wantImportDeclarationsT token pState
 		  pState = wantEndOfDefinition "from imports" pState
 		= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
-			  import_file_position = LinePos file_name line_nr, import_qualified = Qualified }, pState)
-	# (import_symbols, pState) = wantImportDeclarationsT token pState
-	  pState = wantEndOfDefinition "from imports" pState
-	= ( { import_module = mod_ident, import_symbols = ImportSymbolsOnly import_symbols,
-		  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
-where
-	wantImportDeclarations pState
-		# (token, pState) = nextToken GeneralContext pState
-		= wantImportDeclarationsT token pState
+			  import_file_position = LinePos file_name line_nr, import_qualified = NotQualified }, pState)
 
-	wantImportDeclarationsT token pState
-		# (first, pState) = wantImportDeclarationT token pState
-		  (token, pState) = nextToken GeneralContext pState
-		| token =: CommaToken
-			# (rest, pState) = wantImportDeclarations pState
-			= ([first : rest], pState)
-			= ([first], tokenBack pState)
+wantImportDeclarations pState
+	# (token, pState) = nextToken GeneralContext pState
+	= wantImportDeclarationsT token pState
+
+wantImportDeclarationsT token pState
+	# (first, pState) = wantImportDeclarationT token pState
+	  (token, pState) = nextToken GeneralContext pState
+	| token =: CommaToken
+		# (rest, pState) = wantImportDeclarations pState
+		= ([first : rest], pState)
+		= ([first], tokenBack pState)
 
 instance want ImportedObject where
 	want pState
@@ -1779,11 +1868,11 @@ wantClassDefinition :: !ParseContext !Position !ParseState -> (!ParsedDefinition
 wantClassDefinition parseContext pos pState
 	# (might_be_a_class, class_or_member_name, prio, pState) = want_class_or_member_name pState
 	  (class_variables, pState) = wantList "class variable(s)" try_class_variable pState
-	  (class_arity, class_args, class_cons_vars) = convert_class_variables class_variables 0 0
+	  (class_arity, class_args, class_fun_dep_vars, class_cons_vars) = convert_class_variables class_variables 0 0 0
 	  (contexts, pState) = optionalContext pState
   	  (token, pState) = nextToken TypeContext pState
 	| token =: DoubleColonToken
-		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_cons_vars contexts pState
+		= want_overloaded_function pos class_or_member_name prio class_arity class_args class_fun_dep_vars class_cons_vars contexts pState
 	| might_be_a_class
 		# (begin_members, pState) = begin_member_group token pState
 		| begin_members
@@ -1791,7 +1880,7 @@ wantClassDefinition parseContext pos pState
 			  (members, pState) = wantMemberDefinitions (SetClassDefsContext parseContext) pState
   		  	  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
 	    					class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-							class_macro_members = {},
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
 	    					class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex}
 						  }
 	    	  pState = wantEndGroup "class" pState
@@ -1802,8 +1891,8 @@ wantClassDefinition parseContext pos pState
 			# pState = tokenBack pState
 			  (class_id, pState) = stringToIdent class_or_member_name IC_Class pState
   			  class_def = { class_ident = class_id, class_arity = class_arity, class_args = class_args,
-							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars, 
-							class_macro_members = {},
+							class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
 						  }
 	  		  pState = wantEndOfDefinition "class definition" pState
@@ -1846,42 +1935,56 @@ wantClassDefinition parseContext pos pState
 			want_name token pState
 				= ("", parseError "Class Definition" (Yes token) "<identifier>" pState)
 
-		want_overloaded_function pos member_name prio class_arity class_args class_cons_vars contexts pState
+		want_overloaded_function pos member_name prio class_arity class_args class_fun_dep_vars class_cons_vars contexts pState
 			# (tspec, pState) = wantSymbolType pState
 			  (member_id, pState) = stringToIdent member_name IC_Expression pState
 			  (class_id, pState) = stringToIdent member_name IC_Class pState
 			  member = PD_TypeSpec pos member_id prio (Yes tspec) FSP_None
 			  class_def = {	class_ident = class_id, class_arity = class_arity, class_args = class_args,
 		    				class_context = contexts, class_pos = pos, class_members = {}, class_cons_vars = class_cons_vars,
-  			  				class_macro_members = {},
- 							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
+							class_macro_members = {}, class_fun_dep_vars = class_fun_dep_vars,
+							class_dictionary = { ds_ident = { class_id & id_info = nilPtr }, ds_arity = 0, ds_index = NoIndex }
    						  }
 	 		  pState = wantEndOfDefinition "overloaded function" pState
 			= (PD_Class class_def [member], pState)
 
 		try_class_variable pState
 			# (token, pState) = nextToken TypeContext pState
-			| token =: DotToken
-				# (type_var, pState) = wantTypeVar pState
-				= (True, (True,type_var,[]), pState)
-			| token=:OpenToken
-				# (type_var,pState) = wantTypeVar pState
-				  (type_vars,pState) = wantList "class variable argument(s)" tryQuantifiedTypeVar pState
-				  pState = wantToken TypeContext "class variable arguments" CloseToken pState
-				= (True, (False,type_var,type_vars), pState)
-			# (succ, type_var, pState) = tryTypeVarT token pState
-			= (succ, (False,type_var,[]), pState)
+			= case token of
+				IdentToken "~"
+					# (token, pState) = nextToken TypeContext pState
+					-> case token of
+						DotToken
+							# (type_var, pState) = wantTypeVar pState
+							= (True, (1, 1, type_var, []), pState)
+						_
+							# (type_var, pState) = wantTypeVarT token pState
+							= (True, (1, 0, type_var, []), pState)
+				OpenToken
+					# (type_var,pState) = wantTypeVar pState
+					  (type_vars,pState) = wantList "class variable argument(s)" tryQuantifiedTypeVar pState
+					  pState = wantToken TypeContext "class variable arguments" CloseToken pState
+					-> (True, (0,0,type_var,type_vars), pState)
+				DotToken
+					# (type_var, pState) = wantTypeVar pState
+					-> (True, (0, 1, type_var, []), pState)
+				_
+					# (succ, type_var, pState) = tryTypeVarT token pState
+					-> (succ, (0, 0, type_var, []), pState)
 
-		convert_class_variables [] arg_nr cons_vars
-			= (arg_nr, NoClassArgs, cons_vars)
-		convert_class_variables [(annot,var,[]) : class_vars] arg_nr cons_vars
-			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
-			| annot
-				= (arity, ClassArg var class_vars, cons_vars bitor (1 << arg_nr))
-				= (arity, ClassArg var class_vars, cons_vars)
-		convert_class_variables [(_,var,vars) : class_vars] arg_nr cons_vars
-			# (arity, class_vars, cons_vars) = convert_class_variables class_vars (inc arg_nr) cons_vars
-			= (arity, ClassArgPattern var vars class_vars, cons_vars)
+		convert_class_variables [(fun_dep_var,annot,var,[]) : class_vars] arg_nr fun_dep_vars cons_vars
+			# (arity, class_vars, fun_dep_vars, cons_vars)
+				= convert_class_variables class_vars (arg_nr+1) fun_dep_vars cons_vars
+			#! fun_dep_vars = (fun_dep_vars<<1) bitor fun_dep_var
+			   cons_vars = (cons_vars<<1) bitor annot
+			= (arity, ClassArg var class_vars, fun_dep_vars, cons_vars)
+		convert_class_variables [(_,_,var,vars) : class_vars] arg_nr fun_dep_vars cons_vars
+			# (arity, class_vars, fun_dep_vars, cons_vars)
+				= convert_class_variables class_vars (inc arg_nr) fun_dep_vars cons_vars
+			#! cons_vars = cons_vars<<1
+			= (arity, ClassArgPattern var vars class_vars, fun_dep_vars, cons_vars)
+		convert_class_variables [] arg_nr fun_dep_vars cons_vars
+			= (arg_nr, NoClassArgs, fun_dep_vars, cons_vars)
 
 wantInstanceDeclaration :: !ParseContext !Position !ParseState -> (!ParsedDefinition, !ParseState)
 wantInstanceDeclaration parseContext pi_pos pState
@@ -2146,7 +2249,8 @@ wantGenericDefinition parseContext pos pState
 	# (ident, pState) = stringToIdent name IC_Generic pState
 	# (member_ident, pState) = stringToIdent name IC_Expression pState
 	# (arg_vars, pState) = wantList "generic variable(s)" try_variable pState
-	# (gen_deps, pState) = optionalDependencies pState
+	  (gen_deps, token, pState) = optionalDependencies pState
+	  (gen_use_binumap, pState) = optionalAsteriskExclamation token pState
 	# pState = wantToken TypeContext "generic definition" DoubleColonToken pState
 	# (type, pState) = wantSymbolType pState
 	# pState = wantEndOfDefinition "generic definition" pState
@@ -2157,13 +2261,14 @@ wantGenericDefinition parseContext pos pState
 		,	gen_vars = arg_vars
 		,	gen_deps = gen_deps                 
 		,	gen_pos = pos
+		,	gen_use_binumap = gen_use_binumap
 		,	gen_info_ptr = nilPtr
 		}
 	= (PD_Generic gen_def, pState)	
 	where
 		want_name pState 
 			# (token, pState) = nextToken TypeContext pState
-			= 	case token of
+			= case token of
 				IdentToken name -> (name, pState)
 				_ -> ("", parseError "generic definition" (Yes token) "<identifier>" pState)
 
@@ -2171,12 +2276,21 @@ wantGenericDefinition parseContext pos pState
 			# (token, pState) = nextToken TypeContext pState
 			= tryTypeVarT token pState
 
-		optionalDependencies :: !ParseState -> (![GenericDependency], !ParseState)
+		optionalDependencies :: !ParseState -> (![GenericDependency], !Token, !ParseState)
 		optionalDependencies pState
 			# (token, pState) = nextToken TypeContext pState
 			= case token of 
-				BarToken -> wantSepList "generic dependencies" CommaToken TypeContext wantDependency pState
-				_ -> ([], tokenBack pState)
+				BarToken
+					# (gen_deps, pState) = wantSepList "generic dependencies" CommaToken TypeContext wantDependency pState
+					  (token, pState) = nextToken TypeContext pState
+					-> (gen_deps, token, pState)
+				_ -> ([], token, pState)
+
+		optionalAsteriskExclamation :: !Token !ParseState -> (!Bool, !ParseState)
+		optionalAsteriskExclamation AsteriskToken pState
+			= (True, wantToken TypeContext "generic definition" ExclamationToken pState)
+		optionalAsteriskExclamation token pState
+			= (False, tokenBack pState)
 
 		wantDependency :: !ParseState -> (Bool, GenericDependency, ParseState)
 		wantDependency pState 
@@ -2518,8 +2632,18 @@ wantTypeVar pState
 	# (succ, type_var, pState) = tryTypeVar pState
 	| succ
 		= (type_var, pState)
-		# (token, pState) = nextToken TypeContext pState
-		= (MakeTypeVar erroneousIdent, parseError "Type Variable" (Yes token) "type variable" pState)
+		= wantTypeVarError pState
+
+wantTypeVarT :: !Token !ParseState -> (!TypeVar, !ParseState)
+wantTypeVarT token pState
+	# (succ, type_var, pState) = tryTypeVarT token pState
+	| succ
+		= (type_var, pState)
+		= wantTypeVarError pState
+
+wantTypeVarError pState
+	# (token, pState) = nextToken TypeContext pState
+	= (MakeTypeVar erroneousIdent, parseError "Type Variable" (Yes token) "type variable" pState)
 
 tryAttributedTypeVar :: !ParseState -> (!Bool, ATypeVar, !ParseState)
 tryAttributedTypeVar pState
@@ -3501,37 +3625,75 @@ trySimpleTypeT CurlyOpenToken attr pState
 		| token =: CurlyCloseToken
 			# array_symbol = makeUnboxedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeUnboxedArrayP2Symbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype, pState)			= wantAType_strictness_ignoredT token pState
-  			  pState					= wantToken TypeContext "unboxed array type" CurlyCloseToken pState
-  			  array_symbol = makeUnboxedArraySymbol 1
-  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makeUnboxedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makeUnboxedArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "unboxed array type" (Yes token) "} or :}" pState
+				  array_symbol = makeUnboxedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token =: ExclamationToken
 		# (token, pState) = nextToken TypeContext pState
 		| token =: CurlyCloseToken
 			# array_symbol = makeStrictArraySymbol 0
 			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeStrictArrayP2Symbol 0
+			= (ParseOk,  {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype,pState)			= wantAType_strictness_ignoredT token pState
-  			  pState					= wantToken TypeContext "strict array type" CurlyCloseToken pState
-  			  array_symbol = makeStrictArraySymbol 1
-  			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makeStrictArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makeStrictArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "strict array type" (Yes token) "} or :}" pState
+				  array_symbol = makeStrictArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
 	| token =: (IntToken "32")
 		# pState = wantToken TypeContext "packed array type" HashToken pState
-		# (token, pState) = nextToken TypeContext pState
+		  (token, pState) = nextToken TypeContext pState
 		| token =: CurlyCloseToken
 			# array_symbol =  makePackedArraySymbol 0
 			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
-		// otherwise // token <> CurlyCloseToken
+		| token =: ColonCurlyCloseToken
+			# array_symbol =  makePackedArrayP2Symbol 0
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
 			# (atype, pState) = wantAType_strictness_ignoredT token pState
-			  pState          = wantToken TypeContext "packed array type" CurlyCloseToken pState
-			  array_symbol    = makePackedArraySymbol 1
-			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			  (token, pState) = nextToken TypeContext pState
+			| token =: CurlyCloseToken
+				# array_symbol = makePackedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			| token =: ColonCurlyCloseToken
+				# array_symbol = makePackedArrayP2Symbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+				# pState = parseError "packed array type" (Yes token) "} or :}" pState
+				  array_symbol = makePackedArraySymbol 1
+				= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+	| token =: ColonCurlyCloseToken
+		# array_symbol = makeLazyArrayP2Symbol 0
+		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol []}, pState)
   	// otherwise
 		# (atype,pState)			= wantAType_strictness_ignoredT token pState
-		  pState					= wantToken TypeContext "lazy array type" CurlyCloseToken pState
-		  array_symbol = makeLazyArraySymbol 1
-		= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+		  (token, pState) = nextToken TypeContext pState
+		| token =: CurlyCloseToken
+			# array_symbol = makeLazyArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+		| token =: ColonCurlyCloseToken
+			# array_symbol = makeLazyArrayP2Symbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+			# pState = parseError "lazy array type" (Yes token) "} or :}" pState
+			# array_symbol = makeLazyArraySymbol 1
+			= (ParseOk, {at_attribute = attr, at_type = TA array_symbol [atype]}, pState)
+
 trySimpleTypeT StringTypeToken attr pState
 	# type = makeStringType
 	= (ParseOk, {at_attribute = attr, at_type = type}, pState)
@@ -5798,9 +5960,8 @@ wantModuleName pState
 		UnderscoreIdentToken name -> (name, pState)
 		_				-> ("", parseError "String" (Yes token) "module name" pState)
 
-wantOptionalQualifiedAndModuleName :: !*ParseState -> (!ImportQualified,!{#Char},!*ParseState)
-wantOptionalQualifiedAndModuleName pState
-	# (token, pState) = nextToken ModuleNameContext pState
+wantOptionalQualifiedAndModuleNameT :: !Token !*ParseState -> (!ImportQualified,!{#Char},!*ParseState)
+wantOptionalQualifiedAndModuleNameT token pState
 	= case token of
 		IdentToken name1=:"qualified"
 			# (token, pState) = nextToken ModuleNameContext pState

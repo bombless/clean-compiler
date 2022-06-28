@@ -393,6 +393,118 @@ where
 		# (cur, (t,ts), env) = cleanUpClosed (t,ts) env
 		= (cur, [t:ts], env)
 
+undefinedVarInType :: !Type !VarEnv -> Bool
+undefinedVarInType (TempV tv_number) env
+	= env.[tv_number]=:TE
+undefinedVarInType (TA tc types) env
+	= undefinedVarInATypes types env
+undefinedVarInType (TAS tc types strictness) env
+	= undefinedVarInATypes types env
+undefinedVarInType (argtype --> restype) env
+	= undefinedVarInType argtype.at_type env || undefinedVarInType restype.at_type env
+undefinedVarInType (TArrow1 argtype) env
+	= undefinedVarInType argtype.at_type env
+undefinedVarInType (TempCV tv_number :@: types) env
+	= env.[tv_number]=:TE || undefinedVarInATypes types env
+undefinedVarInType t env
+	= False
+
+undefinedVarInATypes :: ![AType] !VarEnv -> Bool
+undefinedVarInATypes [t:ts] env
+	= undefinedVarInType t.at_type env || undefinedVarInATypes ts env
+undefinedVarInATypes [] env
+	= False
+
+undefinedVarInNonFunDepTypes :: ![Type] !BITVECT !VarEnv -> Bool
+undefinedVarInNonFunDepTypes [t:ts] fun_dep_vars env
+	| fun_dep_vars bitand 1<>0
+		= undefinedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+	| undefinedVarInType t env
+		= True
+		= undefinedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+undefinedVarInNonFunDepTypes [] fun_dep_vars env
+	= False
+
+definedVarInType :: !Type !VarEnv -> Bool
+definedVarInType (TempV tv_number) env
+	= not env.[tv_number]=:TE
+definedVarInType (TA tc types) env
+	= definedVarInATypes types env
+definedVarInType (TAS tc types strictness) env
+	= definedVarInATypes types env
+definedVarInType (argtype --> restype) env
+	= definedVarInType argtype.at_type env || definedVarInType restype.at_type env
+definedVarInType (TArrow1 argtype) env
+	= definedVarInType argtype.at_type env
+definedVarInType (TempCV tv_number :@: types) env
+	= not env.[tv_number]=:TE || definedVarInATypes types env
+definedVarInType t env
+	= False
+
+definedVarInATypes :: ![AType] !VarEnv -> Bool
+definedVarInATypes [t:ts] env
+	= definedVarInType t.at_type env || definedVarInATypes ts env
+definedVarInATypes [] env
+	= False
+
+definedVarInNonFunDepTypes :: ![Type] !BITVECT !VarEnv -> Bool
+definedVarInNonFunDepTypes [t:ts] fun_dep_vars env
+	| fun_dep_vars bitand 1<>0
+		= definedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+	| definedVarInType t env
+		= True
+		= definedVarInNonFunDepTypes ts (fun_dep_vars>>1) env
+definedVarInNonFunDepTypes [] fun_dep_vars env
+	= False
+
+defineVarsInTypeVariable :: !Type !Int !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInTypeVariable TE tv_number env next_var_n type_heaps
+	# (tv_info_ptr, th_vars) = newPtr TVI_Empty type_heaps.th_vars
+	  type_heaps & th_vars = th_vars
+	  env & [tv_number] = TV {tv_ident = NewVarId next_var_n, tv_info_ptr = tv_info_ptr}
+	  next_var_n = next_var_n+1
+	= (env,next_var_n,type_heaps)
+defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInType :: !Type !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInType (TempV tv_number) env next_var_n type_heaps
+	# (type, env) = env![tv_number]
+	= defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+defineVarsInType (TA tc types) env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType (TAS tc types strictness) env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType (argtype --> restype) env next_var_n type_heaps
+	# (env,next_var_n,type_heaps) = defineVarsInType argtype.at_type env next_var_n type_heaps
+	= defineVarsInType restype.at_type env next_var_n type_heaps
+defineVarsInType (TArrow1 argtype) env next_var_n type_heaps
+	= defineVarsInType argtype.at_type env next_var_n type_heaps
+defineVarsInType (TempCV tv_number :@: types) env next_var_n type_heaps
+	# (type, env) = env![tv_number]
+	# (env,next_var_n,type_heaps) = defineVarsInTypeVariable type tv_number env next_var_n type_heaps
+	= defineVarsInATypes types env next_var_n type_heaps
+defineVarsInType t env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInATypes :: ![AType] !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInATypes [{at_type}:ts] env next_var_n type_heaps
+	# (env,next_var_n,type_heaps)
+		= defineVarsInType at_type env next_var_n type_heaps
+	= defineVarsInATypes ts env next_var_n type_heaps
+defineVarsInATypes [] env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
+defineVarsInFunDepTypes :: ![Type] !BITVECT !*VarEnv !Int !*TypeHeaps -> (!*VarEnv,!Int,!*TypeHeaps)
+defineVarsInFunDepTypes [t:ts] fun_dep_vars env next_var_n type_heaps
+	| fun_dep_vars bitand 1==0
+		= defineVarsInFunDepTypes ts (fun_dep_vars>>1) env next_var_n type_heaps
+	# (env,next_var_n,type_heaps)
+		= defineVarsInType t env next_var_n type_heaps
+	= defineVarsInFunDepTypes ts (fun_dep_vars>>1) env next_var_n type_heaps
+defineVarsInFunDepTypes [] fun_dep_vars env next_var_n type_heaps
+	= (env,next_var_n,type_heaps)
+
 errorHeading :: !String !*ErrorAdmin -> *ErrorAdmin
 errorHeading error_kind err=:{ea_file,ea_loc = []}
 	= { err & ea_file = ea_file <<< error_kind <<< ':', ea_ok = False }
@@ -552,7 +664,7 @@ cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !
 																   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 				  -> (!SymbolType,![AttrInequality],!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
-		coercions attr_part common_defs var_env attr_var_env heaps var_heap expr_heap error
+		coercions attr_part defs var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
 	# cus = { cus_var_env = var_env, cus_attr_env = attr_var_env, cus_appears_in_lifted_part = bitvectCreate max_attr_nr,
@@ -560,19 +672,27 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 	  cui = { cui_coercions = coercions, cui_attr_part = attr_part, cui_is_lifted_part = True }
 	  (lifted_args, cus=:{cus_var_env}) = clean_up cui (take tst_lifted tst_args) cus
 	  cui & cui_is_lifted_part = False
+	  (cus_var_env,cus_var_store,cus_heaps)
+		= if (spec_type && not lifted_args=:[])
+			(mark_dependent_type_vars_in_fun_dep_type_contexts derived_context defs True cus_var_env cus.cus_var_store cus.cus_heaps)
+			(cus_var_env,cus.cus_var_store,cus.cus_heaps)
 	  (lifted_vars, cus_var_env) = determine_lifted_type_vars nr_of_temp_vars cus_var_env
-	  cus & cus_var_env=cus_var_env
+	  cus & cus_var_env=cus_var_env,cus_var_store=cus_var_store,cus_heaps=cus_heaps
 	  (st_args, cus) = clean_up_arg_types cui tst_lifted tst_args cus
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
-	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
-		= clean_up_type_contexts spec_type tst_context derived_context [!!] common_defs cus.cus_var_env cus.cus_heaps var_heap cus.cus_error
+	  (cus_var_env,cus_var_store,cus_heaps)
+		= if (not spec_type)
+			(mark_dependent_type_vars_in_fun_dep_type_contexts derived_context defs False cus.cus_var_env cus.cus_var_store cus.cus_heaps)
+			(cus.cus_var_env,cus.cus_var_store,cus.cus_heaps)
+	  (st_context, ambiguous_or_missing_contexts, cus_var_env, cus_heaps, var_heap, cus_error)
+		= clean_up_type_contexts spec_type tst_context derived_context [!!] defs cus_var_env cus_heaps var_heap cus.cus_error
 	  (st_vars, cus_var_env) = determine_type_vars nr_of_temp_vars lifted_vars cus_var_env
 	  (cus_attr_env, attr_vars, lifted_attr_vars, st_attr_env, lifted_attr_env, cus_error)
 			= build_attribute_environment cus.cus_appears_in_lifted_part max_attr_nr coercions cus.cus_attr_env cus_error
 	  st_attr_vars = lifted_attr_vars ++ attr_vars
 	  (expr_heap, {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps})
 			= clean_up_expression_types case_and_let_exprs expr_heap
-					 {cuets_var_env=cus_var_env,cuets_heaps=type_heaps,cuets_var_store=cus.cus_var_store}
+				  {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps,cuets_var_store=cus_var_store}
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
 	  cus_error = check_type_of_start_rule is_start_rule st cus_error
@@ -620,12 +740,17 @@ cleanUpLocalSymbolType {tst_arity,tst_args,tst_result,tst_context,tst_lifted} ex
 
 	  (lifted_args, cus=:{cus_var_env,cus_error,cus_appears_in_lifted_part}) = clean_up cui (take tst_lifted tst_args) cus
 	  cui & cui_is_lifted_part = False
+	  (cus_var_env,cus_var_store,cus_heaps)
+		= if (not lifted_args=:[])
+			(mark_dependent_type_vars_in_fun_dep_type_contexts derived_context common_defs False cus_var_env cus.cus_var_store cus.cus_heaps)
+			(cus_var_env,cus.cus_var_store,cus.cus_heaps)
 	  (new_and_old_external_type_vars,cus_var_env,cus_error) = prevent_lift_of_external_type_vars external_type_vars cus_var_env cus_error
 	  (lifted_vars, cus_var_env) = determine_type_vars_and_restore_lifted_vars nr_of_temp_vars cus_var_env
 	  external_vars = bitvectCreate max_attr_nr
 	  (new_and_old_external_attr_vars,cus_appears_in_lifted_part,external_vars,cus_attr_env,cus_error)
 		= remove_external_attr_vars cui external_attr_vars cus_appears_in_lifted_part external_vars cus.cus_attr_env cus_error
-	  cus & cus_appears_in_lifted_part=cus_appears_in_lifted_part, cus_var_env=cus_var_env, cus_attr_env=cus_attr_env, cus_error=cus_error
+	  cus & cus_appears_in_lifted_part=cus_appears_in_lifted_part, cus_var_env=cus_var_env, cus_attr_env=cus_attr_env, cus_error=cus_error,
+			cus_var_store=cus_var_store, cus_heaps=cus_heaps
 	  (st_args, cus) = clean_up_arg_types cui tst_lifted tst_args cus
 	  (st_result, cus) = clean_up_result_type cui tst_result cus
 	  (st_context, ambiguous_or_missing_contexts, cus_var_env, type_heaps, var_heap, cus_error)
@@ -748,6 +873,30 @@ clean_up_result_type cui at cus
 	| isEmpty cus_exis_vars
 		= (at, cus)
 		= (at, { cus & cus_error = existentialError cus.cus_error })
+
+mark_dependent_type_vars_in_fun_dep_type_contexts :: ![TypeContext] !{#CommonDefs} !Bool !*{!Type} !Int !*TypeHeaps -> (!*{!Type},!Int,!*TypeHeaps)
+mark_dependent_type_vars_in_fun_dep_type_contexts contexts defs require_defined_var env next_var_n type_heaps
+	#! previous_next_var_n = next_var_n
+	# (contexts, env, next_var_n, type_heaps)
+		= mark_dependent_type_vars_in_fun_dep_type_contexts_pass contexts [] defs require_defined_var env next_var_n type_heaps
+	| next_var_n==previous_next_var_n || contexts=:[]
+		= (env, next_var_n, type_heaps)
+		= mark_dependent_type_vars_in_fun_dep_type_contexts contexts defs require_defined_var env next_var_n type_heaps
+where
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [tc=:{tc_class=TCClass {glob_object={ds_index,ds_ident},glob_module},tc_types}:tcs] contexts defs require_defined_var env next_var_n type_heaps
+		# class_fun_dep_vars = defs.[glob_module].com_class_defs.[ds_index].class_fun_dep_vars
+		| class_fun_dep_vars<>0
+			| undefinedVarInNonFunDepTypes tc_types class_fun_dep_vars env
+				= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs [tc:contexts] defs require_defined_var env next_var_n type_heaps
+			| not require_defined_var || definedVarInNonFunDepTypes tc_types class_fun_dep_vars env
+				# (env,next_var_n,type_heaps) = defineVarsInFunDepTypes tc_types class_fun_dep_vars env next_var_n type_heaps
+				= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs require_defined_var env next_var_n type_heaps
+				= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs require_defined_var env next_var_n type_heaps
+			= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs require_defined_var env next_var_n type_heaps
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [_:tcs] contexts defs require_defined_var env next_var_n type_heaps
+		= mark_dependent_type_vars_in_fun_dep_type_contexts_pass tcs contexts defs require_defined_var env next_var_n type_heaps
+	mark_dependent_type_vars_in_fun_dep_type_contexts_pass [] contexts defs require_defined_var env next_var_n type_heaps
+		= (contexts,env,next_var_n,type_heaps)
 
 clean_up_type_contexts spec_type spec_context derived_context external_type_vars common_defs env type_heaps var_heap error
 	| spec_type
@@ -917,6 +1066,9 @@ where
 		| checkCleanUpResult cur cLiftedVar
 			| checkCleanUpResult cur cDefinedVar
 				# error = liftedContextError (toString tc.tc_class) error
+				= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
+			| checkCleanUpResult cur cUndefinedVar
+				# ambiguous_or_missing_contexts = AmbiguousContext {tc & tc_types=tc_types} ambiguous_or_missing_contexts
 				= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
 				# collected_contexts = [{tc & tc_types = tc_types}:collected_contexts]
 				= (collected_contexts,ambiguous_or_missing_contexts,env,var_heap,error)
@@ -2085,6 +2237,22 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob
 				= (file <<< "String", opt_beautifulizer)
 			| glob_object==PD_UnitTypeIndex
 				= (file <<< "()", opt_beautifulizer)
+			| glob_object==PD_LazyArrayTypeIndex
+				= (file <<< "{}", opt_beautifulizer)
+			| glob_object==PD_StrictArrayTypeIndex
+				= (file <<< "{!}", opt_beautifulizer)
+			| glob_object==PD_UnboxedArrayTypeIndex
+				= (file <<< "{#}", opt_beautifulizer)
+			| glob_object==PD_PackedArrayTypeIndex
+				= (file <<< "{32#}", opt_beautifulizer)
+			| glob_object==PD_LazyArrayP2TypeIndex
+				= (file <<< "{:}", opt_beautifulizer)
+			| glob_object==PD_StrictArrayP2TypeIndex
+				= (file <<< "{!:}", opt_beautifulizer)
+			| glob_object==PD_UnboxedArrayP2TypeIndex
+				= (file <<< "{#:}", opt_beautifulizer)
+			| glob_object==PD_PackedArrayP2TypeIndex
+				= (file <<< "{32#:}", opt_beautifulizer)
 				= (file <<< type_ident, opt_beautifulizer)
 		| glob_object==PD_ListTypeIndex
 			= writeWithinBrackets "[" "]" file opt_beautifulizer (setProperty form cCommaSeparator, types)
@@ -2106,6 +2274,14 @@ writeTypeTA	file opt_beautifulizer form {type_ident,type_index={glob_module,glob
 			= writeWithinBrackets "{#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object==PD_PackedArrayTypeIndex
 			= writeWithinBrackets "{32#" "}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_LazyArrayP2TypeIndex
+			= writeWithinBrackets "{" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_StrictArrayP2TypeIndex
+			= writeWithinBrackets "{!" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_UnboxedArrayP2TypeIndex
+			= writeWithinBrackets "{#" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
+		| glob_object==PD_PackedArrayP2TypeIndex
+			= writeWithinBrackets "{32#" ":}" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object>=PD_Arity2TupleTypeIndex && glob_object<=PD_Arity32TupleTypeIndex
 			= writeWithinBrackets "(" ")" file opt_beautifulizer (setProperty form cCommaSeparator, types)
 		| glob_object==PD_MaybeTypeIndex
@@ -2540,6 +2716,7 @@ anonymizeAttrVars st=:{st_attr_vars, st_args, st_result, st_attr_env} implicit_i
 						st_attr_vars th_attrs
 		= foldSt count_attr_vars_of_atype st_args (count_attr_vars_of_atype st_result th_attrs)
 	where
+		count_attr_vars_of_atype :: !AType !*AttrVarHeap -> *AttrVarHeap
 		count_attr_vars_of_atype {at_attribute=TA_Var {av_info_ptr}, at_type} th_attrs
 			# (av_info,th_attrs) = readPtr av_info_ptr th_attrs
 			= case av_info of
@@ -2955,28 +3132,29 @@ accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r,
 foldATypeSt on_atype on_type type st :== fold_atype_st type st
   where
 	fold_type_st type=:(TA type_symb_ident args) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type=:(TAS type_symb_ident args _) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type=:(l --> r) st
-		#! st
-				= fold_atype_st r (fold_atype_st l st)
+		#! st = fold_atype_st r (fold_atype_st l st)
 		= on_type type st
 	fold_type_st type=:(TArrow1 t) st
 		#! st = fold_atype_st t st
 		= on_type type st	
 	fold_type_st type=:(_ :@: args) st
-		#! st
-				= foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type st
 		= on_type type st
 
 	fold_atype_st atype=:{at_type} st
-		#! st
-				= fold_type_st at_type st
+		#! st = fold_type_st at_type st
 		= on_atype atype st
+
+	fold_args [a:x] st
+		#! st = fold_atype_st a st
+		= fold_args x st
+	fold_args [] st
+		= st

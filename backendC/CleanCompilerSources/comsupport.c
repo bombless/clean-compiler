@@ -307,6 +307,10 @@ static char *ConvertTypeSymbolKindToString (SymbKind skind)
 		case strict_array_type:	return "{ ! }";
 		case unboxed_array_type:return "{ # }";
 		case packed_array_type: return "{ 32# }";
+		case arrayp2_type:		return "{ :}";
+		case strict_arrayp2_type:	return "{ ! :}";
+		case unboxed_arrayp2_type:return "{ # :}";
+		case packed_arrayp2_type: return "{ 32# :}";
 		case world_type:	return "World";
 		case procid_type:	return "ProcId";
 		case redid_type:	return "RedId";
