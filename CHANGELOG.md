@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.0
+
+- Feature: add `{ :}`, `{! :}`, `{# :}`, and `{32# :}` array types which
+  reserve up to the next power of 2 of memory. This uses the ABC instructions
+  `create_arrayp2` and `create_arrayp2_`.
+- Feature: add functional dependencies (backported from the iTasks compiler).
+- Feature: add `import qualified .. as ..` (backported from the iTasks
+  compiler).
+- Feature: add `binumap` (backported from the iTasks compiler).
+- Fix: fix printing of higher-order array types.
+- Fix: prevent stack overflow when compiling very large function types.
+
 #### v2.0.1
 
 - Chore: allow `base-stdenv` ^2.0.
