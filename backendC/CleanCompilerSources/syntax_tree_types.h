@@ -4,11 +4,12 @@ typedef enum {
 	file_type, world_type, procid_type, redid_type,
 	fun_type,
 	array_type, strict_array_type, unboxed_array_type, packed_array_type,
+	arrayp2_type, strict_arrayp2_type, unboxed_arrayp2_type, packed_arrayp2_type,
 	list_type, maybe_type, tuple_type,
 	dynamic_type,
 	apply_type_symb,
 	NTypeSymbKinds,
-	type_definition = 20
+	type_definition = 24
 } TypeSymbKind;
 
 #define Nr_Of_Predef_Types apply_type_symb

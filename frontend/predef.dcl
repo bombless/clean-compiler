@@ -40,12 +40,17 @@ PD_StrictArrayTypeIndex :== 40
 PD_UnboxedArrayTypeIndex :== 41
 PD_PackedArrayTypeIndex :== 42
 
-PD_MaybeTypeIndex :== 43
-PD_StrictMaybeTypeIndex :== 44
-PD_UnboxedMaybeTypeIndex :== 45
-//PD_OverloadedMaybeTypeIndex :== 46
+PD_LazyArrayP2TypeIndex :== 43
+PD_StrictArrayP2TypeIndex :== 44
+PD_UnboxedArrayP2TypeIndex :== 45
+PD_PackedArrayP2TypeIndex :== 46
 
-PD_UnitTypeIndex :== 47
+PD_MaybeTypeIndex :== 47
+PD_StrictMaybeTypeIndex :== 48
+PD_UnboxedMaybeTypeIndex :== 49
+//PD_OverloadedMaybeTypeIndex :== 50
+
+PD_UnitTypeIndex :== 51
 
 /* identifiers not present the hashtable */
 
@@ -71,271 +76,282 @@ PD_StrictArrayType			:== 41
 PD_UnboxedArrayType			:== 42
 PD_PackedArrayType			:== 43
 
-// same order as in MaybeIdentToken
-PD_MaybeType :== 44
-PD_StrictMaybeType :== 45
-PD_UnboxedMaybeType :== 46
-PD_OverloadedMaybeType :== 47
+PD_LazyArrayP2Type			:== 44
+PD_StrictArrayP2Type		:== 45
+PD_UnboxedArrayP2Type		:== 46
+PD_PackedArrayP2Type		:== 47
 
-PD_UnitType :== 48
+// same order as in MaybeIdentToken
+PD_MaybeType :== 48
+PD_StrictMaybeType :== 49
+PD_UnboxedMaybeType :== 50
+PD_OverloadedMaybeType :== 51
+
+PD_UnitType :== 52
 
 // constructors:
 
 FirstConstructorPredefinedSymbolIndex :== PD_ConsSymbol; // to compute index in com_cons_defs
 
-PD_ConsSymbol :== 49
-PD_StrictConsSymbol :== 50
-PD_UnboxedConsSymbol :== 51
-PD_TailStrictConsSymbol :== 52
-PD_StrictTailStrictConsSymbol :== 53
-PD_UnboxedTailStrictConsSymbol :== 54
-PD_OverloadedConsSymbol :== 55
+PD_ConsSymbol :== 53
+PD_StrictConsSymbol :== 54
+PD_UnboxedConsSymbol :== 55
+PD_TailStrictConsSymbol :== 56
+PD_StrictTailStrictConsSymbol :== 57
+PD_UnboxedTailStrictConsSymbol :== 58
+PD_OverloadedConsSymbol :== 59
 
-PD_NilSymbol :== 56
-PD_StrictNilSymbol :== 57
-PD_UnboxedNilSymbol :== 58
-PD_TailStrictNilSymbol :== 59
-PD_StrictTailStrictNilSymbol :== 60
-PD_UnboxedTailStrictNilSymbol :== 61
-PD_OverloadedNilSymbol :== 62
+PD_NilSymbol :== 60
+PD_StrictNilSymbol :== 61
+PD_UnboxedNilSymbol :== 62
+PD_TailStrictNilSymbol :== 63
+PD_StrictTailStrictNilSymbol :== 64
+PD_UnboxedTailStrictNilSymbol :== 65
+PD_OverloadedNilSymbol :== 66
 
-PD_Arity2TupleSymbol		:== 63
-PD_Arity32TupleSymbol		:== 93
+PD_Arity2TupleSymbol		:== 67
+PD_Arity32TupleSymbol		:== 97
 
 // same order as in MaybeIdentToken
-PD_JustSymbol :== 94
-PD_NoneSymbol :== 95
-PD_StrictJustSymbol :== 96
-PD_StrictNoneSymbol :== 97
-PD_UnboxedJustSymbol :== 98
-PD_UnboxedNoneSymbol :== 99
-PD_OverloadedJustSymbol :== 100
-PD_OverloadedNoneSymbol :== 101
+PD_JustSymbol :== 98
+PD_NoneSymbol :== 99
+PD_StrictJustSymbol :== 100
+PD_StrictNoneSymbol :== 101
+PD_UnboxedJustSymbol :== 102
+PD_UnboxedNoneSymbol :== 103
+PD_OverloadedJustSymbol :== 104
+PD_OverloadedNoneSymbol :== 105
 
-PD_UnitConsSymbol :== 102
+PD_UnitConsSymbol :== 106
 
 // end constructors
 
-PD_TypeVar_a0				:== 103
-PD_TypeVar_a31				:== 134
+PD_TypeVar_a0				:== 107
+PD_TypeVar_a31				:== 138
 
 /* identifiers present in the hashtable */
 
-PD_StdArray					:== 135
-PD_StdEnum					:== 136
-PD_StdBool					:== 137
+PD_StdArray					:== 139
+PD_StdEnum					:== 140
+PD_StdBool					:== 141
 
-PD_AndOp					:== 138
-PD_OrOp						:== 139
+PD_AndOp					:== 142
+PD_OrOp						:== 143
 
 /* Array functions */
 
-PD_ArrayClass				:== 140
+PD_ArrayClass				:== 144
 
-PD_CreateArrayFun			:== 141
-PD__CreateArrayFun			:== 142
-PD_ArraySelectFun			:== 143
-PD_UnqArraySelectFun		:== 144
-PD_ArrayUpdateFun			:== 145
-PD_ArrayReplaceFun			:== 146
-PD_ArraySizeFun				:== 147
-PD_UnqArraySizeFun			:== 148
+PD_CreateArrayFun			:== 145
+PD__CreateArrayFun			:== 146
+PD_ArraySelectFun			:== 147
+PD_UnqArraySelectFun		:== 148
+PD_ArrayUpdateFun			:== 149
+PD_ArrayReplaceFun			:== 150
+PD_ArraySizeFun				:== 151
+PD_UnqArraySizeFun			:== 152
 
 /* Enum/Comprehension functions */
 
-PD_SmallerFun				:== 149
-PD_LessOrEqualFun			:== 150
-PD_IncFun					:== 151
-PD_SubFun					:== 152
-PD_From						:== 153
-PD_FromThen					:== 154
-PD_FromTo					:== 155
-PD_FromThenTo				:== 156
+PD_SmallerFun				:== 153
+PD_LessOrEqualFun			:== 154
+PD_IncFun					:== 155
+PD_SubFun					:== 156
+PD_From						:== 157
+PD_FromThen					:== 158
+PD_FromTo					:== 159
+PD_FromThenTo				:== 160
 
 /* StdMisc */
-PD_StdMisc					:== 157
-PD_abort					:== 158
-PD_undef					:== 159
+PD_StdMisc					:== 161
+PD_abort					:== 162
+PD_undef					:== 163
 
-PD_Start					:== 160
+PD_Start					:== 164
 
-PD_DummyForStrictAliasFun	:== 161
+PD_DummyForStrictAliasFun	:== 165
 
 // StdStrictLists
-PD_StdStrictLists:==162
+PD_StdStrictLists:==166
 
-PD_cons:==163
-PD_decons:==164
+PD_cons:==167
+PD_decons:==168
 
-PD_cons_u:==165
-PD_decons_u:==166
+PD_cons_u:==169
+PD_decons_u:==170
 
-PD_cons_uts:==167
-PD_decons_uts:==168
+PD_cons_uts:==171
+PD_decons_uts:==172
 
-PD_nil:==169
-PD_nil_u:==170
-PD_nil_uts:==171
+PD_nil:==173
+PD_nil_u:==174
+PD_nil_uts:==175
 
-PD_ListClass :== 172
-PD_UListClass :== 173
-PD_UTSListClass :== 174
+PD_ListClass :== 176
+PD_UListClass :== 177
+PD_UTSListClass :== 178
 
 // StdStrictMaybes
-PD_StdStrictMaybes:==175
+PD_StdStrictMaybes:==179
 
 // same order as in MaybeIdentToken
-PD_just_u:==176
-PD_none_u:==177
-PD_just:==178
-PD_none:==179
+PD_just_u:==180
+PD_none_u:==181
+PD_just:==182
+PD_none:==183
 
-PD_from_just_u:==180
-PD_from_just:==181
+PD_from_just_u:==184
+PD_from_just:==185
 
-PD_MaybeClass :== 182
-PD_UMaybeClass :== 183
+PD_MaybeClass :== 186
+PD_UMaybeClass :== 187
 
 /* Dynamics */
 
 // TC class
-PD_TypeCodeMember			:== 184
-PD_TypeCodeClass			:== 185
+PD_TypeCodeMember			:== 188
+PD_TypeCodeClass			:== 189
 // dynamic module
-PD_StdDynamic				:== 186
+PD_StdDynamic				:== 190
 // dynamic type
-PD_Dyn_DynamicTemp				:== 187
+PD_Dyn_DynamicTemp				:== 191
 // type code (type)
-PD_Dyn_TypeCode					:== 188
+PD_Dyn_TypeCode					:== 192
 // unification (type)
-PD_Dyn_UnificationEnvironment	:== 189
+PD_Dyn_UnificationEnvironment	:== 193
 // type code (expressions)
-PD_Dyn_TypeScheme			:== 190
-PD_Dyn_TypeApp				:== 191
-PD_Dyn_TypeVar				:== 192
-PD_Dyn_TypeCons				:== 193
-PD_Dyn_TypeUnique			:== 194
-PD_Dyn__TypeFixedVar		:== 195
+PD_Dyn_TypeScheme			:== 194
+PD_Dyn_TypeApp				:== 195
+PD_Dyn_TypeVar				:== 196
+PD_Dyn_TypeCons				:== 197
+PD_Dyn_TypeUnique			:== 198
+PD_Dyn__TypeFixedVar		:== 199
 // unification (expressions)
-PD_Dyn_initial_unification_environment	:== 196
-PD_Dyn_bind_global_type_pattern_var_n	:== 197
-PD_Dyn_unify							:== 198
-PD_Dyn_unify_							:== 199
-PD_Dyn_unify_tcs						:== 200
-PD_Dyn_normalise						:== 201
+PD_Dyn_initial_unification_environment	:== 200
+PD_Dyn_bind_global_type_pattern_var_n	:== 201
+PD_Dyn_unify							:== 202
+PD_Dyn_unify_							:== 203
+PD_Dyn_unify_tcs						:== 204
+PD_Dyn_normalise						:== 205
 
 /* Generics */
-PD_StdGeneric				:== 202
+PD_StdGeneric				:== 206
 // Generics types
-PD_TypeUNIT					:== 203
-PD_TypeEITHER				:== 204
-PD_TypePAIR					:== 205
+PD_TypeUNIT					:== 207
+PD_TypeEITHER				:== 208
+PD_TypePAIR					:== 209
 // for constructor info
-PD_TypeCONS					:== 206
-PD_TypeRECORD				:== 207
-PD_TypeFIELD				:== 208
-PD_TypeOBJECT				:== 209
-PD_TGenericConsDescriptor	:== 210
-PD_TGenericRecordDescriptor	:== 211
-PD_TGenericFieldDescriptor 	:== 212
-PD_TGenericTypeDefDescriptor :== 213
-PD_TGenConsPrio				:== 214
-PD_TGenConsAssoc			:== 215
-PD_TGenType					:== 216
+PD_TypeCONS					:== 210
+PD_TypeRECORD				:== 211
+PD_TypeFIELD				:== 212
+PD_TypeOBJECT				:== 213
+PD_TGenericConsDescriptor	:== 214
+PD_TGenericRecordDescriptor	:== 215
+PD_TGenericFieldDescriptor 	:== 216
+PD_TGenericTypeDefDescriptor :== 217
+PD_TGenConsPrio				:== 218
+PD_TGenConsAssoc			:== 219
+PD_TGenType					:== 220
 
-PD_TypeGenericDict 			:== 217
-PD_TypeGenericDict0			:== 218
+PD_TypeGenericDict 			:== 221
+PD_TypeGenericDict0			:== 222
 // Generics expression
-PD_ConsUNIT					:== 219
-PD_ConsLEFT					:== 220
-PD_ConsRIGHT				:== 221
-PD_ConsPAIR					:== 222
+PD_ConsUNIT					:== 223
+PD_ConsLEFT					:== 224
+PD_ConsRIGHT				:== 225
+PD_ConsPAIR					:== 226
 // for constructor info
-PD_ConsCONS					:== 223
-PD_ConsRECORD				:== 224
-PD_ConsFIELD				:== 225
-PD_ConsOBJECT				:== 226
-PD_CGenericConsDescriptor 	:== 227
-PD_CGenericRecordDescriptor	:== 228
-PD_CGenericFieldDescriptor 	:== 229
-PD_CGenericTypeDefDescriptor :== 230
-PD_CGenConsNoPrio			:== 231
-PD_CGenConsPrio				:== 232
-PD_CGenConsAssocNone		:== 233
-PD_CGenConsAssocLeft		:== 234
-PD_CGenConsAssocRight		:== 235
-PD_CGenTypeCons				:== 236
-PD_CGenTypeVar				:== 237
-PD_CGenTypeArrow			:== 238
-PD_CGenTypeApp				:== 239
+PD_ConsCONS					:== 227
+PD_ConsRECORD				:== 228
+PD_ConsFIELD				:== 229
+PD_ConsOBJECT				:== 230
+PD_CGenericConsDescriptor 	:== 231
+PD_CGenericRecordDescriptor	:== 232
+PD_CGenericFieldDescriptor 	:== 233
+PD_CGenericTypeDefDescriptor :== 234
+PD_CGenConsNoPrio			:== 235
+PD_CGenConsPrio				:== 236
+PD_CGenConsAssocNone		:== 237
+PD_CGenConsAssocLeft		:== 238
+PD_CGenConsAssocRight		:== 239
+PD_CGenTypeCons				:== 240
+PD_CGenTypeVar				:== 241
+PD_CGenTypeArrow			:== 242
+PD_CGenTypeApp				:== 243
 
-PD_GenericBimap				:== 240
+PD_GenericBimap				:== 244
+PD_GenericBinumap			:== 245
 
-PD__SystemEnumStrict:==241
+PD__SystemEnumStrict:==246
 
-PD_FromS					:== 242
-PD_FromTS					:== 243
-PD_FromSTS					:== 244
-PD_FromU					:== 245
-PD_FromUTS					:== 246
-PD_FromO					:== 247
+PD_FromS					:== 247
+PD_FromTS					:== 248
+PD_FromSTS					:== 249
+PD_FromU					:== 250
+PD_FromUTS					:== 251
+PD_FromO					:== 252
 
-PD_FromThenS				:== 248
-PD_FromThenTS				:== 249
-PD_FromThenSTS				:== 250
-PD_FromThenU				:== 251
-PD_FromThenUTS				:== 252
-PD_FromThenO				:== 253
+PD_FromThenS				:== 253
+PD_FromThenTS				:== 254
+PD_FromThenSTS				:== 255
+PD_FromThenU				:== 256
+PD_FromThenUTS				:== 257
+PD_FromThenO				:== 258
 
-PD_FromToS					:== 254
-PD_FromToTS					:== 255
-PD_FromToSTS				:== 256
-PD_FromToU					:== 257
-PD_FromToUTS				:== 258
-PD_FromToO					:== 259
+PD_FromToS					:== 259
+PD_FromToTS					:== 260
+PD_FromToSTS				:== 261
+PD_FromToU					:== 262
+PD_FromToUTS				:== 263
+PD_FromToO					:== 264
 
-PD_FromThenToS				:== 260
-PD_FromThenToTS				:== 261
-PD_FromThenToSTS			:== 262
-PD_FromThenToU				:== 263
-PD_FromThenToUTS			:== 264
-PD_FromThenToO				:== 265
+PD_FromThenToS				:== 265
+PD_FromThenToTS				:== 266
+PD_FromThenToSTS			:== 267
+PD_FromThenToU				:== 268
+PD_FromThenToUTS			:== 269
+PD_FromThenToO				:== 270
 
-PD_Dyn__to_TypeCodeConstructor	:== 266
-PD_TypeCodeConstructor :== 267
+PD_Dyn__to_TypeCodeConstructor	:== 271
+PD_TypeCodeConstructor :== 272
 
-PD_TC_Int			:== 268
-PD_TC_Char			:== 269
-PD_TC_Real			:== 270
-PD_TC_Bool			:== 271
-PD_TC_Dynamic		:== 272
-PD_TC_File			:== 273
-PD_TC_World			:== 274
+PD_TC_Int			:== 273
+PD_TC_Char			:== 274
+PD_TC_Real			:== 275
+PD_TC_Bool			:== 276
+PD_TC_Dynamic		:== 277
+PD_TC_File			:== 278
+PD_TC_World			:== 279
 
-PD_TC__Arrow		:== 275
+PD_TC__Arrow		:== 280
 
-PD_TC__List			:== 276
-PD_TC__StrictList	:== 277
-PD_TC__UnboxedList	:== 278
-PD_TC__TailStrictList	:== 279
-PD_TC__StrictTailStrictList	:== 280
-PD_TC__UnboxedTailStrictList	:== 281
+PD_TC__List			:== 281
+PD_TC__StrictList	:== 282
+PD_TC__UnboxedList	:== 283
+PD_TC__TailStrictList	:== 284
+PD_TC__StrictTailStrictList	:== 285
+PD_TC__UnboxedTailStrictList	:== 286
 
-PD_TC__Tuple2		:== 282
-PD_TC__Tuple32		:== 312
+PD_TC__Tuple2		:== 287
+PD_TC__Tuple32		:== 317
 
-PD_TC__LazyArray	:== 313
-PD_TC__StrictArray	:== 314
-PD_TC__UnboxedArray	:== 315
-PD_TC__PackedArray	:== 316
+PD_TC__LazyArray	:== 318
+PD_TC__StrictArray	:== 319
+PD_TC__UnboxedArray	:== 320
+PD_TC__PackedArray	:== 321
 
-PD_TC__Maybe		:== 317
-PD_TC__StrictMaybe	:== 318
-PD_TC__UnboxedMaybe	:== 319
+PD_TC__LazyArrayP2	:== 322
+PD_TC__StrictArrayP2	:== 323
+PD_TC__UnboxedArrayP2	:== 324
+PD_TC__PackedArrayP2	:== 325
 
-PD_TC__Unit			:== 320
+PD_TC__Maybe		:== 326
+PD_TC__StrictMaybe	:== 327
+PD_TC__UnboxedMaybe	:== 328
 
-PD_NrOfPredefSymbols		:== 321
+PD_TC__Unit			:== 329
+
+PD_NrOfPredefSymbols		:== 330
 
 GetTupleConsIndex tup_arity :== PD_Arity2TupleSymbol + tup_arity - 2
 GetTupleTypeIndex tup_arity :== PD_Arity2TupleType + tup_arity - 2

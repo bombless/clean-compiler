@@ -297,7 +297,7 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 				} else
 					state_p->state_tuple_arguments[i] = arg_type_node->type_node_annotation==NoAnnot ? LazyState : StrictState;
 			}
-		} else if (obj_kind==UnboxedArrayObj || obj_kind==StrictArrayObj || obj_kind==ArrayObj || obj_kind==PackedArrayObj){
+		} else if (obj_kind>=ArrayObj && obj_kind<=PackedArrayP2Obj){
 			TypeNode element_node;
 				
 			element_node=type->type_node_arguments->type_arg_node;
@@ -305,18 +305,23 @@ void ConvertTypeToState (TypeNode type,StateS *state_p,StateKind kind)
 			state_p->state_arity			= 1;
 			state_p->state_array_arguments	= NewArrayOfStates (1);
 			state_p->state_type				= ArrayState;
-			state_p->state_mark=0;
+			state_p->state_mark = 0;
+			state_p->state_arrayp2 = obj_kind>=ArrayP2Obj;
 
 			switch (obj_kind){
 				case ArrayObj:
+				case ArrayP2Obj:
 					SetUnaryState (& state_p->state_array_arguments [0], OnA, UnknownObj);
 					break;
 				case StrictArrayObj:
+				case StrictArrayP2Obj:
 					state_p->state_array_arguments [0] = StrictState;
 					break;
 				case PackedArrayObj:
+				case PackedArrayP2Obj:
 					state_p->state_mark |= STATE_PACKED_ARRAY_MASK;
 				case UnboxedArrayObj:
+				case UnboxedArrayP2Obj:
 					if (element_node->type_node_is_var)
 						state_p->state_array_arguments [0] = StrictState;
 					else
@@ -4681,6 +4686,10 @@ void InitStatesGen (void)
 	SetUnaryState (& BasicTypeSymbolStates[strict_array_type], StrictOnA, StrictArrayObj);
 	SetUnaryState (& BasicTypeSymbolStates[unboxed_array_type], StrictOnA, UnboxedArrayObj);
 	SetUnaryState (& BasicTypeSymbolStates[packed_array_type], StrictOnA, PackedArrayObj);
+	SetUnaryState (& BasicTypeSymbolStates[arrayp2_type], StrictOnA, ArrayP2Obj);
+	SetUnaryState (& BasicTypeSymbolStates[strict_arrayp2_type], StrictOnA, StrictArrayP2Obj);
+	SetUnaryState (& BasicTypeSymbolStates[unboxed_arrayp2_type], StrictOnA, UnboxedArrayP2Obj);
+	SetUnaryState (& BasicTypeSymbolStates[packed_arrayp2_type], StrictOnA, PackedArrayP2Obj);
 	SetUnaryState (& BasicTypeSymbolStates[fun_type], StrictOnA, UnknownObj);
 	SetUnaryState (& BasicTypeSymbolStates[list_type], StrictOnA, ListObj);
 	SetUnaryState (& BasicTypeSymbolStates[maybe_type], StrictOnA, MaybeObj);

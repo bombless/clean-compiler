@@ -51,6 +51,7 @@ instance == FunctionOrMacroIndex
 				| STE_Instance
 				| STE_Variable !VarInfoPtr
 				| STE_TypeVariable !TypeVarInfoPtr
+				| STE_FunDepTypeVariable !TypeVarInfoPtr
 				| STE_BoundTypeVariable !STE_BoundTypeVariable
 				| STE_Imported !STE_Kind !ModuleN
 				| STE_DclFunction
@@ -71,6 +72,7 @@ instance == FunctionOrMacroIndex
 				| STE_BelongingSymbol !Int
 				| STE_ExplImpSymbolNotImported !ModuleN !STE_Kind
 				| STE_ImportedQualified !Declaration !STE_Kind
+				| STE_Hidden !Declaration !STE_Kind
 
 				| STE_UsedType !ModuleN !STE_Kind
 					/* used during binding of types to mark types that have been applied. */
@@ -180,6 +182,8 @@ instance == FunctionOrMacroIndex
 	,	dcls_local		::![Declaration]
 	,	dcls_local_for_import ::!{!Declaration}
 	}
+
+::	QualifiedDeclaration :== ([Declaration], ModuleIdent)
 
 ::	DictionaryInfo = { n_dictionary_types :: !Int, n_dictionary_constructors :: !Int, n_dictionary_selectors :: !Int }
 
@@ -409,6 +413,7 @@ cNameLocationDependent :== True
 	,	class_dictionary	:: !DefinedSymbol
 	,	class_pos			:: !Position
 	,	class_cons_vars		:: !BITVECT
+	,	class_fun_dep_vars	:: !BITVECT
 	}
 
 ::	ClassArgs
@@ -431,11 +436,16 @@ cNameLocationDependent :== True
 	,	me_offset		:: !Index
 	,	me_type			:: !SymbolType
 	,	me_type_ptr		:: !VarInfoPtr
-	,	me_class_vars	:: !ClassArgs
+	,	me_class_vars	:: !AClassArgs
 	,	me_default_implementation :: !MemberDefault
 	,	me_pos			:: !Position
 	,	me_priority 	:: !Priority
 	}
+
+::	AClassArgs
+	= AClassArg !ATypeVar !AClassArgs
+	| AClassArgPattern !ATypeVar ![ATypeVar] !AClassArgs
+	| ANoClassArgs
 
 :: GenericDef = 
 	{	gen_ident		:: !Ident		// the generics name in IC_Generic
@@ -444,6 +454,7 @@ cNameLocationDependent :== True
 	,	gen_type		:: !SymbolType	// Generic type (st_vars include generic type vars)
 	,	gen_vars		:: ![TypeVar]	// Generic type variables
 	,	gen_deps		:: ![GenericDependency]	   // Generic function dependencies
+	,	gen_use_binumap	:: !Bool
 	,	gen_info_ptr	:: !GenericInfoPtr
 	}
 
@@ -572,8 +583,9 @@ instance == GenericDependency
 ::	ImportSymbols import_declarations
 	= ImportSymbolsAll
 	| ImportSymbolsOnly !import_declarations
+	| ImportSymbolsAllSomeQualified !import_declarations
 
-::	ImportQualified = NotQualified | Qualified
+::	ImportQualified = NotQualified | Qualified | QualifiedAs !Ident
 
 instance toString Import, AttributeVar, TypeAttribute, Annotation
 
@@ -1145,6 +1157,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| TVI_GenTypeVarNumber !Int
 					| TVI_TypeVarArgN !Int // type argument number in module backendconvert
 					| TVI_Attr !TypeAttribute
+					| TVI_TypeAttribute !TypeAttribute
 					| ..
 
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo

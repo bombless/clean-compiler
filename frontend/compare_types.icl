@@ -403,6 +403,22 @@ where
 	compare_lists types []
 		= (Greater, [])
 
+compareFunDepInstances :: ![Type] ![Type] !BITVECT -> CompareValue
+compareFunDepInstances types1 types2 fun_dep_vars
+	# (cv, vlist) = compare_lists types1 types2 fun_dep_vars
+	 = cv
+where
+	compare_lists [type1:types1] [type2:types2] fun_dep_vars
+		| fun_dep_vars bitand 1==0
+			= compareInstanceTypes type1 type2 CAND compare_lists types1 types2 (fun_dep_vars>>1)
+			= compare_lists types1 types2 (fun_dep_vars>>1)
+	compare_lists [] [] fun_dep_vars
+		= (Equal, [])
+	compare_lists [] types fun_dep_vars
+		= (Smaller, [])
+	compare_lists types [] fun_dep_vars
+		= (Greater, [])
+
 compareInstanceTypes (TA tc1 a1)    (TA tc2 a2)		= (tc1 =< tc2,[]) CAND compareArguments a1 a2
 compareInstanceTypes (TA tc1 a1)    (TAS tc2 a2 _)	= (tc1 =< tc2,[]) CAND compareArguments a1 a2
 compareInstanceTypes (TAS tc1 a1 _) (TA tc2 a2)		= (tc1 =< tc2,[]) CAND compareArguments a1 a2

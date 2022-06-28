@@ -21,4 +21,6 @@ instance < MemberDef
 
 smallerOrEqual :: !Type !Type -> CompareValue
 
+IF_ALLOW_NON_LINEAR_INSTANCES yes no :== yes
 compareInstances :: ![Type] ![Type] -> CompareValue
+compareFunDepInstances :: ![Type] ![Type] !BITVECT -> CompareValue

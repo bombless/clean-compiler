@@ -666,6 +666,14 @@ where
 					-> type_code_constructor_expression PD_TC__UnboxedArray ci
 				PD_PackedArrayTypeIndex
 					-> type_code_constructor_expression PD_TC__PackedArray ci
+				PD_LazyArrayP2TypeIndex
+					-> type_code_constructor_expression PD_TC__LazyArrayP2 ci
+				PD_StrictArrayP2TypeIndex
+					-> type_code_constructor_expression PD_TC__StrictArrayP2 ci
+				PD_UnboxedArrayP2TypeIndex
+					-> type_code_constructor_expression PD_TC__UnboxedArrayP2 ci
+				PD_PackedArrayP2TypeIndex
+					-> type_code_constructor_expression PD_TC__PackedArrayP2 ci
 				PD_MaybeTypeIndex
 					-> type_code_constructor_expression PD_TC__Maybe ci
 				PD_StrictMaybeTypeIndex

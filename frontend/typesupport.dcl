@@ -151,10 +151,10 @@ accAttrVarHeap f type_heaps :== let (r, th_attrs) = f type_heaps.th_attrs in (r,
 foldATypeSt on_atype on_type type st :== fold_atype_st type st
   where
 	fold_type_st type=:(TA type_symb_ident args) st
-		#! st = foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type=:(TAS type_symb_ident args _) st
-		#! st = foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type=:(l --> r) st
 		#! st = fold_atype_st r (fold_atype_st l st)
@@ -163,10 +163,17 @@ foldATypeSt on_atype on_type type st :== fold_atype_st type st
 		#! st = fold_atype_st t st
 		= on_type type st	
 	fold_type_st type=:(_ :@: args) st
-		#! st = foldSt fold_atype_st args st
+		#! st = fold_args args st
 		= on_type type st
 	fold_type_st type st
 		= on_type type st
+
 	fold_atype_st atype=:{at_type} st
 		#! st = fold_type_st at_type st
 		= on_atype atype st
+
+	fold_args [a:x] st
+		#! st = fold_atype_st a st
+		= fold_args x st
+	fold_args [] st
+		= st

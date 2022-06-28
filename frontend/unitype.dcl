@@ -57,3 +57,7 @@ expand_and_coerce_type :: !{#CommonDefs} !{#Int} !AType !*(!*Coercions,!*{!Type}
 checkExistentionalAttributeVars :: [TempAttrId] !AttributePartition !*{! CoercionTree} -> (!Bool,!*{! CoercionTree})
 
 copyCoercions :: *Coercions -> (*Coercions, *Coercions)
+
+equalize_attribute_vars :: !Int !Int !*Coercions  -> (!Bool, !*Coercions)
+liftSubstitutionFunDep :: !Int !{#BOOLVECT} !{#CommonDefs} !{#BOOLVECT} !*{!Type} !Int !*TypeHeaps !*TypeDefInfos
+																-> (!*{!Type},!Int,!*TypeHeaps,!*TypeDefInfos)
