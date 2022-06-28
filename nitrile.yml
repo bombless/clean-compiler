@@ -9,12 +9,12 @@ type: Application
 build_dependencies:
   argenv: ^1.0
   base-clm: ^1.0
-  base-stdenv: ^1.0
+  base-stdenv: ^2.1
   base-compiler-bootstrap: ^1.0
-  base-code-generator: ^1.0
-  base-rts: ^1.0
+  base-code-generator: ^2.0
+  base-rts: ^2.0
 dependencies:
-  base-stdenv: ^1.0 || ^2.0
+  base-stdenv: ^2.1
 src:
   - backend
   - frontend
