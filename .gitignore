@@ -12,4 +12,5 @@
 exe/cocl*
 
 base-compiler-*.tar.gz
+lib-compiler-*.tar.gz
 nitrile-packages/

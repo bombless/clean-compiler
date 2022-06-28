@@ -6,35 +6,26 @@ This is a delayed mirror of the [upstream][] version and is only used to
 publish the package. Periodically changes from upstream are released in a new
 version here.
 
-The compiler is released in the `base-compiler` and `base-compiler-itasks`
-packages. A library with compiler sources is distributed as
-`lib-compiler-itasks`. `base-compiler` should normally not be used directly;
-instead, you should use `base`.
-
-See the documentation in [base][] if you intend to make a merge request for
-this repository.
+See the documentation in [base][] and the notes on [updating](#updating) below
+if you intend to make a merge request for this repository.
 
 ## Packages
 
 In this repository the sources of three packages are kept:
 
-- [`base-compiler`][base-compiler] (from the [`main`][main] branch), which is
-  the standard compiler. This package should not be included directly, but
-  through [`base`][base].
+- [`base-compiler`][base-compiler], which contains the compiler executable.
+  This package should not be included directly, but through [`base`][base].
 
-- [`base-compiler-itasks`][base-compiler-itasks] (from the [`itasks`][itasks]
-  branch). This compiler is not included in [`base`][base].
+- [`lib-compiler`][lib-compiler]. This is a library with which you can use
+  modules from the Clean compiler.
 
-- [`lib-compiler-itasks`][lib-compiler-itasks] (from the [`itasks`][itasks]
-  branch). This is a library with which you can use modules from the Clean
-  compiler.
+The versions of these packages are kept in sync. This means that `lib-compiler`
+patch versions may not be backwards compatible. Normally you will want to use
+this dependency with an exact version constraint, e.g. `=1.0.0`.
 
-The versions of these packages are kept in sync. This means:
-
-- `base-compiler-itasks` may introduce features in patch versions.
-- `lib-compiler-itasks` patch versions may not be backwards compatible.
-  Normally you will want to use this dependency with an exact version
-  constraint, e.g. `=1.0.0`.
+`base-compiler-itasks` and `lib-compiler-itasks` are old packages with a
+special version of the compiler with extensions for iTasks. All extensions were
+merged into `base-compiler` in June 2022.
 
 ## Updating
 
@@ -65,34 +56,11 @@ vim -p nitrile.yml CHANGELOG.md
 git commit -am 'Bump version to VERSION; add changelog entries'
 ```
 
-To update the `itasks` branch, first merge the upstream `itask` and then merge
-the version and changelog changes:
-
-```bash
-git checkout itasks
-git merge upstream/itask
-git merge main
-```
-
-After each merge you may have to resolve conflicts (and finish the merge with
-`git commit`). You may also have to add extra changelog entries if the `itask`
-branch includes more changes.
-
-The version of `lib-compiler-itasks` needs to be set to the same value as
-`base-compiler-itasks` (which follows `base-compiler`). Do this manually:
-
-```base
-vim nitrile.yml
-git commit --amend nitrile.yml
-```
-
 Push all branches:
 
 ```bash
-git push origin refs/remotes/upstream/itask:refs/heads/upstream-itask
 git push origin refs/remotes/upstream/master:refs/heads/upstream-master
 git push origin main:main
-git push origin itasks:itasks
 ```
 
 Head over to https://gitlab.com/clean-and-itasks/base/compiler/-/network/main
@@ -104,8 +72,6 @@ tags:
 ```bash
 git tag -s VERSION -m VERSION main
 git push origin VERSION
-git tag -s VERSION-itasks -m VERSION-itasks main
-git push origin VERSION-itasks
 ```
 
 ## Maintainer & license
@@ -117,10 +83,9 @@ For license details, see the [LICENSE](/LICENSE) file.
 
 [base]: https://clean-lang.org/pkg/base/
 [base-compiler]: https://clean-lang.org/pkg/base-compiler/
-[base-compiler-itasks]: https://clean-lang.org/pkg/base-compiler-itasks/
 [Camil Staps]: https://camilstaps.nl
 [Clean]: https://clean-lang.org/
 [itasks]: https://gitlab.com/clean-and-itasks/base/compiler/-/tree/itasks
-[lib-compiler-itasks]: https://clean-lang.org/pkg/lib-compiler-itasks/
+[lib-compiler]: https://clean-lang.org/pkg/lib-compiler/
 [main]: https://gitlab.com/clean-and-itasks/base/compiler/-/tree/main
 [upstream]: https://gitlab.com/clean-compiler-and-rts/compiler
