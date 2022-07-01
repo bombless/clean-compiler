@@ -1456,7 +1456,7 @@ foldComponentMembersSt op l st :== fold_ComponentMembers_st l st
 		fold_ComponentMembers_st NoComponentMembers st
 			= st
 
-fresh_variables :: ![.FreeVar] !Int !Int !*(Heap VarInfo) -> *(!.[Int],!Int,!*(Heap VarInfo))
+fresh_variables :: ![.FreeVar] !Int !Int !*VarHeap -> *(!.[Int],!Int,!*VarHeap)
 fresh_variables [{fv_info_ptr} : vars] arg_position next_var_number var_heap
 	# var_heap
 	  		= writePtr fv_info_ptr (VI_AccVar next_var_number arg_position) var_heap

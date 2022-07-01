@@ -453,7 +453,7 @@ where
 :: DeclVarsInput :== Ident
 :: *DeclVarsState = { dvs_backEnd :: !BackEnd, dvs_varHeap :: !*VarHeap, dvs_sequenceNumber :: !Int }
 
-declareVariable :: Int (Ptr VarInfo) {#Char} !*DeclVarsState -> *DeclVarsState
+declareVariable :: Int VarInfoPtr {#Char} !*DeclVarsState -> *DeclVarsState
 declareVariable lhsOrRhs varInfoPtr name dvs
 	# (variable_sequence_number,dvs) = assignOrGetVariableSequenceNumber varInfoPtr dvs
 	= {dvs & dvs_backEnd = BEDeclareNodeId variable_sequence_number lhsOrRhs name dvs.dvs_backEnd}
@@ -479,7 +479,7 @@ instance declareVars [a] | declareVars a where
 	declareVars list dvInput dvs
 		= foldState (flip declareVars dvInput) list dvs
 
-instance declareVars (Ptr VarInfo) where
+instance declareVars VarInfoPtr where
 	declareVars varInfoPtr _ dvs
 		= declareVariable BELhsNodeId varInfoPtr "_var???" dvs	// +++ name
 

@@ -2899,7 +2899,7 @@ check_module1 cdefs icl_global_function_range fun_defs optional_dcl_mod optional
 check_module2 :: Ident {#Char} [.ImportedObject] .[Import] [ParsedForeignExport] .ModuleKind !.IndexRange !Int
 				(Optional (Module a)) [Declaration] [Declaration] Bool Bool *{#FunDef} *{#*{#FunDef}} *{#DclModule} (CollectedDefinitions (ClassInstanceR [FunDef]))
 				*{#.Int} *Heaps *CheckState
-			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.Heap SymbolTableEntry,!.File,[String]);
+			-> (!Bool,.IclModule,!.{#DclModule},.{!Group},!*{#*{#FunDef}},!Int,!.Heaps,!.{#PredefinedSymbol},!.SymbolTable,!.File,[String]);
 check_module2 mod_ident mod_modification_time mod_imported_objects mod_imports mod_foreign_exports mod_type icl_global_function_range nr_of_cached_modules
 			optional_pre_def_mod local_defs macro_and_function_local_defs support_dynamics dynamic_type_used icl_functions macro_defs init_dcl_modules cdefs sizes heaps cs
 	# (main_dcl_module_n,cs)=cs!cs_x.x_main_dcl_module_n

@@ -1533,7 +1533,7 @@ where
 	combine_attributes _ cum_attr attr_env attr_store
 		= (cum_attr, attr_env, attr_store)
 
-determineSymbolTypeOfFunction :: CoercionPosition Ident Int SymbolType (Ptr VarInfo) {#CommonDefs} *TypeState -> *(!TempSymbolType,!*TypeState);
+determineSymbolTypeOfFunction :: CoercionPosition Ident Int SymbolType VarInfoPtr {#CommonDefs} *TypeState -> *(!TempSymbolType,!*TypeState);
 determineSymbolTypeOfFunction pos ident act_arity st=:{st_args,st_result,st_attr_vars,st_attr_env} type_ptr common_defs ts=:{ts_var_heap}
 	# (type_info, ts_var_heap) = readPtr type_ptr ts_var_heap
 	  ts = {ts & ts_var_heap = ts_var_heap}

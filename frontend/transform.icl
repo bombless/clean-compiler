@@ -2104,7 +2104,7 @@ where
 						# (is_cyclic, binds, cos) = detect_cycles_and_handle_alias_binds is_strict binds cos
 						-> (is_cyclic, [(type,bind) : binds], cos)
 			where
-				is_cyclic :: !.(Ptr VarInfo) !(Ptr VarInfo) !VarHeap -> .Bool
+				is_cyclic :: !.VarInfoPtr !VarInfoPtr !VarHeap -> .Bool
 				is_cyclic orig_info_ptr info_ptr var_heap
 					| orig_info_ptr == info_ptr
 						= True

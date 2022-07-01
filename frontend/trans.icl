@@ -1851,7 +1851,7 @@ where
 	is_dictionary _ es_td_infos
 		= False
 
-	set_cons_var_bit :: !.TypeVar !*(!*{#.Int},!u:(Heap TypeVarInfo)) -> (!.{#Int},!v:(Heap TypeVarInfo)), [u <= v]
+	set_cons_var_bit :: !.TypeVar !*(!*{#.Int},!u:TypeVarHeap) -> (!.{#Int},!v:TypeVarHeap), [u <= v]
 	set_cons_var_bit {tv_info_ptr} (cons_vars, th_vars)
 		# (TVI_Type (TempV i), th_vars) = readPtr tv_info_ptr th_vars 
 		= (set_bit i cons_vars, th_vars)
@@ -1908,8 +1908,8 @@ where
 			= (type, ps)
 			= addPropagationAttributesToAType modules type ps
 
-	accum_function_producer_type :: !{!.Producer} !.ReadOnlyTI !.Int !*(!u:[v:(Optional .SymbolType)],!*{#.FunDef},!*(Heap FunctionInfo))
-																	 -> (!w:[x:(Optional SymbolType)],!.{# FunDef},!.(Heap FunctionInfo)), [u <= w,v <= x]
+	accum_function_producer_type :: !{!.Producer} !.ReadOnlyTI !.Int !*(!u:[v:(Optional .SymbolType)],!*{#.FunDef},!*FunctionHeap)
+																	 -> (!w:[x:(Optional SymbolType)],!.{# FunDef},!.FunctionHeap), [u <= w,v <= x]
 	accum_function_producer_type prods ro i (type_accu, ti_fun_defs, ti_fun_heap)
 		= case prods.[size prods-i-1] of
 			PR_Empty
@@ -1937,12 +1937,12 @@ where
 						= get_producer_type symbol ro ti_fun_defs ti_fun_heap
 				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
 
-	collectPropagatingConsVars :: ![AType] !*(Heap TypeVarInfo) -> (!.[TypeVar],!.(Heap TypeVarInfo))
+	collectPropagatingConsVars :: ![AType] !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap)
 	collectPropagatingConsVars type th_vars
 		# th_vars = performOnTypeVars initializeToTVI_Empty type th_vars
 		= performOnTypeVars collect_unencountered_cons_var type ([], th_vars)
 	  where
-		collect_unencountered_cons_var :: !.TypeAttribute !u:TypeVar !*(!v:[w:TypeVar],!*(Heap TypeVarInfo)) -> (!x:[y:TypeVar],!.(Heap TypeVarInfo)), [v <= x,w u <= y]
+		collect_unencountered_cons_var :: !.TypeAttribute !u:TypeVar !*(!v:[w:TypeVar],!*TypeVarHeap) -> (!x:[y:TypeVar],!.TypeVarHeap), [v <= x,w u <= y]
 		collect_unencountered_cons_var TA_MultiOfPropagatingConsVar tv=:{tv_info_ptr} (cons_var_accu, th_vars)
 			# (tvi, th_vars) = readPtr tv_info_ptr th_vars
 			= case tvi of
@@ -4778,7 +4778,7 @@ where
 			= (fun_defs, imported_types, collected_imports, [fun_index : fun_indices_with_abs_syn_types], type_heaps, var_heap)
 			= (fun_defs, imported_types, collected_imports, fun_indices_with_abs_syn_types, type_heaps, var_heap)
 
-	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#CheckedTypeDef}},![(Global .Int)],!*TypeHeaps,!*(Heap VarInfo)) -> (!*{#FunDef},!.{#{#CheckedTypeDef}},![(Global Int)],!.TypeHeaps,!.(Heap VarInfo))
+	expand_abstract_syn_types_in_function_type :: !{#.CommonDefs} !.Int !*(!*{#FunDef},!*{#{#CheckedTypeDef}},![(Global .Int)],!*TypeHeaps,!*VarHeap) -> (!*{#FunDef},!.{#{#CheckedTypeDef}},![(Global Int)],!.TypeHeaps,!.VarHeap)
 	expand_abstract_syn_types_in_function_type common_defs fun_index (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 		# (fun_def=:{fun_type = FunDefType fun_type, fun_info = {fi_properties}}, fun_defs) = fun_defs![fun_index]
 		  rem_annot	= fi_properties bitand FI_HasTypeSpec == 0

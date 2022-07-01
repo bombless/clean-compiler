@@ -3106,7 +3106,7 @@ where
 		# (rcs_exprs, heaps_and_ptrs) = mapSt (convert_reduced_contexts_to_expression defs contexts) rcs heaps_and_ptrs
 		= convert_reduced_context_to_expression defs contexts cid rcs_exprs heaps_and_ptrs
 	where
-		convert_reduced_context_to_expression :: {#CommonDefs} [TypeContext] ClassInstanceDescr [Expression] *(*Heaps,[Ptr ExprInfo]) -> *(Expression,*(*Heaps,[Ptr ExprInfo]))
+		convert_reduced_context_to_expression :: {#CommonDefs} [TypeContext] ClassInstanceDescr [Expression] *(*Heaps,[ExprInfoPtr]) -> *(Expression,*(*Heaps,[ExprInfoPtr]))
 		convert_reduced_context_to_expression defs contexts {cid_class_index, cid_inst_module, cid_inst_members, cid_red_contexts, cid_types} dictionary_args heaps_and_ptrs
 			# (expressions, (heaps, class_ptrs)) = convertClassApplsToExpressions defs contexts cid_red_contexts heaps_and_ptrs
 			  context_size = length expressions

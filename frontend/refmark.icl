@@ -24,7 +24,7 @@ import syntax, Heap, typesupport, overloading, unitype, utilities
 	{	occ_ref_count		:: !ReferenceCount
 	,	occ_bind			:: !OccurrenceBinding
 	,	occ_pattern_vars	:: ![[PatternVar]]
-	,	occ_observing		:: (Bool, Ptr ExprInfo)
+	,	occ_observing		:: (Bool, ExprInfoPtr)
 	,	occ_previous 		:: !ReferenceCountList
 	}
 
