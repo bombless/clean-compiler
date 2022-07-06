@@ -7,14 +7,15 @@ partionateAndExpandTypes :: !NumberSet !Index !*CommonDefs !*{#DclModule} !*Type
 
 ::	TypeGroups :== [[GlobalIndex]]
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
-						-> (!*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*KindHeap !*ErrorAdmin
+																  -> (!*TypeDefInfos,!*TypeVarHeap,!*KindHeap,!*ErrorAdmin)
 
-determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
-	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
+determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*KindHeap !*ErrorAdmin
+								-> (!*ClassDefInfos, !*TypeDefInfos,!*TypeVarHeap,!*KindHeap,!*ErrorAdmin)
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
-	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
+														!*TypeVarHeap !*ExpressionHeap !*KindHeap !*GenericHeap !*ErrorAdmin
+	-> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap,!*ExpressionHeap,!*KindHeap,!*GenericHeap,!*ErrorAdmin)
 
 isATopConsVar cv		:== cv < 0
 encodeTopConsVar cv		:== dec (~cv)

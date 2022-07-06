@@ -630,12 +630,14 @@ decodeTopConsVar cv		:== ~(inc cv)
 
 emptyIdent name :== { id_name = name, id_info = nilPtr }
 
-analyseTypeDefs :: !{#CommonDefs} !TypeGroups  !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
-																   -> (!*TypeDefInfos,!*TypeVarHeap,!*ErrorAdmin)
-analyseTypeDefs modules groups dcl_types dcl_mod_index type_def_infos type_var_heap error
-	# as = {as_kind_heap = newHeap, as_type_var_heap = type_var_heap, as_td_infos = type_def_infos, as_error = error}
-	  {as_td_infos,as_type_var_heap,as_error} = foldSt (anal_type_defs_in_group modules) groups as
-	= check_left_root_attribution_of_typedefs modules groups as_td_infos as_type_var_heap as_error
+analyseTypeDefs :: !{#CommonDefs} !TypeGroups  !{#CheckedTypeDef} !Int !*TypeDefInfos !*TypeVarHeap !*KindHeap !*ErrorAdmin
+																   -> (!*TypeDefInfos,!*TypeVarHeap,!*KindHeap,!*ErrorAdmin)
+analyseTypeDefs modules groups dcl_types dcl_mod_index type_def_infos type_var_heap kind_heap error
+	# as = {as_kind_heap = kind_heap, as_type_var_heap = type_var_heap, as_td_infos = type_def_infos, as_error = error}
+	  {as_td_infos,as_type_var_heap,as_kind_heap,as_error} = foldSt (anal_type_defs_in_group modules) groups as
+	  (type_def_infos,type_var_heap,error)
+		= check_left_root_attribution_of_typedefs modules groups as_td_infos as_type_var_heap as_error
+	= (type_def_infos,type_var_heap,as_kind_heap,error)
 where
 	anal_type_defs_in_group modules group as=:{as_td_infos,as_type_var_heap,as_kind_heap}
 		# (has_abstract_type, as_td_infos, as_type_var_heap, as_kind_heap)
@@ -914,17 +916,17 @@ type_appl_error = "type constructor has too many arguments"
 
 cyclicClassInfoMark =: [KindCycle]
 
-determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*ErrorAdmin
-	-> (!*ClassDefInfos, !*TypeDefInfos, !*TypeVarHeap, !*ErrorAdmin)
-determineKindsOfClasses used_module_numbers modules type_def_infos type_var_heap error
+determineKindsOfClasses :: !NumberSet !{#CommonDefs} !*TypeDefInfos !*TypeVarHeap !*KindHeap !*ErrorAdmin
+								-> (!*ClassDefInfos, !*TypeDefInfos,!*TypeVarHeap,!*KindHeap,!*ErrorAdmin)
+determineKindsOfClasses used_module_numbers modules type_def_infos type_var_heap kind_heap error
 	#! prev_error_ok = error.ea_ok	
 	# nr_of_modules = size modules
 	  class_infos = {{} \\ module_nr <- [0..nr_of_modules] }
 	  class_infos = iFoldSt (initialyse_info_for_module used_module_numbers modules) 0 nr_of_modules class_infos
-	  as = {as_td_infos = type_def_infos, as_type_var_heap = type_var_heap, as_kind_heap = newHeap,	as_error = {error & ea_ok = True}}
-	  (class_infos, {as_td_infos,as_type_var_heap,as_error}) = iFoldSt (determine_kinds_of_class_in_module modules) 0 nr_of_modules (class_infos, as)
+	  as = {as_td_infos = type_def_infos, as_type_var_heap = type_var_heap, as_kind_heap = kind_heap, as_error = {error & ea_ok = True}}
+	  (class_infos, {as_td_infos,as_type_var_heap,as_kind_heap,as_error}) = iFoldSt (determine_kinds_of_class_in_module modules) 0 nr_of_modules (class_infos, as)
 	#! ok = as_error.ea_ok
-	= (class_infos, as_td_infos, as_type_var_heap, { as_error & ea_ok = prev_error_ok && ok })
+	= (class_infos, as_td_infos, as_type_var_heap, as_kind_heap, {as_error & ea_ok = prev_error_ok && ok})
 where
 	initialyse_info_for_module used_module_numbers modules module_index class_infos
 		| inNumberSet module_index used_module_numbers
@@ -1082,24 +1084,20 @@ new_kind_for_type_var {tv_info_ptr} (type_var_heap, kind_heap)
 	= (type_var_heap <:= (tv_info_ptr, TVI_TypeKind kind_info_ptr), kind_heap)
 
 checkKindsOfCommonDefsAndFunctions :: !Index !Index !NumberSet ![IndexRange] !{#CommonDefs} !u:{# FunDef} !v:{#DclModule} !*TypeDefInfos !*ClassDefInfos
-	!*TypeVarHeap !*ExpressionHeap !*GenericHeap !*ErrorAdmin -> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap, !*ExpressionHeap, !*GenericHeap, !*ErrorAdmin)
+														!*TypeVarHeap !*ExpressionHeap !*KindHeap !*GenericHeap !*ErrorAdmin
+	-> (!u:{# FunDef}, !v:{#DclModule}, !*TypeDefInfos, !*TypeVarHeap,!*ExpressionHeap,!*KindHeap,!*GenericHeap,!*ErrorAdmin)
 checkKindsOfCommonDefsAndFunctions first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs icl_fun_defs dcl_modules
-			type_def_infos class_infos type_var_heap expression_heap gen_heap error
-	# as =
-	  	{	as_td_infos			= type_def_infos
-		,	as_type_var_heap	= type_var_heap
-		,	as_kind_heap		= newHeap
-		,	as_error			= error
-		}
+			type_def_infos class_infos type_var_heap expression_heap kind_heap gen_heap error
+	# as = {as_td_infos=type_def_infos, as_type_var_heap=type_var_heap, as_kind_heap=kind_heap, as_error=error}
 	# (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
 		= iFoldSt (check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs)
 						0 (size common_defs) (icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as)
 	| main_module_index<first_uncached_module
-		= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
+		= (icl_fun_defs,dcl_modules,as.as_td_infos,as.as_type_var_heap,expression_heap,as.as_kind_heap,gen_heap,as.as_error)
 		# (dcl_generic_defs,dcl_modules) = dcl_modules![main_module_index].dcl_common.com_generic_defs
 		  icl_generic_defs = common_defs.[main_module_index].com_generic_defs
 		  gen_heap = copy_gen_var_kinds_to_dcl_module 0 icl_generic_defs dcl_generic_defs gen_heap
-		= (icl_fun_defs, dcl_modules, as.as_td_infos, as.as_type_var_heap, expression_heap, gen_heap, as.as_error)
+		= (icl_fun_defs,dcl_modules,as.as_td_infos,as.as_type_var_heap,expression_heap,as.as_kind_heap,gen_heap,as.as_error)
 where
 	check_kinds_of_module first_uncached_module main_module_index used_module_numbers icl_fun_def_ranges common_defs module_index
 					(icl_fun_defs, dcl_modules, class_infos, expression_heap, gen_heap, as) 

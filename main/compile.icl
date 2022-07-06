@@ -144,14 +144,17 @@ InitialCoclOptions =
 	functions_and_macros::!.{#.{#FunDef}},
 	predef_symbols::!.PredefinedSymbols,
 	hash_table::!.HashTable,
+	function_heap :: !.FunctionHeap,
+	kind_heap :: !.KindHeap,
 	heaps::!.Heaps
  };
 
-empty_cache :: !*SymbolTable -> *DclCache
-empty_cache symbol_heap
-	# heaps = {hp_var_heap = newHeap, hp_expression_heap = newHeap, hp_type_heaps = {th_vars = newHeap, th_attrs = newHeap}, hp_generic_heap = newHeap}
+empty_cache :: !*VarHeap !*ExpressionHeap !*TypeVarHeap !*AttrVarHeap !*GenericHeap !*FunctionHeap !*KindHeap !*SymbolTable -> *DclCache
+empty_cache var_heap expression_heap type_var_heap attr_var_heap generic_heap function_heap kind_heap symbol_heap
+	# heaps = {hp_var_heap = var_heap, hp_expression_heap = expression_heap, hp_type_heaps = {th_vars = type_var_heap, th_attrs = attr_var_heap}, hp_generic_heap = generic_heap}
 	# (predef_symbols, hash_table) = buildPredefinedSymbols (newHashTable symbol_heap)
-	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,heaps=heaps}
+	= {dcl_modules={},functions_and_macros={},predef_symbols=predef_symbols,hash_table=hash_table,
+	   function_heap=function_heap,kind_heap=kind_heap,heaps=heaps}
 
 compile :: ![{#Char}] !*DclCache !*Files -> (!Bool,!*DclCache,!*Files)
 compile args cache files
@@ -274,7 +277,7 @@ openPath path mode files
 		=	fopen path mode files
 
 compileModule :: CoclOptions [{#Char}] *DclCache *Files -> (!Bool,!*DclCache,!*Files)
-compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,predef_symbols,hash_table,heaps} files	
+compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,predef_symbols,hash_table,function_heap,kind_heap,heaps} files
 	# (opened, error, files)
 		=	openPath options.errorPath options.errorMode files
 	| not opened
@@ -309,11 +312,12 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	if (options.listTypes.lto_listTypesKind == ListTypesInferred)
 				(Yes options.listTypes.lto_showAttributes)
 				No
-	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,predef_symbols, hash_table, files, error, io, out,tcl_file,heaps)
+	# (optionalSyntaxTree,cached_functions_and_macros,cached_dcl_mods,main_dcl_module_n,
+			predef_symbols,hash_table,files,error,io,out,tcl_file,function_heap,kind_heap,heaps)
 		= frontEndInterface opt_file_dir_time
 			{feo_up_to_phase=FrontEndPhaseAll,feo_fusion=options.fusion_options,feo_allow_undecidable_instances=options.allow_undecidable_instances}
 			moduleIdent options.searchPaths dcl_modules functions_and_macros list_inferred_types options.compile_for_dynamics fmodificationtime
-			predef_symbols hash_table files error io out tcl_file heaps
+			predef_symbols hash_table files error io out tcl_file function_heap kind_heap heaps
 
 	# unique_copy_of_predef_symbols={predef_symbol\\predef_symbol<-:predef_symbols}
 	# (closed, files)
@@ -362,7 +366,9 @@ compileModule options backendArgs cache=:{dcl_modules,functions_and_macros,prede
 		=	abort ("couldn't close error file \"" +++ options.errorPath +++ "\"\n")
 	| success
 		# dcl_modules={{dcl_module \\ dcl_module<-:cached_dcl_mods} & [main_dcl_module_n].dcl_has_macro_conversions=False}
-		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
+		# cache={dcl_modules=dcl_modules,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,
+				 hash_table=hash_table,function_heap=function_heap,kind_heap=kind_heap,heaps=heaps}
 		= (success,cache,files)
-		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,hash_table=hash_table,heaps=heaps}
+		# cache={dcl_modules=cached_dcl_mods,functions_and_macros=cached_functions_and_macros,predef_symbols=unique_copy_of_predef_symbols,
+				 hash_table=hash_table,function_heap=function_heap,kind_heap=kind_heap,heaps=heaps}
 		= (success,cache,files)

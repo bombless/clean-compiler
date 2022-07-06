@@ -4340,14 +4340,16 @@ where
 mark_unused_functions_in_components [] ti
 	= ti
 
-mark_fused_members_of_instance :: !ClassInstance !Int !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
-mark_fused_members_of_instance instance_def=:{ins_members,ins_class_index} main_dcl_module_n instances common_defs fun_heap fun_defs
+mark_fused_members_of_instance :: !ClassInstance !Int !{!InstanceInfo} !{#CommonDefs}
+	!*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+mark_fused_members_of_instance instance_def=:{ins_members,ins_class_index} main_dcl_module_n instances common_defs fun_defs fun_heap
 	# {class_ident,class_members} = common_defs.[ins_class_index.gi_module].com_class_defs.[ins_class_index.gi_index]
 	# class_module_member_defs = common_defs.[ins_class_index.gi_module].com_member_defs
-	= mark_fused_members_of_instance_members 0 ins_members instances class_members class_module_member_defs fun_defs
+	= mark_fused_members_of_instance_members 0 ins_members instances class_members class_module_member_defs fun_defs fun_heap
 where
-	mark_fused_members_of_instance_members :: !Int !{#ClassInstanceMember} !{!InstanceInfo} !{#DefinedSymbol} !{#MemberDef} !*{#FunDef} -> *{#FunDef}
-	mark_fused_members_of_instance_members ins_i ins_members instances class_members class_module_member_defs fun_defs
+	mark_fused_members_of_instance_members :: !Int !{#ClassInstanceMember} !{!InstanceInfo} !{#DefinedSymbol} !{#MemberDef}
+		!*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+	mark_fused_members_of_instance_members ins_i ins_members instances class_members class_module_member_defs fun_defs fun_heap
 		| ins_i<size ins_members
 			# member_i = class_members.[ins_i].ds_index
 			  {st_arity=member_arity,st_context=[_:member_context]} = class_module_member_defs.[member_i].me_type
@@ -4357,39 +4359,40 @@ where
 				| cim_arity==main_dcl_module_n
 					# cim_index = -1-cim_index
 					| cim_index<size instances
-						#! fun_defs = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs
-						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
-						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
-					= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
-			#! fun_defs = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs
-			= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs
-			= fun_defs
+						#! (fun_defs,fun_heap) = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs fun_heap
+						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs fun_heap
+						= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs fun_heap
+					= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs fun_heap
+			#! (fun_defs,fun_heap) = mark_fused_members_of_function cim_index instances.[cim_index] cim_index member_arity fun_defs fun_heap
+			= mark_fused_members_of_instance_members (ins_i+1) ins_members instances class_members class_module_member_defs fun_defs fun_heap
+			= (fun_defs,fun_heap)
 
-	mark_fused_members_of_function :: !Int !InstanceInfo !Int !Int !*{#FunDef} -> *{#FunDef}
-	mark_fused_members_of_function fun_index instance_info instance_function_index member_arity fun_defs
+	mark_fused_members_of_function :: !Int !InstanceInfo !Int !Int !*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+	mark_fused_members_of_function fun_index instance_info instance_function_index member_arity fun_defs fun_heap
 		# ({fun_arity},fun_defs) = fun_defs![fun_index]
-		= mark_fused_members instance_info fun_arity instance_function_index member_arity fun_defs
+		= mark_fused_members instance_info fun_arity instance_function_index member_arity fun_defs fun_heap
 	where
-		mark_fused_members :: !InstanceInfo !Int !Int !Int !*{#FunDef} -> *{#FunDef}
-		mark_fused_members II_Empty fun_arity instance_function_index member_arity fun_defs
-			= fun_defs
-		mark_fused_members (II_Node producers function_info_ptr l r) fun_arity instance_function_index member_arity fun_defs
+		mark_fused_members :: !InstanceInfo !Int !Int !Int !*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+		mark_fused_members II_Empty fun_arity instance_function_index member_arity fun_defs fun_heap
+			= (fun_defs,fun_heap)
+		mark_fused_members (II_Node producers function_info_ptr l r) fun_arity instance_function_index member_arity fun_defs fun_heap
 			| size producers==fun_arity && last_n_producers_are_empty member_arity (size producers) producers 
-				= case sreadPtr function_info_ptr fun_heap of
+				# (function_info,fun_heap) = readPtr function_info_ptr fun_heap
+				= case function_info of
 					FI_Function {gf_fun_index,gf_instance_info}
 						| gf_fun_index<0	// if fusion stops because fused function arity>32 gf_fun_index = -1
-							# fun_defs = mark_fused_members l fun_arity instance_function_index member_arity fun_defs
-							-> mark_fused_members r fun_arity instance_function_index member_arity fun_defs
+							# (fun_defs,fun_heap) = mark_fused_members l fun_arity instance_function_index member_arity fun_defs fun_heap
+							-> mark_fused_members r fun_arity instance_function_index member_arity fun_defs fun_heap
 						# (fun_info,fun_defs) = fun_defs![gf_fun_index].fun_info
 						  fun_info & fi_properties = fun_info.fi_properties bitor FI_FusedMember, fi_def_level = instance_function_index
 						  fun_defs & [gf_fun_index].fun_info = fun_info
-						  fun_defs = mark_fused_members l fun_arity instance_function_index member_arity fun_defs
-						  fun_defs = mark_fused_members r fun_arity instance_function_index member_arity fun_defs
-						-> mark_fused_members_of_function gf_fun_index gf_instance_info instance_function_index member_arity fun_defs
+						  (fun_defs,fun_heap) = mark_fused_members l fun_arity instance_function_index member_arity fun_defs fun_heap
+						  (fun_defs,fun_heap) = mark_fused_members r fun_arity instance_function_index member_arity fun_defs fun_heap
+						-> mark_fused_members_of_function gf_fun_index gf_instance_info instance_function_index member_arity fun_defs fun_heap
 					FI_Empty
-						# fun_defs = mark_fused_members l fun_arity instance_function_index member_arity fun_defs
-						-> mark_fused_members r fun_arity instance_function_index member_arity fun_defs
-				= fun_defs
+						# (fun_defs,fun_heap) = mark_fused_members l fun_arity instance_function_index member_arity fun_defs fun_heap
+						-> mark_fused_members r fun_arity instance_function_index member_arity fun_defs fun_heap
+				= (fun_defs,fun_heap)
 
 		last_n_producers_are_empty :: !Int !Int !{!Producer} -> Bool
 		last_n_producers_are_empty n i producers
@@ -4398,42 +4401,46 @@ where
 				# i=i-1
 				= i>=0 && producers.[i]=:PR_Empty && last_n_producers_are_empty (n-1) i producers
 
-mark_fused_members_of_implementation_module :: !Int !Int !{#ClassInstance} !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
-mark_fused_members_of_implementation_module instance_i main_dcl_module_n instance_defs instances common_defs fun_heap fun_defs
+mark_fused_members_of_implementation_module :: !Int !Int !{#ClassInstance} !{!InstanceInfo} !{#CommonDefs}
+	!*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+mark_fused_members_of_implementation_module instance_i main_dcl_module_n instance_defs instances common_defs fun_defs fun_heap
 	| instance_i<size instance_defs
-		#! fun_defs = mark_fused_members_of_instance instance_defs.[instance_i] main_dcl_module_n instances common_defs fun_heap fun_defs
-		= mark_fused_members_of_implementation_module (instance_i+1) main_dcl_module_n instance_defs instances common_defs fun_heap fun_defs
-		= fun_defs
+		#! (fun_defs,fun_heap) = mark_fused_members_of_instance instance_defs.[instance_i] main_dcl_module_n instances common_defs fun_defs fun_heap
+		= mark_fused_members_of_implementation_module (instance_i+1) main_dcl_module_n instance_defs instances common_defs fun_defs fun_heap
+		= (fun_defs,fun_heap)
 
-mark_fused_members_of_specialized_instances :: !DclModule !Int !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#.FunDef} -> *{#FunDef}
-mark_fused_members_of_specialized_instances {dcl_module_kind=MK_None} main_dcl_module_n instances common_defs fun_heap fun_defs
-	= fun_defs
-mark_fused_members_of_specialized_instances {dcl_common={com_instance_defs},dcl_sizes} main_dcl_module_n instances common_defs fun_heap fun_defs
-	= mark_fused_members_of_instances dcl_sizes.[cInstanceDefs] com_instance_defs instances common_defs fun_heap fun_defs
+mark_fused_members_of_specialized_instances :: !DclModule !Int !{!InstanceInfo} !{#CommonDefs}
+	!*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+mark_fused_members_of_specialized_instances {dcl_module_kind=MK_None} main_dcl_module_n instances common_defs fun_defs fun_heap
+	= (fun_defs,fun_heap)
+mark_fused_members_of_specialized_instances {dcl_common={com_instance_defs},dcl_sizes} main_dcl_module_n instances common_defs fun_defs fun_heap
+	= mark_fused_members_of_instances dcl_sizes.[cInstanceDefs] com_instance_defs instances common_defs fun_defs fun_heap
 where
-	mark_fused_members_of_instances :: !Int !{#ClassInstance} !{!InstanceInfo} !{#CommonDefs} !FunctionHeap !*{#FunDef} -> *{#FunDef}
-	mark_fused_members_of_instances instance_i instance_defs instances common_defs fun_heap fun_defs
+	mark_fused_members_of_instances :: !Int !{#ClassInstance} !{!InstanceInfo} !{#CommonDefs}
+		!*{#FunDef} !*FunctionHeap -> (!*{#FunDef},!*FunctionHeap)
+	mark_fused_members_of_instances instance_i instance_defs instances common_defs fun_defs fun_heap
 		| instance_i<size instance_defs
 			# instance_def=:{ins_specials} = instance_defs.[instance_i]
 			| ins_specials=:SP_TypeOffset _
-				#! fun_defs = mark_fused_members_of_instance instance_def main_dcl_module_n instances common_defs fun_heap fun_defs
-				= mark_fused_members_of_instances (instance_i+1) instance_defs instances common_defs fun_heap fun_defs
-				= mark_fused_members_of_instances (instance_i+1) instance_defs instances common_defs fun_heap fun_defs
-			= fun_defs
+				#! (fun_defs,fun_heap) = mark_fused_members_of_instance instance_def main_dcl_module_n instances common_defs fun_defs fun_heap
+				= mark_fused_members_of_instances (instance_i+1) instance_defs instances common_defs fun_defs fun_heap
+				= mark_fused_members_of_instances (instance_i+1) instance_defs instances common_defs fun_defs fun_heap
+			= (fun_defs,fun_heap)
 
 transformGroups :: !CleanupInfo !Int !Int !Int !*{!Component} !*{!ConsClasses}
 					!{#CommonDefs} !{#{#FunType}} !*TypeDefInfos !{#DclModule} !FusionOptions
-											 !*{#FunDef} !*ImportedTypes !*VarHeap !*TypeHeaps !*ExpressionHeap !*File !*PredefinedSymbols
-	-> (!*{!Component},!ImportedConstructors,!*{#FunDef},!*ImportedTypes,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!*File,!*PredefinedSymbols)
+		!*{#FunDef} !*ImportedTypes !*FunctionHeap !*VarHeap !*TypeHeaps !*ExpressionHeap !*File !*PredefinedSymbols
+	-> (!*{!Component},!ImportedConstructors,
+		!*{#FunDef},!*ImportedTypes,!*FunctionHeap,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!*File,!*PredefinedSymbols)
 transformGroups cleanup_info main_dcl_module_n def_min def_max groups cons_args
 		common_defs imported_funs type_def_infos dcl_mods {compile_with_fusion,generic_fusion}
-		fun_defs imported_types var_heap type_heaps symbol_heap error predef_symbols
+		fun_defs imported_types function_heap var_heap type_heaps symbol_heap error predef_symbols
 	#! nr_of_funs = size fun_defs
 	# initial_ti =	{ ti_fun_defs		= fun_defs
 					, ti_instances		= createArray nr_of_funs II_Empty
 					, ti_cons_args		= cons_args
 					, ti_new_functions	= []
-					, ti_fun_heap		= newHeap
+					, ti_fun_heap		= function_heap
 					, ti_var_heap		= var_heap
 					, ti_symbol_heap	= symbol_heap
 					, ti_type_heaps		= type_heaps
@@ -4457,21 +4464,21 @@ transformGroups cleanup_info main_dcl_module_n def_min def_max groups cons_args
 			False
 				-> (groups,ti)
 	# groups = {group \\ group <- reverse groups}
-	  {ti_fun_defs,ti_new_functions,ti_var_heap,ti_symbol_heap,ti_fun_heap,ti_type_heaps,ti_cleanup_info,ti_instances,ti_predef_symbols,ti_error_file} = ti
+	  {ti_fun_defs,ti_new_functions,ti_fun_heap,ti_var_heap,ti_symbol_heap,ti_type_heaps,ti_cleanup_info,ti_instances,ti_predef_symbols,ti_error_file} = ti
 	  (fun_defs, imported_types, collected_imports, type_heaps, var_heap)
 			= foldSt (expand_abstract_syn_types_in_function_type common_defs) (reverse fun_indices_with_abs_syn_types)
 					(ti_fun_defs, imported_types, collected_imports, ti_type_heaps, ti_var_heap)
 
-	  (groups, new_fun_defs, imported_types, collected_imports, type_heaps, var_heap) 
-	  		= foldSt (add_new_function_to_group common_defs ti_fun_heap) ti_new_functions
-	  				(groups, [], imported_types, collected_imports, type_heaps, var_heap)
+	  (groups,new_fun_defs,imported_types,collected_imports,ti_fun_heap,type_heaps,var_heap)
+			= foldSt (add_new_function_to_group common_defs) ti_new_functions
+					(groups,[],imported_types,collected_imports,ti_fun_heap,type_heaps,var_heap)
 	  symbol_heap = foldSt cleanup_attributes ti_cleanup_info ti_symbol_heap
 	  fun_defs = { fundef \\ fundef <- [ fundef \\ fundef <-: fun_defs ] ++ new_fun_defs }
 
-	  fun_defs = mark_fused_members_of_implementation_module 0 main_dcl_module_n common_defs.[main_dcl_module_n].com_instance_defs ti_instances common_defs ti_fun_heap fun_defs
-	  fun_defs = mark_fused_members_of_specialized_instances dcl_mods.[main_dcl_module_n] main_dcl_module_n ti_instances common_defs ti_fun_heap fun_defs
+	  (fun_defs,fun_heap) = mark_fused_members_of_implementation_module 0 main_dcl_module_n common_defs.[main_dcl_module_n].com_instance_defs ti_instances common_defs fun_defs ti_fun_heap
+	  (fun_defs,fun_heap) = mark_fused_members_of_specialized_instances dcl_mods.[main_dcl_module_n] main_dcl_module_n ti_instances common_defs fun_defs fun_heap
 
-	= (groups, collected_imports, fun_defs, imported_types, var_heap, type_heaps, symbol_heap, ti_error_file, ti_predef_symbols)
+	= (groups,collected_imports,fun_defs,imported_types,fun_heap,var_heap,type_heaps,symbol_heap,ti_error_file,ti_predef_symbols)
 where
 	transform_groups :: !Int ![Component] ![Component] !Int !{#CommonDefs} !{#{#FunType}}
 						  !*{#{#CheckedTypeDef}} ![Global Int] ![Int] !*TransformInfo
@@ -4730,11 +4737,12 @@ where
 	mark_producers_safe NoComponentMembers ti
 		= ti
 
-	add_new_function_to_group ::  !{# CommonDefs} !FunctionHeap  !FunctionInfoPtr
-				  !(!*{!Component}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-				-> (!*{!Component}, ![FunDef], !*ImportedTypes, !ImportedConstructors, !*TypeHeaps, !*VarHeap)
-	add_new_function_to_group common_defs fun_heap fun_ptr (groups, fun_defs, imported_types, collected_imports, type_heaps, var_heap)
-		# (FI_Function {gf_fun_def,gf_fun_index}) = sreadPtr fun_ptr fun_heap
+	add_new_function_to_group ::  !{# CommonDefs} !FunctionInfoPtr
+				  !(!*{!Component},![FunDef],!*ImportedTypes,!ImportedConstructors,!*FunctionHeap,!*TypeHeaps,!*VarHeap)
+				-> (!*{!Component},![FunDef],!*ImportedTypes,!ImportedConstructors,!*FunctionHeap,!*TypeHeaps,!*VarHeap)
+	add_new_function_to_group common_defs fun_ptr
+			(groups,fun_defs,imported_types,collected_imports,function_heap,type_heaps,var_heap)
+		# (FI_Function {gf_fun_def,gf_fun_index},function_heap) = readPtr fun_ptr function_heap
 		  {fun_type = FunDefType ft=:{st_args,st_result}, fun_info = {fi_group_index,fi_properties}} = gf_fun_def
 		  ets =
 			{ ets_type_defs							= imported_types
@@ -4750,7 +4758,7 @@ where
 
 		| fi_properties bitand FI_Unused<>0
 			# gf_fun_def & fun_type = FunDefType ft
-			= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+			= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, function_heap, ets_type_heaps, ets_var_heap)
 
 		| fi_group_index >= size groups
 			= abort ("add_new_function_to_group "+++ toString fi_group_index+++ "," +++ toString (size groups) +++ "," +++ toString gf_fun_index)
@@ -4758,7 +4766,7 @@ where
 		| not (isComponentMember gf_fun_index groups.[fi_group_index].component_members)
 			= abort ("add_new_function_to_group INSANE!\n" +++ toString gf_fun_index +++ "," +++ toString fi_group_index)
 		# gf_fun_def & fun_type = FunDefType ft
-		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, ets_type_heaps, ets_var_heap)
+		= (groups, [gf_fun_def : fun_defs], ets_type_defs, ets_collected_conses, function_heap, ets_type_heaps, ets_var_heap)
 	where
 		isComponentMember index (ComponentMember member members)
 			= index==member || isComponentMember index members

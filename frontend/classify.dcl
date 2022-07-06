@@ -13,8 +13,8 @@ CVarOfMultimatchCase	:== -6
 ::	CleanupInfo :== [ExprInfoPtr]
 
 analyseGroups	:: !{#CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !Int
-												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap
-				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap)
+												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap
+				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap,!*FunctionHeap)
 
 reanalyseGroups	:: !{#CommonDefs} !{#{#FunType}} !Int !Int !Int ![Component]
 								 !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap !*{!ConsClasses}

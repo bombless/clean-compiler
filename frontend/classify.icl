@@ -1050,10 +1050,10 @@ reqs_of_binds [] _ ai
 
 // determine consumerRequirements for functions
 analyseGroups	:: !{#CommonDefs} !{#{#FunType}} !IndexRange !Int !Int !Int
-												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap
-				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap)
+												  !*{!Component} !*{#FunDef} !*VarHeap !*ExpressionHeap !*FunctionHeap
+				-> (!CleanupInfo,!*{!ConsClasses},!*{!Component},!*{#FunDef},!*VarHeap,!*ExpressionHeap,!*FunctionHeap)
 analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdStrictLists_module_n stdStrictMaybes_module_n
-		groups fun_defs var_heap expr_heap
+		groups fun_defs var_heap expr_heap function_heap
 	#! nr_of_funs	= size fun_defs + ir_from - ir_to /* Sjaak */
 	   nr_of_groups	= size groups
 	# consumerAnalysisRO=ConsumerAnalysisRO
@@ -1063,9 +1063,9 @@ analyseGroups common_defs imported_funs {ir_from, ir_to} main_dcl_module_n stdSt
 		}
 	# class_env = createArray nr_of_funs {cc_size=0, cc_args=[], cc_linear_bits=[#!], cc_producer=False}
 	= iFoldSt (analyse_group consumerAnalysisRO) 0 nr_of_groups
-				([], class_env, groups, fun_defs, var_heap, expr_heap)
-where	
-	analyse_group common_defs group_nr (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
+				([],class_env,groups,fun_defs,var_heap,expr_heap,function_heap)
+where
+	analyse_group common_defs group_nr (cleanup_info,class_env,groups,fun_defs,var_heap,expr_heap,function_heap)
 		# ({component_members}, groups) = groups![group_nr]
 
 		# (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)
@@ -1078,7 +1078,7 @@ where
 						,	ai_next_var						= next_var
 						,	ai_next_var_of_fun				= 0
 						,	ai_cases_of_vars_for_function	= []
-						,	ai_fun_heap						= newHeap
+						,	ai_fun_heap						= function_heap
 						,	ai_fun_defs						= fun_defs
 						,	ai_group_members				= component_members
 						,	ai_group_counts					= createArray (lengthComponentMembers component_members) {}
@@ -1100,7 +1100,7 @@ where
 		  (cleanup_info, class_env, fun_defs, var_heap, expr_heap)
 				= foldSt (set_case_expr_info ai.ai_class_subst) (flatten ai_cases_of_vars_for_group)
 					(cleanup_info, class_env, ai.ai_fun_defs, ai.ai_var_heap, expr_heap)
-		= (cleanup_info, class_env, groups, fun_defs, var_heap, expr_heap)
+		= (cleanup_info,class_env,groups,fun_defs,var_heap,expr_heap,ai.ai_fun_heap)
 	  where
 		//initial classification...
 		initial_cons_class fun (next_var, nr_of_local_vars, var_heap, class_env, fun_defs)

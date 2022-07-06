@@ -7,5 +7,5 @@ import syntax,classify,predef
 
 transformGroups :: !CleanupInfo !Int !Int !Int !*{!Component} !*{!ConsClasses}
 					!{#CommonDefs} !{#{#FunType}} !*TypeDefInfos !{#DclModule} !FusionOptions
-											 !*{#FunDef} !*ImportedTypes !*VarHeap !*TypeHeaps !*ExpressionHeap !*File !*PredefinedSymbols
-	-> (!*{!Component},!ImportedConstructors,!*{#FunDef},!*ImportedTypes,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!*File,!*PredefinedSymbols)
+											 !*{#FunDef} !*ImportedTypes !*FunctionHeap !*VarHeap !*TypeHeaps !*ExpressionHeap !*File !*PredefinedSymbols
+	-> (!*{!Component},!ImportedConstructors,!*{#FunDef},!*ImportedTypes,!*FunctionHeap,!*VarHeap,!*TypeHeaps,!*ExpressionHeap,!*File,!*PredefinedSymbols)
