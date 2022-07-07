@@ -5220,7 +5220,7 @@ instance <<< InstanceInfo
 			  file = foldSt (\pr file -> file<<<pr<<<",") [el \\ el<-:producers] file
 			= write_ii r (file<<<")")
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file p = file <<< ptrToInt p
 

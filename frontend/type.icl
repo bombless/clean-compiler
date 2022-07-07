@@ -3567,7 +3567,7 @@ readable {id_name}
 			= id_name%(1, size id_name-1)
 	= id_name
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr
 

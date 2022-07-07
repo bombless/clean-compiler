@@ -4131,7 +4131,7 @@ instance <<< SpecialSubstitution
 where
 	(<<<) file {ss_environ} = file <<< ss_environ
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file ptr = file <<< "[[" <<< ptrToInt ptr <<< "]]"
 

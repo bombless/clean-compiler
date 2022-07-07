@@ -3,7 +3,7 @@ definition module check_instances
 from syntax import
 	::Global,::Index,
 	::CommonDefs,::CommonDefsR,::DclInstanceMemberTypeAndFunctions,
-	::TypeVarHeap,::Heap,::TypeVarInfo
+	::Heap,::TypeVarHeap,::TypeVarInfo,::TypeVarHeapId
 from overloading import ::ClassInstanceInfo,::InstanceTree(..)
 from checksupport import ::ErrorAdmin
 

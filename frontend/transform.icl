@@ -2496,7 +2496,7 @@ equal_index (BasicExpr (BVInt i1)) (BasicExpr (BVInt i2))
 equal_index _ _
 	= False
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file p = file <<< ptrToInt p
 

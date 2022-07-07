@@ -8,6 +8,8 @@ from syntax import ::Heap,
 	::GenericHeap,::GenericInfo,
 	::FunctionHeap,::FunctionInfo,
 	::KindHeap,::KindInfo,
-	::SymbolTable,::SymbolTableEntry
+	::SymbolTable,::SymbolTableEntry,
+	::SymbolHeapId,::VarHeapId,::TypeVarHeapId,::AttrVarHeapId,
+	::ExpressionHeapId,::GenericHeapId,::FunctionHeapId,::KindHeapId
 
 coclMain :: !*VarHeap !*ExpressionHeap !*TypeVarHeap !*AttrVarHeap !*GenericHeap !*FunctionHeap !*KindHeap !*SymbolTable !*World -> *World

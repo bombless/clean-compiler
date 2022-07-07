@@ -17,8 +17,10 @@ instance toString Ident
 	used for binding the identifier with its definition.
 */
 
-::	SymbolTable			:== Heap SymbolTableEntry
-::	SymbolPtr 			:== Ptr SymbolTableEntry
+::	*SymbolHeapId		= SymbolHeapId
+
+::	SymbolTable			:== Heap SymbolTableEntry SymbolHeapId
+::	SymbolPtr 			:== Ptr SymbolTableEntry SymbolHeapId
 
 ::	SymbolTableEntry = 
 	{	ste_kind		:: !STE_Kind
@@ -492,8 +494,10 @@ instance == GenericDependency
 	,	grc_optional_fun_type :: !Optional SymbolType
 	}
 
-:: GenericInfoPtr :== Ptr GenericInfo	
-:: GenericHeap :== Heap GenericInfo
+:: *GenericHeapId = GenericHeapId
+
+:: GenericHeap :== Heap GenericInfo GenericHeapId
+:: GenericInfoPtr :== Ptr GenericInfo GenericHeapId
 
 :: TypeCons 
 	= TypeConsSymb TypeSymbIdent 
@@ -836,8 +840,10 @@ pIsSafe			:== True
 
 ::	ArgumentPosition :== Int
 
-::	VarHeap :== Heap VarInfo
-::	VarInfoPtr	:== Ptr VarInfo
+::	*VarHeapId = VarHeapId
+
+::	VarHeap :== Heap VarInfo VarHeapId
+::	VarInfoPtr	:== Ptr VarInfo VarHeapId
 
 cNotVarNumber :== -1
 
@@ -882,9 +888,10 @@ cNotVarNumber :== -1
 	forbids cyclic dependencies between def modules.
 */
 
-::	FunctionHeap 	:== Heap FunctionInfo
+::	*FunctionHeapId = FunctionHeapId
 
-::	FunctionInfoPtr	:== Ptr FunctionInfo
+::	FunctionHeap 	:== Heap FunctionInfo FunctionHeapId
+::	FunctionInfoPtr	:== Ptr FunctionInfo FunctionHeapId
 
 ::	FunctionInfo	= FI_Empty | FI_Function !GeneratedFunction
 
@@ -912,9 +919,10 @@ cNotVarNumber :== -1
 	
 /*	... main type definitions continued .... */
 
-::	ExpressionHeap 	:== Heap ExprInfo
+::	*ExpressionHeapId = ExpressionHeapId
 
-::	ExprInfoPtr		:== Ptr ExprInfo
+::	ExpressionHeap 	:== Heap ExprInfo ExpressionHeapId
+::	ExprInfoPtr		:== Ptr ExprInfo ExpressionHeapId
 
 ::	TempLocalVar	:== Int
 
@@ -1135,8 +1143,10 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 	,	dt_contexts		:: ![TypeContext]
 	}
 
-::	KindHeap	:== Heap KindInfo
-::	KindInfoPtr	:== Ptr KindInfo
+::	*KindHeapId = KindHeapId
+
+::	KindHeap	:== Heap KindInfo KindHeapId
+::	KindInfoPtr	:== Ptr KindInfo KindHeapId
 
 ::	KindInfo	= KI_Var !KindInfoPtr
 				| KI_Arrow !KindInfo !KindInfo
@@ -1160,8 +1170,10 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| TVI_TypeAttribute !TypeAttribute
 					| ..
 
-::	TypeVarInfoPtr	:== Ptr TypeVarInfo
-::	TypeVarHeap 	:== Heap TypeVarInfo
+::	*TypeVarHeapId 	= TypeVarHeapId
+
+::	TypeVarHeap 	:== Heap TypeVarInfo TypeVarHeapId
+::	TypeVarInfoPtr	:== Ptr TypeVarInfo TypeVarHeapId
 
 ::	AttrVarInfo  	= AVI_Empty
 					| AVI_Attr !TypeAttribute
@@ -1178,8 +1190,10 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| AVI_SequenceNumber !Int // RWS
 					| AVI_Collected // RWS
 
-::	AttrVarInfoPtr	:== Ptr AttrVarInfo
-::	AttrVarHeap 	:== Heap AttrVarInfo
+::	*AttrVarHeapId = AttrVarHeapId;
+
+::	AttrVarHeap 	:== Heap AttrVarInfo AttrVarHeapId
+::	AttrVarInfoPtr	:== Ptr AttrVarInfo AttrVarHeapId
 
 ::	TypeHeaps =
 	{	th_vars		:: ! .TypeVarHeap

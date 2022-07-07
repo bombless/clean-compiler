@@ -2,25 +2,25 @@ implementation module Heap;
 
 import StdOverloaded,StdMisc;
 
-:: Heap v = {heap::!.(HeapN v)};
+:: Heap v hi = {heap::!.(HeapN v)};
 :: HeapN v = Heap !Int;
-:: Ptr v = {pointer::!.(PtrN v)};
+:: Ptr v  hi = {pointer::!.(PtrN v)};
 :: PtrN v = Ptr !v !(HeapN v);
 
-newHeap :: .Heap v;
+newHeap :: .Heap v hi;
 newHeap = {heap=Heap 0};
 
-newPtr :: !v !*(Heap v) -> (!.Ptr v,!.Heap v);
+newPtr :: !v !*(Heap v hi) -> (!.Ptr v hi,!.Heap v hi);
 newPtr v h = code {
 	build_r e_Heap_kPtr 2 0 0 0
 	update_a 0 1
 	pop_a 1
 };
 
-nilPtr :: Ptr v;
+nilPtr :: Ptr v hi;
 nilPtr =: make_nilPtr;
 
-make_nilPtr :: Ptr v;
+make_nilPtr :: Ptr v h;
 make_nilPtr = code {
 	build _Nil 0 _hnf
 	push_a 0
@@ -29,7 +29,7 @@ make_nilPtr = code {
 	pop_a 2
 };
 
-isNilPtr :: !(Ptr v) -> Bool;
+isNilPtr :: !(Ptr v h) -> Bool;
 isNilPtr p = code {
 	repl_args 2 2
 	pop_a 1
@@ -37,7 +37,7 @@ isNilPtr p = code {
 	pop_a 1
 };
 
-allocPtr :: Ptr v;
+allocPtr :: Ptr v h;
 allocPtr = code {
 	build _Cons 0 _hnf
 	push_a 0
@@ -46,7 +46,7 @@ allocPtr = code {
 	pop_a 2
 };
 
-initPtr :: !(Ptr v) !v !*(Heap v) !*World -> (!.Heap v,!*World);
+initPtr :: !(Ptr v hi) !v !*(Heap v hi) !*World -> (!.Heap v hi,!*World);
 initPtr p v h w
  = code {
 	push_args 0 2 2
@@ -67,7 +67,7 @@ initPtr p v h w
 	halt
 };
 /*
-initPtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+initPtr :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
 initPtr p v h
  = code {
 	push_args 0 2 2
@@ -89,7 +89,7 @@ initPtr p v h
 };
 */
 
-readPtr :: !(Ptr v) !u:(Heap v) -> (!v,!u:Heap v);
+readPtr :: !(Ptr v hi) !u:(Heap v hi) -> (!v,!u:Heap v hi);
 readPtr p h = code {
 	push_a_b 1
 	push_r_args_b 0 1 1 1 1
@@ -104,7 +104,7 @@ readPtr p h = code {
 	halt
 };
 
-sreadPtr :: !(Ptr v) !(Heap v) -> v;
+sreadPtr :: !(Ptr v hi) !(Heap v hi) -> v;
 sreadPtr p h = code {
 	push_a_b 1
 	push_r_args_b 0 1 1 1 1
@@ -121,14 +121,14 @@ sreadPtr p h = code {
 	halt
 };
 
-writePtr :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+writePtr :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
 writePtr p v h
 /*
 	| isNilPtr p
 		= abort "writePtr: Nil pointer encountered\n";
 		= writePtr2 p v h;
 
-writePtr2 :: !(Ptr v) !v !*(Heap v) -> .Heap v;
+writePtr2 :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
 writePtr2 p v h
 */
  = code {
@@ -154,13 +154,13 @@ writePtr2 p v h
 	(ptr, val) = ptr_and_val;
 }
 
-ptrToInt :: !(Ptr v) -> Int;
+ptrToInt :: !(Ptr v hi) -> Int;
 ptrToInt p
 	| isNilPtr p
 		= 0;
 		= ptrToInt2 p;
 
-ptrToInt2 :: !(Ptr v) -> Int;
+ptrToInt2 :: !(Ptr v hi) -> Int;
 ptrToInt2 p = code {
 	push_a_b 0
 	pop_a 1
@@ -179,7 +179,7 @@ ptrToInt2 p = code {
 	rtn	
 };
 
-instance == (Ptr a)
+instance == (Ptr a hi)
 where
 {	(==) p1 p2 = code {
 	push_r_args_b 1 1 1 1 1

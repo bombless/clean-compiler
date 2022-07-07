@@ -4430,7 +4430,7 @@ instance <<< Special
 where
 	(<<<) file {spec_types} = file <<< spec_types
 
-instance <<< (Ptr x)
+instance <<< (Ptr x hi)
 where
 	(<<<) file ptr = file <<< '<' <<< ptrToInt ptr <<< '>'
 

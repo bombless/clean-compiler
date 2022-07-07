@@ -2,10 +2,11 @@ definition module typereify
 
 from general import ::Optional
 from syntax import
-	::Ident, ::FunDef, ::IndexRange, ::TypeHeaps,
-	::SymbolTable, ::SymbolTableEntry, ::Heap,
+	::Ident, ::FunDef, ::IndexRange, ::Heap, ::TypeHeaps,
+	::SymbolTable,::SymbolTableEntry,::SymbolHeapId,
 	::CommonDefsR,::DclInstanceMemberTypeAndFunctions,
-	::DclModule, ::CommonDefs, ::CheckedTypeDef, ::TypeDef, ::TypeRhs, ::ClassDef, ::VarHeap, ::VarInfo
+	::DclModule, ::CommonDefs, ::CheckedTypeDef, ::TypeDef, ::TypeRhs, ::ClassDef,
+	::VarHeap, ::VarInfo, ::VarHeapId
 from predef import
 	::PredefinedSymbols, ::PredefinedSymbol
 

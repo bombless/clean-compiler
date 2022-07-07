@@ -594,7 +594,7 @@ instance <<< TypeContext
 where
 	(<<<) file co = file <<< co.tc_class <<< " " <<< co.tc_types <<< " <" <<< co.tc_var <<< '>'
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file p = file <<< ptrToInt p
 
