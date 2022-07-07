@@ -2957,7 +2957,7 @@ typeProgram comps main_dcl_module_n fun_defs specials list_inferred_types icl_de
 	  special_instances = {si_next_generated_unboxed_record_member_index=fun_env_size, si_array_instances=[], si_list_instances=[], si_tail_strict_list_instances=[], si_unboxed_maybe_instances=[]}
 	  (type_error, predef_symbols, special_instances, out, ts) = type_components list_inferred_types 0 comps class_instances ti (False, predef_symbols, special_instances, out, ts)
 	#! start_index = get_index_of_start_rule main_dcl_module_n predef_symbols
-	# (type_error,ts) = check_type_of_start_function start_index type_error ts
+	# (type_error,ts) = check_type_of_start_function start_index ti_common_defs type_error ts
 	  (fun_defs,ts_fun_env) = update_function_types 0 comps ts.ts_fun_env ts.ts_fun_defs
 	  (type_error, predef_symbols, special_instances,out, {ts_td_infos,ts_fun_env,ts_error,ts_var_heap, ts_expr_heap, ts_type_heaps, ts_generic_heap,ts_fun_defs})
 			= type_instances list_inferred_types specials.ir_from specials.ir_to class_instances ti (type_error, predef_symbols, special_instances, out,
@@ -3226,14 +3226,14 @@ get_index_of_start_rule main_dcl_module_n predef_symbols
 		= pds_def
 		= NoIndex
 
-check_type_of_start_function start_index type_error ts=:{ts_fun_env,ts_fun_defs,ts_error}
+check_type_of_start_function start_index common_defs type_error ts=:{ts_fun_env,ts_fun_defs,ts_error}
 	| start_index==NoIndex
 		= (type_error,ts)
 	# (st,ts_fun_env) = ts_fun_env![start_index]
 	= case st of
 		CheckedType st _
 			# ({fun_ident,fun_pos},ts_fun_defs) = ts_fun_defs![start_index]
-			# (type_error,ts_error) = check_type_of_start_rule st type_error fun_ident fun_pos ts.ts_error
+			# (type_error,ts_error) = check_type_of_start_rule st common_defs type_error fun_ident fun_pos ts.ts_error
 			-> (type_error,{ts & ts_fun_env=ts_fun_env,ts_fun_defs=ts_fun_defs,ts_error=ts_error})
 		_
 			-> (type_error,{ts & ts_fun_env=ts_fun_env,ts_fun_defs=ts_fun_defs})

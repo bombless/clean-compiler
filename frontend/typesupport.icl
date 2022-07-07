@@ -711,19 +711,38 @@ where
 				_
 					-> (all_vars, var_env)
 
-check_type_of_start_rule :: !SymbolType !Bool !Ident !Position !*ErrorAdmin -> (!Bool,!*ErrorAdmin)
-check_type_of_start_rule {st_context,st_arity,st_args} type_error fun_ident fun_pos cus_error
+check_type_of_start_rule :: !SymbolType !{#CommonDefs} !Bool !Ident !Position !*ErrorAdmin -> (!Bool,!*ErrorAdmin)
+check_type_of_start_rule {st_context,st_arity,st_args} common_defs type_error fun_ident fun_pos cus_error
 	| st_context=:[]
 		| st_arity > 0
-			| st_arity == 1
-				= case st_args of
-					[{at_type = TB BT_World} : _]
-						-> (type_error,cus_error)
-					_
-						-> (True,startRuleError "argument of Start function should have type World.\n" fun_ident fun_pos cus_error)
-				= (True,startRuleError "Start function has too many arguments.\n" fun_ident fun_pos cus_error)
+				= check_start_function_argument_types st_args [] common_defs type_error fun_ident fun_pos cus_error
 			= (type_error,cus_error)
-		= (True,startRuleError "Start function cannot be overloaded.\n" fun_ident fun_pos cus_error)
+		= (True,startRuleError "Start function cannot be overloaded\n" fun_ident fun_pos cus_error)
+where
+	check_start_function_argument_types [{at_type}] previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		| at_type=:(TB BT_World)
+			= (type_error,error)
+			= (True,startRuleError "last argument of Start function should have type World\n" fun_ident fun_pos error)
+	check_start_function_argument_types [{at_type}:type_args] previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		# (previous_noncreatable_types,type_error,error)
+			= check_start_function_argument_type at_type previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		= check_start_function_argument_types type_args previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+
+	check_start_function_argument_type (TA {type_index=type_index,type_ident} type_args) previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		#! type_rhs = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object].td_rhs
+		= case type_rhs of
+			RecordType {rt_fields}
+				| size rt_fields==1 && rt_fields.[0].fs_ident.id_name=="_"
+					| type_args=:[]
+						| isMember type_index previous_noncreatable_types
+							# error = startRuleError ("noncreatable type "+++toString type_ident+++" occurs more than once in Start function argument types\n") fun_ident fun_pos error
+							-> (previous_noncreatable_types,True,error)
+							-> ([type_index:previous_noncreatable_types],type_error,error)
+						-> check_start_function_argument_type (last type_args).at_type previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+			_
+				-> (previous_noncreatable_types,True,startRuleError "Start function argument type should be noncreatable\n" fun_ident fun_pos error)
+	check_start_function_argument_type _ previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		= (previous_noncreatable_types,True,startRuleError "Start function argument type should be noncreatable\n" fun_ident fun_pos error)
 
 cleanUpLocalSymbolType :: !TempSymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
 							!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin

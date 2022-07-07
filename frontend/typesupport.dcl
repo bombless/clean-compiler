@@ -48,7 +48,7 @@ cleanUpLocalSymbolType :: !TempSymbolType ![!P TypeVar Type!] ![!P AttributeVar 
 						-> (!SymbolType,![AttrInequality],!ErrorContexts,![!P TypeVarInfoPtr TypeVarInfoPtr!],![!P AttrVarInfoPtr AttrVarInfoPtr!],
 							!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
 
-check_type_of_start_rule :: !SymbolType !Bool !Ident !Position !*ErrorAdmin -> (!Bool,!*ErrorAdmin)
+check_type_of_start_rule :: !SymbolType !{#CommonDefs} !Bool !Ident !Position !*ErrorAdmin -> (!Bool,!*ErrorAdmin)
 
 set_class_args_types :: !ClassArgs ![Type] !*TypeVarHeap -> *TypeVarHeap
 
