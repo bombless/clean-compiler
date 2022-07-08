@@ -2,12 +2,12 @@ definition module Heap
 
 import StdClass
 
-:: Heap v hi = {heap::!.HeapN v}
-:: .HeapN v
+:: Heap v hi = {heap::!.HeapN} // _
+:: .HeapN
 :: Ptr v hi = {pointer::!.(PtrN v)};
-:: PtrN v = Ptr !v !(HeapN v);
+:: PtrN v = Ptr !v | NilPtrN | AllocPtrN !();
 
-newHeap		:: .Heap v hi
+newHeap		:: .Heap v hi // don't use anymore, used because Clean 3.1 does not support :: Type = _
 
 nilPtr		:: Ptr v hi
 

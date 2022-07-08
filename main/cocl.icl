@@ -13,4 +13,5 @@ Start world
 	  generic_heap = newHeap
 	  function_heap = newHeap
 	  kind_heap = newHeap
+// Start var_heap expression_heap type_var_heap attr_var_heap generic_heap function_heap kind_heap symbol_table world
 	= coclMain var_heap expression_heap type_var_heap attr_var_heap generic_heap function_heap kind_heap symbol_table world

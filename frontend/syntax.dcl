@@ -17,7 +17,7 @@ instance toString Ident
 	used for binding the identifier with its definition.
 */
 
-::	*SymbolHeapId		= SymbolHeapId
+::	*SymbolHeapId		= SymbolHeapId // _
 
 ::	SymbolTable			:== Heap SymbolTableEntry SymbolHeapId
 ::	SymbolPtr 			:== Ptr SymbolTableEntry SymbolHeapId
@@ -494,7 +494,7 @@ instance == GenericDependency
 	,	grc_optional_fun_type :: !Optional SymbolType
 	}
 
-:: *GenericHeapId = GenericHeapId
+:: *GenericHeapId = GenericHeapId // _
 
 :: GenericHeap :== Heap GenericInfo GenericHeapId
 :: GenericInfoPtr :== Ptr GenericInfo GenericHeapId
@@ -840,7 +840,7 @@ pIsSafe			:== True
 
 ::	ArgumentPosition :== Int
 
-::	*VarHeapId = VarHeapId
+::	*VarHeapId = VarHeapId // _
 
 ::	VarHeap :== Heap VarInfo VarHeapId
 ::	VarInfoPtr	:== Ptr VarInfo VarHeapId
@@ -888,7 +888,7 @@ cNotVarNumber :== -1
 	forbids cyclic dependencies between def modules.
 */
 
-::	*FunctionHeapId = FunctionHeapId
+::	*FunctionHeapId = FunctionHeapId // _
 
 ::	FunctionHeap 	:== Heap FunctionInfo FunctionHeapId
 ::	FunctionInfoPtr	:== Ptr FunctionInfo FunctionHeapId
@@ -919,7 +919,7 @@ cNotVarNumber :== -1
 	
 /*	... main type definitions continued .... */
 
-::	*ExpressionHeapId = ExpressionHeapId
+::	*ExpressionHeapId = ExpressionHeapId // _
 
 ::	ExpressionHeap 	:== Heap ExprInfo ExpressionHeapId
 ::	ExprInfoPtr		:== Ptr ExprInfo ExpressionHeapId
@@ -1143,7 +1143,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 	,	dt_contexts		:: ![TypeContext]
 	}
 
-::	*KindHeapId = KindHeapId
+::	*KindHeapId = KindHeapId // _
 
 ::	KindHeap	:== Heap KindInfo KindHeapId
 ::	KindInfoPtr	:== Ptr KindInfo KindHeapId
@@ -1170,7 +1170,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| TVI_TypeAttribute !TypeAttribute
 					| ..
 
-::	*TypeVarHeapId 	= TypeVarHeapId
+::	*TypeVarHeapId 	= TypeVarHeapId // _
 
 ::	TypeVarHeap 	:== Heap TypeVarInfo TypeVarHeapId
 ::	TypeVarInfoPtr	:== Ptr TypeVarInfo TypeVarHeapId
@@ -1190,7 +1190,7 @@ IsNewTypeOrAbstractNewTypeCons cons_number :== cons_number <= ConsNumberNewType
 					| AVI_SequenceNumber !Int // RWS
 					| AVI_Collected // RWS
 
-::	*AttrVarHeapId = AttrVarHeapId;
+::	*AttrVarHeapId = AttrVarHeapId // _
 
 ::	AttrVarHeap 	:== Heap AttrVarInfo AttrVarHeapId
 ::	AttrVarInfoPtr	:== Ptr AttrVarInfo AttrVarHeapId

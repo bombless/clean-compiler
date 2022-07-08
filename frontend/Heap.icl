@@ -2,61 +2,78 @@ implementation module Heap;
 
 import StdOverloaded,StdMisc;
 
-:: Heap v hi = {heap::!.(HeapN v)};
-:: HeapN v = Heap !Int;
+:: Heap v hi = {heap::!.HeapN}; // _;
+:: HeapN = Heap;
 :: Ptr v  hi = {pointer::!.(PtrN v)};
-:: PtrN v = Ptr !v !(HeapN v);
+:: PtrN v = Ptr !v | NilPtrN | AllocPtrN !();
 
+// don't use anymore, used because Clean 3.1 does not support :: Type = _
 newHeap :: .Heap v hi;
-newHeap = {heap=Heap 0};
+newHeap = {heap=Heap};
 
 newPtr :: !v !*(Heap v hi) -> (!.Ptr v hi,!.Heap v hi);
-newPtr v h = code {
-	build_r e_Heap_kPtr 2 0 0 0
-	update_a 0 1
-	pop_a 1
-};
+newPtr v h = ({pointer=Ptr v},h);
 
 nilPtr :: Ptr v hi;
-nilPtr =: make_nilPtr;
+nilPtr = {pointer=NilPtrN};
 
-make_nilPtr :: Ptr v h;
-make_nilPtr = code {
-	build _Nil 0 _hnf
-	push_a 0
-	build_r e_Heap_kPtr 2 0 0 0
-	update_a 0 2
-	pop_a 2
-};
+isNilPtr :: !(Ptr v hi) -> Bool;
+isNilPtr {pointer} = pointer=:NilPtrN;
 
-isNilPtr :: !(Ptr v h) -> Bool;
-isNilPtr p = code {
-	repl_args 2 2
+readPtr :: !(Ptr v hi) !u:(Heap v hi) -> (!v,!u:Heap v hi);
+readPtr p h = code {
+	eq_desc e_Heap_kPtr 0 0
+	jmp_false read_heap_error
+	repl_arg 1 1
+.d 2 0
+	rtn
+:read_heap_error
 	pop_a 1
-	eq_desc _Nil 0 0
-	pop_a 1
+	print "readPtr: nil or uninitialized pointer"
+	halt
 };
 
-allocPtr :: Ptr v h;
-allocPtr = code {
-	build _Cons 0 _hnf
-	push_a 0
-	build_r e_Heap_kPtr 2 0 0 0
-	update_a 0 2
-	pop_a 2
+sreadPtr :: !(Ptr v hi) !(Heap v hi) -> v;
+sreadPtr p h = code {
+	eq_desc e_Heap_kPtr 0 0
+	jmp_false sread_heap_error
+	repl_arg 1 1
+	updatepop_a 0 1
+.d 1 0
+	rtn
+:sread_heap_error
+	pop_a 1
+	print "sreadPtr: nil or uninitialized pointer"
+	halt
 };
+
+writePtr :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
+writePtr p v h
+ = code {
+	eq_desc e_Heap_kPtr 0 0
+	jmp_false write_heap_error
+	push_a 1
+	fill1_r e_Heap_kPtr 1 0 1 01
+.keep 0 2
+	pop_a 2
+.d 1 0
+	rtn
+:write_heap_error
+	pop_a 2
+	print "writePtr: nil or uninitialized pointer"
+	halt
+};
+
+allocPtr :: Ptr v hi;
+allocPtr = {pointer=AllocPtrN ()};
 
 initPtr :: !(Ptr v hi) !v !*(Heap v hi) !*World -> (!.Heap v hi,!*World);
 initPtr p v h w
  = code {
-	push_args 0 2 2
-	pop_a 1
-	eq_desc _Cons 0 0
-	pop_a 1
+	eq_desc e_Heap_kAllocPtrN 0 0
 	jmp_false init_pointer_error
-	push_a 2
-	push_a 2
-	fill1_r e_Heap_kPtr 2 0 2 011
+	push_a 1
+	fill1_r e_Heap_kPtr 1 0 1 11
 .keep 0 2
 	pop_a 2
 .d 2 0
@@ -66,87 +83,6 @@ initPtr p v h w
 	print "initPtr: Pointer already initialized"
 	halt
 };
-/*
-initPtr :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
-initPtr p v h
- = code {
-	push_args 0 2 2
-	pop_a 1
-	eq_desc _Cons 0 0
-	pop_a 1
-	jmp_false init_pointer_error
-	push_a 2
-	push_a 2
-	fill1_r e_Heap_kPtr 2 0 2 011
-.keep 0 2
-	pop_a 2
-.d 1 0
-	rtn
-:init_pointer_error
-	pop_a 2
-	print "initPtr: Pointer already initialized"
-	halt
-};
-*/
-
-readPtr :: !(Ptr v hi) !u:(Heap v hi) -> (!v,!u:Heap v hi);
-readPtr p h = code {
-	push_a_b 1
-	push_r_args_b 0 1 1 1 1
-	eqI
-	jmp_false read_heap_error
-	repl_r_args_a 2 0 1 1
-.d 2 0
-	rtn
-:read_heap_error
-	pop_a 1
-	print "readPtr: Not a pointer of this heap"
-	halt
-};
-
-sreadPtr :: !(Ptr v hi) !(Heap v hi) -> v;
-sreadPtr p h = code {
-	push_a_b 1
-	push_r_args_b 0 1 1 1 1
-	eqI
-	jmp_false sread_heap_error
-	repl_r_args_a 2 0 1 1
-	update_a 0 1
-	pop_a 1
-.d 1 0
-	rtn
-:sread_heap_error
-	pop_a 1
-	print "sreadPtr: Not a pointer of this heap"
-	halt
-};
-
-writePtr :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
-writePtr p v h
-/*
-	| isNilPtr p
-		= abort "writePtr: Nil pointer encountered\n";
-		= writePtr2 p v h;
-
-writePtr2 :: !(Ptr v hi) !v !*(Heap v hi) -> .Heap v hi;
-writePtr2 p v h
-*/
- = code {
-	push_a_b 2
-	push_r_args_b 0 1 1 1 1
-	eqI
-	jmp_false write_heap_error
-	push_a 1
-	fill1_r e_Heap_kPtr 2 0 1 010
-.keep 0 2
-	pop_a 2 
-.d 1 0
-	rtn
-:write_heap_error
-	pop_a 2
-	print "writePtr: Not a pointer of this heap"
-	halt
-};
 
 (<:=) infixl;
 (<:=) heap ptr_and_val :== writePtr ptr val heap ;
@@ -154,47 +90,29 @@ writePtr2 p v h
 	(ptr, val) = ptr_and_val;
 }
 
-ptrToInt :: !(Ptr v hi) -> Int;
-ptrToInt p
-	| isNilPtr p
-		= 0;
-		= ptrToInt2 p;
-
-ptrToInt2 :: !(Ptr v hi) -> Int;
-ptrToInt2 p = code {
+ptrToInt :: !(Ptr v h) -> Int;
+ptrToInt p = code {
+	eq_desc e_Heap_dNilPtrN 0 0
+	jmp_true nil
 	push_a_b 0
 	pop_a 1
-	build _Nil 0 _hnf
-	push_a_b 0
-	pop_a 1
-	push_b 1
-	eqI
-	jmp_false not_nil
-	pop_b 1
-	pushI 0
-.d 0 1 b
+.d 0 1 i
 	rtn
-:not_nil
-.d 0 1 b
+:nil
+	pop_a 1
+	pushI 0
+.d 0 1 i
 	rtn	
 };
 
 instance == (Ptr a hi)
 where
 {	(==) p1 p2 = code {
-	push_r_args_b 1 1 1 1 1
-	push_r_args_b 0 1 1 1 1
-	eqI
-	jmp_false equal_pointer_error
 	push_a_b 1
 	push_a_b 0
 	pop_a 2
 	eqI
 .d 0 1 b
 	rtn	
-:equal_pointer_error
-	pop_a 1
-	print "equal_pointer: Pointers to different heaps or a nilPtr"
-	halt	
-	}
+}
 };
