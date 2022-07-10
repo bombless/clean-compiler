@@ -6,15 +6,13 @@ description: The Clean compiler.
 license: BSD-2-Clause
 version: 3.0.0
 type: Application
-build_dependencies:
+dependencies:
   argenv: ^1.0
   base-clm: ^1.0
   base-stdenv: ^2.1
   base-compiler-bootstrap: ^1.0
   base-code-generator: ^2.0
   base-rts: ^2.0
-dependencies:
-  base-stdenv: ^2.1
 src:
   - backend
   - frontend

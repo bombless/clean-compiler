@@ -15,7 +15,7 @@
                          ,{"name":"base-clm"
                           ,"version":"1.4.2"}
                          ,{"name":"base-code-generator"
-                          ,"version":"2.0.0"}
+                          ,"version":"2.1.0"}
                          ,{"name":"base-compiler-bootstrap"
                           ,"version":"1.0.0"}
                          ,{"name":"base-rts"

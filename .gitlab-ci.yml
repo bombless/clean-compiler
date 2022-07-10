@@ -1,4 +1,4 @@
-image: cleanlang/nitrile:0.3
+image: cleanlang/nitrile:0.4
 
 stages: [build, publish]
 
