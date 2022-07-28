@@ -1124,6 +1124,8 @@ instance check_completeness CasePatterns where
 		= check_completeness algebraicPatterns cci ccs
 	check_completeness (BasicPatterns _ basicPatterns) cci ccs
 		= check_completeness basicPatterns cci ccs
+	check_completeness (NewTypePatterns _ algebraicPatterns) cci ccs
+		= check_completeness algebraicPatterns cci ccs
 	check_completeness (OverloadedPatterns _ _ algebraicPatterns) cci ccs
 		= check_completeness algebraicPatterns cci ccs
 	check_completeness (DynamicPatterns dynamicPatterns) cci ccs
