@@ -56,6 +56,8 @@ vim -p nitrile.yml CHANGELOG.md
 git commit -am 'Bump version to VERSION; add changelog entries'
 ```
 
+**Do not forget to update the version of the `lib-compiler` package as well!**
+
 Push all branches:
 
 ```bash
