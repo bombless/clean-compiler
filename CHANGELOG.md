@@ -1,5 +1,10 @@
 # Changelog
 
+#### v3.0.1
+
+- Fix: prevent compiler crash when explicitly importing a macro using a new
+  type pattern match.
+
 ## v3.0
 
 - Feature: add `{ :}`, `{! :}`, `{# :}`, and `{32# :}` array types which
