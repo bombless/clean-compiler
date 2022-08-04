@@ -9,7 +9,9 @@ type: Application
 dependencies:
   argenv: ^1.0
   base-clm: ^1.0
-  base-stdenv: ^2.1
+  base-stdenv:
+    version: ^2.1
+    scope: Use
   base-compiler-bootstrap: ^1.0
   base-code-generator: ^2.0
   base-rts: ^2.0
