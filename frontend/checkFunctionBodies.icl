@@ -421,8 +421,8 @@ get_optional_member_ident_index member_ident=:{id_info} ei_mod_index cs
 			# member_ident_global_index = {igi_ident = member_ident, igi_g_index = {gi_module=0,gi_index=0}}
 			-> (Yes member_ident_global_index,cs)
 
-removeLocalsFromSymbolTable :: !Index !Level ![Ident] !LocalDefs !Int !*{#FunDef} !*{#*{#FunDef}} !*(Heap SymbolTableEntry)
-																  -> (!.{#FunDef},!.{#.{#FunDef}},!.Heap SymbolTableEntry)
+removeLocalsFromSymbolTable :: !Index !Level ![Ident] !LocalDefs !Int !*{#FunDef} !*{#*{#FunDef}} !*SymbolTable
+																  -> (!.{#FunDef},!.{#.{#FunDef}},!.SymbolTable)
 removeLocalsFromSymbolTable module_index level loc_vars NoCollectedLocalDefs local_functions_index_offset fun_defs macro_defs symbol_table
 	= (fun_defs,macro_defs,symbol_table)
 removeLocalsFromSymbolTable module_index level loc_vars (CollectedLocalDefs {loc_functions,loc_in_icl_module}) local_functions_index_offset fun_defs macro_defs symbol_table
@@ -749,8 +749,8 @@ where
 		  	= check_case_alts free_vars gs pattern_variables case_name e_input e_state e_info cs
 		= check_case_alt free_vars g gs pattern_scheme pattern_variables defaul case_name e_input e_state e_info cs 
 
-	check_case_alt :: [FreeVar] CaseAlt CasePatterns CasePatterns [(Bind Ident (Ptr VarInfo))] (Optional ((Optional FreeVar),Expression)) {#Char} ExpressionInput *ExpressionState *ExpressionInfo *CheckState
-												 -> *(CasePatterns,CasePatterns,[(Bind Ident (Ptr VarInfo))],(Optional ((Optional FreeVar),Expression)),[FreeVar],*ExpressionState,*ExpressionInfo,*CheckState)
+	check_case_alt :: [FreeVar] CaseAlt CasePatterns CasePatterns [(Bind Ident VarInfoPtr)] (Optional ((Optional FreeVar),Expression)) {#Char} ExpressionInput *ExpressionState *ExpressionInfo *CheckState
+												 -> *(CasePatterns,CasePatterns,[(Bind Ident VarInfoPtr)],(Optional ((Optional FreeVar),Expression)),[FreeVar],*ExpressionState,*ExpressionInfo,*CheckState)
 	check_case_alt free_vars {calt_pattern,calt_rhs={rhs_alts,rhs_locals},calt_position} patterns pattern_scheme pattern_variables defaul case_name 
 				e_input=:{ei_expr_level,ei_mod_index} e_state=:{es_fun_defs,es_var_heap,es_dynamics=outer_dynamics} e_info cs
 		# cs = pushErrorPosition {id_name="<case pattern>", id_info=nilPtr} calt_position cs

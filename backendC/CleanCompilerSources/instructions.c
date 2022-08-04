@@ -1923,7 +1923,7 @@ static int CaseFailNumber;
 
 void CallArrayFunction (SymbDef array_def,Bool is_jsr,StateP node_state_p)
 {
-	return CallArrayFunctionWithNodeMark (array_def,is_jsr,node_state_p,0);
+	CallArrayFunctionWithNodeMark (array_def,is_jsr,node_state_p,0);
 }
 
 void GenNewContext (Label contlab, int offset)
@@ -3884,7 +3884,8 @@ void GenDepend (char *modname
 void GenStart (SymbDef startsymb)
 {
 	if (startsymb->sdef_module == CurrentModule){
-		int arity;
+		int arity,arg_n;
+		TypeArgs type_arg;
 		char *start_function_name;
 
 		arity = startsymb->sdef_arity;
@@ -3905,6 +3906,23 @@ void GenStart (SymbDef startsymb)
 		if (arity!=0 || strcmp (start_function_name,"main")==0){
 			put_instructionb (buildI);
 			put_arguments_n_b (65536l);
+		}
+
+		type_arg=startsymb->sdef_rule->rule_type->type_alt_lhs_arguments;
+		for (arg_n=0; arg_n<arity-1; ++arg_n){
+			SymbDef record_sdef,unit_sdef;
+			LabDef record_lab,unit_lab;
+
+			record_sdef = type_arg->type_arg_node->type_node_symbol->ts_def;
+			ConvertSymbolToRLabel (&record_lab,record_sdef);
+
+			unit_sdef=record_sdef->sdef_type->type_fields->fl_type->type_node_symbol->ts_def;
+			ConvertSymbolToConstructorDLabel (&unit_lab,unit_sdef);
+
+			GenBuildh (&unit_lab,0);
+			GenBuildhr (&record_lab,1,0);
+
+			type_arg=type_arg->type_arg_next;
 		}
 		
 		put_instructionb (build);

@@ -2698,6 +2698,17 @@ where
   				| token==CurlyOpenToken
   					-> want_record_type_rhs name True exi_vars pState
 	 		  		->	(PD_Type td, parseError "Record type" No ("after ! in definition of record type "+name+" { ") pState)
+			WildCardToken
+				#! unit_type_ident = predefined_idents.[PD_UnitType]
+				# unit_type = {at_attribute=TA_None,at_type=TA (MakeNewTypeSymbIdent unit_type_ident 0) []}
+				  field_name = "_"
+				  (ps_field_ident, pState) 		= stringToIdent field_name (IC_Field td_ident) pState
+				  (ps_selector_ident, pState) 	= stringToIdent field_name IC_Selector pState
+				  (ps_field_var, pState) 		= stringToIdent field_name IC_Expression pState
+				  ps = {ps_field_ident=ps_field_ident, ps_selector_ident=ps_selector_ident, ps_field_type=unit_type,
+						ps_field_annotation=AN_Strict, ps_field_var=ps_field_var, ps_field_pos = NoPos}
+				  (rec_cons_ident,pState) = stringToIdent ("_"+++name) IC_Expression pState
+				-> (PD_Type {td & td_rhs = SelectorList rec_cons_ident exi_vars False [ps]}, pState)
 			_
 				# (condefs, extensible_algebraic_type, pState) = want_constructor_list exi_vars token pState
 				# td & td_rhs = if extensible_algebraic_type (ExtensibleConses condefs) (ConsList condefs)

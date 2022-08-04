@@ -447,7 +447,7 @@ where
 				= (True, { attr_type & at_type = at_type }, subst_and_es)
 				= (False, attr_type, subst_and_es)
 	where
-		expand_attribute :: TypeAttribute *(Heap AttrVarInfo) -> (!.Bool,TypeAttribute,!.Heap AttrVarInfo);
+		expand_attribute :: TypeAttribute *AttrVarHeap -> (!.Bool,TypeAttribute,!.AttrVarHeap);
 		expand_attribute (TA_Var {av_ident,av_info_ptr}) attr_var_heap
 			= case (readPtr av_info_ptr attr_var_heap) of
 				(AVI_Attr attr, attr_var_heap)

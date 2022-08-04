@@ -118,13 +118,13 @@ addSymbol :: !(Optional a) !Ident !Position !STE_Kind !STE_Kind !.Int !.Int !Int
 addImportedFunctionOrMacro :: !(Optional IndexRange) !Ident !Int !*{#DclModule} !*CheckState -> (!Bool,!*{#DclModule},!.CheckState)
 
 removeImportedSymbolsFromSymbolTable :: Declaration !*SymbolTable -> .SymbolTable
-removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
+removeFieldFromSelectorDefinition :: !Ident .Int .Int !*SymbolTable -> .SymbolTable;
 removeDeclarationsFromSymbolTable :: ![Declaration] !Int !*SymbolTable -> *SymbolTable
-removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
-removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
-removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
-removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{# FunDef} !*(Heap SymbolTableEntry) -> (!.{# FunDef}, !.Heap SymbolTableEntry)
-removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*(Heap SymbolTableEntry) -> (!.{#.{#FunDef}}, !.Heap SymbolTableEntry)
+removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*SymbolTable -> .SymbolTable;
+removeIdentFromSymbolTable :: !.Int !Ident !*SymbolTable -> .SymbolTable;
+removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*SymbolTable -> .SymbolTable
+removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{# FunDef} !*SymbolTable -> (!.{# FunDef}, !.SymbolTable)
+removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*SymbolTable -> (!.{#.{#FunDef}}, !.SymbolTable)
 
 newFreeVariable :: !FreeVar ![FreeVar] ->(!Bool, ![FreeVar])
 

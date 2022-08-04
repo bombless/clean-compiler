@@ -308,7 +308,7 @@ where
 	collect_imported_constructors common_defs mod_index _ ets
 		= ets
 	
-	collect_imported_constructor :: !.Int !{#.ConsDef} !.DefinedSymbol !*(!u:[v:(Global .Int)],!*(Heap VarInfo)) -> (!w:[x:(Global Int)],!.(Heap VarInfo)), [u <= w,v <= x]
+	collect_imported_constructor :: !.Int !{#.ConsDef} !.DefinedSymbol !*(!u:[v:(Global .Int)],!*VarHeap) -> (!w:[x:(Global Int)],!.VarHeap), [u <= w,v <= x]
 	collect_imported_constructor mod_index cons_defs {ds_index} (collected_conses, var_heap)
 		# {cons_type_ptr} = cons_defs.[ds_index]
 		  (type_info, var_heap) = readVarInfo cons_type_ptr var_heap

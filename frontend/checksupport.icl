@@ -225,7 +225,7 @@ nrOfBelongingSymbols (BS_MembersAndMacros members macro_members _ default_macros
 nrOfBelongingSymbols BS_Nothing
 	= 0
 
-removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry
+removeImportsAndLocalsOfModuleFromSymbolTable :: !Declarations !*SymbolTable -> .SymbolTable
 removeImportsAndLocalsOfModuleFromSymbolTable {dcls_import,dcls_local_for_import} symbol_table
 	# symbol_table = remove_declared_symbols_in_array 0 dcls_import symbol_table
 	= remove_declared_symbols_in_array 0 dcls_local_for_import symbol_table
@@ -474,7 +474,7 @@ removeImportedSymbolsFromSymbolTable (Declaration {decl_ident=decl_ident=:{id_in
 		_
 			-> symbol_table
 
-removeFieldFromSelectorDefinition :: !Ident .Int .Int !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
+removeFieldFromSelectorDefinition :: !Ident .Int .Int !*SymbolTable -> .SymbolTable
 removeFieldFromSelectorDefinition {id_info} field_mod field_index symbol_table 
 	# (entry, symbol_table) = readPtr id_info symbol_table
 	= case entry.ste_kind of
@@ -512,18 +512,18 @@ where
 					-> symbol_table <:= (id_info, ste_previous.ste_previous)
 					-> symbol_table <:= (id_info, ste_previous)
 
-removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
+removeLocalIdentsFromSymbolTable :: .Int !.[Ident] !*SymbolTable -> .SymbolTable;
 removeLocalIdentsFromSymbolTable level idents symbol_table
 	= foldSt (removeIdentFromSymbolTable level) idents symbol_table
 
-removeIdentFromSymbolTable :: !.Int !Ident !*(Heap SymbolTableEntry) -> .Heap SymbolTableEntry;
+removeIdentFromSymbolTable :: !.Int !Ident !*SymbolTable -> .SymbolTable;
 removeIdentFromSymbolTable level {id_name,id_info} symbol_table
 	# ({ste_previous,ste_def_level}, symbol_table) = readPtr id_info symbol_table
 	| level <= ste_def_level 
 		= symbol_table <:= (id_info,ste_previous) // ---> ("removeIdentFromSymbolTable", id_name)
 		= symbol_table // ---> ("NO removeIdentFromSymbolTable", id_name)
 
-removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*(Heap SymbolTableEntry) -> (!.{#.{#FunDef}}, !.Heap SymbolTableEntry)
+removeLocalDclMacrosFromSymbolTable :: !Level !Index !IndexRange !*{#*{#FunDef}} !*SymbolTable -> (!.{#.{#FunDef}}, !.SymbolTable)
 removeLocalDclMacrosFromSymbolTable level module_index {ir_from,ir_to} defs symbol_table
 	= remove_macro_defs_from_symbol_table level ir_from ir_to defs symbol_table
 where
@@ -537,7 +537,7 @@ where
 				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs (symbol_table <:= (id_info, entry.ste_previous))
 				= remove_macro_defs_from_symbol_table level (inc from_index) to_index defs symbol_table
 
-removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{# FunDef} !*(Heap SymbolTableEntry) -> (!.{# FunDef}, !.Heap SymbolTableEntry)
+removeLocalFunctionsFromSymbolTable :: !Level !IndexRange !*{#FunDef} !*SymbolTable -> (!.{# FunDef}, !.SymbolTable)
 removeLocalFunctionsFromSymbolTable level {ir_from,ir_to} defs symbol_table
 	= remove_fun_defs_from_symbol_table level ir_from ir_to defs symbol_table
 where

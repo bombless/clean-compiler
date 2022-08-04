@@ -458,7 +458,7 @@ where
 	(<<<) file (TCE_UnqType type_code)
 		= file <<< "TCE_UnqType " <<< type_code
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file ptr
 		= file <<< ptrToInt ptr

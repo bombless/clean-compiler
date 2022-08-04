@@ -2311,7 +2311,7 @@ where
 	(<<<) file EI_Empty			= file <<< "*Empty*"
 	(<<<) file (EI_CaseType _)	= file <<< "CaseType"
 
-instance <<< (Ptr a)
+instance <<< (Ptr a hi)
 where
 	(<<<) file ptr = file <<< ptrToInt ptr  
 /*

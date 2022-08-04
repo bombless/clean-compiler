@@ -1,22 +1,15 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module coclmain
 
-/*
-	The coclmain library
+from syntax import ::Heap,
+	::VarHeap,::VarInfo,
+	::ExpressionHeap,::ExprInfo,
+	::TypeVarHeap,::TypeVarInfo,
+	::AttrVarHeap,::AttrVarInfo,
+	::GenericHeap,::GenericInfo,
+	::FunctionHeap,::FunctionInfo,
+	::KindHeap,::KindInfo,
+	::SymbolTable,::SymbolTableEntry,
+	::SymbolHeapId,::VarHeapId,::TypeVarHeapId,::AttrVarHeapId,
+	::ExpressionHeapId,::GenericHeapId,::FunctionHeapId,::KindHeapId
 
-	includes
-		compile
-		backend (needs dynamic library backend.dll)
-		ArgEnv
-		Version
-		set_return_code
-
-	uses
-		StdEnv
-		compiler
-*/
-
-coclMain :: ![{#Char}] !*World -> *World
-// testArgs world
+coclMain :: !*VarHeap !*ExpressionHeap !*TypeVarHeap !*AttrVarHeap !*GenericHeap !*FunctionHeap !*KindHeap !*SymbolTable !*World -> *World

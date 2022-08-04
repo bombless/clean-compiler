@@ -538,7 +538,8 @@ liftedAttributeVarMissingError type_var err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< "attribute variable " <<< type_var <<< " does not occur in the type of a lifted argument\n" }
 
-startRuleError mess err
+startRuleError mess fun_ident fun_pos err
+	# err = setErrorPosition fun_ident fun_pos err
 	# err = errorHeading "Type error" err
 	= { err & ea_file = err.ea_file <<< mess }
 
@@ -660,10 +661,10 @@ cDerivedType	:== False
 
 :: ErrorContexts = AmbiguousContext !TypeContext !ErrorContexts | MissingContext !TypeContext !ErrorContexts | NoErrorContexts
 
-cleanUpSymbolType :: !Bool !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
+cleanUpSymbolType :: !Bool !TempSymbolType ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
 																   !*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin
 				  -> (!SymbolType,![AttrInequality],!ErrorContexts,!*VarEnv,!*AttributeEnv,!*TypeHeaps,!*VarHeap,!*ExpressionHeap,!*ErrorAdmin)
-cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
+cleanUpSymbolType spec_type {tst_arity,tst_args,tst_result,tst_context,tst_lifted} derived_context case_and_let_exprs
 		coercions attr_part defs var_env attr_var_env heaps var_heap expr_heap error
 	#! nr_of_temp_vars = size var_env
 	#! max_attr_nr = size attr_var_env
@@ -695,7 +696,6 @@ cleanUpSymbolType is_start_rule spec_type {tst_arity,tst_args,tst_result,tst_con
 				  {cuets_var_env=cus_var_env,cuets_heaps=cus_heaps,cuets_var_store=cus_var_store}
 	  st = {st_arity = tst_arity, st_vars = st_vars , st_args = lifted_args ++ st_args, st_args_strictness=NotStrict, st_result = st_result, st_context = st_context,
 			st_attr_env = st_attr_env, st_attr_vars = st_attr_vars }
-	  cus_error = check_type_of_start_rule is_start_rule st cus_error
 	  cus_var_env = {cus_var_env & [i] = TE \\ i <- [0..nr_of_temp_vars-1]}
 	  cus_attr_env = {cus_attr_env & [i] = TA_None \\ i <- [0..max_attr_nr-1]}
 	= (st,lifted_attr_env,ambiguous_or_missing_contexts,cus_var_env,cus_attr_env,cus_heaps,var_heap,expr_heap,cus_error)
@@ -711,20 +711,38 @@ where
 				_
 					-> (all_vars, var_env)
 
-	check_type_of_start_rule is_start_rule {st_context,st_arity,st_args} cus_error
-		| is_start_rule
-			| isEmpty st_context
-				| st_arity > 0
-					| st_arity == 1
-						= case st_args of
-							[{at_type = TB BT_World} : _]
-								-> cus_error
-							_
-								-> startRuleError "argument of Start rule should have type World.\n" cus_error
-						= startRuleError "Start rule has too many arguments.\n" cus_error
-					= cus_error
-				= startRuleError "Start rule cannot be overloaded.\n" cus_error
-			= cus_error
+check_type_of_start_rule :: !SymbolType !{#CommonDefs} !Bool !Ident !Position !*ErrorAdmin -> (!Bool,!*ErrorAdmin)
+check_type_of_start_rule {st_context,st_arity,st_args} common_defs type_error fun_ident fun_pos cus_error
+	| st_context=:[]
+		| st_arity > 0
+				= check_start_function_argument_types st_args [] common_defs type_error fun_ident fun_pos cus_error
+			= (type_error,cus_error)
+		= (True,startRuleError "Start function cannot be overloaded\n" fun_ident fun_pos cus_error)
+where
+	check_start_function_argument_types [{at_type}] previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		| at_type=:(TB BT_World)
+			= (type_error,error)
+			= (True,startRuleError "last argument of Start function should have type World\n" fun_ident fun_pos error)
+	check_start_function_argument_types [{at_type}:type_args] previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		# (previous_noncreatable_types,type_error,error)
+			= check_start_function_argument_type at_type previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		= check_start_function_argument_types type_args previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+
+	check_start_function_argument_type (TA {type_index=type_index,type_ident} type_args) previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		#! type_rhs = common_defs.[type_index.glob_module].com_type_defs.[type_index.glob_object].td_rhs
+		= case type_rhs of
+			RecordType {rt_fields}
+				| size rt_fields==1 && rt_fields.[0].fs_ident.id_name=="_"
+					| type_args=:[]
+						| isMember type_index previous_noncreatable_types
+							# error = startRuleError ("noncreatable type "+++toString type_ident+++" occurs more than once in Start function argument types\n") fun_ident fun_pos error
+							-> (previous_noncreatable_types,True,error)
+							-> ([type_index:previous_noncreatable_types],type_error,error)
+						-> check_start_function_argument_type (last type_args).at_type previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+			_
+				-> (previous_noncreatable_types,True,startRuleError "Start function argument type should be noncreatable\n" fun_ident fun_pos error)
+	check_start_function_argument_type _ previous_noncreatable_types common_defs type_error fun_ident fun_pos error
+		= (previous_noncreatable_types,True,startRuleError "Start function argument type should be noncreatable\n" fun_ident fun_pos error)
 
 cleanUpLocalSymbolType :: !TempSymbolType ![!P TypeVar Type!] ![!P AttributeVar TypeAttribute!] ![TypeContext] ![ExprInfoPtr] !{!CoercionTree} !AttributePartition !{#CommonDefs}
 							!*VarEnv !*AttributeEnv !*TypeHeaps !*VarHeap !*ExpressionHeap !*ErrorAdmin

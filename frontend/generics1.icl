@@ -3935,7 +3935,7 @@ specializeGeneric gen_index type spec_env gen_ident gen_pos gen_deps gen_rep_con
 	#! st & ss_heaps = clear_tvs spec_env st.ss_heaps
 	= (expr, st)
 where
-	specialize :: GenTypeStruct GlobalIndex Ident [GenericDependency] {!GenericRepresentationConstructor} (Ptr GenericInfo) [Int] *SpecializeState -> *(!Expression,!*SpecializeState)
+	specialize :: GenTypeStruct GlobalIndex Ident [GenericDependency] {!GenericRepresentationConstructor} GenericInfoPtr [Int] *SpecializeState -> *(!Expression,!*SpecializeState)
 	specialize (GTSAppCons kind arg_types) gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr g_nums st
 		#! (arg_exprs, st) = specialize_with_deps gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr arg_types g_nums st
 		= build_generic_app kind arg_exprs gen_index gen_ident st
@@ -4101,7 +4101,7 @@ where
 		lookupArgExpr _ _ [] error
 			= (undef, reportError gen_ident.id_name gen_pos "missing dependencies of its dependencies in the type signature" error)
 
-	specialize_with_deps :: GlobalIndex Ident [GenericDependency] {!GenericRepresentationConstructor} (Ptr GenericInfo) [GenTypeStruct] [Int] *SpecializeState
+	specialize_with_deps :: GlobalIndex Ident [GenericDependency] {!GenericRepresentationConstructor} GenericInfoPtr [GenTypeStruct] [Int] *SpecializeState
 							-> *(![Expression],!*SpecializeState)
 	specialize_with_deps gen_index gen_ident gen_deps gen_rep_conses gen_info_ptr xs g_nums st
 		# (info_deps, st) = collect_dependency_infos gen_deps g_nums st

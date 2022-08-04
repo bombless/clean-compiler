@@ -585,8 +585,8 @@ initialiseAttributeVars [] [] type_var_heap
 	= type_var_heap
 
 :: TypesCorrespondState =
-		{	tc_type_vars :: !.HeapWithNumber TypeVarInfo
-		,	tc_attr_vars :: !.HeapWithNumber AttrVarInfo
+		{	tc_type_vars :: !.HeapWithNumber TypeVarInfo TypeVarHeapId
+		,	tc_attr_vars :: !.HeapWithNumber AttrVarInfo AttrVarHeapId
 		,	tc_strictness_flags :: !Int
 		}
 
@@ -600,7 +600,7 @@ CompareGenericCaseMacro:==4; // only used from ec_tc_state
 :: ExpressionsCorrespondState =
 		{	ec_icl_correspondences ::	!.{# Int },
 			ec_dcl_correspondences ::	!.{# Int }
-		,	ec_var_heap ::	!.HeapWithNumber VarInfo
+		,	ec_var_heap ::	!.HeapWithNumber VarInfo VarHeapId
 		,	ec_expr_heap ::	!.ExpressionHeap
 		,	ec_icl_functions :: !.{#FunDef}
 		,	ec_macro_defs :: !.{#.{#FunDef}}
@@ -614,8 +614,8 @@ CompareGenericCaseMacro:==4; // only used from ec_tc_state
 
 :: Conversions :== {#Index}
 
-:: HeapWithNumber a
-	=	{	hwn_heap ::	!.Heap a
+:: HeapWithNumber v hi
+	=	{	hwn_heap ::	!.Heap v hi
 		,	hwn_number ::	!Int
 		}
 

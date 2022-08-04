@@ -24,7 +24,7 @@ import syntax, Heap, typesupport, overloading, unitype, utilities
 	{	occ_ref_count		:: !ReferenceCount
 	,	occ_bind			:: !OccurrenceBinding
 	,	occ_pattern_vars	:: ![[PatternVar]]
-	,	occ_observing		:: (Bool, Ptr ExprInfo)
+	,	occ_observing		:: (Bool, ExprInfoPtr)
 	,	occ_previous 		:: !ReferenceCountList
 	}
 
@@ -951,10 +951,9 @@ where
 	(<<<) file {su_field,su_multiply,su_uniquely} = file <<< su_field <<< " M:" <<< su_multiply <<< " U:" <<< su_uniquely
 
 
-instance <<< (Ptr v)
+instance <<< (Ptr v hi)
 where
 	(<<<) file ptr = file <<< '[' <<< ptrToInt ptr <<< ']'
-
 
 instance <<< CountedFreeVar
 where
