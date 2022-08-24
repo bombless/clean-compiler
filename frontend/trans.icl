@@ -348,21 +348,16 @@ transformCase this_case=:{case_expr,case_guards,case_default,case_ident,case_inf
 	  ti = { ti & ti_symbol_heap=ti_symbol_heap }
 	  (result_expr, ti)	= case case_info of
 							EI_Extended (EEI_ActiveCase aci) _
-								| is_variable case_expr
+								| case_expr=:Var _
 									-> skip_over this_case ro ti
-								-> case ro.ro_root_case_mode of
-									NotRootCase
-										-> transform_active_non_root_case this_case aci ro ti
-									_
-										-> transform_active_root_case aci this_case ro ti
+								| ro.ro_root_case_mode=:NotRootCase
+									-> transform_active_non_root_case this_case aci ro ti
+									-> transform_active_root_case aci this_case ro ti
 							_
 								-> skip_over this_case ro ti
 	  ti = { ti & ti_symbol_heap = remove_aci_free_vars_info case_info_ptr ti.ti_symbol_heap }
 	# final_expr = removeNeverMatchingSubcases result_expr ro
 	= (final_expr, ti) // ---> ("transformCase",result_expr,final_expr)
-where
-	is_variable (Var _) = True
-	is_variable _ 		= False
 
 skip_over this_case=:{case_expr=case_expr=:BasicExpr basic_value,case_guards=case_guards=:BasicPatterns basic_type basicPatterns,case_default,case_explicit} ro ti
 	// currently only active cases are matched at runtime (multimatch problem)
@@ -444,9 +439,7 @@ where
 	lift_case nested_case=:{case_guards,case_default} outer_case ro ti
 		| isNilPtr nested_case.case_info_ptr	// neverMatchingCase ?!
 			= skip_over outer_case ro ti
-		# default_exists = case case_default of
-							Yes _	-> True
-							No		-> False
+		# default_exists = case_default=:Yes _
 		  (case_guards, ti) = lift_patterns default_exists case_guards nested_case.case_info_ptr outer_case ro ti
 		  (case_default, ti) = lift_default case_default outer_case ro ti
 		  (EI_CaseType outer_case_type, ti_symbol_heap) = readExprInfo outer_case.case_info_ptr ti.ti_symbol_heap
@@ -498,15 +491,24 @@ where
 		= (No, ti)
 
 	possiblyFoldOuterCase final guard_expr outer_case ro=:{ro_tfi} ti
-		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr ti.ti_fun_defs ti.ti_cons_args) False // otherwise GOTO next alternative
-			| ro_tfi.tfi_n_args_before_producer < 0 || ro_tfi.tfi_n_producer_args < 0
-				= possiblyFoldOuterCase` final guard_expr outer_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
-			= case aci.aci_opt_unfolder of
-				No
-					-> possiblyFoldOuterCase` final guard_expr outer_case ro ti
-				Yes _
-					-> transformApplication (make_consumer_application ro_tfi guard_expr) [] ro ti
-		= possiblyFoldOuterCase` final guard_expr outer_case ro ti
+		| SwitchAutoFoldCaseInCase (isFoldExpression guard_expr ti.ti_fun_defs ti.ti_cons_args) False
+		  && ro_tfi.tfi_n_args_before_producer>=0 && ro_tfi.tfi_n_producer_args>=0
+		  && aci.aci_opt_unfolder=:Yes _
+			= transformApplication (make_consumer_application ro_tfi guard_expr) [] ro ti
+		| final
+			# new_case = {outer_case & case_expr = guard_expr}
+			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase",Case new_case)
+		# cs = {cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No, cs_cleanup_info=ti.ti_cleanup_info}
+		  (outer_guards, cs=:{cs_cleanup_info})	= copyCasePatterns outer_case.case_guards No {ci_handle_aci_free_vars = LeaveAciFreeVars} cs
+		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr cs.cs_symbol_heap
+		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
+		  new_cleanup_info 						= case expr_info of
+				EI_Extended _ _
+					-> [new_info_ptr:cs_cleanup_info]
+				_ 	-> cs_cleanup_info
+		  ti = { ti & ti_var_heap = cs.cs_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
+		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
+		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase",Case new_case)
 	where
 		isFoldExpression (App app)	ti_fun_defs ti_cons_args = isFoldSymbol app.app_symb.symb_kind
 			where
@@ -528,22 +530,6 @@ where
 		isFoldExpression (Var _)	ti_fun_defs ti_cons_args = True
 //		isFoldExpression (Case _)	ti_fun_defs ti_cons_args = True
 		isFoldExpression _			ti_fun_defs ti_cons_args = False
-
-	possiblyFoldOuterCase` final guard_expr outer_case ro ti
-		| final
-			# new_case = {outer_case & case_expr = guard_expr}
-			= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
-		# cs = {cs_var_heap = ti.ti_var_heap, cs_symbol_heap = ti.ti_symbol_heap, cs_opt_type_heaps = No, cs_cleanup_info=ti.ti_cleanup_info}
-		  (outer_guards, cs=:{cs_cleanup_info})	= copyCasePatterns outer_case.case_guards No {ci_handle_aci_free_vars = LeaveAciFreeVars} cs
-		  (expr_info, ti_symbol_heap)			= readPtr outer_case.case_info_ptr cs.cs_symbol_heap
-		  (new_info_ptr, ti_symbol_heap)		= newPtr expr_info ti_symbol_heap
-		  new_cleanup_info 						= case expr_info of
-		  		EI_Extended _ _
-		  			-> [new_info_ptr:cs_cleanup_info]
-		  		_ 	-> cs_cleanup_info
-		  ti = { ti & ti_var_heap = cs.cs_var_heap, ti_symbol_heap = ti_symbol_heap, ti_cleanup_info=new_cleanup_info }
-		  new_case								= { outer_case & case_expr = guard_expr, case_guards=outer_guards, case_info_ptr=new_info_ptr }
-		= transformCase new_case ro ti // ---> ("possiblyFoldOuterCase`",Case new_case)
 
 transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app_symb,app_args}),case_guards,case_default,case_explicit,case_ident,case_info_ptr} ro ti
 	= case app_symb.symb_kind of
@@ -573,7 +559,10 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 				Yes unfolder
 					| not (equal app_symb.symb_kind unfolder.symb_kind)
 						// in this case a third function could be fused in
-						-> possiblyFoldOuterCase this_case ro ti					// -!-> ("transform_active_root_case","Diff opt unfolder",unfolder,app_symb)
+						// possiblyFoldOuterCase // -!-> ("transform_active_root_case","Diff opt unfolder",unfolder,app_symb)
+						| SwitchAutoFoldAppInCase (ro.ro_tfi.tfi_n_args_before_producer>=0 && ro.ro_tfi.tfi_n_producer_args>=0) False
+							-> transformApplication (make_consumer_application ro.ro_tfi case_expr) [] ro ti
+							-> skip_over this_case ro ti
 					# variables = [ Var {var_ident=fv_ident, var_info_ptr=fv_info_ptr, var_expr_ptr=nilPtr}
 									\\ {fv_ident, fv_info_ptr} <- ro.ro_tfi.tfi_args ]
 					  (app_symb, ti)
@@ -599,13 +588,6 @@ transform_active_root_case aci this_case=:{case_expr = case_expr=:(App app=:{app
 					  (app_args2, ti) = transform app_args1 { ro & ro_root_case_mode = NotRootCase } ti
 					-> (App {app_symb=app_symb, app_args=app_args2, app_info_ptr=nilPtr}, ti)
 where
-	possiblyFoldOuterCase this_case ro=:{ro_tfi} ti
-		| SwitchAutoFoldAppInCase True False
-			| ro_tfi.tfi_n_args_before_producer < 0 || ro_tfi.tfi_n_producer_args < 0
-				= skip_over this_case ro ti	//abort "possiblyFoldOuterCase: unexpected!\n"
-			= transformApplication (make_consumer_application ro_tfi case_expr) [] ro ti
-		= skip_over this_case ro ti
-
 	equal (SK_Function glob_index1) (SK_Function glob_index2)
 		= glob_index1==glob_index2
 	equal (SK_LocalMacroFunction glob_index1) (SK_LocalMacroFunction glob_index2)
@@ -2783,20 +2765,21 @@ transformFunctionApplication :: !FunDef !InstanceInfo !ConsClasses !App ![Expres
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_args, extra_args) = complete_application fun_def.fun_arity app_args extra_args
 //	| False ---> ("transformFunctionApplication",app_symb,app_args,extra_args,fun_def.fun_arity,cc_size) = undef
+	# expanding_consumer = fun_def.fun_body=:Expanding _
 	| expanding_consumer
 	 	= (build_application { app & app_args = app_args } extra_args, ti)
 	# {fun_body=TransformedBody {tb_rhs}, fun_kind} = fun_def
 	| cc_size == 0
-		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && is_not_caf fun_kind && is_sexy_body tb_rhs) False
+		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && not fun_kind=:FK_Caf && is_sexy_body tb_rhs) False
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	# (opt_expr,ti) = is_trivial_function app_symb app_args fun_kind tb_rhs ro ti
-	| case opt_expr of No -> False; Yes _ -> True
+	| opt_expr=:Yes _
 		= case opt_expr of
 			Yes (App app)
 				-> transformApplication app extra_args ro ti
 			Yes rhs
-				| isEmpty extra_args
+				| extra_args=:[]
 					-> (rhs, ti)
 					-> (rhs @ extra_args, ti)
 	| cc_size >= 0
@@ -2853,13 +2836,6 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	= (build_application { app & app_args = app_args } extra_args, ti)
 where
-	expanding_consumer = case fun_def.fun_body of
-								Expanding _	-> True
-								_			-> False
-
-	is_not_caf FK_Caf	= False
-	is_not_caf _		= True
-
 	possiblyAddStrictLetBinds expr strict_lets ti
 		# (strict_let_binds,let_type) = unzip strict_lets
 		= case strict_let_binds of
@@ -2884,11 +2860,11 @@ where
 				# (is_cycle,ti) = is_cycle_of_trivial_function_calls app.app_symb.symb_kind app_args [app_symb.symb_kind] ro ti
 				| not is_cycle
 					-> transformApplication app extra_args ro ti
-					| isEmpty extra_args
+					| extra_args=:[]
 						-> (tb_rhs, ti)
 						-> (tb_rhs @ extra_args, ti)
 			Yes tb_rhs
-				| isEmpty extra_args
+				| extra_args=:[]
 					-> (tb_rhs, ti)
 					-> (tb_rhs @ extra_args, ti)
 
@@ -2917,7 +2893,7 @@ where
 
 	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
 	is_trivial_function app_symb app_args fun_kind rhs ro ti
-		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && is_not_caf fun_kind && is_sexy_body rhs) False
+		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && not fun_kind=:FK_Caf && is_sexy_body rhs) False
 			= is_trivial_function_call app_symb.symb_kind app_args ro ti
 			= (No, ti)
 
@@ -3251,76 +3227,68 @@ is_safe_producer (SK_Constructor {glob_module}) ro fun_heap cons_args
 	= SwitchConstructorFusion True True/*(glob_module==ro.ro_StdGeneric_module_n)*/ False
 
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
-transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
+transformApplication app=:{app_symb=symb=:{symb_kind=SK_Function gi=:{glob_module,glob_object}},app_args} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
-	| is_SK_Function_or_SK_LocalMacroFunction symb_kind // otherwise GOTO next alternative	
-		# gi
-			= case symb_kind of
-				SK_Function global_index -> global_index
-				SK_LocalMacroFunction index -> { glob_module = ro.ro_main_dcl_module_n, glob_object = index }
-		# { glob_module, glob_object } = gi
-		| glob_module == ro.ro_main_dcl_module_n
-			| glob_object < size ti_cons_args
-				#  (cons_class,ti_cons_args) = ti_cons_args![glob_object]
-				   (instances, ti_instances) = ti_instances![glob_object]
-				   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
-				   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs, ti_cons_args = ti_cons_args }
-				= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
-			// It seems as if we have an array function 
-				| isEmpty extra_args
-					= (App app, ti)
-					= (App { app & app_args = app_args ++ extra_args}, ti)
+	| glob_module == ro.ro_main_dcl_module_n
+		| glob_object < size ti_cons_args
+			#  (cons_class,ti_cons_args) = ti_cons_args![glob_object]
+			   (instances, ti_instances) = ti_instances![glob_object]
+			   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
+			   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs, ti_cons_args = ti_cons_args }
+			= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
+			// It seems as if we have an array function
+			| extra_args=:[]
+				= (App app, ti)
+				= (App { app & app_args = app_args ++ extra_args}, ti)
 
-		| (glob_module==ro.ro_special_module_ns.smn_StdStrictLists_module_n || glob_module==ro.ro_special_module_ns.smn_StdStrictMaybes_module_n)
-			&& is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && not app_args=:[]
+	| (glob_module==ro.ro_special_module_ns.smn_StdStrictLists_module_n || glob_module==ro.ro_special_module_ns.smn_StdStrictMaybes_module_n)
+		&& is_cons_or_decons_of_UList_or_UTSList glob_object glob_module ro.ro_imported_funs && not app_args=:[]
 //			&& True ---> ("transformApplication "+++toString symb.symb_ident)
-			# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
-			# [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:_] = ft_type.st_context			
-			# member_n=find_member_n 0 symb.symb_ident.id_name ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members
-			# cons_u_member_index=ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members.[member_n].ds_index
-			# {me_ident,me_offset}=ro.ro_common_defs.[glob_module].com_member_defs.[cons_u_member_index]
-			# select_symb= {glob_module=glob_module,glob_object={ds_ident=me_ident,ds_index=cons_u_member_index,ds_arity=1}}
-			# [first_arg:other_app_args] = app_args;
-			# args=other_app_args++extra_args
-			| isEmpty args
-				= select_member first_arg select_symb me_offset ti
-				# (expr,ti) = select_member first_arg select_symb me_offset ti
-				= case expr of
-					App app
-						-> transformApplication app args ro ti
-					_
-						-> (expr @ args,ti)
-		// This function is imported
-		| SwitchSpecialFusion
-				(not (isEmpty app_args) )
-				False
-			// Check imported overloaded function application for specials...
-			# {ft_specials}						= ro.ro_imported_funs.[glob_module].[glob_object]
-			# specials							= case ft_specials of
-													FSP_ContextTypes s	-> s
-													_ -> []
-			| not (isEmpty specials)
-				# (ei,ti_symbol_heap)			= mapSt readAppInfo app_args ti.ti_symbol_heap
-					with
-						readAppInfo :: !Expression !*ExpressionHeap -> (!ExprInfo,!*ExpressionHeap)
-						readAppInfo (App {app_info_ptr}) heap
-							| isNilPtr app_info_ptr
-								= (EI_Empty,heap)
-							= readPtr app_info_ptr heap
-						readAppInfo _ heap = (EI_Empty,heap)
-				# ti							= {ti & ti_symbol_heap = ti_symbol_heap}
-				# context						= ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_context
-				# insts							= resolveContext context ei ro.ro_common_defs
-				# (num_special_args,special_gi)	= findInstInSpecials insts specials
-				| foundSpecial special_gi
-					= build_application {app & app_symb.symb_kind = SK_Function special_gi} (drop num_special_args app_args) extra_args special_gi ti
-				= build_application app app_args extra_args gi ti
+		# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object] // type of cons instance of instance List [#] a | U(TS)List a
+		# [{tc_class=TCClass {glob_module,glob_object={ds_index}}}:_] = ft_type.st_context
+		# member_n=find_member_n 0 symb.symb_ident.id_name ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members
+		# cons_u_member_index=ro.ro_common_defs.[glob_module].com_class_defs.[ds_index].class_members.[member_n].ds_index
+		# {me_ident,me_offset}=ro.ro_common_defs.[glob_module].com_member_defs.[cons_u_member_index]
+		# select_symb= {glob_module=glob_module,glob_object={ds_ident=me_ident,ds_index=cons_u_member_index,ds_arity=1}}
+		# [first_arg:other_app_args] = app_args;
+		# args=other_app_args++extra_args
+		| isEmpty args
+			= select_member first_arg select_symb me_offset ti
+			# (expr,ti) = select_member first_arg select_symb me_offset ti
+			= case expr of
+				App app
+					-> transformApplication app args ro ti
+				_
+					-> (expr @ args,ti)
+	// This function is imported
+	| SwitchSpecialFusion (not app_args=:[]) False
+		// Check imported overloaded function application for specials...
+		# {ft_specials}						= ro.ro_imported_funs.[glob_module].[glob_object]
+		# specials							= case ft_specials of
+												FSP_ContextTypes s	-> s
+												_ -> []
+		| not specials=:[]
+			# (ei,ti_symbol_heap)			= mapSt readAppInfo app_args ti.ti_symbol_heap
+				with
+					readAppInfo :: !Expression !*ExpressionHeap -> (!ExprInfo,!*ExpressionHeap)
+					readAppInfo (App {app_info_ptr}) heap
+						| isNilPtr app_info_ptr
+							= (EI_Empty,heap)
+						= readPtr app_info_ptr heap
+					readAppInfo _ heap = (EI_Empty,heap)
+			# ti							= {ti & ti_symbol_heap = ti_symbol_heap}
+			# context						= ro.ro_imported_funs.[glob_module].[glob_object].ft_type.st_context
+			# insts							= resolveContext context ei ro.ro_common_defs
+			# (num_special_args,special_gi)	= findInstInSpecials insts specials
+			| foundSpecial special_gi
+				= build_application {app & app_symb.symb_kind = SK_Function special_gi} (drop num_special_args app_args) extra_args special_gi ti
 			= build_application app app_args extra_args gi ti
 		= build_application app app_args extra_args gi ti
+	= build_application app app_args extra_args gi ti
 	where
 		build_application :: !.App ![.Expression] ![.Expression] !(Global .Int) !*TransformInfo -> (!Expression,!*TransformInfo)
 		build_application app app_args extra_args {glob_module,glob_object} ti
-			| isEmpty extra_args
+			| extra_args=:[]
 				= (App {app & app_args = app_args}, ti)
 			# {ft_arity,ft_type}	= ro.ro_imported_funs.[glob_module].[glob_object]
 			  form_arity			= ft_arity + length ft_type.st_context
@@ -3331,7 +3299,7 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 				= (App {app  &  app_args = app_args ++ take ar_diff extra_args } @ drop ar_diff extra_args, ti)
 /*		
 		build_special_application app app_args extra_args {glob_module,glob_object} ro ti
-			| isEmpty extra_args
+			| extra_args=:[]
 				= (App {app & app_args = app_args}, ti)
 			# {ft_arity,ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
 			  form_arity = ft_arity + length ft_type.st_context
@@ -3358,7 +3326,18 @@ transformApplication app=:{app_symb=symb=:{symb_kind}, app_args} extra_args
 					_						-> (Selection NormalSelector exp [RecordSelection select_symb me_offset],ti)
 		select_member exp select_symb me_offset ti
 			= (Selection NormalSelector exp [RecordSelection select_symb me_offset],ti)
-
+transformApplication app=:{app_symb=symb=:{symb_kind=SK_LocalMacroFunction glob_object}, app_args} extra_args
+			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs}
+	| glob_object < size ti_cons_args
+		#  (cons_class,ti_cons_args) = ti_cons_args![glob_object]
+		   (instances, ti_instances) = ti_instances![glob_object]
+		   (fun_def, ti_fun_defs) = ti_fun_defs![glob_object]
+		   ti = { ti & ti_instances = ti_instances, ti_fun_defs = ti_fun_defs, ti_cons_args = ti_cons_args }
+		= transformFunctionApplication fun_def instances cons_class app extra_args ro ti
+		// It seems as if we have an array function
+		| extra_args=:[]
+			= (App app, ti)
+			= (App { app & app_args = app_args ++ extra_args}, ti)
 // XXX linear_bits field has to be added for generated functions
 transformApplication app=:{app_symb={symb_ident,symb_kind = SK_GeneratedFunction fun_def_ptr fun_index}} extra_args
 			ro ti=:{ti_cons_args,ti_instances,ti_fun_defs,ti_fun_heap}
