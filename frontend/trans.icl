@@ -157,7 +157,6 @@ cleanup_attributes expr_info_ptr symbol_heap
 ::	ReadOnlyTI = 
 	{	ro_imported_funs	:: !{# {# FunType} }
 	,	ro_common_defs		:: !{# CommonDefs }
-// the following four are used when possibly generating functions for cases...
 	,	ro_tfi					:: !TransformFunctionInfo
 	,	ro_main_dcl_module_n 	:: !Int
 	,	ro_transform_fusion		:: !Int	// fusion switch
@@ -782,7 +781,7 @@ where
 			= (lazy_args,fun_defs,fun_heap)
 		
 		app_indices {app_symb,app_args} ro fun_defs fun_heap
-			# ({st_args_strictness,st_arity},fun_defs,fun_heap)	= get_producer_type app_symb ro fun_defs fun_heap
+			# ({st_args_strictness,st_arity},fun_defs,fun_heap)	= get_producer_type app_symb.symb_kind ro fun_defs fun_heap
 			| length app_args == st_arity
 				= find_indices st_args_strictness 0 app_args ro fun_defs fun_heap
 				= ([],fun_defs,fun_heap)
@@ -907,8 +906,8 @@ free_variables_of_expression expr ti
 	 = (fvi_variables,ti)
 
 transform_active_safe_non_root_case :: !Case !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
-transform_active_safe_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
-	| is_safe_producer app_symb.symb_kind ro ti.ti_fun_heap ti.ti_cons_args
+transform_active_safe_non_root_case kees=:{case_info_ptr,case_expr = App {app_symb}} ro=:{ro_main_dcl_module_n} ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
+	| is_safe_producer app_symb.symb_kind ro_main_dcl_module_n ti.ti_fun_heap ti.ti_cons_args
 		# (all_args,outer_fun_def,used_mask,outer_cons_args,ti)
 			= args_of_case_function (Case {kees & case_expr=EE}) ro.ro_tfi.tfi_root.symb_kind ti
 		| SwitchArityChecks (1+length all_args > 32) False
@@ -946,7 +945,7 @@ transform_active_safe_non_root_case kees=:{case_info_ptr} ro ti=:{ti_recursion_i
 		# ti & ti_next_fun_nr = fun_index + 1, ti_new_functions = [fun_info_ptr:ti.ti_new_functions], ti_fun_heap = ti_fun_heap
 		# new_ro_tfi = { ro.ro_tfi & tfi_args = all_args, tfi_consumer_or_case = CaseSymbIdent fun_symb }
 		= generate_case_function fun_index case_info_ptr (Case kees) outer_fun_def outer_cons_args used_mask new_ro_tfi ti
-	# new_ro = {ro & ro_tfi.tfi_args = all_args, ro_tfi.tfi_consumer_or_case = CaseSymbIdent fun_symb}
+	# new_ro = {ro & ro_tfi.tfi_args = all_args, ro_tfi.tfi_consumer_or_case = CaseSymbIdent fun_symb }
 	  ti & ti_recursion_introduced = No, ti_fun_heap = ti_fun_heap
 	  (new_expr, ti)
 			= transformCase kees RootCase new_ro ti
@@ -978,6 +977,19 @@ args_of_case_function case_expr root_symb_kind ti
 	  all_args = lifted_arguments++arguments_from_outer_fun
 	  ti & ti_cons_args = ti_cons_args, ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap
 	= (all_args,outer_fun_def,used_mask,outer_cons_args,ti)
+
+is_safe_producer :: !SymbKind !Int !FunctionHeap !{!ConsClasses} -> Bool
+is_safe_producer (SK_GeneratedFunction fun_ptr _) main_dcl_module_n fun_heap cons_args
+	# (FI_Function {gf_cons_args={cc_producer}}) = sreadPtr fun_ptr fun_heap
+	= cc_producer
+is_safe_producer (SK_LocalMacroFunction glob_object) main_dcl_module_n fun_heap cons_args
+	= cons_args.[glob_object].cc_producer
+is_safe_producer (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_heap cons_args
+	| glob_module <> main_dcl_module_n || glob_object >= size cons_args
+		= False
+		= cons_args.[glob_object].cc_producer
+is_safe_producer (SK_Constructor {glob_module}) main_dcl_module_n fun_heap cons_args
+	= SwitchConstructorFusion True True/*(glob_module==ro.ro_StdGeneric_module_n)*/ False
 
 FI_CopyMask:==63
 
@@ -1872,7 +1884,7 @@ where
 			producer
 				# (symbol,_) = get_producer_symbol producer
 				  (symbol_type, ti_fun_defs, ti_fun_heap)
-						= get_producer_type symbol ro ti_fun_defs ti_fun_heap
+						= get_producer_type symbol.symb_kind ro ti_fun_defs ti_fun_heap
 				-> ([Yes symbol_type:type_accu], ti_fun_defs, ti_fun_heap)
 
 	collectPropagatingConsVars :: ![AType] !*TypeVarHeap -> (!.[TypeVar],!.TypeVarHeap)
@@ -2030,8 +2042,8 @@ where
 			= False
 
 // get_producer_type retrieves the type of symbol
-get_producer_type :: !SymbIdent !.ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
-get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs fun_heap
+get_producer_type :: !SymbKind !ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
+get_producer_type (SK_Function {glob_module, glob_object}) ro fun_defs fun_heap
 	| glob_module == ro.ro_main_dcl_module_n
 		# ({fun_type=FunDefType symbol_type, fun_info={fi_properties}}, fun_defs) = fun_defs![glob_object]
 		|  fi_properties bitand FI_HasTypeSpec <> 0
@@ -2044,15 +2056,14 @@ get_producer_type {symb_kind=SK_Function {glob_module, glob_object}} ro fun_defs
 		  new_st_arity = length new_st_args
 		  new_st_args_strictness = insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
 		= ({ft_type & st_args = new_st_args, st_args_strictness = new_st_args_strictness, st_arity = new_st_arity, st_context = [] }, fun_defs, fun_heap)
-get_producer_type {symb_kind=SK_LocalMacroFunction glob_object} ro fun_defs fun_heap
+get_producer_type (SK_LocalMacroFunction glob_object) ro fun_defs fun_heap
 	# ({fun_type=FunDefType symbol_type}, fun_defs) = fun_defs![glob_object]
 	= (symbol_type, fun_defs, fun_heap)
-get_producer_type {symb_kind=SK_GeneratedFunction fun_ptr _} ro fun_defs fun_heap
+get_producer_type (SK_GeneratedFunction fun_ptr _) ro fun_defs fun_heap
 	# (FI_Function {gf_fun_def={fun_type=FunDefType symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
 	= (symbol_type, fun_defs, fun_heap)
-get_producer_type {symb_kind=SK_Constructor {glob_module, glob_object}} ro fun_defs fun_heap
-	# cons_defs = ro.ro_common_defs.[glob_module].com_cons_defs
-	# {cons_type} = cons_defs.[glob_object]
+get_producer_type (SK_Constructor {glob_module, glob_object}) ro fun_defs fun_heap
+	# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
 	# (_,cons_type) = removeAnnotations cons_type	// necessary???
 	= (cons_type, fun_defs, fun_heap)
 
@@ -2717,6 +2728,11 @@ where
 remove_TA_TempVars_in_info_ptrs [] attrs
 	= attrs
 
+::	TrivialFunction
+	= TrivialApp !Expression
+	| TrivialRedirectOrBasicExpr !Expression
+	| NoTrivialFunction
+
 transformFunctionApplication :: !FunDef !InstanceInfo !ConsClasses !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_bits} app=:{app_symb,app_args} extra_args ro ti
 	# (app_args, extra_args) = complete_application fun_def.fun_arity app_args extra_args
@@ -2730,14 +2746,8 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	# (opt_expr,ti) = is_trivial_function app_symb app_args fun_kind tb_rhs ro ti
-	| opt_expr=:Yes _
-		= case opt_expr of
-			Yes (App app)
-				-> transformApplication app extra_args ro ti
-			Yes rhs
-				| extra_args=:[]
-					-> (rhs, ti)
-					-> (rhs @ extra_args, ti)
+	| not opt_expr=:NoTrivialFunction
+		= transform_trivial_function_call opt_expr app_args extra_args ro ti
 	| cc_size >= 0
 		# consumer_properties = fun_def.fun_info.fi_properties
 	  	# consumer_is_curried = cc_size <> length app_args
@@ -2787,8 +2797,6 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 				= possiblyAddStrictLetBinds expr strict_let_binds ti
 				# (expr,ti) = transformApplication {app & app_symb = app_symb`, app_args = app_args} extra_args ro ti
 				= possiblyAddStrictLetBinds expr strict_let_binds ti
-		| SwitchTrivialFusion (ro.ro_transform_fusion>=FullFusion) False
-			= transform_trivial_function app app_args extra_args ro ti
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	= (build_application { app & app_args = app_args } extra_args, ti)
 where
@@ -2806,61 +2814,18 @@ where
 							,	let_expr_position	= NoPos
 							},ti) // ---> "added strict_let_binds"
 
+	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!TrivialFunction,!*TransformInfo)
+	is_trivial_function app_symb app_args fun_kind rhs ro ti
+		| SwitchTrivialFusion (ro.ro_transform_fusion>=FullFusion && not fun_kind=:FK_Caf && is_sexy_body rhs) False
+			= is_trivial_function_call app_symb.symb_kind app_args ro ti
+			= (NoTrivialFunction, ti)
+
 	transform_trivial_function :: !.App ![.Expression] ![.Expression] !.ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 	transform_trivial_function app=:{app_symb} app_args extra_args ro ti
 		# (opt_expr,ti) = is_trivial_function_call app_symb.symb_kind app_args ro ti
-		= case opt_expr of
-			No
-				-> (build_application {app & app_symb = app_symb, app_args = app_args} extra_args, ti)
-			Yes tb_rhs=:(App app)
-				# (is_cycle,ti) = is_cycle_of_trivial_function_calls app.app_symb.symb_kind app_args [app_symb.symb_kind] ro ti
-				| not is_cycle
-					-> transformApplication app extra_args ro ti
-					| extra_args=:[]
-						-> (tb_rhs, ti)
-						-> (tb_rhs @ extra_args, ti)
-			Yes tb_rhs
-				| extra_args=:[]
-					-> (tb_rhs, ti)
-					-> (tb_rhs @ extra_args, ti)
-
-	is_cycle_of_trivial_function_calls :: !SymbKind ![Expression] ![SymbKind] !ReadOnlyTI !*TransformInfo -> *(!Bool,!*TransformInfo)
-	is_cycle_of_trivial_function_calls symb_kind app_args previous_function_symb_kinds ro ti
-		| not (is_main_module_function_symbol symb_kind ro.ro_main_dcl_module_n)
-			= (False,ti)
-		| Any (equal_function symb_kind) previous_function_symb_kinds
-			= (True,ti)
-		# (opt_expr,ti) = is_trivial_function_call symb_kind app_args ro ti
-		= case opt_expr of
-			Yes (App {app_symb,app_args})
-				-> is_cycle_of_trivial_function_calls app_symb.symb_kind app_args [symb_kind:previous_function_symb_kinds] ro ti
-			_
-				-> (False,ti)
-	where
-		is_main_module_function_symbol (SK_Function {glob_module})	main_dcl_module_n = glob_module == main_dcl_module_n
-		is_main_module_function_symbol (SK_LocalMacroFunction _)	main_dcl_module_n = True
-		is_main_module_function_symbol (SK_GeneratedFunction _ _)	main_dcl_module_n = True
-		is_main_module_function_symbol _							main_dcl_module_n = False
-
-		equal_function (SK_Function i1) (SK_Function i2) = i1==i2
-		equal_function (SK_LocalMacroFunction i1) (SK_LocalMacroFunction i2) = i1==i2
-		equal_function (SK_GeneratedFunction _ i1) (SK_GeneratedFunction _ i2) = i1==i2
-		equal_function _ _ = False
-
-	is_trivial_function :: !SymbIdent ![Expression] !FunKind !Expression !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
-	is_trivial_function app_symb app_args fun_kind rhs ro ti
-		| SwitchTransformConstants (ro.ro_transform_fusion>=FullFusion && not fun_kind=:FK_Caf && is_sexy_body rhs) False
-			= is_trivial_function_call app_symb.symb_kind app_args ro ti
-			= (No, ti)
-
-	is_trivial_function_call :: !SymbKind ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Optional Expression,!*TransformInfo)
-	is_trivial_function_call symb_kind app_args ro ti
-		# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
-		# {fun_body=fun_body=:TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
-		# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
-			= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
-		# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
-		= (opt_expr, ti)
+		| opt_expr=:NoTrivialFunction
+			= (build_application {app & app_symb = app_symb, app_args = app_args} extra_args, ti)
+			= transform_trivial_function_call opt_expr app_args extra_args ro ti
 
 	update_instance_info :: !.SymbKind !.InstanceInfo !*TransformInfo -> *TransformInfo
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
@@ -2904,6 +2869,65 @@ where
 is_cons_or_decons_of_UList_or_UTSList glob_object glob_module imported_funs
 	:== let  type = imported_funs.[glob_module].[glob_object].ft_type;
 		  in type.st_arity>0 && not (isEmpty type.st_context);
+
+is_trivial_function_call :: !SymbKind ![Expression] !ReadOnlyTI !*TransformInfo -> *(!TrivialFunction,!*TransformInfo)
+is_trivial_function_call symb_kind app_args ro ti
+	# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+	# {fun_body=TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
+	# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
+		= is_trivial_body tb_args tb_rhs app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
+	# ti & ti_fun_defs = ti_fun_defs, ti_fun_heap = ti_fun_heap, ti_type_heaps = ti_type_heaps, ti_cons_args = ti_cons_args
+	= (opt_expr, ti)
+
+is_cycle_of_trivial_function_calls :: !SymbKind ![Expression] ![SymbKind] !ReadOnlyTI !*TransformInfo -> *(!Bool,!*TransformInfo)
+is_cycle_of_trivial_function_calls symb_kind app_args previous_function_symb_kinds ro ti
+	| not (is_main_module_function_symbol symb_kind ro.ro_main_dcl_module_n)
+		= (False,ti)
+	| Any (equal_function symb_kind) previous_function_symb_kinds
+		= (True,ti)
+	# (opt_expr,ti) = is_trivial_function_call_app symb_kind app_args ro ti
+	= case opt_expr of
+		TrivialApp (App {app_symb,app_args})
+			-> is_cycle_of_trivial_function_calls app_symb.symb_kind app_args [symb_kind:previous_function_symb_kinds] ro ti
+		_
+			-> (False,ti)
+where
+	is_main_module_function_symbol (SK_Function {glob_module})	main_dcl_module_n = glob_module == main_dcl_module_n
+	is_main_module_function_symbol (SK_LocalMacroFunction _)	main_dcl_module_n = True
+	is_main_module_function_symbol (SK_GeneratedFunction _ _)	main_dcl_module_n = True
+	is_main_module_function_symbol _							main_dcl_module_n = False
+
+	equal_function (SK_Function i1) (SK_Function i2) = i1==i2
+	equal_function (SK_LocalMacroFunction i1) (SK_LocalMacroFunction i2) = i1==i2
+	equal_function (SK_GeneratedFunction _ i1) (SK_GeneratedFunction _ i2) = i1==i2
+	equal_function _ _ = False
+
+	is_trivial_function_call_app :: !SymbKind ![Expression] !ReadOnlyTI !*TransformInfo -> *(!TrivialFunction,!*TransformInfo)
+	is_trivial_function_call_app symb_kind app_args ro ti
+		# (fun_def,ti_fun_defs,ti_fun_heap) = get_fun_def symb_kind ro.ro_main_dcl_module_n ti.ti_fun_defs ti.ti_fun_heap
+		# {fun_body=TransformedBody {tb_args,tb_rhs},fun_type} = fun_def
+		= case tb_rhs of
+			App app
+				# (opt_expr, ti_fun_defs, ti_fun_heap, ti_type_heaps, ti_cons_args)
+					= is_trivial_app_body tb_args app app_args fun_type ro ti_fun_defs ti_fun_heap ti.ti_type_heaps ti.ti_cons_args
+				# ti & ti_fun_defs=ti_fun_defs, ti_fun_heap=ti_fun_heap, ti_type_heaps=ti_type_heaps, ti_cons_args=ti_cons_args
+				-> (opt_expr, ti)
+			_
+				# ti & ti_fun_defs=ti_fun_defs, ti_fun_heap=ti_fun_heap
+				-> (NoTrivialFunction, ti)
+
+transform_trivial_function_call :: !TrivialFunction ![Expression] ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
+transform_trivial_function_call (TrivialApp rhs=:(App app=:{app_symb})) app_args extra_args ro ti
+	# (is_cycle,ti) = is_cycle_of_trivial_function_calls app_symb.symb_kind app_args [app_symb.symb_kind] ro ti
+	| not is_cycle
+		= transformApplication app extra_args ro ti
+		| extra_args=:[]
+			= (rhs, ti)
+			= (rhs @ extra_args, ti)
+transform_trivial_function_call (TrivialRedirectOrBasicExpr rhs) app_args extra_args ro ti
+	| extra_args=:[]
+		= (rhs, ti)
+		= (rhs @ extra_args, ti)
 
 determineCurriedProducersInExtraArgs :: ![Expression] ![Expression] !BITVECT !{!.Producer} ![Int] ![#Bool!] !FunDef !ReadOnlyTI !*TransformInfo
 	-> *(!Bool,![Expression],![Expression],!{!Producer},![Int],![#Bool!],!FunDef,!Int,!*TransformInfo)
@@ -3029,29 +3053,25 @@ where
 		# arity = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object].cons_type.st_arity
 		= (arity, fun_defs, fun_heap)
 
-is_trivial_body :: ![FreeVar] !Expression ![Expression] !FunDefType !.ReadOnlyTI
-							 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
-	-> (!Optional Expression,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
-is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps cons_args
-	| fv.fv_info_ptr == bv.var_info_ptr
-		= (Yes arg, fun_defs, fun_heap, type_heaps, cons_args)
-		= (No, fun_defs, fun_heap, type_heaps, cons_args)
-is_trivial_body lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps cons_args
-	| not (is_safe_producer app.app_symb.symb_kind ro fun_heap cons_args)
-		= (No,fun_defs,fun_heap,type_heaps,cons_args)
-	# (type`,fun_defs,fun_heap)	= get_producer_type app.app_symb ro fun_defs fun_heap
-	  lhs_args_var_ptrs = {!fv_info_ptr \\ {fv_info_ptr} <- lhs_args}
+is_trivial_app_body :: ![FreeVar] !App ![Expression] !FunDefType !.ReadOnlyTI
+						 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
+	-> (!TrivialFunction,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
+is_trivial_app_body lhs_args app f_args type ro=:{ro_main_dcl_module_n} fun_defs fun_heap type_heaps cons_args
+	| not (is_safe_producer_or_external_function app.app_symb.symb_kind ro_main_dcl_module_n fun_heap cons_args)
+		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+	# lhs_args_var_ptrs = {!fv_info_ptr \\ {fv_info_ptr} <- lhs_args}
 	  n_f_args = length f_args
 	  optional_perm = match_args lhs_args app.app_args 0 n_f_args lhs_args_var_ptrs []
 	= case optional_perm of
 		Yes perm
+			# (type`,fun_defs,fun_heap)	= get_producer_type_with_strictness app.app_symb.symb_kind ro fun_defs fun_heap
 			# (match, type_heaps) = match_types type type` perm ro.ro_common_defs type_heaps
 			| match
 				# f_args = permute_args f_args perm n_f_args
-				-> (Yes (App {app & app_args = f_args}),fun_defs,fun_heap,type_heaps,cons_args)
-				-> (No,fun_defs,fun_heap,type_heaps,cons_args)
+				-> (TrivialApp (App {app & app_args = f_args}),fun_defs,fun_heap,type_heaps,cons_args)
+				-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
 		_
-			-> (No,fun_defs,fun_heap,type_heaps,cons_args)
+			-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
 where
 	match_args :: ![FreeVar] ![Expression] !Int !Int !*{!VarInfoPtr} ![Int] -> Optional [Int]
 	match_args [fv:fvs] [Var bv:bvs] arg_n n_f_args lhs_args_var_ptrs reversed_perm
@@ -3148,35 +3168,66 @@ where
 
 	permute_args args perm n_f_args
 		= [args!!p \\ p <- perm & arg_n<-[0..n_f_args-1]]
+
+is_safe_producer_or_external_function :: !SymbKind !Int !FunctionHeap !{!ConsClasses} -> Bool
+is_safe_producer_or_external_function (SK_GeneratedFunction fun_ptr _) main_dcl_module_n fun_heap cons_args
+	# (FI_Function {gf_cons_args={cc_producer}}) = sreadPtr fun_ptr fun_heap
+	= cc_producer
+is_safe_producer_or_external_function (SK_LocalMacroFunction glob_object) main_dcl_module_n fun_heap cons_args
+	= cons_args.[glob_object].cc_producer
+is_safe_producer_or_external_function (SK_Function {glob_module, glob_object}) main_dcl_module_n fun_heap cons_args
+	| glob_module <> main_dcl_module_n
+		= True
+		= glob_object < size cons_args && cons_args.[glob_object].cc_producer
+is_safe_producer_or_external_function (SK_Constructor {glob_module}) main_dcl_module_n fun_heap cons_args
+	= SwitchConstructorFusion True True/*(glob_module==ro.ro_StdGeneric_module_n)*/ False
+
+get_producer_type_with_strictness :: !SymbKind !ReadOnlyTI !*{#FunDef} !*FunctionHeap -> (!SymbolType,!*{#FunDef},!*FunctionHeap)
+get_producer_type_with_strictness (SK_Function {glob_module, glob_object}) ro fun_defs fun_heap
+	| glob_module == ro.ro_main_dcl_module_n
+		# ({fun_type=FunDefType symbol_type}, fun_defs) = fun_defs![glob_object]
+		= (symbol_type, fun_defs, fun_heap)
+		# {ft_type} = ro.ro_imported_funs.[glob_module].[glob_object]
+		  {st_args,st_args_strictness} = ft_type
+		  new_st_args = addTypesOfDictionaries ro.ro_common_defs ft_type.st_context st_args
+		  new_st_arity = length new_st_args
+		  new_st_args_strictness = insert_n_strictness_values_at_beginning (new_st_arity-length st_args) st_args_strictness
+		= ({ft_type & st_args = new_st_args, st_args_strictness = new_st_args_strictness, st_arity = new_st_arity, st_context = [] }, fun_defs, fun_heap)
+get_producer_type_with_strictness (SK_LocalMacroFunction glob_object) ro fun_defs fun_heap
+	# ({fun_type=FunDefType symbol_type}, fun_defs) = fun_defs![glob_object]
+	= (symbol_type, fun_defs, fun_heap)
+get_producer_type_with_strictness (SK_GeneratedFunction fun_ptr _) ro fun_defs fun_heap
+	# (FI_Function {gf_fun_def={fun_type=FunDefType symbol_type}}, fun_heap) = readPtr fun_ptr fun_heap
+	= (symbol_type, fun_defs, fun_heap)
+get_producer_type_with_strictness (SK_Constructor {glob_module, glob_object}) ro fun_defs fun_heap
+	# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
+	= (cons_type, fun_defs, fun_heap)
+
+is_trivial_body :: ![FreeVar] !Expression ![Expression] !FunDefType !.ReadOnlyTI
+						 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
+	-> (!TrivialFunction,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
+is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps cons_args
+	| fv.fv_info_ptr == bv.var_info_ptr
+		= (TrivialRedirectOrBasicExpr arg, fun_defs, fun_heap, type_heaps, cons_args)
+		= (NoTrivialFunction, fun_defs, fun_heap, type_heaps, cons_args)
+is_trivial_body lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps cons_args
+	= is_trivial_app_body lhs_args app f_args type ro fun_defs fun_heap type_heaps cons_args
 is_trivial_body args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps cons_args
 	| both_nil args f_args || (same_length args f_args && no_strict_args type)
-		= (Yes rhs_expr,fun_defs,fun_heap,type_heaps,cons_args)
+		= (TrivialRedirectOrBasicExpr rhs_expr,fun_defs,fun_heap,type_heaps,cons_args)
 where
 	no_strict_args (FunDefType type)
 		= is_not_strict type.st_args_strictness 
 	no_strict_args NoFunDefType
 		= True
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
-	= (No,fun_defs,fun_heap,type_heaps,cons_args)
-	
+	= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+
 same_length [_:l1] [_:l2] = same_length l1 l2
 same_length l1 l2 = both_nil l1 l2
 
 both_nil [] [] = True
 both_nil _ _ = False
-
-is_safe_producer (SK_GeneratedFunction fun_ptr _) ro fun_heap cons_args
-	# (FI_Function {gf_cons_args={cc_producer}}) = sreadPtr fun_ptr fun_heap
-	= cc_producer
-is_safe_producer (SK_LocalMacroFunction glob_object) ro fun_heap cons_args
-	= cons_args.[glob_object].cc_producer
-is_safe_producer (SK_Function {glob_module, glob_object}) ro fun_heap cons_args
-	# max_index = size cons_args
-	| glob_module <> ro.ro_main_dcl_module_n || glob_object >= max_index
-		= False
-		= cons_args.[glob_object].cc_producer
-is_safe_producer (SK_Constructor {glob_module}) ro fun_heap cons_args
-	= SwitchConstructorFusion True True/*(glob_module==ro.ro_StdGeneric_module_n)*/ False
 
 transformApplication :: !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
 transformApplication app=:{app_symb=symb=:{symb_kind=SK_Function gi=:{glob_module,glob_object}},app_args} extra_args
