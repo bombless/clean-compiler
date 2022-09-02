@@ -2747,7 +2747,7 @@ transformFunctionApplication fun_def instances cc=:{cc_size, cc_args, cc_linear_
 		= (build_application { app & app_args = app_args } extra_args, ti)
 	# (opt_expr,ti) = is_trivial_function app_symb app_args fun_kind tb_rhs ro ti
 	| not opt_expr=:NoTrivialFunction
-		= transform_trivial_function_call opt_expr app_args extra_args ro ti
+		= transform_trivial_function_call opt_expr app_symb extra_args ro ti
 	| cc_size >= 0
 		# consumer_properties = fun_def.fun_info.fi_properties
 	  	# consumer_is_curried = cc_size <> length app_args
@@ -2825,7 +2825,7 @@ where
 		# (opt_expr,ti) = is_trivial_function_call app_symb.symb_kind app_args ro ti
 		| opt_expr=:NoTrivialFunction
 			= (build_application {app & app_symb = app_symb, app_args = app_args} extra_args, ti)
-			= transform_trivial_function_call opt_expr app_args extra_args ro ti
+			= transform_trivial_function_call opt_expr app_symb extra_args ro ti
 
 	update_instance_info :: !.SymbKind !.InstanceInfo !*TransformInfo -> *TransformInfo
 	update_instance_info (SK_Function {glob_object}) instances ti=:{ti_instances}
@@ -2916,15 +2916,15 @@ where
 				# ti & ti_fun_defs=ti_fun_defs, ti_fun_heap=ti_fun_heap
 				-> (NoTrivialFunction, ti)
 
-transform_trivial_function_call :: !TrivialFunction ![Expression] ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
-transform_trivial_function_call (TrivialApp rhs=:(App app=:{app_symb})) app_args extra_args ro ti
-	# (is_cycle,ti) = is_cycle_of_trivial_function_calls app_symb.symb_kind app_args [app_symb.symb_kind] ro ti
+transform_trivial_function_call :: !TrivialFunction !SymbIdent ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
+transform_trivial_function_call (TrivialApp rhs=:(App app)) app_symb extra_args ro ti
+	# (is_cycle,ti) = is_cycle_of_trivial_function_calls app.app_symb.symb_kind app.app_args [app_symb.symb_kind] ro ti
 	| not is_cycle
 		= transformApplication app extra_args ro ti
 		| extra_args=:[]
 			= (rhs, ti)
 			= (rhs @ extra_args, ti)
-transform_trivial_function_call (TrivialRedirectOrBasicExpr rhs) app_args extra_args ro ti
+transform_trivial_function_call (TrivialRedirectOrBasicExpr rhs) app_symb extra_args ro ti
 	| extra_args=:[]
 		= (rhs, ti)
 		= (rhs @ extra_args, ti)
