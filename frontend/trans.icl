@@ -2731,6 +2731,7 @@ remove_TA_TempVars_in_info_ptrs [] attrs
 ::	TrivialFunction
 	= TrivialApp !Expression
 	| TrivialRedirectOrBasicExpr !Expression
+	| TrivialAlgebraicCase !Expression
 	| NoTrivialFunction
 
 transformFunctionApplication :: !FunDef !InstanceInfo !ConsClasses !App ![Expression] !ReadOnlyTI !*TransformInfo -> *(!Expression,!*TransformInfo)
@@ -2925,6 +2926,12 @@ transform_trivial_function_call (TrivialApp rhs=:(App app)) app_symb extra_args 
 			= (rhs, ti)
 			= (rhs @ extra_args, ti)
 transform_trivial_function_call (TrivialRedirectOrBasicExpr rhs) app_symb extra_args ro ti
+	| extra_args=:[]
+		= (rhs, ti)
+		= (rhs @ extra_args, ti)
+transform_trivial_function_call (TrivialAlgebraicCase (App app)) app_symb extra_args ro ti
+	= transformApplication app extra_args ro ti
+transform_trivial_function_call (TrivialAlgebraicCase rhs=:(BasicExpr _)) app_symb extra_args ro ti
 	| extra_args=:[]
 		= (rhs, ti)
 		= (rhs @ extra_args, ti)
@@ -3203,6 +3210,123 @@ get_producer_type_with_strictness (SK_Constructor {glob_module, glob_object}) ro
 	# {cons_type} = ro.ro_common_defs.[glob_module].com_cons_defs.[glob_object]
 	= (cons_type, fun_defs, fun_heap)
 
+is_trivial_algebraic_case_body :: ![FreeVar] !VarInfoPtr ![AlgebraicPattern] ![Expression] !FunDefType !.ReadOnlyTI
+						 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
+	-> (!TrivialFunction,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
+is_trivial_algebraic_case_body args var_info_ptr [] f_args type ro fun_defs fun_heap type_heaps cons_args
+	= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+is_trivial_algebraic_case_body args var_info_ptr algebraic_patterns f_args type ro fun_defs fun_heap type_heaps cons_args
+	# case_arg_n = find_free_var_n var_info_ptr args 0
+	| case_arg_n<0
+		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+	= case find_case_arg case_arg_n f_args of
+		App {app_symb=app_symb=:{symb_kind=SK_Constructor cons_index},app_args}
+			-> case [ap \\ ap=:{ap_symbol}<-algebraic_patterns | cons_index.glob_module==ap_symbol.glob_module && cons_index.glob_object==ap_symbol.glob_object.ds_index] of
+				[{ap_symbol,ap_vars,ap_expr}:_]
+					| is_not_strict ro.ro_common_defs.[cons_index.glob_module].com_cons_defs.[cons_index.glob_object].cons_type.st_args_strictness
+						&& same_length args f_args
+						# (mb_new_rhs_expr,used_args,used_ap_vars,fun_heap,cons_args)
+							= update_trivial_rhs ap_expr (1<<case_arg_n) 0 ro.ro_main_dcl_module_n fun_heap cons_args
+						  with
+							update_trivial_rhs (App case_rhs_app) used_args used_ap_vars main_dcl_module_n fun_heap cons_args
+								| not (only_vars case_rhs_app.app_args)
+									= (No,used_args,used_ap_vars,fun_heap,cons_args)
+								| not (is_safe_producer_or_external_function case_rhs_app.app_symb.symb_kind main_dcl_module_n fun_heap cons_args)
+									= (No,used_args,used_ap_vars,fun_heap,cons_args)
+								# (ok,permutation,used_args,used_apvars) = make_arg_permution case_rhs_app.app_args used_args used_ap_vars args ap_vars
+								| not ok
+									= (No,used_args,used_ap_vars,fun_heap,cons_args)
+								# new_args = replace_vars_in_app_args case_rhs_app.app_args permutation f_args app_args
+								# app = App {app_symb=case_rhs_app.app_symb,app_args=new_args,app_info_ptr=nilPtr}
+								= (Yes app,used_args,used_ap_vars,fun_heap,cons_args)
+							update_trivial_rhs expr=:(BasicExpr (BVB _)) used_args used_ap_vars main_dcl_module_n fun_heap cons_args
+								= (Yes expr,used_args,used_ap_vars,fun_heap,cons_args)
+							update_trivial_rhs _ used_args used_ap_vars main_dcl_module_n fun_heap cons_args
+								= (No,used_args,used_ap_vars,fun_heap,cons_args)
+						-> case mb_new_rhs_expr of
+							Yes new_rhs_expr
+								// to do use strictness of first rhs function call
+								# (no_strict_arg_or_tuple_result,type_heaps) = has_no_strict_arg_or_tuple_result type case_arg_n ro.ro_common_defs type_heaps
+								| not no_strict_arg_or_tuple_result
+									-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+									-> (TrivialAlgebraicCase new_rhs_expr,fun_defs,fun_heap,type_heaps,cons_args)
+							No
+								-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+						-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+				[]
+					-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+		_
+			-> (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
+
+make_arg_permution :: ![Expression] !Int !Int ![FreeVar] ![FreeVar] -> (!Bool,![Int],!Int,!Int)
+make_arg_permution [Var {var_info_ptr}:rhs_app_args] used_args used_ap_vars args ap_vars
+	# arg_n = find_free_var_n var_info_ptr args 0
+	| arg_n>=0
+		# arg_n_mask = 1<<arg_n
+		| used_args bitand arg_n_mask<>0
+			= (False,[],used_args,used_ap_vars)
+			# used_args = used_args bitor arg_n_mask
+			# (ok,arg_ns,used_args,used_ap_vars) = make_arg_permution rhs_app_args used_args used_ap_vars args ap_vars
+			= (ok,[arg_n:arg_ns],used_args,used_ap_vars)
+	# ap_var_n = find_free_var_n var_info_ptr ap_vars 0
+	| ap_var_n>=0
+		# ap_var_n_mask = 1<<ap_var_n
+		| used_ap_vars bitand ap_var_n_mask<>0
+			= (False,[],used_args,used_ap_vars)
+		# used_ap_vars = used_ap_vars bitor ap_var_n_mask
+		# arg_n = bitnot ap_var_n
+		# (ok,arg_ns,used_args,used_ap_vars) = make_arg_permution rhs_app_args used_args used_ap_vars args ap_vars
+		= (ok,[arg_n:arg_ns],used_args,used_ap_vars)
+		= (False,[],used_args,used_ap_vars)
+make_arg_permution [] used_args used_ap_vars args ap_vars
+	= (True,[],used_args,used_ap_vars)
+
+replace_vars_in_app_args [Var _:args] [arg_n:permutation] f_args app_args
+	# args = replace_vars_in_app_args args permutation f_args app_args
+	| arg_n>=0
+		= [f_args!!arg_n:args]
+		= [app_args!!bitnot arg_n:args]
+replace_vars_in_app_args [] permutation f_args app_args
+	= []
+
+find_free_var_n :: !VarInfoPtr ![FreeVar] !Int -> Int
+find_free_var_n var_info_ptr [{fv_info_ptr}:args] arg_n
+	| fv_info_ptr<>var_info_ptr
+		= find_free_var_n var_info_ptr args (arg_n+1)
+		= arg_n
+find_free_var_n var_info_ptr [] arg_n
+	= -1
+
+find_case_arg 0 [f_arg:_]
+	= f_arg
+find_case_arg n [_:f_args]
+	= find_case_arg (n-1) f_args
+find_case_arg _ _
+	= EE
+
+only_vars [Var _:args] = only_vars args
+only_vars [_:_] = False
+only_vars [] = True
+
+has_no_strict_arg_or_tuple_result :: !FunDefType !Int !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+has_no_strict_arg_or_tuple_result (FunDefType {st_args_strictness,st_result}) case_arg_n common_defs type_heaps
+	| is_not_strict (remove_strictness case_arg_n st_args_strictness)
+		= not_strict_tuple st_result common_defs type_heaps
+		= (False,type_heaps)
+where
+	not_strict_tuple :: !AType !{#CommonDefs} !*TypeHeaps -> (!Bool,!*TypeHeaps)
+	not_strict_tuple {at_type=TAS _ _ strictness} common_defs type_heaps
+		= (is_not_strict strictness,type_heaps)
+	not_strict_tuple {at_attribute,at_type=type=:TA _ _} common_defs type_heaps
+		# (ok,type,type_heaps)	= tryToExpand type at_attribute common_defs type_heaps
+		| ok
+			= not_strict_tuple {at_attribute=at_attribute,at_type=type} common_defs type_heaps
+			= (True,type_heaps)
+	not_strict_tuple type common_defs type_heaps
+		= (True,type_heaps)
+has_no_strict_arg_or_tuple_result NoFunDefType case_arg_n common_defs type_heaps
+	= (True,type_heaps)
+
 is_trivial_body :: ![FreeVar] !Expression ![Expression] !FunDefType !.ReadOnlyTI
 						 !*{#FunDef} !*FunctionHeap !*TypeHeaps !*{!ConsClasses}
 	-> (!TrivialFunction,!*{#FunDef},!*FunctionHeap,!*TypeHeaps,!*{!ConsClasses})
@@ -3220,6 +3344,9 @@ where
 		= is_not_strict type.st_args_strictness 
 	no_strict_args NoFunDefType
 		= True
+is_trivial_body args (Case {case_expr=Var {var_info_ptr},case_guards=AlgebraicPatterns _ algebraic_patterns,case_default=No})
+						f_args type ro fun_defs fun_heap type_heaps cons_args
+	= is_trivial_algebraic_case_body args var_info_ptr algebraic_patterns f_args type ro fun_defs fun_heap type_heaps cons_args
 is_trivial_body args rhs f_args type ro fun_defs fun_heap type_heaps cons_args
 	= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,cons_args)
 
