@@ -1,7 +1,15 @@
 # Changelog
 
-#### Unreleased
+#### v3.0.2
 
+- Enhancement: add optimisation to generic fusion to prevent generating some
+  small functions with many arguments that may cause fusion to stop because of
+  the 32 arguments limit. Instead generate larger functions with fewer
+  arguments by inlining function calls.
+- Enhancement: speed up and reduce memory usage of compilation with generic
+  fusion. Instead of generating a new trivial function and inlining the
+  function later do this immediately (without generating a new function) in
+  some cases.
 - Fix: the Windows version of `lib-compiler` now distributes `backend.dll` in
   `misc/dll/backend.dll` instead of `exe/backend.dll` to avoid a name clash
   with `base-compiler`.

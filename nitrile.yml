@@ -4,7 +4,7 @@ maintainer: Camil Staps
 contact_email: clean@camilstaps.nl
 description: The Clean compiler.
 license: BSD-2-Clause
-version: 3.0.1
+version: 3.0.2
 type: Application
 dependencies:
   argenv: ^1.0
@@ -98,7 +98,7 @@ maintainer: Camil Staps
 contact_email: clean@camilstaps.nl
 description: A library with the base-compiler sources.
 license: BSD-2-Clause
-version: 3.0.1
+version: 3.0.2
 type: Library
 dependencies:
   argenv: ^1.0.0
