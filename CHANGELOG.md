@@ -1,5 +1,11 @@
 # Changelog
 
+#### Unreleased
+
+- Fix: the Windows version of `lib-compiler` now distributes `backend.dll` in
+  `misc/dll/backend.dll` instead of `exe/backend.dll` to avoid a name clash
+  with `base-compiler`.
+
 #### v3.0.1
 
 - Fix: prevent compiler crash when explicitly importing a macro using a new
