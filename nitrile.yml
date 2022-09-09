@@ -146,4 +146,4 @@ rules:
         - c_thread_message.obj
       extra_files:
         - src: backendC/backend.dll
-          dst: exe/backend.dll
+          dst: misc/dll/backend.dll
