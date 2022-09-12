@@ -281,6 +281,9 @@ where
 		bind_attr _ attribute type_heaps
 			= type_heaps
 
+		substitute_rhs rem_annots (TFA vars type) heaps
+			# (type, heaps) = substitute_rhs rem_annots type heaps
+			= (TFA vars type, heaps)
 		substitute_rhs rem_annots rhs_type type_heaps
 			| rem_annots bitand RemoveAnnotationsMask<>0
 				# (_, rhs_type) = removeAnnotations rhs_type
