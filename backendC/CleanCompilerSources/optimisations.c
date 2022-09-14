@@ -4818,7 +4818,7 @@ void OptimiseRules (ImpRules rules,SymbDef start_sdef)
 				NodeP call_node_p;
 				
 				call_node_p=rule_p->rule_lazy_call_node;
-				if (call_node_p->node_mark & 3==0 /* ? */ && !(call_node_p->node_state.state_type==SimpleState && call_node_p->node_state.state_kind==SemiStrict)){
+				if ((call_node_p->node_mark & 3)==0 /* ? */ && !(call_node_p->node_state.state_type==SimpleState && call_node_p->node_state.state_kind==SemiStrict)){
 					StateP function_arg_state_p;
 					ArgP arg_p;
 
