@@ -571,8 +571,8 @@ where
 		# (expr,ti) = transform_on_case_path expr ro ti
 		= (Yes expr,ti)
 
-case_alt_matches_always_and_strict_let_allowed (Let {let_strict_binds=[_:_],let_expr}) case_explicit=:True root_case_mode=:RootCase ro
-	= case_alt_matches_always_and_strict_let_allowed let_expr case_explicit root_case_mode ro
+case_alt_matches_always_and_strict_let_allowed (Let {let_strict_binds=[_:_],let_expr}) case_explicit=:True root_case_mode ro
+	= root_case_mode=:RootCase && case_alt_matches_always_and_strict_let_allowed let_expr case_explicit root_case_mode ro
 case_alt_matches_always_and_strict_let_allowed bp_expr case_explicit root_case_mode ro
 	= case_alt_matches_always bp_expr ro
 where
