@@ -1,5 +1,13 @@
 # Changelog
 
+#### v3.0.3
+
+- Fix: substitute type variables and attributes when expanding a newtype with a
+  universal quantifier.
+- Fix: fix replacement of an explicit case by a case alternative with a strict
+  let.
+- Fix: fix bug that prevented unboxing arguments of some closures.
+
 #### v3.0.2
 
 - Enhancement: add optimisation to generic fusion to prevent generating some
