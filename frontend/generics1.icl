@@ -2558,13 +2558,13 @@ where
 			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 
 			| generic_info_index<0
-				#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+				#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
 				# (ins_type,hp_type_heaps,hp_var_heap,error)
-					= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+					= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
 						heaps.hp_type_heaps heaps.hp_var_heap error
 				# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 				#! (fun_type, heaps, error)
-					= determine_type_of_member_instance member_def ins_type heaps error
+					= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
 				# class_instance_member = {cim_ident=fun_ident,cim_arity=module_index,cim_index= -1-fun_index}
@@ -2576,14 +2576,8 @@ where
 						Yes fun_type
 							-> (fun_type,modules,heaps,error)
 						No
-							#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
-							# (ins_type,hp_type_heaps,hp_var_heap,error)
-								= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
-									heaps.hp_type_heaps heaps.hp_var_heap error
-							# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
-							# (fun_type, heaps, error)
-								= determine_type_of_member_instance member_def ins_type heaps error
-							-> (fun_type,modules,heaps,error)
+							#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+							-> determine_type_of_generic_instance me_type me_class_vars ins_type gs_predefs gc_ident gc_pos modules heaps error
 				# fun_type_with_generic_info
 					= if (generic_info<>0)
 						(add_generic_info_to_type fun_type generic_info_index generic_info gs_predefs)
@@ -2653,13 +2647,13 @@ where
 			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 
 			| generic_info_index<0
-				#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+				#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
 				# (ins_type,hp_type_heaps,hp_var_heap,error)
-					= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+					= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
 						heaps.hp_type_heaps heaps.hp_var_heap error
 				# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 				#! (fun_type, heaps, error)
-					= determine_type_of_member_instance member_def ins_type heaps error
+					= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
 				# st & ss_modules=modules, ss_heaps=heaps, ss_error=error
@@ -2675,13 +2669,8 @@ where
 						Yes fun_type
 							-> (fun_type,modules,heaps,error)
 						No
-							#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
-							# (ins_type,hp_type_heaps,hp_var_heap,error)
-								= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
-									heaps.hp_type_heaps heaps.hp_var_heap error
-							# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
-							# (fun_type,heaps,error) = determine_type_of_member_instance member_def ins_type heaps error
-							-> (fun_type,modules,heaps,error)
+							#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+							-> determine_type_of_generic_instance me_type me_class_vars ins_type gs_predefs gc_ident gc_pos modules heaps error
 				# fun_type_with_generic_info
 					= if (generic_info<>0)
 						(add_generic_info_to_type fun_type generic_info_index generic_info gs_predefs)
@@ -2702,23 +2691,23 @@ where
 			  (Yes class_info) = lookupGenericClassInfo gcf_kind gen_classes
 			| generic_info_index>=0
 				= {st & ss_error = reportError gc_ident.id_name gc_pos "cannot derive a local function for this type" error}
-			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+			#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
 			# (ins_type,hp_type_heaps,hp_var_heap,error)
-				= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+				= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
 					heaps.hp_type_heaps heaps.hp_var_heap error
 			# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 			# st & ss_modules=modules, ss_heaps=heaps, ss_error=error
-			= update_functions fun_indices ins_type member_def st
+			= update_functions fun_indices ins_type me_type me_class_vars st
 		where
-			update_functions [fun_index:fun_indices] ins_type member_def st=:{ss_heaps=heaps,ss_error=error,ss_funs=funs}
+			update_functions [fun_index:fun_indices] ins_type me_type me_class_vars st=:{ss_heaps=heaps,ss_error=error,ss_funs=funs}
 				#! (fun_type, heaps, error)
-					= determine_type_of_member_instance member_def ins_type heaps error
+					= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
 				# ({fun_ident},funs) = funs![fun_index]
 				# st & ss_heaps=heaps, ss_error=error, ss_funs=funs
 				#! st = update_icl_function fun_index fun_ident gc_pos gc_type_cons gc_ident gcf_generic
 												fun_type generic_info_index -1 AllGenericInstanceDependencies st
-				= update_functions fun_indices ins_type member_def st
-			update_functions [] ins_type member_def st
+				= update_functions fun_indices ins_type me_type me_class_vars st
+			update_functions [] ins_type me_type me_class_vars st
 				= st
 
 	build_shorthand_instances_in_modules :: !Index
@@ -2790,13 +2779,13 @@ where
 			#! (ins_type, heaps)
 				= build_instance_type gc_type num_args n_gen_vars (map removeDupByIndex arg_and_dep_class_infoss) heaps
 		
-			#! (member_def, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+			#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
 			# (ins_type,hp_type_heaps,hp_var_heap,error)
-				= add_type_variables_to_instance_type ins_type member_def.me_class_vars gs_predefs gc_ident gc_pos
+				= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
 					heaps.hp_type_heaps heaps.hp_var_heap error
 			# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
 			#! (fun_type, heaps, error)
-				= determine_type_of_member_instance member_def ins_type heaps error
+				= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
 			# fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
 	
 			#! (memfun_ds, fun_info, heaps)
@@ -2935,6 +2924,17 @@ where
 				}
 			= (ins_index+1, [ins:instances])
 
+	determine_type_of_generic_instance :: !SymbolType !AClassArgs !InstanceType !PredefinedSymbolsData !Ident !Position !*{#CommonDefs} !*Heaps !*ErrorAdmin
+		-> (!SymbolType,!*{#CommonDefs},!*Heaps,!*ErrorAdmin)
+	determine_type_of_generic_instance me_type me_class_vars ins_type gs_predefs gc_ident gc_pos modules heaps error
+		# (ins_type,hp_type_heaps,hp_var_heap,error)
+			= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
+				heaps.hp_type_heaps heaps.hp_var_heap error
+		# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
+		# (fun_type, heaps, error)
+			= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
+		= (fun_type,modules,heaps,error)
+
 	get_class_for_kind :: !GlobalIndex !TypeKind !(!*{#CommonDefs},!*Heaps) -> (!GenericClassInfo,!(!*{#CommonDefs},!*Heaps))
 	get_class_for_kind {gi_module, gi_index} kind (modules,heaps=:{hp_generic_heap})
 		#! ({gen_info_ptr}, modules) = modules![gi_module].com_generic_defs.[gi_index]
@@ -2942,9 +2942,9 @@ where
 		# (Yes class_info) = lookupGenericClassInfo kind gen_classes
 		= (class_info, (modules, heaps))	
 
-	determine_type_of_member_instance :: !MemberDef !InstanceType !*Heaps !*ErrorAdmin
+	determine_type_of_member_instance :: !SymbolType !AClassArgs !InstanceType !*Heaps !*ErrorAdmin
 		-> (!SymbolType, !*Heaps, !*ErrorAdmin)
-	determine_type_of_member_instance {me_type, me_class_vars} ins_type heaps=:{hp_type_heaps, hp_var_heap} error
+	determine_type_of_member_instance me_type me_class_vars ins_type heaps=:{hp_type_heaps, hp_var_heap} error
 		#! (symbol_type, _, hp_type_heaps, _, error) 
 			= determineTypeOfMemberInstance me_type me_class_vars ins_type SP_None hp_type_heaps No error
 		#! (st_context, hp_var_heap) = initializeContextVariables symbol_type.st_context hp_var_heap
@@ -4155,8 +4155,11 @@ where
 		  st & ss_heaps = {heaps & hp_generic_heap = generic_heap}
 		| grc_local_fun_index>=0
 			= (main_module_index,grc_local_fun_index,gen_rep_conses,st)
-		# (fun_index,st)
-			= copy_generic_case_macro module_index macro_index grc_optional_fun_type gen_cons_index grc_generic_info grc_generic_instance_deps main_module_index st
+		# {ss_funs_and_groups=funs_and_groups,ss_heaps=heaps,ss_funs=fun_defs,ss_dcl_macros=dcl_macros,ss_symbol_table=symbol_table,ss_error=error} = st
+		  (fun_index,funs_and_groups,heaps,fun_defs,dcl_macros,symbol_table,error)
+			= copy_generic_case_macro module_index macro_index grc_optional_fun_type gen_cons_index grc_generic_info grc_generic_instance_deps main_module_index predefs
+					 funs_and_groups heaps fun_defs dcl_macros symbol_table error
+		  st & ss_funs_and_groups=funs_and_groups,ss_dcl_macros=dcl_macros,ss_heaps=heaps,ss_error=error,ss_funs=fun_defs,ss_symbol_table=symbol_table
 		  gen_rep_conses = {gen_rep_cons\\gen_rep_cons<-:gen_rep_conses}
 		  gen_rep_conses & [gen_cons_index].grc_local_fun_index = fun_index
 		  heaps = st.ss_heaps
@@ -4166,77 +4169,78 @@ where
 	get_function_or_copied_macro_index (GCB_FunIndexAndIndices fun_index _) module_index main_module_index local_fun_index gen_info_ptr gen_cons_index gen_rep_conses st
 		= (module_index,fun_index,gen_rep_conses,st)
 
-	copy_generic_case_macro :: !Int !Int !(Optional SymbolType) !Int !Int !GenericInstanceDependencies !Int !*SpecializeState -> (!Int,!*SpecializeState)
-	copy_generic_case_macro macro_module_index macro_index optional_fun_type gen_cons_index generic_info generic_instance_deps main_module_index st
-		# {ss_heaps=heaps,ss_funs_and_groups=funs_and_groups,ss_error=error,ss_funs=fun_defs,ss_dcl_macros=dcl_macros,ss_symbol_table=symbol_table} = st
-		  {fg_fun_index = fun_index, fg_funs=funs, fg_groups=groups, fg_group_index=group_index} = funs_and_groups
+copy_generic_case_macro :: !Int !Int !(Optional SymbolType) !Int !Int !GenericInstanceDependencies !Int !PredefinedSymbolsData
+			 !FunsAndGroups !*Heaps !*{#FunDef} !*DclMacros !*SymbolTable !*ErrorAdmin
+	-> (!Int,!FunsAndGroups,!*Heaps,!*{#FunDef},!*DclMacros,!*SymbolTable,!*ErrorAdmin)
+copy_generic_case_macro macro_module_index macro_index optional_fun_type gen_cons_index generic_info generic_instance_deps main_module_index predefs
+		funs_and_groups heaps fun_defs dcl_macros symbol_table error
+	# {fg_fun_index = fun_index, fg_funs=funs, fg_groups=groups, fg_group_index=group_index} = funs_and_groups
 
-		  fun_defs = case funs of
-		  				[] -> fun_defs
-		  				_  -> arrayPlusRevList fun_defs funs
-		  funs = []
+	  fun_defs = case funs of
+					[] -> fun_defs
+					_  -> arrayPlusRevList fun_defs funs
+	  funs = []
 
-		  {hp_var_heap=var_heap,hp_expression_heap=expression_heap} = heaps
-		| size fun_defs<>fun_index
-			= abort "copy_generic_case_macro: incorrect function index"
+	  {hp_var_heap=var_heap,hp_expression_heap=expression_heap} = heaps
+	| size fun_defs<>fun_index
+		= abort "copy_generic_case_macro: incorrect function index"
 
-		# (reversed_groups,unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
-			= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs.psd_predefs_a group_index
-												 fun_defs dcl_macros var_heap expression_heap symbol_table error
+	# (reversed_groups,unexpanded_dcl_macros,fun_defs,dcl_macros,var_heap,expression_heap,symbol_table,error)
+		= partitionateAndLiftMacro macro_module_index macro_index main_module_index predefs.psd_predefs_a group_index
+											 fun_defs dcl_macros var_heap expression_heap symbol_table error
 
-		  (fun_index,fun_defs) = usize fun_defs
+	  (fun_index,fun_defs) = usize fun_defs
 
-		  (macro,dcl_macros) = dcl_macros![macro_module_index,macro_index]
+	  (macro,dcl_macros) = dcl_macros![macro_module_index,macro_index]
 
-		  macro
-		  	= case generic_instance_deps of
-		  		GenericInstanceDependencies n_deps deps
-		  			# m = (1<<n_deps)-1
-		  			| deps bitand m<>m
-		  				# {fun_body=TransformedBody {tb_args,tb_rhs}} = macro
-						# n_generic_info_args
-							= if (generic_info==0) 0 (if (generic_info<0) 1 (add_n_bits generic_info 0))
-						  tb_args = remove_unused_dep_args_after_generic_info_args tb_args n_generic_info_args n_deps deps
-		  				-> {macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=tb_rhs}}
-		  			where
-		  				remove_unused_dep_args_after_generic_info_args args 0 n_deps deps
-		  					= remove_unused_dep_args args 0 n_deps deps
-		  				remove_unused_dep_args_after_generic_info_args [arg:args] n_generic_info_args n_deps deps
-		  					= [arg : remove_unused_dep_args_after_generic_info_args args (n_generic_info_args-1) n_deps deps]
-		 		_
-		  			-> macro
+	  macro
+		= case generic_instance_deps of
+			GenericInstanceDependencies n_deps deps
+				# m = (1<<n_deps)-1
+				| deps bitand m<>m
+					# {fun_body=TransformedBody {tb_args,tb_rhs}} = macro
+					# n_generic_info_args
+						= if (generic_info==0) 0 (if (generic_info<0) 1 (add_n_bits generic_info 0))
+					  tb_args = remove_unused_dep_args_after_generic_info_args tb_args n_generic_info_args n_deps deps
+					-> {macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=tb_rhs}}
+				where
+					remove_unused_dep_args_after_generic_info_args args 0 n_deps deps
+						= remove_unused_dep_args args 0 n_deps deps
+					remove_unused_dep_args_after_generic_info_args [arg:args] n_generic_info_args n_deps deps
+						= [arg : remove_unused_dep_args_after_generic_info_args args (n_generic_info_args-1) n_deps deps]
+			_
+				-> macro
 
-		  (fun_def,local_fun_defs,next_fun_index,fun_defs,dcl_macros,var_heap,expression_heap)
-			= copy_macro_and_local_functions macro fun_index fun_defs dcl_macros var_heap expression_heap
+	  (fun_def,local_fun_defs,next_fun_index,fun_defs,dcl_macros,var_heap,expression_heap)
+		= copy_macro_and_local_functions macro fun_index fun_defs dcl_macros var_heap expression_heap
 
-		  fun_def & fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_GenericFun
+	  fun_def & fun_info.fi_properties = fun_def.fun_info.fi_properties bitor FI_GenericFun
 
-		  dcl_macros = restore_unexpanded_dcl_macros unexpanded_dcl_macros dcl_macros
+	  dcl_macros = restore_unexpanded_dcl_macros unexpanded_dcl_macros dcl_macros
 
-		  heaps & hp_var_heap=var_heap,hp_expression_heap=expression_heap
+	  heaps & hp_var_heap=var_heap,hp_expression_heap=expression_heap
 
-		  (fun_def,heaps)
-		  	= case optional_fun_type of
-		  		Yes fun_type
-					# (fun_type, heaps) = fresh_symbol_type fun_type heaps
-					  fun_type_with_generic_info
-						= if (generic_info<>0)
-							(add_generic_info_to_type fun_type gen_cons_index generic_info predefs)
-							fun_type
-					  fun_def & fun_type = FunDefType fun_type_with_generic_info
-		  			-> (fun_def,heaps)
-		  		No
-		  			-> (fun_def,heaps)
+	  (fun_def,heaps)
+		= case optional_fun_type of
+			Yes fun_type
+				# (fun_type, heaps) = fresh_symbol_type fun_type heaps
+				  fun_type_with_generic_info
+					= if (generic_info<>0)
+						(add_generic_info_to_type fun_type gen_cons_index generic_info predefs)
+						fun_type
+				  fun_def & fun_type = FunDefType fun_type_with_generic_info
+				-> (fun_def,heaps)
+			No
+				-> (fun_def,heaps)
 
-		  funs = [fun_def:funs]
-		  (funs,groups,group_index) = add_local_macro_functions local_fun_defs (fun_index+1) funs groups group_index
+	  funs = [fun_def:funs]
+	  (funs,groups,group_index) = add_local_macro_functions local_fun_defs (fun_index+1) funs groups group_index
 
-		  groups = [{group_members = [fun_index]}:groups]
-		  group_index = group_index+1
+	  groups = [{group_members = [fun_index]}:groups]
+	  group_index = group_index+1
 
-		  funs_and_groups & fg_fun_index=next_fun_index, fg_group_index=group_index, fg_funs=funs, fg_groups=groups
-		  st & ss_funs_and_groups=funs_and_groups,ss_dcl_macros=dcl_macros,ss_heaps=heaps,ss_error=error,ss_funs=fun_defs,ss_symbol_table=symbol_table
-		= (fun_index,st)
+	  funs_and_groups & fg_fun_index=next_fun_index, fg_group_index=group_index, fg_funs=funs, fg_groups=groups
+	= (fun_index,funs_and_groups,heaps,fun_defs,dcl_macros,symbol_table,error)
 
 add_local_macro_functions [] fun_index funs groups group_index
 	= (funs,groups,group_index)
