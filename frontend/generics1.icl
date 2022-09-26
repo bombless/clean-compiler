@@ -2462,8 +2462,8 @@ convertGenericCases bimap_functions new_groups group_index dcl_macros
 	#! first_instance_index = size main_module_instances	
 	#! instance_info = (first_instance_index, [])
 
-	#! (gs_modules, gs_dcl_modules, (instance_info, heaps, gs_error)) 
-		= build_exported_main_instances_in_modules 0 gs_modules gs_dcl_modules (instance_info, heaps, gs_error)
+	#! (gs_modules,gs_dcl_modules,instance_info,fun_info,heaps,dcl_macros,gs_funs,gs_symtab,gs_error)
+		= build_exported_main_instances_in_modules 0 gs_modules gs_dcl_modules instance_info fun_info heaps dcl_macros gs_funs gs_symtab gs_error
 
 	# st2 = {ss_modules=gs_modules,ss_td_infos=gs_td_infos,ss_funs_and_groups=fun_info,ss_heaps=heaps,ss_dcl_macros=dcl_macros,ss_funs=gs_funs,
 			 ss_symbol_table=gs_symtab,ss_error=gs_error}
@@ -2491,65 +2491,64 @@ convertGenericCases bimap_functions new_groups group_index dcl_macros
 	= (new_groups, fg_group_index, dcl_macros, gs)
 where
 	build_exported_main_instances_in_modules :: !Index
-			!*{#CommonDefs} !*{#DclModule} !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
-		-> (!*{#CommonDefs},!*{#DclModule},!(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
-	build_exported_main_instances_in_modules module_index modules dcl_modules st
+			!*{#CommonDefs} !*{#DclModule} !(!Index,![ClassInstance]) !FunsAndGroups !*Heaps !*DclMacros !*{#FunDef} !*SymbolTable !*ErrorAdmin
+		-> (!*{#CommonDefs},!*{#DclModule},!(!Index,![ClassInstance]),!FunsAndGroups,!*Heaps,!*DclMacros,!*{#FunDef},!*SymbolTable,!*ErrorAdmin)
+	build_exported_main_instances_in_modules module_index modules dcl_modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 		| module_index == size modules
-			= (modules, dcl_modules, st)
+			= (modules,dcl_modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 		| not (inNumberSet module_index gs_used_modules) || module_index==gs_main_module
-			= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules st
+			= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 			#! (com_gencase_defs,modules) = modules![module_index].com_gencase_defs
 			| size com_gencase_defs==0
-				= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules st
+				= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 			#! (dcl_functions,dcl_modules) = dcl_modules![module_index].dcl_functions
-			#! (dcl_functions, modules, st)
-				= build_exported_main_instances_in_module module_index com_gencase_defs {x\\x<-:dcl_functions} modules st  
+			#! (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
+				= build_exported_main_instances_in_module module_index com_gencase_defs {x\\x<-:dcl_functions} modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 			#! dcl_modules = {dcl_modules & [module_index].dcl_functions = dcl_functions} 
-			= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules st
+			= build_exported_main_instances_in_modules (module_index+1) modules dcl_modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 	where
-		build_exported_main_instances_in_module module_index com_gencase_defs dcl_functions modules st
-			= foldArraySt (build_exported_main_instance module_index) com_gencase_defs (dcl_functions, modules, st)
+		build_exported_main_instances_in_module module_index com_gencase_defs dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
+			= foldArraySt (build_exported_main_instance module_index) com_gencase_defs (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 
 		build_exported_main_instance :: !Index !GenericCaseDef
-				(!*{#FunType} ,!*Modules, !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
-			->	(!*{#FunType} ,!*Modules, !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))					
+				(!*{#FunType},!*Modules,!(!Index,![ClassInstance]),!FunsAndGroups,!*Heaps,!*DclMacros,!*{#FunDef},!*SymbolTable,!*ErrorAdmin)
+			->	(!*{#FunType},!*Modules,!(!Index,![ClassInstance]),!FunsAndGroups,!*Heaps,!*DclMacros,!*{#FunDef},!*SymbolTable,!*ErrorAdmin)
 		build_exported_main_instance module_index
 				{gc_gcf=GCF gc_ident {gcf_body,gcf_kind,gcf_generic,gcf_generic_info}, gc_type, gc_type_cons,gc_pos} 
-				(dcl_functions, modules, st)
+				(dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 			#! generic_info_index = index_gen_cons_with_info_type gc_type gs_predefs
-			# fun_index
-				= case gcf_body of
-					GCB_FunIndex fun_index
-						-> fun_index
-					GCB_FunAndMacroIndex fun_index macro_index
-						-> fun_index
-			= build_exported_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
-									dcl_functions modules st
+			= case gcf_body of
+				GCB_FunIndex fun_index
+					-> build_exported_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
+				GCB_FunAndMacroIndex fun_index macro_index
+					-> build_exported_main_instance_with_macro ins_type module_index gc_ident fun_index macro_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 		build_exported_main_instance module_index
 				{gc_gcf=GCFS gcfs,gc_type,gc_type_cons,gc_pos}
-				(dcl_functions, modules, st)
+				(dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 			#! ins_type = {it_vars = instance_vars_from_type_cons gc_type_cons, it_types = [gc_type], it_attr_vars = [], it_context = []}
 			#! generic_info_index = index_gen_cons_with_info_type gc_type gs_predefs
 			= build_exported_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index
-											dcl_functions modules st
+											dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 		where
 			build_exported_main_instances [!{gcf_body = GCB_FunIndex fun_index,gcf_generic,gcf_generic_info,gcf_kind,gcf_gident}:gcfs!] ins_type module_index gc_type_cons gc_pos generic_info_index
-									dcl_functions modules st
-				# (dcl_functions, modules, st)
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
+				# (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 					= build_exported_main_instance_ ins_type module_index gcf_gident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index gcf_generic_info
-									dcl_functions modules st
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 				= build_exported_main_instances gcfs ins_type module_index gc_type_cons gc_pos generic_info_index
-									dcl_functions modules st
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 			build_exported_main_instances [!!] ins_type module_index gc_type_cons gc_pos generic_info_index
-									dcl_functions modules st
-				= (dcl_functions, modules, st)
+									dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
+				= (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 
 		build_exported_main_instance_ :: InstanceType Int Ident Int TypeKind GlobalIndex TypeCons Position Int Int
-				!*{#FunType} !*{#CommonDefs} !(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin)
-			-> (!*{#FunType},!*{#CommonDefs},!(!(!Index, ![ClassInstance]), !*Heaps, !*ErrorAdmin))
+				!*{#FunType} !*{#CommonDefs} !(!Index,![ClassInstance]) !FunsAndGroups !*Heaps !*DclMacros !*{#FunDef} !*SymbolTable !*ErrorAdmin
+			-> (!*{#FunType},!*{#CommonDefs},!(!Index,![ClassInstance]),!FunsAndGroups,!*Heaps,!*DclMacros,!*{#FunDef},!*SymbolTable,!*ErrorAdmin)
 		build_exported_main_instance_ ins_type module_index gc_ident fun_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index generic_info
-								dcl_functions modules (ins_info, heaps, error)
+								dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
 			# (gen_info_ptr, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_info_ptr
 			  ({gen_classes,gen_rep_conses}, hp_generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
 			  heaps & hp_generic_heap=hp_generic_heap
@@ -2569,7 +2568,51 @@ where
 					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
 				# class_instance_member = {cim_ident=fun_ident,cim_arity=module_index,cim_index= -1-fun_index}
 				#! ins_info = build_class_instance class_info.gci_class gc_ident gc_pos gcf_kind class_instance_member ins_type ins_info
-				= (dcl_functions, modules, (ins_info, heaps, error))
+				= (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
+
+				# (fun_type,modules,heaps,error)
+					= case gen_rep_conses.[generic_info_index].grc_optional_fun_type of
+						Yes fun_type
+							-> (fun_type,modules,heaps,error)
+						No
+							#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+							-> determine_type_of_generic_instance me_type me_class_vars ins_type gs_predefs gc_ident gc_pos modules heaps error
+				# fun_type_with_generic_info
+					= if (generic_info<>0)
+						(add_generic_info_to_type fun_type generic_info_index generic_info gs_predefs)
+						fun_type
+				#! (dcl_functions, heaps)
+					= update_dcl_function fun_index fun_ident fun_type_with_generic_info dcl_functions heaps
+				= (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
+
+		build_exported_main_instance_with_macro :: InstanceType Int Ident Int Int TypeKind GlobalIndex TypeCons Position Int Int
+				!*{#FunType} !*{#CommonDefs} !(!Index,![ClassInstance]) !FunsAndGroups !*Heaps !*DclMacros !*{#FunDef} !*SymbolTable !*ErrorAdmin
+			-> (!*{#FunType},!*{#CommonDefs},!(!Index,![ClassInstance]),!FunsAndGroups,!*Heaps,!*DclMacros,!*{#FunDef},!*SymbolTable,!*ErrorAdmin)
+		build_exported_main_instance_with_macro ins_type module_index gc_ident fun_index macro_index gcf_kind gcf_generic gc_type_cons gc_pos generic_info_index generic_info
+								dcl_functions modules ins_info funs_and_groups heaps dcl_macros fun_defs symbol_table error
+			# (gen_info_ptr, modules) = modules![gcf_generic.gi_module].com_generic_defs.[gcf_generic.gi_index].gen_info_ptr
+			  ({gen_classes,gen_rep_conses}, hp_generic_heap) = readPtr gen_info_ptr heaps.hp_generic_heap
+			  heaps & hp_generic_heap=hp_generic_heap
+			  (Yes class_info) = lookupGenericClassInfo gcf_kind gen_classes
+
+			#! fun_ident = genericIdentToFunIdent gc_ident.id_name gc_type_cons
+
+			| generic_info_index<0
+				#! ({me_type,me_class_vars}, modules) = modules![class_info.gci_module].com_member_defs.[class_info.gci_member]
+				# (ins_type,hp_type_heaps,hp_var_heap,error)
+					= add_type_variables_to_instance_type ins_type me_class_vars gs_predefs gc_ident gc_pos
+						heaps.hp_type_heaps heaps.hp_var_heap error
+				# heaps & hp_type_heaps = hp_type_heaps, hp_var_heap = hp_var_heap
+				#! (fun_type, heaps, error)
+					= determine_type_of_member_instance me_type me_class_vars ins_type heaps error
+				# (new_fun_index,funs_and_groups,heaps,fun_defs,dcl_macros,symbol_table,error)
+					= copy_generic_case_macro module_index macro_index (Yes fun_type) -1 0 AllGenericInstanceDependencies gs_main_module gs_predefs
+							 funs_and_groups heaps fun_defs dcl_macros symbol_table error
+				#! (dcl_functions, heaps)
+					= update_dcl_function fun_index fun_ident fun_type dcl_functions heaps
+				# class_instance_member = {cim_ident=fun_ident,cim_arity=fun_type.st_arity,cim_index=new_fun_index}
+				#! ins_info = build_class_instance class_info.gci_class gc_ident gc_pos gcf_kind class_instance_member ins_type ins_info
+				= (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 
 				# (fun_type,modules,heaps,error)
 					= case gen_rep_conses.[generic_info_index].grc_optional_fun_type of
@@ -2584,7 +2627,7 @@ where
 						fun_type	
 				#! (dcl_functions, heaps)
 					= update_dcl_function fun_index fun_ident fun_type_with_generic_info dcl_functions heaps
-				= (dcl_functions, modules, (ins_info, heaps, error))
+				= (dcl_functions,modules,ins_info,funs_and_groups,heaps,dcl_macros,fun_defs,symbol_table,error)
 
 	build_main_instances_in_main_module :: !Index
 			!*{#DclModule} !(!Index, ![ClassInstance])  !*SpecializeState
