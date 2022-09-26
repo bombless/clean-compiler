@@ -3742,8 +3742,10 @@ is_trivial_algebraic_case_body args var_info_ptr algebraic_patterns f_args type 
 								# new_args = replace_vars_in_app_args case_rhs_app.app_args permutation f_args app_args
 								# app = App {app_symb=case_rhs_app.app_symb,app_args=new_args,app_info_ptr=nilPtr}
 								= (Yes app,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
-							update_trivial_rhs expr=:(BasicExpr (BVB _)) used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
-								= (Yes expr,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
+							update_trivial_rhs expr=:(BasicExpr basic_expr) used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
+								| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+									= (Yes expr,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
+									= (No,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
 							update_trivial_rhs _ used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
 								= (No,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
 						-> case mb_new_rhs_expr of
@@ -3998,8 +4000,9 @@ is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps expr_he
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
 	= is_trivial_app_body lhs_args app f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-is_trivial_body args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-	| both_nil args f_args || (same_length args f_args && no_strict_args type)
+is_trivial_body args rhs_expr=:(BasicExpr basic_expr) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
+	| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+	  && (both_nil args f_args || (same_length args f_args && no_strict_args type))
 		= (TrivialRedirectOrBasicExpr rhs_expr,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body args (Case {case_expr=Var {var_info_ptr},case_guards=AlgebraicPatterns _ algebraic_patterns,case_default=No})
@@ -4017,8 +4020,9 @@ is_trivial_body_on_case_path [fv] (Var bv) [arg] type ro fun_defs fun_heap type_
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body_on_case_path lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
 	= is_trivial_app_body lhs_args app f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-is_trivial_body_on_case_path args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-	| both_nil args f_args || (same_length args f_args && no_strict_args type)
+is_trivial_body_on_case_path args rhs_expr=:(BasicExpr basic_expr) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
+	| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+	  && (both_nil args f_args || (same_length args f_args && no_strict_args type))
 		= (TrivialRedirectOrBasicExpr rhs_expr,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body_on_case_path args (Case {case_expr=Var {var_info_ptr},case_guards=AlgebraicPatterns _ algebraic_patterns,case_default=No})
