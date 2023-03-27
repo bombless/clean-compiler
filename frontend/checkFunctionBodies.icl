@@ -804,10 +804,13 @@ checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_in
 	= (Update expr1 selectors expr2, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Tuple exprs) e_input e_state e_info cs
 	# (exprs, arity, free_vars, e_state, e_info, cs) = check_expression_list free_vars exprs e_input e_state e_info cs
-	  ({glob_object={ds_ident,ds_index},glob_module}, cs)
+	| arity<=32
+		# ({glob_object={ds_ident,ds_index},glob_module}, cs)
 	  		= getPredefinedGlobalSymbol (GetTupleConsIndex arity) PD_PredefinedModule STE_Constructor arity cs
-	= (App { app_symb = { symb_ident = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
-			 app_args = exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
+		= (App {app_symb = {symb_ident = ds_ident, symb_kind = SK_Constructor {glob_object = ds_index, glob_module = glob_module}},
+				app_args = exprs, app_info_ptr = nilPtr}, free_vars, e_state, e_info, cs)
+		# cs & cs_error = checkError "Tuple" ("has more than 32 elements ("+++toString arity+++")") cs.cs_error
+		= (EE, free_vars, e_state, e_info, cs)
 where
 	check_expression_list free_vars [] e_input e_state e_info cs
 		= ([], 0, free_vars, e_state, e_info, cs)
