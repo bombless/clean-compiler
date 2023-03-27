@@ -1438,7 +1438,7 @@ where
 		  || id==local_predefined_idents.[PD_cons_u] || id==local_predefined_idents.[PD_decons_u]
 		  || id==local_predefined_idents.[PD_cons_uts] || id==local_predefined_idents.[PD_decons_uts]
 		  || id==local_predefined_idents.[PD_nil] || id==local_predefined_idents.[PD_nil_u] || id==local_predefined_idents.[PD_nil_uts]
-			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdStrictLists}})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cStdStrictListsImportMising}})
 				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_just] || id==local_predefined_idents.[PD_from_just]
 		  || id==local_predefined_idents.[PD_just_u] || id==local_predefined_idents.[PD_from_just_u]

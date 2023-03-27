@@ -3389,19 +3389,18 @@ check_dynamics_used_without_support_dynamics support_dynamics mod_ident cs
 check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_modules}}
 	# cs = check_if_imported (x_needed_modules bitand cNeedStdGeneric) PD_StdGeneric mod_ident "" extension cs
 	# cs = check_if_imported (x_needed_modules bitand cNeedStdDynamic) PD_StdDynamic mod_ident "" extension cs
-	# cs = case x_needed_modules bitand cStdArrayImportMissing of
-			0 -> cs
-			_ -> missing_import_error PD_StdArray mod_ident " (needed for array denotations)" extension cs
-	# cs = case x_needed_modules bitand cStdEnumImportMissing of
-			0 -> cs
-			_ -> missing_import_error PD_StdEnum mod_ident " (needed for [..] expressions)" extension cs
-	# cs = check_if_imported (x_needed_modules bitand cNeedStdStrictLists)
-								PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
-	# cs = case x_needed_modules bitand c_SystemEnumStrictImportMissing of
-			0 -> cs
-			_ -> missing_import_error PD__SystemEnumStrict mod_ident " (needed for strict list generators)" extension cs
+	# cs = if_non_zero_missing_import_error (x_needed_modules bitand cStdArrayImportMissing)
+											PD_StdArray mod_ident " (needed for array denotations)" extension cs
+	# cs = if_non_zero_missing_import_error (x_needed_modules bitand cStdEnumImportMissing)
+											PD_StdEnum mod_ident " (needed for [..] expressions)" extension cs
+	# cs = if_non_zero_missing_import_error (x_needed_modules bitand cStdStrictListsImportMising)
+											PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
+	# cs = check_if_imported (if ((x_needed_modules bitand cStdStrictListsImportMising)==0) (x_needed_modules bitand cNeedStdStrictLists) 0)
+											PD_StdStrictLists mod_ident " (needed for strict lists)" extension cs
+	# cs = if_non_zero_missing_import_error (x_needed_modules bitand c_SystemEnumStrictImportMissing)
+											PD__SystemEnumStrict mod_ident " (needed for strict list generators)" extension cs
 	# cs = check_if_imported (x_needed_modules bitand cNeedStdStrictMaybes)
-								PD_StdStrictMaybes mod_ident " (needed for strict maybe types)" extension cs
+											PD_StdStrictMaybes mod_ident " (needed for strict maybe types)" extension cs
 	= cs
   where
 	check_if_imported 0 pd mod_ident explanation extension cs
@@ -3410,6 +3409,12 @@ check_needed_modules_are_imported mod_ident extension cs=:{cs_x={x_needed_module
 		| (sreadPtr predefined_idents.[pd].id_info cs.cs_symbol_table).ste_kind=:STE_ClosedModule
 			= cs
 			= missing_import_error pd mod_ident explanation extension cs
+
+	if_non_zero_missing_import_error :: !Int !Int !Ident !{#Char} !{#Char} !*CheckState -> *CheckState
+	if_non_zero_missing_import_error 0 pd mod_ident explanation extension cs
+		= cs
+	if_non_zero_missing_import_error _ pd mod_ident explanation extension cs
+		= missing_import_error pd mod_ident explanation extension cs
 
 	missing_import_error pd mod_ident explanation extension cs
 		# pds_ident = predefined_idents.[pd]
