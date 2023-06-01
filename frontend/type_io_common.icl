@@ -1,6 +1,3 @@
-/*
-	module owner: Martijn Vervoort
-*/
 implementation module type_io_common
 
 // common between compiler and static linker

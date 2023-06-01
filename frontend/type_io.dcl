@@ -1,6 +1,3 @@
-/*
-	module owner: Martijn Vervoort
-*/
 definition module type_io
 
 import scanner, general, Heap, typeproperties, utilities, checksupport
