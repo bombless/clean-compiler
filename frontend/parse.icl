@@ -4048,12 +4048,7 @@ wantPatternWithoutDefinitionsT token pState
 combineExpressions expr []
 	= expr
 combineExpressions expr exprs
-	= make_app_exp expr exprs
-where
-	make_app_exp exp []
-		= exp
-	make_app_exp exp exprs
-		= PE_List [exp : exprs]
+	= PE_List [expr : exprs]
 
 trySimplePattern :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimplePattern pState
@@ -5501,7 +5496,7 @@ where
 
 	want_more_field_assignments_without_definitions field_name_or_qualified_field_name pState
 		# pState = wantToken FunctionContext "record pattern" EqualToken pState
-		# (field_expr, pState) = wantPattern pState
+		# (field_expr, pState) = wantPatternWithoutDefinitions pState
 		  field = {bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
 		#  (token, pState) = nextToken FunctionContext pState
 		| token =: CommaToken
