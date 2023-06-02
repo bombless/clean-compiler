@@ -4078,10 +4078,8 @@ where
 						-> (exp, tokenBack pState)
 			ExclamationToken
 				# (token, pState) = nextToken FunctionContext pState
-// JVG added for strict lists:
-				| token=:SquareCloseToken
+				| token=:SquareCloseToken	// !]
 					-> (exp, tokenBack (tokenBack pState))
-//			
 				# (selectors, token, pState) = wantSelectors token pState
 				  exp = PE_Selection (ParsedUniqueSelector False) exp selectors
 				-> case token of
@@ -4109,7 +4107,13 @@ where
 					# (pattern_args,pState) = parse_wild_cards pState
 					  pattern = if (pattern_args=:[]) (PE_Ident just_or_none_ident) (PE_List [PE_Ident just_or_none_ident:pattern_args])
 					-> matches_expression exp pattern pState
-			// to do: qualified ident
+			QualifiedIdentToken module_name ident_name
+				| not (isLowerCaseName ident_name)
+					# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+					  pe = PE_QualifiedIdent module_id ident_name
+					  (pattern_args,pState) = parse_wild_cards pState
+					  pattern = if pattern_args=:[] pe (PE_List [pe:pattern_args])
+					-> matches_expression exp pattern pState
 			_
 				# (succ, pattern, pState) = trySimplePatternWithoutDefinitionsT token pState
 				| succ
@@ -4119,12 +4123,10 @@ where
 
 	parse_wild_cards pState
 	 	# (token, pState) = nextToken FunctionContext pState
-	 	= case token of
-	 		WildCardToken
-				# (pattern_args,pState) = parse_wild_cards pState
-	 			-> ([PE_WildCard:pattern_args],pState)
-	 		_
-	 			-> ([],tokenBack pState);
+		| token=:WildCardToken
+			# (pattern_args,pState) = parse_wild_cards pState
+			= ([PE_WildCard:pattern_args],pState)
+			= ([],tokenBack pState);
 
 	matches_expression exp pattern pState
 		# (case_ident, pState) = internalIdent "_c" pState
