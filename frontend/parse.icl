@@ -630,11 +630,15 @@ where
 			  (defs, pState)	= wantDefinitions (cLocalContext bitor WhereOfMemberDefsContext) pState
 			= (LocalParsedDefs defs, wantEndLocals pState)
 
+parseSimplePatternList :: !ParseState -> (![ParsedExpr],!ParseState)
+parseSimplePatternList pState
+	= parseList trySimplePattern pState
+
 want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
 want_lhs_of_def token pState
 	# (succ, fname, is_infix, pState) = try_function_symbol token pState
 	| succ
-		# (args, pState) = parseList trySimplePattern pState
+		# (args, pState) = parseSimplePatternList pState
 		= ((Yes (fname, is_infix), args), pState)
 		# (_, exp, pState) = trySimplePattern pState
 		= ((No, [exp]), pState)
@@ -870,7 +874,7 @@ wantGenericFunctionDefinition name parseContext pos pState
 			-> (PE_WildCard, 0, pState)
 
 	//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-	# (args, pState) = parseList trySimplePattern pState
+	# (args, pState) = parseSimplePatternList pState
 	# has_args = isNotEmpty args || gcf_generic_info<>0
 	# args = [geninfo_arg : args]
 
@@ -4000,12 +4004,12 @@ where
 					IdentToken name
 						| ~ (isLowerCaseName name)
 							#	(constructor, pState) = stringToIdent name IC_Expression pState
-								(args, pState)	= parseList trySimplePattern pState
+								(args, pState)	= parseSimplePatternList pState
 							->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
 					_	# (succ, expr, pState) = trySimplePatternT token pState
 						| succ
 							# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
-							# (exprs, pState) = parseList trySimplePattern pState
+							# (exprs, pState) = parseSimplePatternList pState
 							->	(combineExpressions expr1 exprs, pState)
 						// not succ
 							-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
@@ -4013,12 +4017,12 @@ where
 				# (dyn_type, pState) = wantDynamicTypeInPattern pState
 				= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
 			// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
-			# (exprs, pState) = parseList trySimplePattern (tokenBack pState)
+			# (exprs, pState) = parseSimplePatternList (tokenBack pState)
 			= (combineExpressions (PE_Ident id) exprs, pState)
 	wantPatternT2 token pState
 		# (succ, expr, pState) = trySimplePatternT token pState
 		| succ
-			# (exprs, pState) = parseList trySimplePattern pState
+			# (exprs, pState) = parseSimplePatternList pState
 			= (combineExpressions expr exprs, pState)
 			= (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
 
@@ -5021,7 +5025,7 @@ where
 		| succ
 			# (succ, expr2, pState) = trySimplePattern pState
 			| succ
-				# (exprs, pState) = parseList trySimplePattern pState
+				# (exprs, pState) = parseSimplePatternList pState
 				# list = PE_List [expr,expr2 : exprs]
 				# (token, pState)	= nextToken FunctionContext pState
 				| token =: DoubleColonToken
