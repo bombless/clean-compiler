@@ -4006,6 +4006,11 @@ where
 							#	(constructor, pState) = stringToIdent name IC_Expression pState
 								(args, pState)	= parseSimplePatternList pState
 							->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
+					MaybeIdentToken maybe_token
+						| maybe_token<8
+							#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+							# (args, pState) = parseSimplePatternList pState
+							-> (PE_Bound {bind_dst = id, bind_src = combineExpressions (PE_Ident just_or_none_ident) args}, pState)
 					_	# (succ, expr, pState) = trySimplePatternT token pState
 						| succ
 							# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
