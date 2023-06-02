@@ -4011,6 +4011,12 @@ where
 							#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
 							# (args, pState) = parseSimplePatternList pState
 							-> (PE_Bound {bind_dst = id, bind_src = combineExpressions (PE_Ident just_or_none_ident) args}, pState)
+					QualifiedIdentToken module_name ident_name
+						| not (isLowerCaseName ident_name)
+							# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+							  pe = PE_QualifiedIdent module_id ident_name
+							  (args, pState) = parseSimplePatternList pState
+							-> (PE_Bound {bind_dst = id, bind_src = combineExpressions pe args}, pState)
 					_	# (succ, expr, pState) = trySimplePatternT token pState
 						| succ
 							# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
