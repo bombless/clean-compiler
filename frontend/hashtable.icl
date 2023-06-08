@@ -250,17 +250,28 @@ where
 remove_qualified_idents_from_hash_table :: !*HashTable -> *HashTable
 remove_qualified_idents_from_hash_table hash_table=:{hte_entries}
 	# (modules_with_qualified_idents,hte_entries) = hte_entries![ModulesWithQualifiedIdentsHashTableIndex]
+	  (modules_with_qualified_idents,module_names) = get_module_names modules_with_qualified_idents [#!]
 	  hte_entries & [ModulesWithQualifiedIdentsHashTableIndex] = modules_with_qualified_idents
-	  hte_entries = remove_qualified_idents_from_modules modules_with_qualified_idents hte_entries
+	  hte_entries = remove_qualified_idents_from_modules module_names (IC_Module NoQualifiedIdents) hte_entries
 	= {hash_table & hte_entries = hte_entries}
 	where
-		remove_qualified_idents_from_modules (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class=:(IC_Module NoQualifiedIdents) hte_mark hte_left hte_right) hte_entries
+		get_module_names :: !*HashTableEntry ![#{#Char}!] -> (!*HashTableEntry,![#{#Char}!]);
+		get_module_names (HTE_Ident hte_ident=:{boxed_ident={id_name}} hte_class=:(IC_Module NoQualifiedIdents) hte_mark hte_left hte_right) module_names
+			# module_names = [#id_name:module_names!]
+			  (hte_left,module_names) = get_module_names hte_left module_names
+			  (hte_right,module_names) = get_module_names hte_right module_names
+			= (HTE_Ident hte_ident hte_class hte_mark hte_left hte_right,module_names)
+		get_module_names HTE_Empty module_names
+			= (HTE_Empty,module_names)
+
+		remove_qualified_idents_from_modules :: [#{#Char}!] IdentClass !*{!*HashTableEntry} -> *{!*HashTableEntry};
+		remove_qualified_idents_from_modules [#id_name:module_name!] hte_class hte_entries
 			# hash_val = hashValue id_name
 			  (entries,hte_entries) = hte_entries![hash_val]
-			  (_, entries) = remove_qualified_idents_from_module id_name hte_class entries
+			  (_,entries) = remove_qualified_idents_from_module id_name hte_class entries
 			  hte_entries & [hash_val] = entries
-			= remove_qualified_idents_from_modules hte_right (remove_qualified_idents_from_modules hte_left hte_entries)
-		remove_qualified_idents_from_modules HTE_Empty hte_entries
+			= remove_qualified_idents_from_modules module_name hte_class hte_entries
+		remove_qualified_idents_from_modules [#!] hte_class hte_entries
 			= hte_entries
 
 		remove_qualified_idents_from_module :: !String !IdentClass *HashTableEntry -> (!Bool, !*HashTableEntry)
