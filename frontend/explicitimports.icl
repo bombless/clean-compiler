@@ -687,7 +687,7 @@ solveExplicitImports expl_imp_indices_ikh modules_in_component_set modules_in_co
 				-> ([ini:not_exported_symbols],decls_accu,belonging_accu,dcl_modules,visited_modules,expl_imp_info)
 	where
 		search_declaration_in_component :: *DeclaringModulesSet Declaration Int [Int] ExplicitImportsModuleInfo *{#Int}
-											-> (![Int],!DeclaringModulesSet,!*{#Int})
+											-> (![Int],!*DeclaringModulesSet,!*{#Int})
 		search_declaration_in_component eii_declaring_modules di_decl ini_symbol_nr [module_in_component:other_modules_in_component] eimi visited_modules
 			# eimi & eimi_module_path=[]
 			# (declaration_found,path,eii_declaring_modules,visited_modules)
