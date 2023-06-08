@@ -68,28 +68,42 @@ partionateAndExpandTypes used_module_numbers main_dcl_module_index icl_common=:{
 	= (reversed_groups, common_defs, pi_type_def_infos, icl_common, dcl_modules, type_heaps, error)
 where
 	create_type_defs_marks_and_infos :: NumberSet Int Int Int (*{#CheckedTypeDef},*{#DclModule}) -> (!*{#DclModule},!*{#*{#CheckedTypeDef}},!*{#*{#Int}},!*TypeDefInfos)
-	create_type_defs_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules  (icl_type_defs, dcl_modules)
+	create_type_defs_marks_and_infos used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries nr_of_modules (icl_type_defs, dcl_modules)
 		# type_defs 		= { {}	\\ module_nr <- [0..nr_of_modules-1] }
 		  marks				= { {}	\\ module_nr <- [0..nr_of_modules-1] }
 	  	  type_def_infos	= { {}	\\ module_nr <- [0..nr_of_modules-1] }
-		= iFoldSt (create_type_defs_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries icl_type_defs)
-				0 nr_of_modules (dcl_modules, type_defs, marks, type_def_infos)
+		# (dcl_modules, marks, type_def_infos)
+			= iFoldSt (create_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries)
+				0 nr_of_modules (dcl_modules, marks, type_def_infos)
+		# (dcl_modules,type_defs)
+			= iFoldSt (create_type_defs_for_module used_module_numbers main_dcl_module_index) 0 nr_of_modules (dcl_modules,type_defs)
+		| inNumberSet main_dcl_module_index used_module_numbers
+			# type_defs & [main_dcl_module_index] = icl_type_defs
+			= (dcl_modules, type_defs, marks, type_def_infos)
+			= (dcl_modules, type_defs, marks, type_def_infos)
 	where
-		create_type_defs_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries icl_type_defs module_index
-						(dcl_modules, type_defs, marks, type_def_infos)
+		create_marks_and_infos_for_module used_module_numbers main_dcl_module_index n_types_without_not_exported_dictionaries module_index
+						(dcl_modules, marks, type_def_infos)
 			| inNumberSet module_index used_module_numbers
 				| module_index == main_dcl_module_index
-					= ( dcl_modules,
-							{ type_defs			& [module_index] = icl_type_defs },
+					= (dcl_modules,
 							{ marks				& [module_index] = createArray n_types_without_not_exported_dictionaries cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray n_types_without_not_exported_dictionaries EmptyTypeDefInfo })
 					# ({com_type_defs,com_class_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
 					# nr_of_types = size com_type_defs - size com_class_defs
-					= (	dcl_modules,
-							{ type_defs			& [module_index] = com_type_defs },
+					= (dcl_modules,
 							{ marks				& [module_index] = createArray nr_of_types cNotPartitionated },
 							{ type_def_infos	& [module_index] = createArray nr_of_types EmptyTypeDefInfo })
-				= (dcl_modules, type_defs, marks,type_def_infos)
+				= (dcl_modules,marks,type_def_infos)
+
+		create_type_defs_for_module used_module_numbers main_dcl_module_index module_index (dcl_modules, type_defs)
+			| inNumberSet module_index used_module_numbers
+				| module_index == main_dcl_module_index
+					= (dcl_modules,type_defs) // icl_type_defs is later stored at [main_dcl_module_index]
+					# ({com_type_defs}, dcl_modules) = dcl_modules![module_index].dcl_common
+					# com_type_defs = {td\\td<-:com_type_defs}
+					= (dcl_modules, {type_defs & [module_index] = com_type_defs})
+				= (dcl_modules, type_defs)
 
 	expand_synonym_types_of_groups main_dcl_module_index pi_groups (new_type_defs, icl_type_defs, new_cons_defs, icl_cons_defs, type_heaps, dcl_modules, error)
 		| error.ea_ok
