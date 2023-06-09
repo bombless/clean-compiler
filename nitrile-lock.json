@@ -1,24 +1,24 @@
 {"packages":{"linux-x86":[{"name":"argenv"
                           ,"version":"1.0.1"}
                          ,{"name":"base-clm"
-                          ,"version":"1.4.2"}
+                          ,"version":"1.5.0"}
                          ,{"name":"base-code-generator"
-                          ,"version":"2.0.0"}
+                          ,"version":"2.2.0"}
                          ,{"name":"base-compiler-bootstrap"
                           ,"version":"1.0.0"}
                          ,{"name":"base-rts"
-                          ,"version":"2.1.0"}
+                          ,"version":"2.1.1"}
                          ,{"name":"base-stdenv"
                           ,"version":"2.1.0"}]
             ,"linux-x64":[{"name":"argenv"
                           ,"version":"1.0.1"}
                          ,{"name":"base-clm"
-                          ,"version":"1.4.2"}
+                          ,"version":"1.5.0"}
                          ,{"name":"base-code-generator"
-                          ,"version":"2.1.0"}
+                          ,"version":"2.2.0"}
                          ,{"name":"base-compiler-bootstrap"
                           ,"version":"1.0.0"}
                          ,{"name":"base-rts"
-                          ,"version":"2.1.0"}
+                          ,"version":"2.1.1"}
                          ,{"name":"base-stdenv"
                           ,"version":"2.1.0"}]}}

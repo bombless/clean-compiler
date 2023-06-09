@@ -1,10 +1,11 @@
+format_version: 0.4.4
 name: base-compiler
 url: https://gitlab.com/clean-and-itasks/base/compiler
 maintainer: Camil Staps
 contact_email: clean@camilstaps.nl
 description: The Clean compiler.
 license: BSD-2-Clause
-version: 3.0.3
+version: 3.1.0
 type: Application
 dependencies:
   argenv: ^1.0
@@ -92,13 +93,14 @@ rules:
 
 ---
 
+format_version: 0.4.4
 name: lib-compiler
 url: https://gitlab.com/clean-and-itasks/base/compiler
 maintainer: Camil Staps
 contact_email: clean@camilstaps.nl
 description: A library with the base-compiler sources.
 license: BSD-2-Clause
-version: 3.0.3
+version: 3.1.0
 type: Library
 dependencies:
   argenv: ^1.0.0

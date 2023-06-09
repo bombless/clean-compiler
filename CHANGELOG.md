@@ -1,5 +1,30 @@
 # Changelog
 
+### v3.1.0
+
+- Enhancement: allow patterns after qualified constructors in `=:` expressions
+  without parentheses (e.g. `a=:'M'.C 0`); already allowed for constructors in
+  the global namespace.
+- Enhancement: optimize calls to generic functions with an implementation
+  exported in a definition module by creating a local copy (except for generic
+  representation types, e.g. `PAIR`).
+- Enhancement: add unfolding of functions yielding a character, integer or real
+  constant in (trivial) fusion.
+- Fix: fix bug in generic fusion for active trivial boolean cases on a case
+  path with a function argument.
+- Fix: report an error for tuples with more than 32 elements.
+- Fix: improve checking of required imports of module StdStrictLists.
+- Fix: prevent compiler crash when compiling macros such as `.` imported from a
+  definition module.
+- Fix: disallow unique attributes that propagate to the root in CAF types.
+- Fix: fix parsing of qualified non-alphanumeric identifiers with a module name
+  of length 1 (e.g. `'L'. ++`).
+- Fix: fix parsing of record patterns without definitions; don't allow
+  definitions.
+- Fix: fix compiler crash for match functions generated for irrefutable unboxed
+  list patterns when the elements are not in a strict context.
+- Fix: fix reporting of uniqueness type coercion errors.
+
 #### v3.0.3
 
 - Fix: substitute type variables and attributes when expanding a newtype with a
