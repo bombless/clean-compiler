@@ -2884,7 +2884,8 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 		struct arg **rhs_arg_p;
 		StateP constructor_arg_state_p;
 #if STRICT_LISTS
-		StateS head_and_tail_states[2];
+		StateP head_and_tail_states_p[2];
+		StateP *head_and_tail_state_h;
 #endif
 		struct node *push_node;
 		NodeIdListElementP *last_node_id_p;
@@ -2895,21 +2896,25 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 			if (constructor_symbol->symb_kind==cons_symb && (constructor_symbol->symb_head_strictness>OVERLOADED_CONS || constructor_symbol->symb_tail_strictness)){
 				if (constructor_symbol->symb_head_strictness>OVERLOADED_CONS){
 					if (constructor_symbol->symb_head_strictness==UNBOXED_CONS)
-						head_and_tail_states[0]=*constructor_symbol->symb_state_p;
+						head_and_tail_states_p[0]=constructor_symbol->symb_state_p;
 					else
-						head_and_tail_states[0]=StrictState;
+						head_and_tail_states_p[0]=&StrictState;
 				} else
-					head_and_tail_states[0]=LazyState;
+					head_and_tail_states_p[0]=&LazyState;
 				
 				if (constructor_symbol->symb_tail_strictness)
-					head_and_tail_states[1]=StrictState;
+					head_and_tail_states_p[1]=&StrictState;
 				else
-					head_and_tail_states[1]=LazyState;
+					head_and_tail_states_p[1]=&LazyState;
 				
-				constructor_arg_state_p=head_and_tail_states;
+				constructor_arg_state_p=NULL;
+				head_and_tail_state_h = head_and_tail_states_p;
 			} else
 #endif
-			constructor_arg_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p;
+			{
+				constructor_arg_state_p=constructor_symbol->symb_def->sdef_constructor->cl_state_p;
+				head_and_tail_state_h = NULL;
+			}
 		}
 
 		rhs_root=NewNode (TupleSymbol,NULL,result_arity);
@@ -2936,13 +2941,14 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 
 				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-1;
-				arg_node_id->nid_lhs_state_p_=constructor_arg_state_p;
+				if (constructor_arg_state_p!=NULL)
+					arg_node_id->nid_lhs_state_p_=constructor_arg_state_p++;
+				else
+					arg_node_id->nid_lhs_state_p_=*head_and_tail_state_h++;
 
 				*last_node_id_p=CompAllocType (NodeIdListElementS);
 				(*last_node_id_p)->nidl_node_id=arg_node_id;
 				last_node_id_p=&(*last_node_id_p)->nidl_next;
-
-				++constructor_arg_state_p;
 			}
 
 			for (n=0; n<result_arity; ++n){
@@ -2951,7 +2957,10 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 
 				arg_node_id=NewNodeId();
 				arg_node_id->nid_refcount=-2;
-				arg_node_id->nid_lhs_state_p_=constructor_arg_state_p;
+				if (constructor_arg_state_p!=NULL)
+					arg_node_id->nid_lhs_state_p_=constructor_arg_state_p++;
+				else
+					arg_node_id->nid_lhs_state_p_=*head_and_tail_state_h++;
 
 				rhs_arg=NewArgument (NewNodeIdNode (arg_node_id));
 				rhs_arg->arg_state=LazyState;
@@ -2962,8 +2971,6 @@ SymbDef create_match_function (SymbolP constructor_symbol,int result_arity,int n
 
 				*rhs_arg_p=rhs_arg;
 				rhs_arg_p=&rhs_arg->arg_next;
-
-				++constructor_arg_state_p;
 			}
 		} else {
 			for (n=0; n<n_dictionaries; ++n){

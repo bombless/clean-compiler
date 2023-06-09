@@ -4,7 +4,7 @@ import StdEnv
 
 import syntax, transform, checksupport, compare_types, utilities, expand_types, unitype, type
 import classify, partition
-from StdOverloadedList import RepeatnM,TakeM,++$,Any
+from StdOverloadedList import RepeatnM,TakeM,++$,Any,IsMemberM
 
 SwitchCaseFusion			fuse dont_fuse :== fuse
 SwitchGeneratedFusion		fuse dont_fuse :== fuse
@@ -1234,9 +1234,11 @@ transform_active_safe_non_root_case kees=:{case_info_ptr} ro ti=:{ti_recursion_i
 		No	-> (new_expr, ti)
 
 transform_active_safe_non_root_case_on_case_path :: !Case !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
-transform_active_safe_non_root_case_on_case_path kees=:{case_expr = App {app_symb}} ro=:{ro_main_dcl_module_n} ti=:{ti_fun_heap,ti_cons_args}
+transform_active_safe_non_root_case_on_case_path kees=:{case_expr = App {app_symb}} ro=:{ro_main_dcl_module_n} ti=:{ti_fun_heap,ti_symbol_heap,ti_cons_args}
 	| is_safe_producer app_symb.symb_kind ro_main_dcl_module_n ti_fun_heap ti_cons_args
-		= transform_active_safe_non_root_case_safe_producer kees ro ti
+		| becomes_trivial_boolean_case_body kees ro_main_dcl_module_n ti_fun_heap ti_symbol_heap ti_cons_args
+			= skip_over_case_on_case_path kees ro ti
+			= transform_active_safe_non_root_case_safe_producer kees ro ti
 transform_active_safe_non_root_case_on_case_path kees=:{case_info_ptr} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 	# (all_args,outer_fun_def,used_mask,outer_cons_args,ti)
 		= args_of_case_function (Case kees) ro.ro_tfi.tfi_root.symb_kind ti
@@ -1268,7 +1270,7 @@ transform_active_safe_non_root_case_on_case_path kees=:{case_info_ptr} ro ti=:{t
 		No	-> (new_expr, ti)
 
 transform_active_safe_non_root_case_safe_producer :: !Case !ReadOnlyTI !*TransformInfo -> *(!Expression, !*TransformInfo)
-transform_active_safe_non_root_case_safe_producer kees=:{case_info_ptr,case_expr = App {app_symb}} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
+transform_active_safe_non_root_case_safe_producer kees=:{case_info_ptr,case_expr = App _} ro ti=:{ti_recursion_introduced=old_ti_recursion_introduced}
 	# (all_args,outer_fun_def,used_mask,outer_cons_args,ti)
 		= args_of_case_function (Case {kees & case_expr=EE}) ro.ro_tfi.tfi_root.symb_kind ti
 	| SwitchArityChecks (1+length all_args > 32) False
@@ -3740,8 +3742,10 @@ is_trivial_algebraic_case_body args var_info_ptr algebraic_patterns f_args type 
 								# new_args = replace_vars_in_app_args case_rhs_app.app_args permutation f_args app_args
 								# app = App {app_symb=case_rhs_app.app_symb,app_args=new_args,app_info_ptr=nilPtr}
 								= (Yes app,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
-							update_trivial_rhs expr=:(BasicExpr (BVB _)) used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
-								= (Yes expr,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
+							update_trivial_rhs expr=:(BasicExpr basic_expr) used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
+								| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+									= (Yes expr,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
+									= (No,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
 							update_trivial_rhs _ used_args used_ap_vars main_dcl_module_n fun_heap expr_heap cons_args
 								= (No,used_args,used_ap_vars,fun_heap,expr_heap,cons_args)
 						-> case mb_new_rhs_expr of
@@ -3885,6 +3889,57 @@ where
 	replace_vars_in_app_args [] permutation f_args
 		= []
 
+becomes_trivial_boolean_case_body :: !Case !Int !FunctionHeap !ExpressionHeap !{!ConsClasses} -> Bool
+becomes_trivial_boolean_case_body {case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr}],case_default=Yes (BasicExpr (BVB False)),case_info_ptr}
+		main_dcl_module_n fun_heap expr_heap cons_args
+	| boolean_pattern_and_result_type_ptr case_info_ptr expr_heap
+		# (rhs_trivial,used_args)
+			= becomes_trivial_rhs bp_expr [!!] main_dcl_module_n fun_heap expr_heap cons_args
+		  with
+			becomes_trivial_rhs (App case_rhs_app) used_args main_dcl_module_n fun_heap expr_heap cons_args
+				| not (only_vars case_rhs_app.app_args)
+					= (False,used_args)
+				| not (is_safe_producer_or_external_function case_rhs_app.app_symb.symb_kind main_dcl_module_n fun_heap cons_args)
+					= (False,used_args)
+				= check_args_used_once case_rhs_app.app_args used_args
+			becomes_trivial_rhs (Case {case_expr,case_guards=BasicPatterns BT_Bool [{bp_value=BVB True,bp_expr}],
+									  case_default=Yes (BasicExpr (BVB False)),
+									  case_info_ptr=case2_info_ptr}) used_args main_dcl_module_n fun_heap expr_heap cons_args
+				| boolean_pattern_and_result_type_ptr case2_info_ptr expr_heap
+					# (rhs_trivial,used_args)
+						= becomes_trivial_rhs case_expr used_args main_dcl_module_n fun_heap expr_heap cons_args
+					| not rhs_trivial
+						= (False,used_args)
+					= becomes_trivial_rhs bp_expr used_args main_dcl_module_n fun_heap expr_heap cons_args
+					= (False,used_args)
+			becomes_trivial_rhs _ used_args main_dcl_module_n fun_heap expr_heap cons_args
+				= (False,used_args)
+		= rhs_trivial
+		= False
+where
+	boolean_pattern_and_result_type_ptr expr_info_ptr symbol_heap
+		= case sreadPtr expr_info_ptr symbol_heap of
+			EI_Extended _ ei
+				-> boolean_pattern_and_result_type ei
+			ei
+				-> boolean_pattern_and_result_type ei
+
+	boolean_pattern_and_result_type (EI_CaseType {ct_pattern_type={at_attribute=TA_Multi,at_type=TB BT_Bool},
+												  ct_result_type ={at_attribute=TA_Multi,at_type=TB BT_Bool}})
+		= True
+	boolean_pattern_and_result_type _
+		= False
+
+	check_args_used_once :: ![Expression] ![!VarInfoPtr!] -> (!Bool,![!VarInfoPtr!])
+	check_args_used_once [Var {var_info_ptr}:rhs_app_args] used_args
+		| IsMemberM var_info_ptr used_args
+			= (False,used_args)
+			= check_args_used_once rhs_app_args [!var_info_ptr:used_args!]
+	check_args_used_once [] used_args
+		= (True,used_args)
+becomes_trivial_boolean_case_body _ main_dcl_module_n fun_heap expr_heap cons_args
+	= False
+
 find_free_var_n :: !VarInfoPtr ![FreeVar] !Int -> Int
 find_free_var_n var_info_ptr [{fv_info_ptr}:args] arg_n
 	| fv_info_ptr<>var_info_ptr
@@ -3945,8 +4000,9 @@ is_trivial_body [fv] (Var bv) [arg] type ro fun_defs fun_heap type_heaps expr_he
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
 	= is_trivial_app_body lhs_args app f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-is_trivial_body args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-	| both_nil args f_args || (same_length args f_args && no_strict_args type)
+is_trivial_body args rhs_expr=:(BasicExpr basic_expr) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
+	| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+	  && (both_nil args f_args || (same_length args f_args && no_strict_args type))
 		= (TrivialRedirectOrBasicExpr rhs_expr,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body args (Case {case_expr=Var {var_info_ptr},case_guards=AlgebraicPatterns _ algebraic_patterns,case_default=No})
@@ -3964,8 +4020,9 @@ is_trivial_body_on_case_path [fv] (Var bv) [arg] type ro fun_defs fun_heap type_
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body_on_case_path lhs_args (App app) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
 	= is_trivial_app_body lhs_args app f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-is_trivial_body_on_case_path args rhs_expr=:(BasicExpr (BVB _)) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
-	| both_nil args f_args || (same_length args f_args && no_strict_args type)
+is_trivial_body_on_case_path args rhs_expr=:(BasicExpr basic_expr) f_args type ro fun_defs fun_heap type_heaps expr_heap cons_args
+	| case basic_expr of BVB _ -> True; BVC _ -> True; BVI _ -> True; BVInt _ -> True; BVR _ -> True; _ -> False
+	  && (both_nil args f_args || (same_length args f_args && no_strict_args type))
 		= (TrivialRedirectOrBasicExpr rhs_expr,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 		= (NoTrivialFunction,fun_defs,fun_heap,type_heaps,expr_heap,cons_args)
 is_trivial_body_on_case_path args (Case {case_expr=Var {var_info_ptr},case_guards=AlgebraicPatterns _ algebraic_patterns,case_default=No})

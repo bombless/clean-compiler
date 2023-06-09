@@ -836,6 +836,7 @@ where
 copy_macro_or_local_macro_function :: !FunDef !(Optional CopiedLocalFunctions) !*VarHeap !*ExpressionHeap -> (!FunDef,!Optional CopiedLocalFunctions,!*VarHeap,!*ExpressionHeap);
 copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,tb_rhs},fun_kind,fun_info={fi_local_vars,fi_calls,fi_dynamics}} local_macro_functions var_heap expr_heap
 	# (new_dynamics,expr_heap) = copy_dynamic_expr_info_ptrs fi_dynamics expr_heap
+	# old_tb_args = tb_args
 	# (tb_args,var_heap) = create_new_arguments tb_args var_heap
 		with
 			create_new_arguments [var=:{fv_ident,fv_info_ptr} : vars] var_heap
@@ -861,6 +862,12 @@ copy_macro_or_local_macro_function macro=:{fun_body = TransformedBody {tb_args,t
 				= ([],var_heap)
 	# fi_calls = update_calls fi_calls us_local_macro_functions
 	# us_symbol_heap = remove_dynamic_expr_info_ptr_copies fi_dynamics us_symbol_heap
+	# us_var_heap = remove_VI_Variables old_tb_args us_var_heap
+		with
+			remove_VI_Variables [{fv_info_ptr} : vars] var_heap
+				= remove_VI_Variables vars (writePtr fv_info_ptr VI_Empty var_heap)
+			remove_VI_Variables [] var_heap
+				= var_heap
 	= ({macro & fun_body = TransformedBody {tb_args=tb_args,tb_rhs=result_expr},fun_info.fi_local_vars=fi_local_vars,fun_info.fi_calls=fi_calls,fun_info.fi_dynamics=new_dynamics},us_local_macro_functions,
 	   us_var_heap, us_symbol_heap)
 copy_macro_or_local_macro_function macro=:{fun_body = PartitioningGenerateInstanceBodyLocalMacro _ _ _ _} local_macro_functions var_heap expr_heap

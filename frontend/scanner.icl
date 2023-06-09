@@ -1319,7 +1319,7 @@ where
 				= (QualifiedIdentToken {c1} ident_name,input)
 			| c==' ' && i+2<size line && isSpecialChar line.[i+2]
 				# end_i = scan_special_chars_in_string (i+3) line
-				  ident_name = line % (i+1,end_i-1)
+				  ident_name = line % (i+2,end_i-1)
 				  pos = {inp_pos & fp_col = inp_pos.fp_col + (end_i-i)}
 				  input =  {input & inp_stream=OldLine end_i line stream,inp_pos=pos}
 				= (QualifiedIdentToken {c1} ident_name,input)

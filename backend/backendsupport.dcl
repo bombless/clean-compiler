@@ -1,6 +1,3 @@
-/*
-	module owner: Ronny Wichers Schreur
-*/
 definition module backendsupport
 
 from StdArray import class Array(size,usize)

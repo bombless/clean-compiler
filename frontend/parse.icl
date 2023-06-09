@@ -630,11 +630,15 @@ where
 			  (defs, pState)	= wantDefinitions (cLocalContext bitor WhereOfMemberDefsContext) pState
 			= (LocalParsedDefs defs, wantEndLocals pState)
 
+parseSimplePatternList :: !ParseState -> (![ParsedExpr],!ParseState)
+parseSimplePatternList pState
+	= parseList trySimplePattern pState
+
 want_lhs_of_def :: !Token !ParseState -> (!(Optional (Ident, Bool), ![ParsedExpr]), !ParseState)
 want_lhs_of_def token pState
 	# (succ, fname, is_infix, pState) = try_function_symbol token pState
 	| succ
-		# (args, pState) = parseList trySimplePattern pState
+		# (args, pState) = parseSimplePatternList pState
 		= ((Yes (fname, is_infix), args), pState)
 		# (_, exp, pState) = trySimplePattern pState
 		= ((No, [exp]), pState)
@@ -870,7 +874,7 @@ wantGenericFunctionDefinition name parseContext pos pState
 			-> (PE_WildCard, 0, pState)
 
 	//# pState = wantToken FunctionContext "type argument" GenericCloseToken pState
-	# (args, pState) = parseList trySimplePattern pState
+	# (args, pState) = parseSimplePatternList pState
 	# has_args = isNotEmpty args || gcf_generic_info<>0
 	# args = [geninfo_arg : args]
 
@@ -4000,12 +4004,23 @@ where
 					IdentToken name
 						| ~ (isLowerCaseName name)
 							#	(constructor, pState) = stringToIdent name IC_Expression pState
-								(args, pState)	= parseList trySimplePattern pState
+								(args, pState)	= parseSimplePatternList pState
 							->	(PE_Bound { bind_dst = id, bind_src = combineExpressions (PE_Ident constructor) args }, pState)
+					MaybeIdentToken maybe_token
+						| maybe_token<8
+							#! just_or_none_ident = predefined_idents.[PD_JustSymbol+maybe_token]
+							# (args, pState) = parseSimplePatternList pState
+							-> (PE_Bound {bind_dst = id, bind_src = combineExpressions (PE_Ident just_or_none_ident) args}, pState)
+					QualifiedIdentToken module_name ident_name
+						| not (isLowerCaseName ident_name)
+							# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+							  pe = PE_QualifiedIdent module_id ident_name
+							  (args, pState) = parseSimplePatternList pState
+							-> (PE_Bound {bind_dst = id, bind_src = combineExpressions pe args}, pState)
 					_	# (succ, expr, pState) = trySimplePatternT token pState
 						| succ
 							# expr1 = PE_Bound { bind_dst = id, bind_src = expr }
-							# (exprs, pState) = parseList trySimplePattern pState
+							# (exprs, pState) = parseSimplePatternList pState
 							->	(combineExpressions expr1 exprs, pState)
 						// not succ
 							-> (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
@@ -4013,12 +4028,12 @@ where
 				# (dyn_type, pState) = wantDynamicTypeInPattern pState
 				= (PE_DynamicPattern (PE_Ident id) dyn_type, pState)
 			// token <> DefinesColonToken // token back and call to wantPatternT2 would do also.
-			# (exprs, pState) = parseList trySimplePattern (tokenBack pState)
+			# (exprs, pState) = parseSimplePatternList (tokenBack pState)
 			= (combineExpressions (PE_Ident id) exprs, pState)
 	wantPatternT2 token pState
 		# (succ, expr, pState) = trySimplePatternT token pState
 		| succ
-			# (exprs, pState) = parseList trySimplePattern pState
+			# (exprs, pState) = parseSimplePatternList pState
 			= (combineExpressions expr exprs, pState)
 			= (PE_Empty,  parseError "LHS expression" (Yes token) "<expression>" pState)
 
@@ -4033,12 +4048,7 @@ wantPatternWithoutDefinitionsT token pState
 combineExpressions expr []
 	= expr
 combineExpressions expr exprs
-	= make_app_exp expr exprs
-where
-	make_app_exp exp []
-		= exp
-	make_app_exp exp exprs
-		= PE_List [exp : exprs]
+	= PE_List [expr : exprs]
 
 trySimplePattern :: !ParseState -> (!Bool, !ParsedExpr, !ParseState)
 trySimplePattern pState
@@ -4078,10 +4088,8 @@ where
 						-> (exp, tokenBack pState)
 			ExclamationToken
 				# (token, pState) = nextToken FunctionContext pState
-// JVG added for strict lists:
-				| token=:SquareCloseToken
+				| token=:SquareCloseToken	// !]
 					-> (exp, tokenBack (tokenBack pState))
-//			
 				# (selectors, token, pState) = wantSelectors token pState
 				  exp = PE_Selection (ParsedUniqueSelector False) exp selectors
 				-> case token of
@@ -4109,7 +4117,13 @@ where
 					# (pattern_args,pState) = parse_wild_cards pState
 					  pattern = if (pattern_args=:[]) (PE_Ident just_or_none_ident) (PE_List [PE_Ident just_or_none_ident:pattern_args])
 					-> matches_expression exp pattern pState
-			// to do: qualified ident
+			QualifiedIdentToken module_name ident_name
+				| not (isLowerCaseName ident_name)
+					# (module_id, pState) = stringToQualifiedModuleIdent module_name ident_name IC_Expression pState
+					  pe = PE_QualifiedIdent module_id ident_name
+					  (pattern_args,pState) = parse_wild_cards pState
+					  pattern = if pattern_args=:[] pe (PE_List [pe:pattern_args])
+					-> matches_expression exp pattern pState
 			_
 				# (succ, pattern, pState) = trySimplePatternWithoutDefinitionsT token pState
 				| succ
@@ -4119,12 +4133,10 @@ where
 
 	parse_wild_cards pState
 	 	# (token, pState) = nextToken FunctionContext pState
-	 	= case token of
-	 		WildCardToken
-				# (pattern_args,pState) = parse_wild_cards pState
-	 			-> ([PE_WildCard:pattern_args],pState)
-	 		_
-	 			-> ([],tokenBack pState);
+		| token=:WildCardToken
+			# (pattern_args,pState) = parse_wild_cards pState
+			= ([PE_WildCard:pattern_args],pState)
+			= ([],tokenBack pState);
 
 	matches_expression exp pattern pState
 		# (case_ident, pState) = internalIdent "_c" pState
@@ -5019,7 +5031,7 @@ where
 		| succ
 			# (succ, expr2, pState) = trySimplePattern pState
 			| succ
-				# (exprs, pState) = parseList trySimplePattern pState
+				# (exprs, pState) = parseSimplePatternList pState
 				# list = PE_List [expr,expr2 : exprs]
 				# (token, pState)	= nextToken FunctionContext pState
 				| token =: DoubleColonToken
@@ -5484,7 +5496,7 @@ where
 
 	want_more_field_assignments_without_definitions field_name_or_qualified_field_name pState
 		# pState = wantToken FunctionContext "record pattern" EqualToken pState
-		# (field_expr, pState) = wantPattern pState
+		# (field_expr, pState) = wantPatternWithoutDefinitions pState
 		  field = {bind_src = field_expr, bind_dst = field_name_or_qualified_field_name}
 		#  (token, pState) = nextToken FunctionContext pState
 		| token =: CommaToken

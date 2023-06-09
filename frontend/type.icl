@@ -2477,12 +2477,19 @@ CreateInitialSymbolTypes start_index common_defs [fun : funs] (pre_def_symbols, 
 	  (pre_def_symbols, ts) = initial_symbol_type (start_index == fun) common_defs fd (pre_def_symbols, ts)
 	= CreateInitialSymbolTypes start_index common_defs funs (pre_def_symbols, ts)
 where
-	initial_symbol_type is_start_rule common_defs {fun_type=FunDefType ft,fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos} (pre_def_symbols, ts)
+	initial_symbol_type :: Bool {#CommonDefs} FunDef *(!*PredefinedSymbols,!*TypeState) -> (!*PredefinedSymbols,!*TypeState)
+	initial_symbol_type is_start_rule common_defs {fun_type=FunDefType ft,fun_ident,fun_lifted,fun_info={fi_dynamics},fun_kind,fun_pos} (pre_def_symbols, ts)
 		# ts & ts_error = setErrorPosition fun_ident fun_pos ts.ts_error
 		  (ft_with_prop,lifted_args,fresh_fun_type,pre_def_symbols,ts)
 			= create_specified_symbol_type common_defs ft fun_lifted fi_dynamics pre_def_symbols ts
 		  ts & ts_fun_env.[fun] = SpecifiedType ft_with_prop lifted_args fresh_fun_type
-		= (pre_def_symbols, ts)
+		| not fun_kind=:FK_Caf
+			= (pre_def_symbols, ts)
+		# result_attribute = ft_with_prop.st_result.at_attribute
+		| result_attribute=:TA_Unique || result_attribute=:TA_Var _
+			# ts & ts_error = checkErrorWithPosition fun_ident fun_pos "CAF type must be non unique" ts.ts_error
+			= (pre_def_symbols, ts)
+			= (pre_def_symbols, ts)
 	initial_symbol_type is_start_rule common_defs {fun_type=LocalFunDefCheckedType external_type_vars external_attr_vars ft,
 			 fun_ident,fun_lifted,fun_info={fi_dynamics},fun_pos}
 			(pre_def_symbols, ts=:{ts_type_heaps,ts_error,ts_var_store,ts_attr_store})
@@ -2504,7 +2511,7 @@ where
 		  ts & ts_fun_env.[fun] = SpecifiedLocalFunType ft_with_prop fresh_and_external_type_vars fresh_and_external_attr_vars lifted_args fresh_fun_type
 		= (pre_def_symbols, ts)
 	initial_symbol_type is_start_rule common_defs {fun_type=NoFunDefType,fun_arity,fun_lifted,fun_info={fi_dynamics},fun_kind} (pre_def_symbols, ts)
-		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind == FK_Caf) fun_arity fun_lifted ts
+		# (st_gen, ts) = create_general_symboltype is_start_rule (fun_kind=:FK_Caf) fun_arity fun_lifted ts
 		  ts_type_heaps = ts.ts_type_heaps
 		  (th_vars, ts_expr_heap) = clear_dynamics fi_dynamics (ts_type_heaps.th_vars, ts.ts_expr_heap)
 		  (ts_var_store, ts_type_heaps, ts_var_heap, ts_expr_heap, pre_def_symbols)
@@ -3320,7 +3327,7 @@ where
 								-> ea_file
 					  ea_file = ea_file	<<< "attribute at position indicated by ^ could not be coerced "
 										 <:: (format, exp_off_type, Yes initialTypeVarBeautifulizer) <<< '\n'
-					-> (coercion_env, { error & ea_file = ea_file })
+					-> (coercion_env, {error & ea_file = ea_file,ea_ok = False})
 		= add_to_coercion_env attr_coercions subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 	add_to_coercion_env []  subst coercion_env common_defs cons_var_vects type_signs type_var_heap error
 		= (subst, coercion_env, type_signs, type_var_heap, error)

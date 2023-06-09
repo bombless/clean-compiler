@@ -804,10 +804,13 @@ checkExpression free_vars (PE_Update expr1 selectors expr2) e_input e_state e_in
 	= (Update expr1 selectors expr2, free_vars, e_state, e_info, cs)
 checkExpression free_vars (PE_Tuple exprs) e_input e_state e_info cs
 	# (exprs, arity, free_vars, e_state, e_info, cs) = check_expression_list free_vars exprs e_input e_state e_info cs
-	  ({glob_object={ds_ident,ds_index},glob_module}, cs)
+	| arity<=32
+		# ({glob_object={ds_ident,ds_index},glob_module}, cs)
 	  		= getPredefinedGlobalSymbol (GetTupleConsIndex arity) PD_PredefinedModule STE_Constructor arity cs
-	= (App { app_symb = { symb_ident = ds_ident, symb_kind = SK_Constructor { glob_object = ds_index, glob_module = glob_module }},
-			 app_args = exprs, app_info_ptr = nilPtr }, free_vars, e_state, e_info, cs)
+		= (App {app_symb = {symb_ident = ds_ident, symb_kind = SK_Constructor {glob_object = ds_index, glob_module = glob_module}},
+				app_args = exprs, app_info_ptr = nilPtr}, free_vars, e_state, e_info, cs)
+		# cs & cs_error = checkError "Tuple" ("has more than 32 elements ("+++toString arity+++")") cs.cs_error
+		= (EE, free_vars, e_state, e_info, cs)
 where
 	check_expression_list free_vars [] e_input e_state e_info cs
 		= ([], 0, free_vars, e_state, e_info, cs)
@@ -1435,7 +1438,7 @@ where
 		  || id==local_predefined_idents.[PD_cons_u] || id==local_predefined_idents.[PD_decons_u]
 		  || id==local_predefined_idents.[PD_cons_uts] || id==local_predefined_idents.[PD_decons_uts]
 		  || id==local_predefined_idents.[PD_nil] || id==local_predefined_idents.[PD_nil_u] || id==local_predefined_idents.[PD_nil_uts]
-			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cNeedStdStrictLists}})
+			= (EE, free_vars, e_state, e_info, {cs & cs_x={cs_x & x_needed_modules = x_needed_modules bitor cStdStrictListsImportMising}})
 				// instead report that StdStrictLists should be imported in function check_needed_modules_are_imported
 		| id==local_predefined_idents.[PD_just] || id==local_predefined_idents.[PD_from_just]
 		  || id==local_predefined_idents.[PD_just_u] || id==local_predefined_idents.[PD_from_just_u]
