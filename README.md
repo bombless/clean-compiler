@@ -6,8 +6,9 @@ This is a delayed mirror of the [upstream][] version and is only used to
 publish the package. Periodically changes from upstream are released in a new
 version here.
 
-See the documentation in [base][] and the notes on [updating](#updating) below
-if you intend to make a merge request for this repository.
+See the documentation in [base][] and the notes on
+[updating](/CONTRIBUTING.md#updating) if you intend to make a merge request for
+this repository.
 
 ## Packages
 
